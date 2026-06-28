@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RX.TRAINING — Manager</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg:#0a0a0c; --panel:#141418; --panel2:#1c1c22; --line:#2a2a32;
@@ -177,6 +178,7 @@
   <section class="view" id="view-customers"></section>
   <section class="view" id="view-locations"></section>
   <section class="view" id="view-finance"></section>
+  <section class="view" id="view-admin"></section>
 </div>
 
 <div class="login" id="login">
@@ -280,7 +282,7 @@ function load(){
   localStorage.setItem(DB_KEY,JSON.stringify(d));
   return d;
 }
-function save(){localStorage.setItem(DB_KEY,JSON.stringify(DB));}
+function save(){try{localStorage.setItem(DB_KEY,JSON.stringify(DB));return true;}catch(e){flash('Storage is full — try smaller/fewer photos or videos',true);return false;}}
 
 /* ---------- helpers ---------- */
 const custById = id => DB.customers.find(c=>c.id===id);
@@ -306,19 +308,20 @@ function locOptions(selected){
 }
 
 let AUTH=null, ROLE='owner', TAB='about';
-let clientAs=null, pendingClient=null, sessionReturnCust=null;
+let clientAs=null, pendingClient=null, sessionReturnCust=null, editMedia=[];
 let calY, calM; {const n=new Date();calY=n.getFullYear();calM=n.getMonth();}
 const TABS=[
   {id:'about',label:'About'},
   {id:'booking',label:'Booking & Schedule'},
   {id:'customers',label:'Customers'},
   {id:'locations',label:'Locations'},
-  {id:'finance',label:'Finance'}
+  {id:'finance',label:'Finance'},
+  {id:'admin',label:'Admin'}
 ];
 
 function renderTabs(){
   const allowed = AUTH==='client' ? ['booking'] : TABS.map(t=>t.id);
-  if(!allowed.includes(TAB)) TAB = AUTH==='client' ? 'booking' : 'about';
+  if(!allowed.includes(TAB)) TAB = 'booking';
   $('#tabs').innerHTML = TABS.filter(t=>allowed.includes(t.id)).map(t=>{
     const label=(t.id==='booking'&&AUTH==='client')?'My Sessions':t.label;
     return `<button data-tab="${t.id}" class="${TAB===t.id?'active':''}">${label}</button>`;
@@ -330,14 +333,16 @@ function switchTab(){
   $$('.view').forEach(v=>v.classList.remove('active'));
   $('#view-'+TAB).classList.add('active');
   refreshOwner();
+  saveSess();
 }
-function refreshOwner(){const f={about:renderAbout,booking:renderBooking,customers:renderCustomers,locations:renderLocations,finance:renderFinance}[TAB];if(f)f();}
+function saveSess(){try{sessionStorage.setItem('rx_sess',JSON.stringify({auth:AUTH,clientAs,tab:TAB}));}catch(e){}}
+function refreshOwner(){const f={about:renderAbout,booking:renderBooking,customers:renderCustomers,locations:renderLocations,finance:renderFinance,admin:renderAdmin}[TAB];if(f)f();}
 
 /* ---------- Auth ---------- */
 function ensureTokens(){let ch=false;DB.customers.forEach(c=>{if(!c.token){c.token=uid()+uid();ch=true;}});if(ch)save();}
 function clientLink(c){return location.origin+location.pathname+'#c='+c.token;}
 function renderWhoami(){
-  if(AUTH==='owner') $('#whoami').innerHTML='<span class="pill orange">Owner</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';
+  if(AUTH==='owner') $('#whoami').innerHTML='<button class="btn ghost sm" onclick="exportExcel()">⬇ Export</button><span class="pill orange">Owner</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';
   else if(AUTH==='client'){const c=custById(clientAs);$('#whoami').innerHTML='<span class="pill blue">'+(c?c.name:'Client')+'</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';}
   else $('#whoami').innerHTML='';
 }
@@ -345,6 +350,9 @@ function initAuth(){
   ensureTokens();
   const m=location.hash.match(/[#&]c=([a-z0-9]+)/i);
   if(m){const c=DB.customers.find(x=>x.token===m[1]);if(c)pendingClient=c.id;}
+  let ss=null;try{ss=JSON.parse(sessionStorage.getItem('rx_sess'));}catch(e){}
+  if(ss&&ss.auth==='owner'){AUTH='owner';ROLE='owner';TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();return;}
+  if(ss&&ss.auth==='client'&&custById(ss.clientAs)){AUTH='client';ROLE='client';clientAs=ss.clientAs;TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();return;}
   showLogin();
 }
 function showLogin(){
@@ -359,7 +367,7 @@ function ownerLogin(){
   const v=$('#loginPwd').value;
   if(!DB.settings.ownerPwd){if((v||'').length<4)return flash('Choose a password with 4+ characters',true);DB.settings.ownerPwd=v;save();flash('Owner password set 🔑');}
   else if(v!==DB.settings.ownerPwd)return flash('Incorrect password',true);
-  AUTH='owner';ROLE='owner';TAB='about';
+  AUTH='owner';ROLE='owner';TAB='booking';
   $('#login').classList.remove('show');renderWhoami();switchTab();
 }
 function clientLoginPick(){
@@ -375,6 +383,7 @@ function loginAsClient(id){
 }
 function signOut(){
   AUTH=null;ROLE='owner';pendingClient=null;
+  try{sessionStorage.removeItem('rx_sess');}catch(e){}
   if(location.hash) history.replaceState(null,'',location.pathname+location.search);
   showLogin();
 }
@@ -399,6 +408,44 @@ function saveClientPwd(){
   const n=$('#cpNew').value||'';if(n.length<4)return flash('New password must be 4+ characters',true);
   if(n!==$('#cpNew2').value)return flash('Passwords do not match',true);
   c.pwd=n;save();closeModal();flash('Password updated 🔑');
+}
+
+/* ---------- Export all data to Excel (multi-sheet) ---------- */
+function exportExcel(){
+  if(typeof XLSX==='undefined')return flash('Export needs internet to load the Excel library',true);
+  const wb=XLSX.utils.book_new();
+  const add=(name,rows)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{}]),name);
+
+  const cashSess=DB.sessions.filter(s=>s.paid&&s.paidVia==='cash'&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
+  const pkgRev=DB.customers.flatMap(c=>c.packages).reduce((a,p)=>a+p.amount,0);
+  const otherCash=DB.cashEntries.reduce((a,e)=>a+e.amount,0);
+  const expenses=DB.expenses.reduce((a,e)=>a+e.amount,0);
+  const outstanding=DB.sessions.filter(s=>!s.paid&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
+  const revenue=cashSess+pkgRev+otherCash;
+  add('Finance',[
+    {Metric:'Revenue (collected)',Amount:revenue},
+    {Metric:'  Cash — sessions',Amount:cashSess},
+    {Metric:'  Cash — other income',Amount:otherCash},
+    {Metric:'  Packages',Amount:pkgRev},
+    {Metric:'Outstanding (unpaid)',Amount:outstanding},
+    {Metric:'Expenses',Amount:expenses},
+    {Metric:'Net profit',Amount:revenue-expenses},
+    {Metric:'1:1 rate / hr',Amount:DB.settings.rate1on1},
+    {Metric:'Group rate / hr',Amount:DB.settings.rateGroup}
+  ]);
+  add('Customers',DB.customers.map(c=>({Name:c.name,Phone:c.phone,Email:c.email,Parent:c.parent,Level:c.level,
+    '1:1 used':usedFor(c,'1on1'),'1:1 total':totalFor(c,'1on1'),'1:1 left':creditsFor(c,'1on1'),
+    'Group used':usedFor(c,'group'),'Group total':totalFor(c,'group'),'Group left':creditsFor(c,'group'),
+    Password:c.pwd,Created:c.created,Notes:c.notes})));
+  add('Locations',DB.locations.map(l=>({Name:l.name,Address:l.address,Sessions:DB.sessions.filter(s=>s.location===l.name).length})));
+  add('Booking & Schedule',sortSessions(DB.sessions).map(s=>({Date:s.date,Time:s.time,Clients:custNames(s.customerIds),
+    Type:s.type==='1on1'?'1:1':'Group',Players:s.customerIds.length,Duration:s.dur,Location:s.location,Status:s.status,
+    'Checked in':s.checkedIn?'Yes':'No',Payment:s.paid?(s.paidVia||'paid'):'unpaid',Price:s.price,Notes:s.notes,Feedback:s.feedback||'',Attachments:(s.media||[]).length})));
+  add('Packages',DB.customers.flatMap(c=>c.packages.map(p=>({Client:c.name,Date:p.date,Type:p.type==='1on1'?'1:1':'Group',Sessions:p.qty,Amount:p.amount}))));
+  add('Expenses',DB.expenses.map(e=>({Date:e.date,Category:e.cat,Note:e.note,Amount:e.amount})));
+  add('Cash income',DB.cashEntries.map(e=>({Date:e.date,Note:e.note,Amount:e.amount})));
+  XLSX.writeFile(wb,'RXTraining-export-'+todayISO()+'.xlsx');
+  flash('Excel exported ⬇');
 }
 
 /* ---------- flash + modal ---------- */
@@ -589,6 +636,10 @@ function renderBookingClient(){
           <button class="btn ghost sm" onclick="addToCalendar('${s.id}')">📅 Add to calendar</button>
         </div>
       </div>
+      ${(s.feedback||(s.media&&s.media.length))?`<div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
+        ${s.feedback?`<div class="small"><b style="color:var(--accent2)">📣 Coach feedback:</b> ${s.feedback}</div>`:''}
+        ${mediaThumbs(s)?`<div style="margin-top:4px">${mediaThumbs(s)}</div>`:''}
+      </div>`:''}
     </div>`;
   };
   const pkgHist=c.packages.length?c.packages.slice().reverse().map(p=>`<div class="clienttag">• ${p.qty}× ${p.type==='1on1'?'1:1':'Group'} package — ${money(p.amount)} · ${fmtDate(p.date)}</div>`).join(''):'<div class="clienttag">No packages yet.</div>';
@@ -653,12 +704,38 @@ function clientCheckIn(id){
 function ownerCheckIn(id){const s=DB.sessions.find(x=>x.id===id);s.checkedIn=true;save();flash('Checked in');refreshOwner();}
 
 /* session editor (owner) */
+/* session feedback media (photos/videos stored with the session) */
+function addMediaFiles(input){
+  [...input.files].forEach(f=>{
+    if(f.size>8*1024*1024)return flash(f.name+' is too large (max ~8MB)',true);
+    const r=new FileReader();
+    r.onload=()=>{editMedia.push({type:f.type.indexOf('video')===0?'video':'image',name:f.name,data:r.result});renderMediaPrev();};
+    r.readAsDataURL(f);
+  });
+  input.value='';
+}
+function renderMediaPrev(){
+  const el=$('#sMediaPrev');if(!el)return;
+  el.innerHTML=editMedia.length?editMedia.map((m,i)=>`<div style="position:relative;display:inline-block;margin:0 8px 8px 0;vertical-align:top">
+    ${m.type==='image'?`<img src="${m.data}" style="width:84px;height:84px;object-fit:cover;border-radius:8px">`:`<video src="${m.data}" style="width:84px;height:84px;object-fit:cover;border-radius:8px"></video>`}
+    <button class="iconbtn" style="position:absolute;top:-8px;right:-8px;padding:2px 7px" onclick="rmMedia(${i})">✕</button></div>`).join(''):'<span class="clienttag">No attachments yet.</span>';
+}
+function rmMedia(i){editMedia.splice(i,1);renderMediaPrev();}
+function viewMedia(sid,i){const s=DB.sessions.find(x=>x.id===sid);const m=s&&s.media&&s.media[i];if(!m)return;
+  openModal(m.name||'Attachment',m.type==='image'?`<img src="${m.data}" style="max-width:100%;border-radius:10px">`:`<video src="${m.data}" controls autoplay style="max-width:100%;border-radius:10px"></video>`,`<button class="btn" onclick="closeModal()">Close</button>`);}
+function mediaThumbs(s,owner){
+  if(!s.media||!s.media.length)return '';
+  return s.media.map((m,i)=>m.type==='image'
+    ?`<img src="${m.data}" onclick="viewMedia('${s.id}',${i})" style="width:90px;height:90px;object-fit:cover;border-radius:8px;margin:6px 6px 0 0;cursor:pointer">`
+    :`<video src="${m.data}" controls style="width:150px;border-radius:8px;margin:6px 6px 0 0"></video>`).join('');
+}
 function openSession(id,returnCust){
   sessionReturnCust=returnCust||null;
   const blank={id:'',customerIds:returnCust?[returnCust]:[],type:'1on1',date:todayISO(),time:'16:00',dur:60,price:computePrice('1on1',60,1),status:'scheduled',paid:false,paidVia:'',checkedIn:false,location:(DB.locations[0]?DB.locations[0].name:''),notes:''};
   const s = id?DB.sessions.find(x=>x.id===id):blank;
   const opts = DB.customers.map(c=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 4px;cursor:pointer"><input type="checkbox" class="sCustCb" value="${c.id}" ${s.customerIds.includes(c.id)?'checked':''} style="width:auto" onchange="recalcPrice()"><span>${c.name}${totalFor(c,'1on1')||totalFor(c,'group')?' · 1:1 '+creditsFor(c,'1on1')+' left':''}</span></label>`).join('')||'<div class="clienttag">No customers yet — add one in the Customers tab first.</div>';
   const payVal = s.paid?(s.paidVia||'cash'):'';
+  editMedia=(s.media||[]).slice();
   openModal(id?'Edit Session':'New Session',`
     <div class="field"><label class="f">Client(s) — tick one for a 1:1, up to ${MAX_GROUP} for a group</label>
       <div id="sCustBox" style="max-height:160px;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px">${opts}</div></div>
@@ -684,12 +761,18 @@ function openSession(id,returnCust){
       <div class="field"><label class="f">Location — clients see this</label><select id="sLoc">${locOptions(s.location)}</select></div>
     </div>
     <label class="f" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="sCheck" ${s.checkedIn?'checked':''} style="width:auto"> Checked in</label>
-    <div class="field"><label class="f">Notes</label><textarea id="sNotes">${s.notes||''}</textarea></div>
+    <div class="field"><label class="f">Notes (internal — not shown to client)</label><textarea id="sNotes">${s.notes||''}</textarea></div>
+    <div class="field"><label class="f">📣 Feedback to client — shown on their My Sessions</label><textarea id="sFeedback" placeholder="How did it go? Progress, tips, next focus...">${s.feedback||''}</textarea></div>
+    <div class="field"><label class="f">📎 Photos / videos for client</label>
+      <input type="file" accept="image/*,video/*" multiple onchange="addMediaFiles(this)">
+      <div id="sMediaPrev" style="margin-top:8px"></div>
+      <div class="clienttag" style="margin-top:4px">Saved on this device with the session and shown to the client. Keep files small — large videos may exceed browser storage.</div></div>
     <p class="muted small">Marking payment as "package credit" counts one used session against the client's prepaid total. Manage venues in the Locations tab.</p>
   `,`
     ${id?`<button class="btn danger" onclick="delSession('${id}')">Delete</button>`:''}
     <button class="btn ghost" onclick="closeSessionEditor()">Cancel</button>
-    <button class="btn" onclick="saveSession('${id}')">Save</button>`);
+    <button class="btn" onclick="saveSession('${id||''}')">Save</button>`);
+  renderMediaPrev();
 }
 function closeSessionEditor(){const rc=sessionReturnCust;sessionReturnCust=null;if(rc&&custById(rc))viewCustomer(rc);else closeModal();}
 function recalcPrice(){
@@ -706,10 +789,11 @@ function saveSession(id){
   const pay=$('#sPay').value;
   const obj={customerIds:ids,type,dur:+$('#sDur').value,date:$('#sDate').value,time:$('#sTime').value,
     price:+$('#sPrice').value,status:$('#sStatus').value,location:$('#sLoc').value,
-    paid:pay!=='',paidVia:pay,checkedIn:$('#sCheck').checked,notes:$('#sNotes').value};
+    paid:pay!=='',paidVia:pay,checkedIn:$('#sCheck').checked,notes:$('#sNotes').value,
+    feedback:$('#sFeedback').value,media:editMedia.slice()};
   if(id){Object.assign(DB.sessions.find(x=>x.id===id),obj);}
   else{obj.id=uid();DB.sessions.push(obj);}
-  save();flash('Session saved');afterSessionSave();
+  if(!save())return;flash('Session saved');afterSessionSave();
 }
 function delSession(id){if(!confirm('Delete this session?'))return;DB.sessions=DB.sessions.filter(x=>x.id!==id);save();flash('Session deleted');afterSessionSave();}
 
@@ -919,7 +1003,7 @@ function openCustomer(id){
   `,`
     ${id?`<button class="btn danger" onclick="delCustomer('${id}')">Delete</button>`:''}
     <button class="btn ghost" onclick="closeModal()">Cancel</button>
-    <button class="btn" onclick="saveCustomer('${id}')">Save</button>`);
+    <button class="btn" onclick="saveCustomer('${id||''}')">Save</button>`);
 }
 function saveCustomer(id){
   const name=$('#cName').value.trim();if(!name)return flash('Name is required',true);
@@ -952,7 +1036,7 @@ function openLocation(id){
   openModal(id?'Edit Location':'Add Location',`
     <div class="field"><label class="f">Name *</label><input id="lName" value="${l.name}" placeholder="e.g. Lexington Gym"></div>
     <div class="field"><label class="f">Address / notes</label><input id="lAddr" value="${l.address||''}" placeholder="Street, city, or court info"></div>
-  `,`${id?`<button class="btn danger" onclick="delLocation('${id}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveLocation('${id}')">Save</button>`);
+  `,`${id?`<button class="btn danger" onclick="delLocation('${id}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveLocation('${id||''}')">Save</button>`);
 }
 function saveLocation(id){
   const name=$('#lName').value.trim();if(!name)return flash('Name is required',true);
@@ -1058,30 +1142,7 @@ function renderFinance(){
           <div style="font-size:20px;font-weight:900;margin-top:4px">${remCredits} sessions · ${money(creditValue)}</div>
           <div class="clienttag" style="margin-top:2px">Already collected, still to be delivered.</div>
         </div>
-        <h3 style="margin-top:18px">Rates (per hour)</h3>
-        <div class="row">
-          <div class="field"><label class="f">1:1 rate ($/hr)</label><input type="number" id="rate1" value="${DB.settings.rate1on1}"></div>
-          <div class="field"><label class="f">Group rate ($/hr/player)</label><input type="number" id="rateG" value="${DB.settings.rateGroup}"></div>
-        </div>
-        <button class="btn sm" onclick="saveRates()">Save rates</button>
-        <h3 style="margin-top:18px">Owner password</h3>
-        <div class="row"><div class="field"><input type="password" id="newPwd" placeholder="New owner password (4+ chars)"></div></div>
-        <button class="btn sm ghost" onclick="changePwd()">Update password</button>
-        <h3 style="margin-top:18px">Default client password</h3>
-        <div class="row"><div class="field"><input id="defCPwd" value="${DB.settings.defaultClientPwd}"></div></div>
-        <button class="btn sm ghost" onclick="saveDefCPwd()">Save default</button>
-      </div>
-    </div>
-
-    <div class="twocol" style="margin-top:16px">
-      <div class="panel" style="padding:6px 14px;overflow-x:auto">
-        <div class="row" style="justify-content:space-between;align-items:center;padding:12px 6px 0"><h3 style="margin:0">Outstanding payments</h3></div>
-        <table><thead><tr><th>Date</th><th>Client</th><th>Type</th><th class="right">Amount</th><th></th></tr></thead><tbody>${unpaidRows}</tbody></table>
-      </div>
-      <div class="panel" style="padding:6px 14px;overflow-x:auto">
-        <div class="row" style="justify-content:space-between;align-items:center;padding:12px 6px 0">
-          <h3 style="margin:0">Expenses</h3><button class="btn sm" onclick="openExpense()">+ Add</button></div>
-        <table><thead><tr><th>Date</th><th>Category</th><th>Note</th><th class="right">Amount</th><th></th></tr></thead><tbody>${expRows}</tbody></table>
+        <div class="clienttag" style="margin-top:14px">Rates & passwords are now in the <b style="color:var(--txt)">Admin</b> tab.</div>
       </div>
     </div>
 
@@ -1097,12 +1158,53 @@ function renderFinance(){
         <table><thead><tr><th>Date</th><th>Client</th><th>Package</th><th class="right">Amount</th><th></th></tr></thead><tbody>${pkgRows}</tbody></table>
         <div class="clienttag" style="padding:6px">Edit a package to adjust its amount and the client's credit total.</div>
       </div>
+    </div>
+
+    <div class="twocol" style="margin-top:16px">
+      <div class="panel" style="padding:6px 14px;overflow-x:auto">
+        <div class="row" style="justify-content:space-between;align-items:center;padding:12px 6px 0"><h3 style="margin:0">Outstanding payments</h3></div>
+        <table><thead><tr><th>Date</th><th>Client</th><th>Type</th><th class="right">Amount</th><th></th></tr></thead><tbody>${unpaidRows}</tbody></table>
+      </div>
+      <div class="panel" style="padding:6px 14px;overflow-x:auto">
+        <div class="row" style="justify-content:space-between;align-items:center;padding:12px 6px 0">
+          <h3 style="margin:0">Expenses</h3><button class="btn sm" onclick="openExpense()">+ Add</button></div>
+        <table><thead><tr><th>Date</th><th>Category</th><th>Note</th><th class="right">Amount</th><th></th></tr></thead><tbody>${expRows}</tbody></table>
+      </div>
     </div>`;
   drawCashChart(months.map(monthLabel),rev,exp,prof);
 }
-function saveRates(){DB.settings.rate1on1=+$('#rate1').value;DB.settings.rateGroup=+$('#rateG').value;save();flash('Rates updated');renderFinance();}
-function changePwd(){const v=$('#newPwd').value;if((v||'').length<4)return flash('Password must be 4+ characters',true);DB.settings.ownerPwd=v;save();flash('Owner password updated 🔑');renderFinance();}
-function saveDefCPwd(){const v=($('#defCPwd').value||'').trim();if(v.length<4)return flash('Default must be 4+ characters',true);DB.settings.defaultClientPwd=v;save();flash('Default client password saved');renderFinance();}
+function saveRates(){DB.settings.rate1on1=+$('#rate1').value;DB.settings.rateGroup=+$('#rateG').value;save();flash('Rates updated');refreshOwner();}
+function changePwd(){const v=$('#newPwd').value;if((v||'').length<4)return flash('Password must be 4+ characters',true);DB.settings.ownerPwd=v;save();flash('Owner password updated 🔑');refreshOwner();}
+function saveDefCPwd(){const v=($('#defCPwd').value||'').trim();if(v.length<4)return flash('Default must be 4+ characters',true);DB.settings.defaultClientPwd=v;save();flash('Default client password saved');refreshOwner();}
+
+/* ============================================================
+   ADMIN
+   ============================================================ */
+function renderAdmin(){
+  $('#view-admin').innerHTML=`
+    <h1 class="page">Admin</h1>
+    <div class="sub">Pricing and access settings.</div>
+    <div class="twocol">
+      <div class="panel">
+        <h3>Rates (per hour)</h3>
+        <div class="row">
+          <div class="field"><label class="f">1:1 rate ($/hr)</label><input type="number" id="rate1" value="${DB.settings.rate1on1}"></div>
+          <div class="field"><label class="f">Group rate ($/hr/player)</label><input type="number" id="rateG" value="${DB.settings.rateGroup}"></div>
+        </div>
+        <button class="btn sm" onclick="saveRates()">Save rates</button>
+        <div class="clienttag" style="margin-top:8px">New sessions auto-price from these rates (still editable per session).</div>
+      </div>
+      <div class="panel">
+        <h3>Owner password</h3>
+        <div class="row"><div class="field"><input type="password" id="newPwd" placeholder="New owner password (4+ chars)"></div></div>
+        <button class="btn sm ghost" onclick="changePwd()">Update password</button>
+        <h3 style="margin-top:18px">Default client password</h3>
+        <div class="row"><div class="field"><input id="defCPwd" value="${DB.settings.defaultClientPwd}"></div></div>
+        <button class="btn sm ghost" onclick="saveDefCPwd()">Save default</button>
+        <div class="clienttag" style="margin-top:8px">Used for new clients. Reset any client's password in Customers → Edit.</div>
+      </div>
+    </div>`;
+}
 function openExpense(id){
   const e=id?DB.expenses.find(x=>x.id===id):{date:todayISO(),cat:'Gym Rental',amount:0,note:''};
   const cats=['Gym Rental','Equipment','Travel','Marketing','Insurance','Other'];
@@ -1114,7 +1216,7 @@ function openExpense(id){
     <div class="field"><label class="f">Category</label>
       <select id="eCat">${cats.map(c=>`<option ${e.cat===c?'selected':''}>${c}</option>`).join('')}</select></div>
     <div class="field"><label class="f">Note</label><input id="eNote" value="${e.note||''}"></div>
-  `,`${id?`<button class="btn danger" onclick="delExpense('${id}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveExpense('${id}')">Save</button>`);
+  `,`${id?`<button class="btn danger" onclick="delExpense('${id}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveExpense('${id||''}')">Save</button>`);
 }
 function saveExpense(id){
   const amt=+$('#eAmt').value;if(!amt)return flash('Enter an amount',true);
@@ -1132,7 +1234,7 @@ function openCashEntry(id){
     </div>
     <div class="field"><label class="f">Note</label><input id="kNote" value="${e.note||''}" placeholder="e.g. drop-in clinic, walk-in cash"></div>
     <p class="muted small">Use this for cash income not tied to a specific booked session. It counts toward revenue.</p>
-  `,`${id?`<button class="btn danger" onclick="delCashEntry('${id}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveCashEntry('${id}')">Save</button>`);
+  `,`${id?`<button class="btn danger" onclick="delCashEntry('${id}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveCashEntry('${id||''}')">Save</button>`);
 }
 function saveCashEntry(id){
   const amt=+$('#kAmt').value;if(!amt)return flash('Enter an amount',true);
