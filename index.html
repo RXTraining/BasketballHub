@@ -181,6 +181,7 @@
 <div class="wrap">
   <section class="view active" id="view-about"></section>
   <section class="view" id="view-booking"></section>
+  <section class="view" id="view-past"></section>
   <section class="view" id="view-customers"></section>
   <section class="view" id="view-locations"></section>
   <section class="view" id="view-availability"></section>
@@ -415,6 +416,7 @@ let calY, calM; {const n=new Date();calY=n.getFullYear();calM=n.getMonth();}
 const TABS=[
   {id:'about',label:'About'},
   {id:'booking',label:'Booking'},
+  {id:'past',label:'Past Sessions'},
   {id:'customers',label:'Customers'},
   {id:'locations',label:'Locations'},
   {id:'availability',label:'Availability'},
@@ -423,7 +425,7 @@ const TABS=[
 ];
 
 function renderTabs(){
-  const allowed = AUTH==='client' ? ['booking'] : TABS.map(t=>t.id);
+  const allowed = AUTH==='client' ? ['booking','past'] : TABS.map(t=>t.id).filter(x=>x!=='past');
   if(!allowed.includes(TAB)) TAB = 'booking';
   $('#tabs').innerHTML = TABS.filter(t=>allowed.includes(t.id)).map(t=>{
     const label=(t.id==='booking'&&AUTH==='client')?'My Sessions':t.label;
@@ -439,7 +441,7 @@ function switchTab(){
   saveSess();
 }
 function saveSess(){try{sessionStorage.setItem('rx_sess',JSON.stringify({auth:AUTH,clientAs,tab:TAB}));}catch(e){}}
-function refreshOwner(){const f={about:renderAbout,booking:renderBooking,customers:renderCustomers,locations:renderLocations,availability:renderAvailability,finance:renderFinance,admin:renderAdmin}[TAB];if(f)f();}
+function refreshOwner(){const f={about:renderAbout,booking:renderBooking,past:renderPast,customers:renderCustomers,locations:renderLocations,availability:renderAvailability,finance:renderFinance,admin:renderAdmin}[TAB];if(f)f();}
 
 /* ---------- Auth ---------- */
 function ensureTokens(){let ch=false;DB.customers.forEach(c=>{if(!c.token){c.token=uid()+uid();ch=true;}});if(ch)save();}
@@ -725,6 +727,26 @@ function calStep(n){calM+=n;if(calM<0){calM=11;calY--;}if(calM>11){calM=0;calY++
 function calToday(){const n=new Date();calY=n.getFullYear();calM=n.getMonth();renderBooking();}
 
 /* ---- client view (locked to the logged-in client only) ---- */
+function clientCard(s){
+  const now=todayISO(); const others=s.customerIds.length-1;
+  return `<div class="panel" style="margin-bottom:12px">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <div>
+        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} ${s.paid?'<span class="pill green">Prepaid</span>':''} ${s.status==='completed'?'<span class="pill green">Completed</span>':s.status==='cancelled'?'<span class="pill red">Cancelled</span>':''}
+        <div class="clienttag" style="margin-top:4px">${s.dur} min · 📍 ${s.location||'TBD'}${others>0?' · with '+others+' other player'+(others>1?'s':''):''}</div>
+      </div>
+      <div class="actions">
+        ${s.date===now && !s.checkedIn && s.status==='scheduled'?`<button class="btn sm" onclick="clientCheckIn('${s.id}')">Check In</button>`:''}
+        ${s.checkedIn?'<span class="pill green">✓ Checked in</span>':''}
+        <button class="btn ghost sm" onclick="addToCalendar('${s.id}')">📅 Add to calendar</button>
+      </div>
+    </div>
+    ${(s.feedback||(s.media&&s.media.length))?`<div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
+      ${s.feedback?`<div class="small"><b style="color:var(--accent2)">📣 Coach feedback:</b> ${s.feedback}</div>`:''}
+      ${mediaThumbs(s)?`<div style="margin-top:4px">${mediaThumbs(s)}</div>`:''}
+    </div>`:''}
+  </div>`;
+}
 function renderBookingClient(){
   const now=todayISO();
   const c=custById(clientAs);
@@ -732,35 +754,13 @@ function renderBookingClient(){
   const mine = DB.sessions.filter(s=>s.customerIds.includes(c.id));
   const today=sortSessions(mine.filter(s=>s.date===now && s.status!=='cancelled'));
   const upcoming=sortSessions(mine.filter(s=>s.date>=now && s.status==='scheduled'));
-  const past=sortSessions(mine.filter(s=>s.date<now || s.status==='completed')).reverse();
   const t1=totalFor(c,'1on1'),u1=usedFor(c,'1on1'),tG=totalFor(c,'group'),uG=usedFor(c,'group');
-
-  const card=s=>{
-    const others=s.customerIds.length-1;
-    return `<div class="panel" style="margin-bottom:12px">
-      <div class="row" style="justify-content:space-between;align-items:center">
-        <div>
-          <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} ${s.paid?'<span class="pill green">Prepaid</span>':''} ${s.status==='completed'?'<span class="pill green">Completed</span>':s.status==='cancelled'?'<span class="pill red">Cancelled</span>':''}
-          <div class="clienttag" style="margin-top:4px">${s.dur} min · 📍 ${s.location||'TBD'}${others>0?' · with '+others+' other player'+(others>1?'s':''):''}</div>
-        </div>
-        <div class="actions">
-          ${s.date===now && !s.checkedIn && s.status==='scheduled'?`<button class="btn sm" onclick="clientCheckIn('${s.id}')">Check In</button>`:''}
-          ${s.checkedIn?'<span class="pill green">✓ Checked in</span>':''}
-          <button class="btn ghost sm" onclick="addToCalendar('${s.id}')">📅 Add to calendar</button>
-        </div>
-      </div>
-      ${(s.feedback||(s.media&&s.media.length))?`<div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
-        ${s.feedback?`<div class="small"><b style="color:var(--accent2)">📣 Coach feedback:</b> ${s.feedback}</div>`:''}
-        ${mediaThumbs(s)?`<div style="margin-top:4px">${mediaThumbs(s)}</div>`:''}
-      </div>`:''}
-    </div>`;
-  };
   const pkgHist=c.packages.length?c.packages.slice().reverse().map(p=>`<div class="clienttag">• ${p.qty}× ${p.type==='1on1'?'1:1':'Group'} package — ${money(p.amount)} · ${fmtDate(p.date)}</div>`).join(''):'<div class="clienttag">No packages yet.</div>';
   const balLine=(lab,tot,used)=>tot>0?`<div class="small" style="margin-top:6px"><b>${lab}: ${used}/${tot} used</b> · <span style="color:var(--accent2)">${tot-used} left</span><div class="creditbar"><i style="width:${tot?used/tot*100:0}%"></i></div></div>`:'';
 
   $('#view-booking').innerHTML=`
     <h1 class="page">Welcome, ${firstName(c.name)} 👋</h1>
-    <div class="sub">Your sessions, check-ins and reminders — all in one place.</div>
+    <div class="sub">Request a session and manage your upcoming sessions. Past sessions are in the Past Sessions tab.</div>
     <div class="panel" style="margin-bottom:16px">
       <div class="row" style="justify-content:space-between;align-items:flex-start">
         <div style="flex:1;min-width:200px">
@@ -772,24 +772,35 @@ function renderBookingClient(){
     </div>
     <div class="twocol">
       <div>
-        ${today.length?`<h3 style="margin-bottom:10px">Today — ready to check in</h3>${today.map(card).join('')}`:''}
-        <h3 style="margin:18px 0 10px">Your upcoming sessions</h3>
-        ${upcoming.length?upcoming.map(card).join(''):'<div class="panel"><div class="empty">No upcoming sessions yet — request one →</div></div>'}
-        ${past.length?`<h3 style="margin:18px 0 10px">Past sessions</h3>${past.slice(0,6).map(card).join('')}`:''}
-        <div class="panel" style="margin-top:14px"><h3>Your packages</h3>${pkgHist}
+        <div class="panel">
+          <h3>Request a session</h3>
+          <div class="field"><label class="f">Session type</label>
+            <select id="rqType" onchange="renderSlots()"><option value="1on1">1:1 Private (${money(DB.settings.rate1on1)}/hr)</option><option value="group">Group / 1:N (${money(DB.settings.rateGroup)}/hr per player)</option></select></div>
+          <div class="field"><label class="f">Date</label><input type="date" id="rqDate" min="${now}" value="${now}" onchange="renderSlots()"></div>
+          <div class="field"><label class="f">Available time</label><select id="rqSlot"></select></div>
+          <button class="btn" style="width:100%" onclick="submitRequest()">Request Session</button>
+          <p class="muted small" style="margin-top:10px">Only the Owner's open time slots are shown. They'll confirm your request; if you have a prepaid package, your credit is applied when you check in.</p>
+        </div>
+        <div class="panel" style="margin-top:16px"><h3>Your packages</h3>${pkgHist}
           <p class="muted small" style="margin-top:8px">To buy a package, ask the Owner — your used/total balance updates automatically.</p></div>
       </div>
-      <div class="panel" style="align-self:start">
-        <h3>Request a session</h3>
-        <div class="field"><label class="f">Session type</label>
-          <select id="rqType" onchange="renderSlots()"><option value="1on1">1:1 Private (${money(DB.settings.rate1on1)}/hr)</option><option value="group">Group / 1:N (${money(DB.settings.rateGroup)}/hr per player)</option></select></div>
-        <div class="field"><label class="f">Date</label><input type="date" id="rqDate" min="${now}" value="${now}" onchange="renderSlots()"></div>
-        <div class="field"><label class="f">Available time</label><select id="rqSlot"></select></div>
-        <button class="btn" style="width:100%" onclick="submitRequest()">Request Session</button>
-        <p class="muted small" style="margin-top:10px">Only the Owner's open time slots are shown. They'll confirm your request; if you have a prepaid package, your credit is applied when you check in.</p>
+      <div>
+        ${today.length?`<h3 style="margin:0 0 10px">Today — ready to check in</h3>${today.map(clientCard).join('')}`:''}
+        <h3 style="margin:${today.length?'18px':'0'} 0 10px">Your upcoming sessions</h3>
+        ${upcoming.length?upcoming.map(clientCard).join(''):'<div class="panel"><div class="empty">No upcoming sessions yet — request one ←</div></div>'}
       </div>
     </div>`;
   renderSlots();
+}
+function renderPast(){
+  const c=custById(clientAs);
+  if(!c){$('#view-past').innerHTML='<div class="panel"><div class="empty">Please sign in again.</div></div>';return;}
+  const now=todayISO();
+  const past=sortSessions(DB.sessions.filter(s=>s.customerIds.includes(c.id)&&(s.date<now||s.status==='completed')&&s.status!=='cancelled')).reverse();
+  $('#view-past').innerHTML=`
+    <h1 class="page">Past Sessions</h1>
+    <div class="sub">Your completed sessions, with any coach feedback and attachments.</div>
+    ${past.length?past.map(clientCard).join(''):'<div class="panel"><div class="empty">No past sessions yet.</div></div>'}`;
 }
 
 function submitRequest(){
