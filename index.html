@@ -22,15 +22,16 @@
 
   header.top{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
     background:rgba(10,10,12,.82);border-bottom:1px solid var(--line)}
-  .topin{max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:18px;padding:12px 18px}
-  .logo{font-weight:900;letter-spacing:.5px;font-size:20px}
+  .topin{max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:12px 18px}
+  .logo{font-weight:900;letter-spacing:.5px;font-size:20px;flex:0 0 auto}
   .logo .dot{color:var(--accent)}
-  nav.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-left:8px}
-  nav.tabs button{background:transparent;border:0;color:var(--muted);font-weight:600;
-    padding:9px 14px;border-radius:10px;cursor:pointer;font-size:14px;transition:.15s}
+  nav.tabs{display:flex;gap:3px;flex-wrap:nowrap;overflow-x:auto;margin-left:6px;flex:1 1 auto;min-width:0;-webkit-overflow-scrolling:touch}
+  nav.tabs::-webkit-scrollbar{height:0}
+  nav.tabs button{background:transparent;border:0;color:var(--muted);font-weight:600;white-space:nowrap;
+    padding:9px 11px;border-radius:10px;cursor:pointer;font-size:13.5px;transition:.15s}
   nav.tabs button:hover{color:var(--txt);background:var(--panel)}
   nav.tabs button.active{color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2))}
-  .rolewrap{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .rolewrap{flex:0 0 auto;display:flex;align-items:center;gap:10px}
 
   section.view{display:none;padding-top:26px;animation:fade .25s ease}
   section.view.active{display:block}
@@ -413,7 +414,7 @@ let clientAs=null, pendingClient=null, sessionReturnCust=null, editMedia=[];
 let calY, calM; {const n=new Date();calY=n.getFullYear();calM=n.getMonth();}
 const TABS=[
   {id:'about',label:'About'},
-  {id:'booking',label:'Booking & Schedule'},
+  {id:'booking',label:'Booking'},
   {id:'customers',label:'Customers'},
   {id:'locations',label:'Locations'},
   {id:'availability',label:'Availability'},
@@ -1281,16 +1282,15 @@ function renderFinance(){
   const outstanding=DB.sessions.filter(s=>!s.paid&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
   const expenses=DB.expenses.reduce((a,e)=>a+e.amount,0);
   const profit=revenue-expenses;
-  let remCredits=0, creditValue=0;
-  DB.customers.forEach(c=>{
-    ['1on1','group'].forEach(t=>{
-      const rem=creditsFor(c,t); remCredits+=rem;
-      const pk=c.packages.filter(p=>p.type===t);
-      const paid=pk.reduce((a,p)=>a+p.amount,0), qty=pk.reduce((a,p)=>a+p.qty,0);
-      const per=qty>0?paid/qty:(t==='1on1'?DB.settings.rate1on1:DB.settings.rateGroup); // price actually paid per session
-      creditValue+=rem*per;
-    });
-  });
+  // Liability = money received for sessions not yet delivered (prepaid packages + cash sessions),
+  // reduced by every completed (delivered) session, whether cash or prepaid.
+  const soldVal=DB.customers.reduce((a,c)=>a+c.packages.reduce((x,p)=>x+p.amount,0),0)
+              + DB.sessions.filter(s=>s.paidVia==='cash'&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
+  const soldCnt=DB.customers.reduce((a,c)=>a+c.packages.reduce((x,p)=>x+p.qty,0),0)
+              + DB.sessions.filter(s=>s.paidVia==='cash'&&s.status!=='cancelled').length;
+  const delivered=DB.sessions.filter(s=>s.status==='completed'&&(s.paidVia==='package'||s.paidVia==='cash'));
+  const remCredits=Math.max(0, soldCnt - delivered.length);
+  const creditValue=Math.max(0, soldVal - delivered.reduce((a,s)=>a+s.price,0));
 
   const months=[];const n=finRange==='12m'?12:finRange==='3m'?3:6;
   const base=new Date();base.setDate(1);
