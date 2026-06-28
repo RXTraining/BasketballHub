@@ -214,8 +214,7 @@
     <div class="field"><label class="f">Project URL</label><input id="supaUrl" placeholder="https://xxxx.supabase.co"></div>
     <div class="field"><label class="f">Anon public key</label><input id="supaKey" placeholder="eyJhbGciOi..."></div>
     <button class="btn" style="width:100%" onclick="saveSupaCfg()">Connect</button>
-    <p class="muted small" style="margin-top:12px">Find these in Supabase → Project Settings → API. Saved on this device. For all devices, paste them into the SUPABASE_URL / SUPABASE_ANON_KEY lines near the top of this file.</p>
-    <button class="btn ghost sm" style="width:100%;margin-top:8px" onclick="useLocalOnly()">Skip — use this device only</button>
+    <p class="muted small" style="margin-top:12px">Owner setup only. Find these in Supabase → Project Settings → API.</p>
   </div>
 </div>
 
@@ -275,8 +274,8 @@ function seed(){
   };
 }
 /* ===== Supabase config — paste here to enable cloud sync on ALL devices ===== */
-const SUPABASE_URL = "";        // e.g. https://abcd1234.supabase.co
-const SUPABASE_ANON_KEY = "";   // your anon public key
+const SUPABASE_URL = "https://hlqesgnemuquwxetyhaw.supabase.co";        // e.g. https://abcd1234.supabase.co
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhscWVzZ25lbXVxdXd4ZXR5aGF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2MTM1NDcsImV4cCI6MjA5ODE4OTU0N30.n8xYCIg7eSq-V2dyRPkUDQ8Vdwtgn65LINwZKcV2UjU";   // your anon public key
 const MEDIA_BUCKET = "rx-media";
 const STATE_TABLE = "rx_state";
 /* =========================================================================== */
@@ -317,18 +316,39 @@ function normalize(d){
 }
 function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.parse(r);}catch(e){}return normalize(d);}
 
+/* ----- relational mapping (separate tables in Supabase) ----- */
+function assemble(st,loc,cus,pkg,ses,exp,cash){
+  const d={};
+  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):''};
+  d.locations=(loc||[]).map(l=>({id:l.id,name:l.name,address:l.address||''}));
+  d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',notes:c.notes||'',created:c.created||'',creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
+    packages:(pkg||[]).filter(p=>p.customer_id===c.id).map(p=>({id:p.id,type:p.type,qty:p.qty,amount:Number(p.amount),date:p.date}))}));
+  d.sessions=(ses||[]).map(s=>({id:s.id,customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[]}));
+  d.expenses=(exp||[]).map(e=>({id:e.id,date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||''}));
+  d.cashEntries=(cash||[]).map(e=>({id:e.id,date:e.date,amount:Number(e.amount),note:e.note||''}));
+  return normalize(d);
+}
+const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',notes:c.notes||'',created:c.created||'',credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
+const sessRow=s=>({id:s.id,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[]});
+async function migrateSource(){
+  try{const {data}=await supa.from(STATE_TABLE).select('data').eq('id','main').maybeSingle();if(data&&data.data)return normalize(data.data);}catch(e){}
+  return localData();
+}
 async function bootLoad(){
   const cfg=getSupaCfg();
-  if(cfg && window.supabase && localStorage.getItem('rx_localonly')!=='1'){
+  if(cfg && window.supabase){
     try{
       supa=window.supabase.createClient(cfg.url,cfg.key);
-      const {data,error}=await supa.from(STATE_TABLE).select('data').eq('id','main').maybeSingle();
-      if(error) throw error;
+      const [st,loc,cus,pkg,ses,exp,cash]=await Promise.all([
+        supa.from('settings').select('*').eq('id','main').maybeSingle(),
+        supa.from('locations').select('*'), supa.from('customers').select('*'),
+        supa.from('packages').select('*'), supa.from('sessions').select('*'),
+        supa.from('expenses').select('*'), supa.from('cash_entries').select('*')]);
+      const err=[st,loc,cus,pkg,ses,exp,cash].find(r=>r.error); if(err) throw err.error;
       SUPA_OK=true;
-      if(data&&data.data) return normalize(data.data);
-      const init=localData();                       // first run: seed cloud from local/seed
-      await supa.from(STATE_TABLE).upsert({id:'main',data:init});
-      return init;
+      const empty=!st.data && !(cus.data&&cus.data.length) && !(ses.data&&ses.data.length);
+      if(empty){ DB=await migrateSource(); await cloudPush(); return DB; }
+      return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data);
     }catch(e){console.warn('Supabase offline:',e.message);SUPA_OK=false;}
   }
   return localData();
@@ -336,13 +356,26 @@ async function bootLoad(){
 
 function save(){
   try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){}
-  if(supa&&SUPA_OK){clearTimeout(cloudTimer);cloudTimer=setTimeout(cloudPush,400);}
+  if(supa&&SUPA_OK){clearTimeout(cloudTimer);cloudTimer=setTimeout(cloudPush,500);}
   return true;
+}
+async function syncTable(name,rows){
+  if(rows.length) {const {error}=await supa.from(name).upsert(rows); if(error) throw error;}
+  const ids=rows.map(r=>r.id);
+  if(ids.length){await supa.from(name).delete().not('id','in','('+ids.map(x=>'"'+x+'"').join(',')+')');}
+  else{await supa.from(name).delete().neq('id','__none__');}
 }
 async function cloudPush(){
   if(!supa||!SUPA_OK)return;
-  try{await supa.from(STATE_TABLE).upsert({id:'main',data:DB,updated_at:new Date().toISOString()});}
-  catch(e){flash('Cloud save failed — saved on this device',true);}
+  try{
+    await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null});
+    await syncTable('locations',DB.locations.map(l=>({id:l.id,name:l.name,address:l.address||''})));
+    await syncTable('customers',DB.customers.map(custRow));
+    await syncTable('packages',DB.customers.flatMap(c=>c.packages.map(p=>({id:p.id,customer_id:c.id,type:p.type,qty:p.qty,amount:p.amount,date:p.date}))));
+    await syncTable('sessions',DB.sessions.map(sessRow));
+    await syncTable('expenses',DB.expenses.map(e=>({id:e.id,date:e.date,cat:e.cat,amount:e.amount,note:e.note||''})));
+    await syncTable('cash_entries',DB.cashEntries.map(e=>({id:e.id,date:e.date,amount:e.amount,note:e.note||''})));
+  }catch(e){flash('Cloud save failed — saved on this device',true);}
 }
 
 /* ---------- helpers ---------- */
@@ -1354,11 +1387,9 @@ window.addEventListener('resize',()=>{if(TAB==='finance'&&AUTH==='owner')renderF
 
 /* ---------- boot ---------- */
 (async function(){
-  if(!getSupaCfg() && localStorage.getItem('rx_localonly')!=='1'){
-    $('#connect').classList.add('show');return;   // first run: ask for Supabase credentials
-  }
+  if(!getSupaCfg()){ $('#connect').classList.add('show');return; }  // only if no credentials baked in
   DB = await bootLoad();
-  if(getSupaCfg() && !SUPA_OK) flash('Cloud offline — using this device for now',true);
+  if(!SUPA_OK) flash('Cloud offline — check connection and refresh',true);
   initAuth();
 })();
 </script>
