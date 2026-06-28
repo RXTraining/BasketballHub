@@ -277,7 +277,7 @@ function consumeCredits(s){let u=0;s.customerIds.forEach(id=>{const c=custById(i
 function refundCredits(s){s.customerIds.forEach(id=>{const c=custById(id);if(c){c.credits[s.type]=creditsFor(c,s.type)+1;}});}
 
 let AUTH=null, ROLE='owner', TAB='about';
-let clientAs=null;
+let clientAs=null, pendingClient=null;
 let calY, calM; {const n=new Date();calY=n.getFullYear();calM=n.getMonth();}
 const TABS=[
   {id:'about',label:'About'},
@@ -310,7 +310,6 @@ function renderWhoami(){
   else if(AUTH==='client'){const c=custById(clientAs);$('#whoami').innerHTML='<span class="pill blue">'+(c?c.name:'Client')+'</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';}
   else $('#whoami').innerHTML='';
 }
-let pendingClient=null;
 function initAuth(){
   ensureTokens();
   const m=location.hash.match(/[#&]c=([a-z0-9]+)/i);
@@ -344,14 +343,14 @@ function loginAsClient(id){
   $('#login').classList.remove('show');renderWhoami();switchTab();
 }
 function signOut(){
-  AUTH=null;ROLE='owner';
+  AUTH=null;ROLE='owner';pendingClient=null;
   if(location.hash) history.replaceState(null,'',location.pathname+location.search);
   showLogin();
 }
 function copyClientLink(id){
   const c=custById(id);const url=clientLink(c);
   openModal('Client link — '+c.name,`
-    <p class="muted small" style="margin-bottom:10px">Send this personal link to ${c.name}. Opening it signs them straight into their own schedule — no password needed.</p>
+    <p class="muted small" style="margin-bottom:10px">Send this personal link to ${c.name}. Opening it pre-selects their profile on the sign-in screen — they just enter their password.</p>
     <input id="lnk" value="${url}" readonly onclick="this.select()">
     <p class="muted small" style="margin-top:10px">Tip: this link uses your published web address, so it works once the page is hosted (e.g. on Netlify).</p>
   `,`<button class="btn" onclick="(function(){var i=document.getElementById('lnk');i.select();try{document.execCommand('copy');}catch(e){}if(navigator.clipboard){navigator.clipboard.writeText(i.value);}flash('Link copied 🔗');})()">Copy link</button><button class="btn ghost" onclick="closeModal()">Close</button>`);
@@ -416,7 +415,7 @@ function renderAbout(){
    <div class="panel" style="margin-top:18px">
      <h3>How booking works</h3>
      <p class="muted small" style="line-height:1.7">
-       1. Each client gets a personal sign-in link from the Owner — opening it lands them on <b style="color:var(--txt)">My Sessions</b>.<br>
+       1. Each client gets a personal sign-in link and password from the Owner — they land on <b style="color:var(--txt)">My Sessions</b>.<br>
        2. They request a 1:1 or group session — pick a date and time.<br>
        3. On session day, they tap <b style="color:var(--txt)">Check In</b> — if they have a prepaid package, a credit is used automatically. The session can be added to a calendar with one click.<br>
        4. The Owner confirms, manages the table & calendar, sells packages, and tracks finances here.
@@ -754,7 +753,7 @@ function renderCustomers(){
 
   $('#view-customers').innerHTML=`
     <h1 class="page">Customers</h1>
-    <div class="sub">Manage contacts, prepaid packages, login links, and each player's schedule & history.</div>
+    <div class="sub">Manage contacts, prepaid packages, login links & passwords, and each player's schedule.</div>
     <div class="row" style="margin-bottom:16px">
       <div class="field" style="max-width:280px;margin-bottom:0"><input placeholder="Search name or parent..." value="${custSearch}" oninput="custSearch=this.value;renderCustomers()"></div>
       <button class="btn" onclick="openCustomer()">+ Add Customer</button>
