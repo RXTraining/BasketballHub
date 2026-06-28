@@ -657,11 +657,11 @@ function openSession(id,returnCust){
   sessionReturnCust=returnCust||null;
   const blank={id:'',customerIds:returnCust?[returnCust]:[],type:'1on1',date:todayISO(),time:'16:00',dur:60,price:computePrice('1on1',60,1),status:'scheduled',paid:false,paidVia:'',checkedIn:false,location:(DB.locations[0]?DB.locations[0].name:''),notes:''};
   const s = id?DB.sessions.find(x=>x.id===id):blank;
-  const opts = DB.customers.map(c=>`<option value="${c.id}" ${s.customerIds.includes(c.id)?'selected':''}>${c.name}${totalFor(c,'1on1')||totalFor(c,'group')?' ·1:1 '+creditsFor(c,'1on1')+' left':''}</option>`).join('');
+  const opts = DB.customers.map(c=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 4px;cursor:pointer"><input type="checkbox" class="sCustCb" value="${c.id}" ${s.customerIds.includes(c.id)?'checked':''} style="width:auto" onchange="recalcPrice()"><span>${c.name}${totalFor(c,'1on1')||totalFor(c,'group')?' · 1:1 '+creditsFor(c,'1on1')+' left':''}</span></label>`).join('')||'<div class="clienttag">No customers yet — add one in the Customers tab first.</div>';
   const payVal = s.paid?(s.paidVia||'cash'):'';
   openModal(id?'Edit Session':'New Session',`
-    <div class="field"><label class="f">Client(s) — Ctrl/Cmd-click for a group (max ${MAX_GROUP})</label>
-      <select id="sCust" multiple size="4" onchange="recalcPrice()">${opts}</select></div>
+    <div class="field"><label class="f">Client(s) — tick one for a 1:1, up to ${MAX_GROUP} for a group</label>
+      <div id="sCustBox" style="max-height:160px;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px">${opts}</div></div>
     <div class="row">
       <div class="field"><label class="f">Type</label><select id="sType" onchange="recalcPrice()"><option value="1on1" ${s.type==='1on1'?'selected':''}>1:1 Private</option><option value="group" ${s.type==='group'?'selected':''}>Group / 1:N</option></select></div>
       <div class="field"><label class="f">Duration (min)</label><input type="number" id="sDur" value="${s.dur}" onchange="recalcPrice()"></div>
@@ -694,13 +694,13 @@ function openSession(id,returnCust){
 function closeSessionEditor(){const rc=sessionReturnCust;sessionReturnCust=null;if(rc&&custById(rc))viewCustomer(rc);else closeModal();}
 function recalcPrice(){
   const type=$('#sType').value, dur=+$('#sDur').value||60;
-  const n=Math.max(1,[...$('#sCust').selectedOptions].length);
+  const n=Math.max(1,$$('.sCustCb').filter(cb=>cb.checked).length);
   $('#sPrice').value=computePrice(type,dur,n);
 }
 function afterSessionSave(){const rc=sessionReturnCust;sessionReturnCust=null;closeModal();if(rc&&custById(rc))viewCustomer(rc);else refreshOwner();}
 function saveSession(id){
-  const ids=[...$('#sCust').selectedOptions].map(o=>o.value);
-  if(!ids.length)return flash('Pick at least one client',true);
+  const ids=$$('.sCustCb').filter(cb=>cb.checked).map(cb=>cb.value);
+  if(!ids.length)return flash('Tick at least one client',true);
   const type=$('#sType').value;
   if(type==='group' && ids.length>MAX_GROUP) return flash('Groups are capped at '+MAX_GROUP+' players',true);
   const pay=$('#sPay').value;
