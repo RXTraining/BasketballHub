@@ -161,6 +161,10 @@
   .lbox{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:20px}
   .lbox .lh{font-weight:800;font-size:16px;margin-bottom:8px}
   .lbox p{margin-bottom:12px}
+  .ownerbtn{position:absolute;top:18px;right:18px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);
+    font-weight:700;font-size:12.5px;padding:8px 14px;border-radius:999px;cursor:pointer}
+  .ownerbtn:hover{color:var(--txt);border-color:var(--accent)}
+  .login p{margin-bottom:12px}
 </style>
 </head>
 <body>
@@ -182,23 +186,22 @@
 </div>
 
 <div class="login" id="login">
-  <div class="card">
-    <div class="logo" style="font-size:28px;margin-bottom:4px">RX<span class="dot">.</span>TRAINING</div>
-    <div class="muted small">Manager — sign in</div>
-    <div class="loginrow">
-      <div class="lbox">
-        <div class="lh">🏀 Client</div>
-        <p class="muted small" id="clientHint">Pick your profile (or open your personal link) and enter your password.</p>
-        <select id="loginClient"></select>
-        <input type="password" id="loginClientPwd" placeholder="Your password" style="margin-top:10px" onkeydown="if(event.key==='Enter')clientLoginPick()">
-        <button class="btn" style="width:100%;margin-top:12px" onclick="clientLoginPick()">Sign in</button>
-      </div>
-      <div class="lbox">
-        <div class="lh">🔑 Owner</div>
-        <p class="muted small" id="ownerHint">Enter your owner password.</p>
-        <input type="password" id="loginPwd" placeholder="Owner password" onkeydown="if(event.key==='Enter')ownerLogin()">
-        <button class="btn ghost" style="width:100%;margin-top:12px" onclick="ownerLogin()">Enter owner mode</button>
-      </div>
+  <button class="ownerbtn" onclick="toggleOwnerLogin(true)" title="Owner sign in">🔑 Owner</button>
+  <div class="card" style="max-width:420px">
+    <div class="logo" style="font-size:30px;margin-bottom:4px">RX<span class="dot">.</span>TRAINING</div>
+    <div id="clientPanel">
+      <div class="muted small" style="margin-bottom:18px">Player sign in</div>
+      <p class="muted small" id="clientHint">Enter your name and password (or open your personal link).</p>
+      <input id="loginClient" placeholder="Your full name" autocomplete="off" onkeydown="if(event.key==='Enter')clientLoginPick()">
+      <input type="password" id="loginClientPwd" placeholder="Your password" style="margin-top:10px" onkeydown="if(event.key==='Enter')clientLoginPick()">
+      <button class="btn" style="width:100%;margin-top:14px" onclick="clientLoginPick()">Sign in</button>
+    </div>
+    <div id="ownerPanel" class="hidden">
+      <div class="muted small" style="margin-bottom:18px">🔑 Owner sign in</div>
+      <p class="muted small" id="ownerHint">Enter your owner password.</p>
+      <input type="password" id="loginPwd" placeholder="Owner password" onkeydown="if(event.key==='Enter')ownerLogin()">
+      <button class="btn" style="width:100%;margin-top:14px" onclick="ownerLogin()">Enter owner mode</button>
+      <button class="btn ghost" style="width:100%;margin-top:10px" onclick="toggleOwnerLogin(false)">← Back to player sign in</button>
     </div>
   </div>
 </div>
@@ -357,11 +360,16 @@ function initAuth(){
 }
 function showLogin(){
   AUTH=null;renderWhoami();
-  $('#loginClient').innerHTML=DB.customers.length?DB.customers.map(c=>`<option value="${c.id}" ${c.id===pendingClient?'selected':''}>${c.name}</option>`).join(''):'<option value="">No client profiles yet</option>';
-  if(pendingClient){const pc=custById(pendingClient);if(pc)$('#clientHint').textContent='Welcome back, '+firstName(pc.name)+' — enter your password.';}
+  if(pendingClient){const pc=custById(pendingClient);if(pc){$('#loginClient').value=pc.name;$('#clientHint').textContent='Welcome back, '+firstName(pc.name)+' — enter your password.';}}
+  else{$('#loginClient').value='';$('#clientHint').textContent='Enter your name and password (or open your personal link).';}
   $('#ownerHint').textContent=DB.settings.ownerPwd?'Enter your owner password.':'First time here — create an owner password (4+ characters).';
   $('#loginPwd').value='';if($('#loginClientPwd'))$('#loginClientPwd').value='';
+  toggleOwnerLogin(false);
   $('#login').classList.add('show');
+}
+function toggleOwnerLogin(showOwner){
+  $('#ownerPanel').classList.toggle('hidden',!showOwner);
+  $('#clientPanel').classList.toggle('hidden',!!showOwner);
 }
 function ownerLogin(){
   const v=$('#loginPwd').value;
@@ -371,10 +379,12 @@ function ownerLogin(){
   $('#login').classList.remove('show');renderWhoami();switchTab();
 }
 function clientLoginPick(){
-  const id=$('#loginClient').value;if(!id)return flash('No client profile available — ask the Owner to add you',true);
-  const c=custById(id);const pwd=$('#loginClientPwd').value;
-  if((c.pwd||'')!==pwd)return flash('Incorrect password',true);
-  loginAsClient(id);
+  const name=($('#loginClient').value||'').trim().toLowerCase();
+  if(!name)return flash('Enter your name',true);
+  const c=DB.customers.find(x=>(x.name||'').trim().toLowerCase()===name);
+  const pwd=$('#loginClientPwd').value;
+  if(!c||(c.pwd||'')!==pwd)return flash('Incorrect name or password',true);
+  loginAsClient(c.id);
   if(pwd===DB.settings.defaultClientPwd)flash('Tip: set your own password via “Change password”.');
 }
 function loginAsClient(id){
