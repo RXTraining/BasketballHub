@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RX.TRAINING — Manager</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bg:#0a0a0c; --panel:#141418; --panel2:#1c1c22; --line:#2a2a32;
@@ -206,6 +207,18 @@
   </div>
 </div>
 
+<div class="login" id="connect">
+  <div class="card" style="max-width:480px">
+    <div class="logo" style="font-size:28px;margin-bottom:4px">RX<span class="dot">.</span>TRAINING</div>
+    <div class="muted small" style="margin-bottom:16px">☁︎ Connect your Supabase database</div>
+    <div class="field"><label class="f">Project URL</label><input id="supaUrl" placeholder="https://xxxx.supabase.co"></div>
+    <div class="field"><label class="f">Anon public key</label><input id="supaKey" placeholder="eyJhbGciOi..."></div>
+    <button class="btn" style="width:100%" onclick="saveSupaCfg()">Connect</button>
+    <p class="muted small" style="margin-top:12px">Find these in Supabase → Project Settings → API. Saved on this device. For all devices, paste them into the SUPABASE_URL / SUPABASE_ANON_KEY lines near the top of this file.</p>
+    <button class="btn ghost sm" style="width:100%;margin-top:8px" onclick="useLocalOnly()">Skip — use this device only</button>
+  </div>
+</div>
+
 <div class="modal" id="modal">
   <div class="box">
     <div class="head"><h3 id="mTitle">Title</h3><button class="x" onclick="closeModal()">&times;</button></div>
@@ -261,11 +274,29 @@ function seed(){
     cashEntries:[]
   };
 }
-let DB = load();
-function load(){
-  let d;
-  try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.parse(r);}catch(e){}
-  if(!d){d=seed();}
+/* ===== Supabase config — paste here to enable cloud sync on ALL devices ===== */
+const SUPABASE_URL = "";        // e.g. https://abcd1234.supabase.co
+const SUPABASE_ANON_KEY = "";   // your anon public key
+const MEDIA_BUCKET = "rx-media";
+const STATE_TABLE = "rx_state";
+/* =========================================================================== */
+let DB = {}, supa = null, SUPA_OK = false, cloudTimer = null, localOnly = false;
+
+function getSupaCfg(){
+  try{const r=localStorage.getItem('rx_supa');if(r){const c=JSON.parse(r);if(c&&c.url&&c.key)return c;}}catch(e){}
+  if(SUPABASE_URL&&SUPABASE_ANON_KEY)return{url:SUPABASE_URL,key:SUPABASE_ANON_KEY};
+  return null;
+}
+function saveSupaCfg(){
+  const url=($('#supaUrl').value||'').trim(), key=($('#supaKey').value||'').trim();
+  if(!url||!key)return flash('Enter both the Project URL and anon key',true);
+  localStorage.setItem('rx_supa',JSON.stringify({url,key}));
+  location.reload();
+}
+function useLocalOnly(){localStorage.setItem('rx_localonly','1');location.reload();}
+
+function normalize(d){
+  if(!d)d=seed();
   d.settings=d.settings||{rate1on1:30,rateGroup:20};
   if(d.settings.defaultClientPwd===undefined)d.settings.defaultClientPwd='rxtraining';
   if(!d.cashEntries)d.cashEntries=[];
@@ -282,10 +313,37 @@ function load(){
     if(!c.pwd)c.pwd=d.settings.defaultClientPwd;
   });
   (d.sessions||[]).forEach(s=>{if(s.paidVia===undefined)s.paidVia=s.paid?'cash':'';});
-  localStorage.setItem(DB_KEY,JSON.stringify(d));
   return d;
 }
-function save(){try{localStorage.setItem(DB_KEY,JSON.stringify(DB));return true;}catch(e){flash('Storage is full — try smaller/fewer photos or videos',true);return false;}}
+function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.parse(r);}catch(e){}return normalize(d);}
+
+async function bootLoad(){
+  const cfg=getSupaCfg();
+  if(cfg && window.supabase && localStorage.getItem('rx_localonly')!=='1'){
+    try{
+      supa=window.supabase.createClient(cfg.url,cfg.key);
+      const {data,error}=await supa.from(STATE_TABLE).select('data').eq('id','main').maybeSingle();
+      if(error) throw error;
+      SUPA_OK=true;
+      if(data&&data.data) return normalize(data.data);
+      const init=localData();                       // first run: seed cloud from local/seed
+      await supa.from(STATE_TABLE).upsert({id:'main',data:init});
+      return init;
+    }catch(e){console.warn('Supabase offline:',e.message);SUPA_OK=false;}
+  }
+  return localData();
+}
+
+function save(){
+  try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){}
+  if(supa&&SUPA_OK){clearTimeout(cloudTimer);cloudTimer=setTimeout(cloudPush,400);}
+  return true;
+}
+async function cloudPush(){
+  if(!supa||!SUPA_OK)return;
+  try{await supa.from(STATE_TABLE).upsert({id:'main',data:DB,updated_at:new Date().toISOString()});}
+  catch(e){flash('Cloud save failed — saved on this device',true);}
+}
 
 /* ---------- helpers ---------- */
 const custById = id => DB.customers.find(c=>c.id===id);
@@ -345,7 +403,7 @@ function refreshOwner(){const f={about:renderAbout,booking:renderBooking,custome
 function ensureTokens(){let ch=false;DB.customers.forEach(c=>{if(!c.token){c.token=uid()+uid();ch=true;}});if(ch)save();}
 function clientLink(c){return location.origin+location.pathname+'#c='+c.token;}
 function renderWhoami(){
-  if(AUTH==='owner') $('#whoami').innerHTML='<button class="btn ghost sm" onclick="exportExcel()">⬇ Export</button><span class="pill orange">Owner</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';
+  if(AUTH==='owner') $('#whoami').innerHTML=(SUPA_OK?'<span class="pill green" title="Synced to Supabase">☁︎ Synced</span>':'<span class="pill" title="Saved on this device only">⊘ Local</span>')+'<button class="btn ghost sm" onclick="exportExcel()">⬇ Export</button><span class="pill orange">Owner</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';
   else if(AUTH==='client'){const c=custById(clientAs);$('#whoami').innerHTML='<span class="pill blue">'+(c?c.name:'Client')+'</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';}
   else $('#whoami').innerHTML='';
 }
@@ -715,29 +773,42 @@ function ownerCheckIn(id){const s=DB.sessions.find(x=>x.id===id);s.checkedIn=tru
 
 /* session editor (owner) */
 /* session feedback media (photos/videos stored with the session) */
-function addMediaFiles(input){
-  [...input.files].forEach(f=>{
-    if(f.size>8*1024*1024)return flash(f.name+' is too large (max ~8MB)',true);
-    const r=new FileReader();
-    r.onload=()=>{editMedia.push({type:f.type.indexOf('video')===0?'video':'image',name:f.name,data:r.result});renderMediaPrev();};
-    r.readAsDataURL(f);
-  });
-  input.value='';
+const mUrl=m=>m.url||m.data||'';
+async function addMediaFiles(input){
+  const files=[...input.files];input.value='';
+  for(const f of files){
+    if(f.size>50*1024*1024){flash(f.name+' is too large (max 50MB)',true);continue;}
+    const type=f.type.indexOf('video')===0?'video':'image';
+    if(supa&&SUPA_OK){
+      const path='media/'+uid()+'-'+(f.name||'file').replace(/[^a-zA-Z0-9._-]/g,'_');
+      flash('Uploading '+f.name+'…');
+      const up=await supa.storage.from(MEDIA_BUCKET).upload(path,f,{upsert:true,contentType:f.type});
+      if(up.error){flash('Upload failed: '+up.error.message,true);continue;}
+      const pub=supa.storage.from(MEDIA_BUCKET).getPublicUrl(path);
+      editMedia.push({type,name:f.name,url:pub.data.publicUrl,path});
+      renderMediaPrev();
+    }else{
+      if(f.size>8*1024*1024){flash('Connect Supabase to upload large files',true);continue;}
+      const r=new FileReader();
+      r.onload=()=>{editMedia.push({type,name:f.name,data:r.result});renderMediaPrev();};
+      r.readAsDataURL(f);
+    }
+  }
 }
 function renderMediaPrev(){
   const el=$('#sMediaPrev');if(!el)return;
   el.innerHTML=editMedia.length?editMedia.map((m,i)=>`<div style="position:relative;display:inline-block;margin:0 8px 8px 0;vertical-align:top">
-    ${m.type==='image'?`<img src="${m.data}" style="width:84px;height:84px;object-fit:cover;border-radius:8px">`:`<video src="${m.data}" style="width:84px;height:84px;object-fit:cover;border-radius:8px"></video>`}
+    ${m.type==='image'?`<img src="${mUrl(m)}" style="width:84px;height:84px;object-fit:cover;border-radius:8px">`:`<video src="${mUrl(m)}" style="width:84px;height:84px;object-fit:cover;border-radius:8px"></video>`}
     <button class="iconbtn" style="position:absolute;top:-8px;right:-8px;padding:2px 7px" onclick="rmMedia(${i})">✕</button></div>`).join(''):'<span class="clienttag">No attachments yet.</span>';
 }
-function rmMedia(i){editMedia.splice(i,1);renderMediaPrev();}
+function rmMedia(i){const m=editMedia[i];if(m&&m.path&&supa&&SUPA_OK){supa.storage.from(MEDIA_BUCKET).remove([m.path]).catch(()=>{});}editMedia.splice(i,1);renderMediaPrev();}
 function viewMedia(sid,i){const s=DB.sessions.find(x=>x.id===sid);const m=s&&s.media&&s.media[i];if(!m)return;
-  openModal(m.name||'Attachment',m.type==='image'?`<img src="${m.data}" style="max-width:100%;border-radius:10px">`:`<video src="${m.data}" controls autoplay style="max-width:100%;border-radius:10px"></video>`,`<button class="btn" onclick="closeModal()">Close</button>`);}
+  openModal(m.name||'Attachment',m.type==='image'?`<img src="${mUrl(m)}" style="max-width:100%;border-radius:10px">`:`<video src="${mUrl(m)}" controls autoplay style="max-width:100%;border-radius:10px"></video>`,`<button class="btn" onclick="closeModal()">Close</button>`);}
 function mediaThumbs(s,owner){
   if(!s.media||!s.media.length)return '';
   return s.media.map((m,i)=>m.type==='image'
-    ?`<img src="${m.data}" onclick="viewMedia('${s.id}',${i})" style="width:90px;height:90px;object-fit:cover;border-radius:8px;margin:6px 6px 0 0;cursor:pointer">`
-    :`<video src="${m.data}" controls style="width:150px;border-radius:8px;margin:6px 6px 0 0"></video>`).join('');
+    ?`<img src="${mUrl(m)}" onclick="viewMedia('${s.id}',${i})" style="width:90px;height:90px;object-fit:cover;border-radius:8px;margin:6px 6px 0 0;cursor:pointer">`
+    :`<video src="${mUrl(m)}" controls style="width:150px;border-radius:8px;margin:6px 6px 0 0"></video>`).join('');
 }
 function openSession(id,returnCust){
   sessionReturnCust=returnCust||null;
@@ -1282,7 +1353,14 @@ function drawCashChart(labels,rev,exp,prof){
 window.addEventListener('resize',()=>{if(TAB==='finance'&&AUTH==='owner')renderFinance();});
 
 /* ---------- boot ---------- */
-initAuth();
+(async function(){
+  if(!getSupaCfg() && localStorage.getItem('rx_localonly')!=='1'){
+    $('#connect').classList.add('show');return;   // first run: ask for Supabase credentials
+  }
+  DB = await bootLoad();
+  if(getSupaCfg() && !SUPA_OK) flash('Cloud offline — using this device for now',true);
+  initAuth();
+})();
 </script>
 </body>
 </html>
