@@ -175,6 +175,7 @@
   <section class="view active" id="view-about"></section>
   <section class="view" id="view-booking"></section>
   <section class="view" id="view-customers"></section>
+  <section class="view" id="view-locations"></section>
   <section class="view" id="view-finance"></section>
 </div>
 
@@ -230,11 +231,12 @@ function seed(){
   const plus = d=>{const x=new Date();x.setDate(x.getDate()+d);return x.toISOString().slice(0,10)};
   return {
     settings:{rate1on1:30, rateGroup:20, defaultClientPwd:'rxtraining'},
+    locations:[{id:'l1',name:'Lexington Gym',address:'Lexington, MA'},{id:'l2',name:'Community Center Court',address:''}],
     customers:[
-      {id:'c1',name:'Ethan Carter',phone:'781-555-0142',email:'ethan.c@example.com',parent:'Mia Carter',level:'AAU U14',notes:'Working on left-hand finishing.',created:minus(60),credits:{'1on1':7,'group':0},creditsTotal:{'1on1':10,'group':0},packages:[{id:'p1',type:'1on1',qty:10,amount:300,date:minus(34)}]},
-      {id:'c2',name:'Sophia Nguyen',phone:'781-555-0188',email:'sophia.n@example.com',parent:'',level:'Middle School',notes:'Great shooter, build defense.',created:minus(40),credits:{'1on1':0,'group':0},creditsTotal:{'1on1':0,'group':0},packages:[]},
-      {id:'c3',name:'Liam OBrien',phone:'617-555-0110',email:'liam.ob@example.com',parent:'Dan OBrien',level:'AAU U16',notes:'Conditioning + ball handling.',created:minus(20),credits:{'1on1':0,'group':0},creditsTotal:{'1on1':0,'group':0},packages:[]},
-      {id:'c4',name:'Ava Martinez',phone:'339-555-0173',email:'ava.m@example.com',parent:'Rosa Martinez',level:'Youth',notes:'',created:minus(8),credits:{'1on1':0,'group':0},creditsTotal:{'1on1':0,'group':0},packages:[]}
+      {id:'c1',name:'Ethan Carter',phone:'781-555-0142',email:'ethan.c@example.com',parent:'Mia Carter',level:'AAU U14',notes:'Working on left-hand finishing.',created:minus(60),creditsTotal:{'1on1':10,'group':0},packages:[{id:'p1',type:'1on1',qty:10,amount:300,date:minus(34)}]},
+      {id:'c2',name:'Sophia Nguyen',phone:'781-555-0188',email:'sophia.n@example.com',parent:'',level:'Middle School',notes:'Great shooter, build defense.',created:minus(40),creditsTotal:{'1on1':0,'group':0},packages:[]},
+      {id:'c3',name:'Liam OBrien',phone:'617-555-0110',email:'liam.ob@example.com',parent:'Dan OBrien',level:'AAU U16',notes:'Conditioning + ball handling.',created:minus(20),creditsTotal:{'1on1':0,'group':0},packages:[]},
+      {id:'c4',name:'Ava Martinez',phone:'339-555-0173',email:'ava.m@example.com',parent:'Rosa Martinez',level:'Youth',notes:'',created:minus(8),creditsTotal:{'1on1':0,'group':0},packages:[]}
     ],
     sessions:[
       {id:'s0a',customerIds:['c1'],type:'1on1',date:minus(34),time:'16:00',dur:60,price:30,status:'completed',paid:true,paidVia:'package',checkedIn:true,location:'Lexington Gym',notes:''},
@@ -245,12 +247,13 @@ function seed(){
       {id:'s2',customerIds:['c2','c3','c4'],type:'group',date:minus(3),time:'10:00',dur:90,price:90,status:'completed',paid:true,paidVia:'cash',checkedIn:true,location:'Lexington Gym',notes:'Group skills'},
       {id:'s3',customerIds:['c1'],type:'1on1',date:plus(1),time:'17:00',dur:60,price:30,status:'scheduled',paid:true,paidVia:'package',checkedIn:false,location:'Lexington Gym',notes:'Prepaid'},
       {id:'s4',customerIds:['c2'],type:'1on1',date:plus(2),time:'15:30',dur:60,price:30,status:'scheduled',paid:false,paidVia:'',checkedIn:false,location:'Lexington Gym',notes:''},
-      {id:'s5',customerIds:['c3','c4'],type:'group',date:plus(4),time:'11:00',dur:90,price:60,status:'scheduled',paid:false,paidVia:'',checkedIn:false,location:'Lexington Gym',notes:''}
+      {id:'s5',customerIds:['c3','c4'],type:'group',date:plus(4),time:'11:00',dur:90,price:60,status:'scheduled',paid:false,paidVia:'',checkedIn:false,location:'Community Center Court',notes:''}
     ],
     expenses:[
       {id:'e1',date:minus(15),cat:'Gym Rental',amount:200,note:'Court time'},
       {id:'e2',date:minus(10),cat:'Equipment',amount:85,note:'Cones & balls'}
-    ]
+    ],
+    cashEntries:[]
   };
 }
 let DB = load();
@@ -260,11 +263,17 @@ function load(){
   if(!d){d=seed();}
   d.settings=d.settings||{rate1on1:30,rateGroup:20};
   if(d.settings.defaultClientPwd===undefined)d.settings.defaultClientPwd='rxtraining';
+  if(!d.cashEntries)d.cashEntries=[];
+  if(!d.locations){const names=[...new Set((d.sessions||[]).map(s=>s.location).filter(Boolean))];if(!names.length)names.push('Lexington Gym');d.locations=names.map(n=>({id:uid(),name:n,address:''}));}
   (d.customers||[]).forEach(c=>{
-    if(!c.credits)c.credits={'1on1':0,'group':0};
     if(!c.packages)c.packages=[];
-    if(!c.creditsTotal){const tot={'1on1':0,'group':0};c.packages.forEach(p=>{tot[p.type]=(tot[p.type]||0)+p.qty;});
-      c.creditsTotal={'1on1':Math.max(tot['1on1']||0,c.credits['1on1']||0),'group':Math.max(tot['group']||0,c.credits['group']||0)};}
+    if(!c.creditsTotal){
+      const pk={'1on1':0,'group':0};c.packages.forEach(p=>{pk[p.type]=(pk[p.type]||0)+p.qty;});
+      const oldRem=c.credits||{'1on1':0,'group':0};
+      const usedD=t=>(d.sessions||[]).filter(s=>s.customerIds.includes(c.id)&&s.type===t&&s.paidVia==='package'&&s.status!=='cancelled').length;
+      c.creditsTotal={'1on1':Math.max(pk['1on1'],(oldRem['1on1']||0)+usedD('1on1')),'group':Math.max(pk['group'],(oldRem['group']||0)+usedD('group'))};
+    }
+    if(c.credits)delete c.credits;
     if(!c.pwd)c.pwd=d.settings.defaultClientPwd;
   });
   (d.sessions||[]).forEach(s=>{if(s.paidVia===undefined)s.paidVia=s.paid?'cash':'';});
@@ -279,25 +288,31 @@ const custNames = ids => ids.map(i=>{const c=custById(i);return c?c.name:'?';}).
 const initials = n => n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
 const firstName = n => n.split(' ')[0];
 function computePrice(type,dur,n){const h=(dur||60)/60;return Math.round(type==='1on1'?DB.settings.rate1on1*h:DB.settings.rateGroup*h*(n||1));}
-function creditsFor(c,type){return (c&&c.credits&&c.credits[type])||0;}
 function totalFor(c,type){return (c&&c.creditsTotal&&c.creditsTotal[type])||0;}
-function usedFor(c,type){return Math.max(0,totalFor(c,type)-creditsFor(c,type));}
+function usedFor(c,type){if(!c)return 0;return DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.type===type&&s.paidVia==='package'&&s.status!=='cancelled').length;}
+function creditsFor(c,type){return Math.max(0,totalFor(c,type)-usedFor(c,type));}
 function creditBadge(c){
   const parts=[];
   [['1on1','1:1'],['group','Grp']].forEach(([t,lab])=>{const tot=totalFor(c,t);if(tot>0)parts.push(lab+' '+usedFor(c,t)+'/'+tot+' used');});
   return parts.length?parts.map(p=>'<span class="credit">'+p+'</span>').join(' '):'<span class="muted small">—</span>';
 }
 function sessionHasCredit(s){return s.customerIds.some(id=>creditsFor(custById(id),s.type)>0);}
-function consumeCredits(s){let u=0;s.customerIds.forEach(id=>{const c=custById(id);if(creditsFor(c,s.type)>0){c.credits[s.type]--;u++;}});return u;}
-function refundCredits(s){s.customerIds.forEach(id=>{const c=custById(id);if(c){c.credits[s.type]=Math.min(totalFor(c,s.type),creditsFor(c,s.type)+1);}});}
+function locOptions(selected){
+  const names=DB.locations.map(l=>l.name);
+  let out=DB.locations.map(l=>`<option ${l.name===selected?'selected':''}>${l.name}</option>`).join('');
+  if(selected && !names.includes(selected)) out='<option selected>'+selected+'</option>'+out;
+  if(!out) out='<option value="">Add a location first</option>';
+  return out;
+}
 
 let AUTH=null, ROLE='owner', TAB='about';
-let clientAs=null, pendingClient=null;
+let clientAs=null, pendingClient=null, sessionReturnCust=null;
 let calY, calM; {const n=new Date();calY=n.getFullYear();calM=n.getMonth();}
 const TABS=[
   {id:'about',label:'About'},
   {id:'booking',label:'Booking & Schedule'},
   {id:'customers',label:'Customers'},
+  {id:'locations',label:'Locations'},
   {id:'finance',label:'Finance'}
 ];
 
@@ -314,8 +329,9 @@ function switchTab(){
   renderTabs();
   $$('.view').forEach(v=>v.classList.remove('active'));
   $('#view-'+TAB).classList.add('active');
-  ({about:renderAbout,booking:renderBooking,customers:renderCustomers,finance:renderFinance})[TAB]();
+  refreshOwner();
 }
+function refreshOwner(){const f={about:renderAbout,booking:renderBooking,customers:renderCustomers,locations:renderLocations,finance:renderFinance}[TAB];if(f)f();}
 
 /* ---------- Auth ---------- */
 function ensureTokens(){let ch=false;DB.customers.forEach(c=>{if(!c.token){c.token=uid()+uid();ch=true;}});if(ch)save();}
@@ -424,16 +440,16 @@ function renderAbout(){
      <div class="feat"><div class="ic">👥</div><h4>Group / Small-Group (1:N)</h4>
        <p>Train with teammates or friends — up to ${MAX_GROUP} players per group. Competitive drills, conditioning, and team concepts. <b style="color:var(--txt)">${money(DB.settings.rateGroup)} / hour per player</b>.</p></div>
      <div class="feat"><div class="ic">🎟️</div><h4>Session Packages</h4>
-       <p>Save time and lock in your spot — prepay for multiple sessions (e.g. a 10-pack of 1:1s). Usage is tracked as used/total and checked in with one tap.</p></div>
+       <p>Save time and lock in your spot — prepay for multiple sessions (e.g. a 10-pack of 1:1s). Usage shows as used/total and updates from your session history.</p></div>
    </div>
 
    <div class="panel" style="margin-top:18px">
      <h3>How booking works</h3>
      <p class="muted small" style="line-height:1.7">
        1. Each client gets a personal sign-in link and password from the Owner — they land on <b style="color:var(--txt)">My Sessions</b>.<br>
-       2. They request a 1:1 or group session — pick a date and time.<br>
+       2. They request a 1:1 or group session — pick a date, time and location.<br>
        3. On session day, they tap <b style="color:var(--txt)">Check In</b> — if they have a prepaid package, a credit is used automatically (e.g. 4/10 used). The session can be added to a calendar with one click.<br>
-       4. The Owner confirms, edits sessions & credit balances, sells packages, and tracks finances here.
+       4. The Owner confirms, edits sessions, packages, locations & credit balances, and tracks finances here.
      </p>
    </div>`;
 }
@@ -452,7 +468,7 @@ function typePill(s){return s.type==='1on1'?'<span class="pill blue">1:1</span>'
 function renderBookingOwner(){
   $('#view-booking').innerHTML=`
     <h1 class="page">Booking & Schedule</h1>
-    <div class="sub">All client arrangements — manage sessions, check-ins, packages and your calendar.</div>
+    <div class="sub">All client arrangements — manage sessions, check-ins, packages, locations and your calendar.</div>
     <div class="row" style="margin-bottom:16px">
       <button class="btn" onclick="openSession()">+ New Session</button>
       <button class="btn ghost" onclick="exportAllCal()">📅 Export all upcoming (.ics)</button>
@@ -523,7 +539,7 @@ function renderBookingCalendar(){
     const isToday = ds===todayISO();
     const chips=sortSessions(byDate[ds]||[]).map(s=>{
       const lab=(s.time)+' '+firstName(custNames(s.customerIds))+(s.customerIds.length>1?' +'+(s.customerIds.length-1):'');
-      return `<div class="cchip ${s.type==='1on1'?'t1on1':'tgroup'} ${s.status==='completed'?'done':''}" title="${custNames(s.customerIds)}" onclick="openSession('${s.id}')">${lab}</div>`;
+      return `<div class="cchip ${s.type==='1on1'?'t1on1':'tgroup'} ${s.status==='completed'?'done':''}" title="${custNames(s.customerIds)} · ${s.location||''}" onclick="openSession('${s.id}')">${lab}</div>`;
     }).join('');
     cells+=`<div class="calcell ${isToday?'today':''}"><div class="caldate">${d}</div>${chips}</div>`;
   }
@@ -565,7 +581,7 @@ function renderBookingClient(){
       <div class="row" style="justify-content:space-between;align-items:center">
         <div>
           <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} ${s.paid?'<span class="pill green">Prepaid</span>':''} ${s.status==='completed'?'<span class="pill green">Completed</span>':s.status==='cancelled'?'<span class="pill red">Cancelled</span>':''}
-          <div class="clienttag" style="margin-top:4px">${s.dur} min · ${s.location||'TBD'}${others>0?' · with '+others+' other player'+(others>1?'s':''):''}</div>
+          <div class="clienttag" style="margin-top:4px">${s.dur} min · 📍 ${s.location||'TBD'}${others>0?' · with '+others+' other player'+(others>1?'s':''):''}</div>
         </div>
         <div class="actions">
           ${s.date===now && !s.checkedIn && s.status==='scheduled'?`<button class="btn sm" onclick="clientCheckIn('${s.id}')">Check In</button>`:''}
@@ -604,6 +620,7 @@ function renderBookingClient(){
         <h3>Request a session</h3>
         <div class="field"><label class="f">Session type</label>
           <select id="rqType"><option value="1on1">1:1 Private (${money(DB.settings.rate1on1)}/hr)</option><option value="group">Group / 1:N (${money(DB.settings.rateGroup)}/hr per player)</option></select></div>
+        <div class="field"><label class="f">Location</label><select id="rqLoc">${locOptions(DB.locations[0]?DB.locations[0].name:'')}</select></div>
         <div class="row">
           <div class="field"><label class="f">Date</label><input type="date" id="rqDate" min="${now}" value="${now}"></div>
           <div class="field"><label class="f">Time</label><input type="time" id="rqTime" value="16:00"></div>
@@ -618,24 +635,28 @@ function submitRequest(){
   const cid=clientAs;if(!cid)return flash('Please sign in again',true);
   const type=$('#rqType').value;
   const dur=type==='1on1'?60:90;
+  const loc=$('#rqLoc')&&$('#rqLoc').value?$('#rqLoc').value:(DB.locations[0]?DB.locations[0].name:'TBD');
   DB.sessions.push({id:uid(),customerIds:[cid],type,date:$('#rqDate').value,time:$('#rqTime').value,
-    dur,price:computePrice(type,dur,1),status:'scheduled',paid:false,paidVia:'',checkedIn:false,location:'Lexington Gym',notes:'Client request'});
+    dur,price:computePrice(type,dur,1),status:'scheduled',paid:false,paidVia:'',checkedIn:false,location:loc,notes:'Client request'});
   save();flash('Session requested! 🏀');renderBooking();
 }
 
 function clientCheckIn(id){
   const s=DB.sessions.find(x=>x.id===id);s.checkedIn=true;
-  if(!s.paid && sessionHasCredit(s)){
-    consumeCredits(s);s.paid=true;s.paidVia='package';
+  const c=custById(clientAs);
+  if(!s.paid && creditsFor(c,s.type)>0){
+    s.paid=true;s.paidVia='package';
     save();flash("Checked in — 1 credit used. Let's work! 🔥");
   }else{save();flash("Checked in — let's work! 🔥");}
   renderBooking();
 }
-function ownerCheckIn(id){const s=DB.sessions.find(x=>x.id===id);s.checkedIn=true;save();flash('Checked in');renderBooking();}
+function ownerCheckIn(id){const s=DB.sessions.find(x=>x.id===id);s.checkedIn=true;save();flash('Checked in');refreshOwner();}
 
 /* session editor (owner) */
-function openSession(id){
-  const s = id?DB.sessions.find(x=>x.id===id):{id:'',customerIds:[],type:'1on1',date:todayISO(),time:'16:00',dur:60,price:computePrice('1on1',60,1),status:'scheduled',paid:false,paidVia:'',checkedIn:false,location:'Lexington Gym',notes:''};
+function openSession(id,returnCust){
+  sessionReturnCust=returnCust||null;
+  const blank={id:'',customerIds:returnCust?[returnCust]:[],type:'1on1',date:todayISO(),time:'16:00',dur:60,price:computePrice('1on1',60,1),status:'scheduled',paid:false,paidVia:'',checkedIn:false,location:(DB.locations[0]?DB.locations[0].name:''),notes:''};
+  const s = id?DB.sessions.find(x=>x.id===id):blank;
   const opts = DB.customers.map(c=>`<option value="${c.id}" ${s.customerIds.includes(c.id)?'selected':''}>${c.name}${totalFor(c,'1on1')||totalFor(c,'group')?' ·1:1 '+creditsFor(c,'1on1')+' left':''}</option>`).join('');
   const payVal = s.paid?(s.paidVia||'cash'):'';
   openModal(id?'Edit Session':'New Session',`
@@ -660,20 +681,23 @@ function openSession(id){
         <option value="cash" ${payVal==='cash'?'selected':''}>Paid — cash</option>
         <option value="package" ${payVal==='package'?'selected':''}>Paid — use package credit</option>
       </select></div>
-      <div class="field"><label class="f">Location</label><input id="sLoc" value="${s.location||''}"></div>
+      <div class="field"><label class="f">Location — clients see this</label><select id="sLoc">${locOptions(s.location)}</select></div>
     </div>
     <label class="f" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="sCheck" ${s.checkedIn?'checked':''} style="width:auto"> Checked in</label>
     <div class="field"><label class="f">Notes</label><textarea id="sNotes">${s.notes||''}</textarea></div>
+    <p class="muted small">Marking payment as "package credit" counts one used session against the client's prepaid total. Manage venues in the Locations tab.</p>
   `,`
     ${id?`<button class="btn danger" onclick="delSession('${id}')">Delete</button>`:''}
-    <button class="btn ghost" onclick="closeModal()">Cancel</button>
+    <button class="btn ghost" onclick="closeSessionEditor()">Cancel</button>
     <button class="btn" onclick="saveSession('${id}')">Save</button>`);
 }
+function closeSessionEditor(){const rc=sessionReturnCust;sessionReturnCust=null;if(rc&&custById(rc))viewCustomer(rc);else closeModal();}
 function recalcPrice(){
   const type=$('#sType').value, dur=+$('#sDur').value||60;
   const n=Math.max(1,[...$('#sCust').selectedOptions].length);
   $('#sPrice').value=computePrice(type,dur,n);
 }
+function afterSessionSave(){const rc=sessionReturnCust;sessionReturnCust=null;closeModal();if(rc&&custById(rc))viewCustomer(rc);else refreshOwner();}
 function saveSession(id){
   const ids=[...$('#sCust').selectedOptions].map(o=>o.value);
   if(!ids.length)return flash('Pick at least one client',true);
@@ -683,22 +707,14 @@ function saveSession(id){
   const obj={customerIds:ids,type,dur:+$('#sDur').value,date:$('#sDate').value,time:$('#sTime').value,
     price:+$('#sPrice').value,status:$('#sStatus').value,location:$('#sLoc').value,
     paid:pay!=='',paidVia:pay,checkedIn:$('#sCheck').checked,notes:$('#sNotes').value};
-  if(id){
-    const ex=DB.sessions.find(x=>x.id===id);
-    const oldVia=ex.paidVia||'';
-    if(oldVia==='package' && pay!=='package') refundCredits(ex);
-    if(pay==='package' && oldVia!=='package'){const u=consumeCredits(obj); if(u===0){flash('No matching credits — marked paid anyway',true);} }
-    Object.assign(ex,obj);
-  }else{
-    if(pay==='package'){const u=consumeCredits(obj); if(u===0) flash('No matching credits — marked paid anyway',true);}
-    obj.id=uid();DB.sessions.push(obj);
-  }
-  save();closeModal();flash('Session saved');renderBooking();
+  if(id){Object.assign(DB.sessions.find(x=>x.id===id),obj);}
+  else{obj.id=uid();DB.sessions.push(obj);}
+  save();flash('Session saved');afterSessionSave();
 }
-function delSession(id){if(!confirm('Delete this session?'))return;const s=DB.sessions.find(x=>x.id===id);if(s&&s.paidVia==='package')refundCredits(s);DB.sessions=DB.sessions.filter(x=>x.id!==id);save();closeModal();flash('Session deleted');renderBooking();}
+function delSession(id){if(!confirm('Delete this session?'))return;DB.sessions=DB.sessions.filter(x=>x.id!==id);save();flash('Session deleted');afterSessionSave();}
 
-function payCash(id){const s=DB.sessions.find(x=>x.id===id);s.paid=true;s.paidVia='cash';save();flash('Marked paid (cash) 💵');renderBooking();}
-function payCredit(id){const s=DB.sessions.find(x=>x.id===id);const u=consumeCredits(s);if(!u)return flash('No matching credits available',true);s.paid=true;s.paidVia='package';save();flash('Applied '+u+' credit(s) 🎟️');renderBooking();}
+function payCash(id){const s=DB.sessions.find(x=>x.id===id);s.paid=true;s.paidVia='cash';save();flash('Marked paid (cash) 💵');refreshOwner();}
+function payCredit(id){const s=DB.sessions.find(x=>x.id===id);if(!sessionHasCredit(s))return flash('No prepaid credit available',true);s.paid=true;s.paidVia='package';save();flash('Credit applied 🎟️');refreshOwner();}
 
 /* ---------- Calendar export (.ics + Google) ---------- */
 function pad(n){return String(n).padStart(2,'0');}
@@ -727,7 +743,7 @@ function googleCalUrl(s){
 function addToCalendar(id){
   const s=DB.sessions.find(x=>x.id===id);
   openModal('Add to calendar',`
-    <p class="muted small" style="margin-bottom:16px"><b style="color:var(--txt)">${sessionTitle(s)}</b><br>${fmtDT(s.date,s.time)} · ${s.dur} min · ${s.location||''}</p>
+    <p class="muted small" style="margin-bottom:16px"><b style="color:var(--txt)">${sessionTitle(s)}</b><br>${fmtDT(s.date,s.time)} · ${s.dur} min · 📍 ${s.location||''}</p>
     <div class="row">
       <button class="btn" onclick="downloadICS('rx-session.ics',buildICS([DB.sessions.find(x=>x.id==='${id}')]));flash('Calendar file downloaded')">⬇ Download .ics (Apple/Outlook)</button>
       <a class="btn ghost" href="${googleCalUrl(s)}" target="_blank" rel="noopener" style="text-decoration:none">📆 Add to Google Calendar</a>
@@ -749,12 +765,12 @@ function renderCustomers(){
   const q=custSearch.toLowerCase();
   const list=DB.customers.filter(c=>!q||c.name.toLowerCase().includes(q)||(c.parent||'').toLowerCase().includes(q));
   const rows=list.map(c=>{
-    const sess=DB.sessions.filter(s=>s.customerIds.includes(c.id));
-    const next=sortSessions(sess.filter(s=>s.date>=todayISO()&&s.status==='scheduled'))[0];
+    const booked=DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status!=='cancelled').length;
+    const next=sortSessions(DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.date>=todayISO()&&s.status==='scheduled'))[0];
     return `<tr>
       <td><div class="nameceil"><span class="av">${initials(c.name)}</span><div><b>${c.name}</b><div class="clienttag">${c.level||'—'}${c.parent?' · '+c.parent:''}</div></div></div></td>
       <td>${c.phone||''}<div class="clienttag">${c.email||''}</div></td>
-      <td>${sess.length}<div class="clienttag">sessions</div></td>
+      <td>${booked}<div class="clienttag">booked</div></td>
       <td>${creditBadge(c)}</td>
       <td>${next?fmtDT(next.date,next.time):'<span class="muted">—</span>'}</td>
       <td class="right"><div class="actions">
@@ -767,14 +783,14 @@ function renderCustomers(){
 
   $('#view-customers').innerHTML=`
     <h1 class="page">Customers</h1>
-    <div class="sub">Manage contacts, prepaid credit balances (used/total), login links & passwords, and each player's schedule.</div>
+    <div class="sub">Manage contacts, prepaid credits (used/total), packages, session history, login links & passwords.</div>
     <div class="row" style="margin-bottom:16px">
       <div class="field" style="max-width:280px;margin-bottom:0"><input placeholder="Search name or parent..." value="${custSearch}" oninput="custSearch=this.value;renderCustomers()"></div>
       <button class="btn" onclick="openCustomer()">+ Add Customer</button>
     </div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
       <table>
-        <thead><tr><th>Player</th><th>Contact</th><th>Sessions</th><th>Credits (used/total)</th><th>Next session</th><th></th></tr></thead>
+        <thead><tr><th>Player</th><th>Contact</th><th>Booked</th><th>Credits (used/total)</th><th>Next session</th><th></th></tr></thead>
         <tbody>${rows||'<tr><td colspan="6"><div class="empty">No customers found.</div></td></tr>'}</tbody>
       </table>
     </div>`;
@@ -782,11 +798,12 @@ function renderCustomers(){
 function viewCustomer(id){
   const c=custById(id);
   const sess=sortSessions(DB.sessions.filter(s=>s.customerIds.includes(c.id))).reverse();
-  const hist=sess.map(s=>`<tr><td>${fmtDT(s.date,s.time)}</td><td>${s.type==='1on1'?'1:1':'Group'}</td>
+  const hist=sess.map(s=>`<tr><td>${fmtDT(s.date,s.time)}<div class="clienttag">📍 ${s.location||''}</div></td><td>${s.type==='1on1'?'1:1':'Group'}</td>
     <td><span class="pill ${s.status==='completed'?'green':s.status==='cancelled'?'red':'yellow'}">${s.status}</span></td>
     <td>${s.paid?'<span class="pill green">'+(s.paidVia==='package'?'pkg':'paid')+'</span>':'<span class="pill red">unpaid</span>'}</td>
-    <td class="right">${money(s.price/s.customerIds.length)}</td></tr>`).join('')||'<tr><td colspan="5"><div class="empty">No sessions yet.</div></td></tr>';
-  const pkgs=c.packages.length?c.packages.slice().reverse().map(p=>`<tr><td>${fmtDate(p.date)}</td><td>${p.qty}× ${p.type==='1on1'?'1:1':'Group'}</td><td class="right">${money(p.amount)}</td></tr>`).join(''):'<tr><td colspan="3"><div class="empty">No packages.</div></td></tr>';
+    <td class="right">${money(s.price/s.customerIds.length)}</td>
+    <td class="right"><button class="iconbtn" onclick="openSession('${s.id}','${id}')">Edit</button></td></tr>`).join('')||'<tr><td colspan="6"><div class="empty">No sessions yet.</div></td></tr>';
+  const pkgs=c.packages.length?c.packages.slice().reverse().map(p=>`<tr><td>${fmtDate(p.date)}</td><td>${p.qty}× ${p.type==='1on1'?'1:1':'Group'}</td><td class="right">${money(p.amount)}</td><td class="right"><button class="iconbtn" onclick="openPackage('${id}','${p.id}')">Edit</button></td></tr>`).join(''):'<tr><td colspan="4"><div class="empty">No packages.</div></td></tr>';
   const credLine=(lab,t)=>totalFor(c,t)>0?`<div class="small" style="margin-top:4px">${lab}: <b>${usedFor(c,t)}/${totalFor(c,t)} used</b> · <span style="color:var(--accent2)">${creditsFor(c,t)} left</span></div>`:'';
   openModal(c.name,`
     <div class="row" style="margin-bottom:8px">
@@ -803,10 +820,14 @@ function viewCustomer(id){
         <div><b>Prepaid sessions</b>${(totalFor(c,'1on1')||totalFor(c,'group'))?credLine('1:1','1on1')+credLine('Group','group'):'<div class="clienttag" style="margin-top:4px">No package yet.</div>'}</div>
         <button class="btn sm" onclick="openSellPackage('${id}')">+ Sell package</button>
       </div>
-      <table style="margin-top:10px"><thead><tr><th>Date</th><th>Package</th><th class="right">Paid</th></tr></thead><tbody>${pkgs}</tbody></table>
+      <table style="margin-top:10px"><thead><tr><th>Date</th><th>Package</th><th class="right">Paid</th><th></th></tr></thead><tbody>${pkgs}</tbody></table>
     </div>
-    <h3 style="margin:6px 0 8px">Session history</h3>
-    <table><thead><tr><th>When</th><th>Type</th><th>Status</th><th>Pay</th><th class="right">Share</th></tr></thead><tbody>${hist}</tbody></table>
+    <div class="row" style="justify-content:space-between;align-items:center;margin:6px 0 8px">
+      <h3 style="margin:0">Session history</h3>
+      <button class="btn sm ghost" onclick="openSession('','${id}')">+ Add session</button>
+    </div>
+    <div style="overflow-x:auto"><table><thead><tr><th>When</th><th>Type</th><th>Status</th><th>Pay</th><th class="right">Share</th><th></th></tr></thead><tbody>${hist}</tbody></table></div>
+    <p class="muted small" style="margin-top:8px">Editing a session here updates the client's "My Sessions" too.</p>
   `,`<button class="btn ghost" onclick="copyClientLink('${id}')">🔗 Client link</button><button class="btn ghost" onclick="openCustomer('${id}')">Edit</button><button class="btn" onclick="closeModal()">Close</button>`);
 }
 function openSellPackage(id){
@@ -822,8 +843,8 @@ function openSellPackage(id){
       <div class="field"><label class="f">Amount charged ($) — editable</label><input type="number" id="pkAmt" value="${10*DB.settings.rate1on1}"></div>
       <div class="field"><label class="f">Date</label><input type="date" id="pkDate" value="${todayISO()}"></div>
     </div>
-    <p class="muted small">Adds to the client's total credits and records the amount as revenue. The balance shows as used/total; sessions paid with a credit aren't billed again.</p>
-  `,`<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="savePackage('${id}')">Sell package</button>`);
+    <p class="muted small">Adds to the client's total credits and records the amount as revenue. Balance shows as used/total; package-paid sessions aren't billed again.</p>
+  `,`<button class="btn ghost" onclick="viewCustomer('${id}')">Cancel</button><button class="btn" onclick="savePackage('${id}')">Sell package</button>`);
 }
 function recalcPkg(){const type=$('#pkType').value,qty=+$('#pkQty').value||0;const rate=type==='1on1'?DB.settings.rate1on1:DB.settings.rateGroup;$('#pkAmt').value=qty*rate;}
 function savePackage(id){
@@ -831,10 +852,41 @@ function savePackage(id){
   if(!qty||qty<1)return flash('Enter a session count',true);
   if(!c.creditsTotal)c.creditsTotal={'1on1':0,'group':0};
   c.creditsTotal[type]=totalFor(c,type)+qty;
-  c.credits[type]=creditsFor(c,type)+qty;
   c.packages.push({id:uid(),type,qty,amount:amt,date:$('#pkDate').value});
-  save();closeModal();flash(qty+'× '+(type==='1on1'?'1:1':'Group')+' package sold 🎟️');
-  renderCustomers();
+  save();flash(qty+'× '+(type==='1on1'?'1:1':'Group')+' package sold 🎟️');viewCustomer(id);
+}
+function openPackage(cid,pid){
+  const c=custById(cid);const p=c.packages.find(x=>x.id===pid);
+  openModal('Edit package — '+c.name,`
+    <div class="row">
+      <div class="field"><label class="f">Type</label><select id="epType">
+        <option value="1on1" ${p.type==='1on1'?'selected':''}>1:1 Private</option>
+        <option value="group" ${p.type==='group'?'selected':''}>Group / 1:N</option></select></div>
+      <div class="field"><label class="f">Number of sessions</label><input type="number" id="epQty" min="1" value="${p.qty}"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label class="f">Amount charged ($)</label><input type="number" id="epAmt" value="${p.amount}"></div>
+      <div class="field"><label class="f">Date</label><input type="date" id="epDate" value="${p.date}"></div>
+    </div>
+    <p class="muted small">Editing the count adjusts the client's total credits; editing the amount adjusts recorded revenue.</p>
+  `,`<button class="btn danger" onclick="delPackageEntry('${cid}','${pid}')">Delete</button><button class="btn ghost" onclick="viewCustomer('${cid}')">Cancel</button><button class="btn" onclick="savePackageEdit('${cid}','${pid}')">Save</button>`);
+}
+function savePackageEdit(cid,pid){
+  const c=custById(cid);const p=c.packages.find(x=>x.id===pid);
+  const nt=$('#epType').value, nq=+$('#epQty').value||0, na=+$('#epAmt').value||0, nd=$('#epDate').value;
+  if(nq<1)return flash('Sessions must be at least 1',true);
+  if(!c.creditsTotal)c.creditsTotal={'1on1':0,'group':0};
+  c.creditsTotal[p.type]=Math.max(0,(c.creditsTotal[p.type]||0)-p.qty);
+  c.creditsTotal[nt]=(c.creditsTotal[nt]||0)+nq;
+  p.type=nt;p.qty=nq;p.amount=na;p.date=nd;
+  save();flash('Package updated');viewCustomer(cid);
+}
+function delPackageEntry(cid,pid){
+  if(!confirm('Delete this package? Total credits will decrease.'))return;
+  const c=custById(cid);const p=c.packages.find(x=>x.id===pid);
+  if(c.creditsTotal)c.creditsTotal[p.type]=Math.max(0,(c.creditsTotal[p.type]||0)-p.qty);
+  c.packages=c.packages.filter(x=>x.id!==pid);
+  save();flash('Package removed');viewCustomer(cid);
 }
 function openCustomer(id){
   const c=id?custById(id):{id:'',name:'',phone:'',email:'',parent:'',level:'',notes:''};
@@ -850,16 +902,12 @@ function openCustomer(id){
     </div>
     <div class="field"><label class="f">Notes</label><textarea id="cNotes">${c.notes||''}</textarea></div>
     <div class="panel" style="background:var(--panel2);padding:14px;margin-bottom:14px">
-      <b class="small">Credit status (used / total)</b>
+      <b class="small">Prepaid credit totals</b>
       <div class="row" style="margin-top:10px">
-        <div class="field" style="margin-bottom:8px"><label class="f">1:1 — total sessions</label><input type="number" id="cTot1" min="0" value="${id?totalFor(c,'1on1'):0}"></div>
-        <div class="field" style="margin-bottom:8px"><label class="f">1:1 — used</label><input type="number" id="cUsed1" min="0" value="${id?usedFor(c,'1on1'):0}"></div>
-      </div>
-      <div class="row">
+        <div class="field" style="margin-bottom:0"><label class="f">1:1 — total sessions</label><input type="number" id="cTot1" min="0" value="${id?totalFor(c,'1on1'):0}"></div>
         <div class="field" style="margin-bottom:0"><label class="f">Group — total sessions</label><input type="number" id="cTotG" min="0" value="${id?totalFor(c,'group'):0}"></div>
-        <div class="field" style="margin-bottom:0"><label class="f">Group — used</label><input type="number" id="cUsedG" min="0" value="${id?usedFor(c,'group'):0}"></div>
       </div>
-      <div class="clienttag" style="margin-top:8px">Totals grow when you sell a package; "used" rises as sessions are checked in. Remaining = total − used.</div>
+      <div class="clienttag" style="margin-top:8px">${id?`Used now: 1:1 ${usedFor(c,'1on1')}/${totalFor(c,'1on1')} · Group ${usedFor(c,'group')}/${totalFor(c,'group')}. `:''}Used is counted automatically from package-paid sessions — change it by editing a session's payment in the history.</div>
     </div>
     <div class="field"><label class="f">Client login password</label>
       <div class="row" style="gap:8px">
@@ -867,7 +915,7 @@ function openCustomer(id){
         <button class="btn ghost sm" type="button" onclick="document.getElementById('cPwd').value='${DB.settings.defaultClientPwd}'">Reset to default</button>
       </div>
       <div class="clienttag" style="margin-top:6px">Default: ${DB.settings.defaultClientPwd}. The client can change this themselves after signing in.</div></div>
-    ${id?'<p class="muted small">After saving, use 🔗 Client link to send this player their personal sign-in link.</p>':'<p class="muted small">A personal client login link is generated automatically when you save.</p>'}
+    ${id?'<p class="muted small">Use 🔗 Client link (in the list or View) to send this player their personal sign-in link.</p>':'<p class="muted small">A personal client login link is generated automatically when you save.</p>'}
   `,`
     ${id?`<button class="btn danger" onclick="delCustomer('${id}')">Delete</button>`:''}
     <button class="btn ghost" onclick="closeModal()">Cancel</button>
@@ -876,13 +924,49 @@ function openCustomer(id){
 function saveCustomer(id){
   const name=$('#cName').value.trim();if(!name)return flash('Name is required',true);
   const obj={name,phone:$('#cPhone').value,email:$('#cEmail').value,level:$('#cLevel').value,parent:$('#cParent').value,notes:$('#cNotes').value};
-  const tot1=Math.max(0,Math.round(+$('#cTot1').value||0)); let used1=Math.max(0,Math.round(+$('#cUsed1').value||0)); if(used1>tot1)used1=tot1;
-  const totG=Math.max(0,Math.round(+$('#cTotG').value||0)); let usedG=Math.max(0,Math.round(+$('#cUsedG').value||0)); if(usedG>totG)usedG=totG;
+  const tot1=Math.max(0,Math.round(+$('#cTot1').value||0)), totG=Math.max(0,Math.round(+$('#cTotG').value||0));
   const pwd=($('#cPwd').value||'').trim()||DB.settings.defaultClientPwd;
-  if(id){const ex=custById(id);Object.assign(ex,obj);ex.creditsTotal={'1on1':tot1,'group':totG};ex.credits={'1on1':tot1-used1,'group':totG-usedG};ex.pwd=pwd;save();closeModal();flash('Customer saved');renderCustomers();}
-  else{obj.id=uid();obj.created=todayISO();obj.creditsTotal={'1on1':tot1,'group':totG};obj.credits={'1on1':tot1-used1,'group':totG-usedG};obj.packages=[];obj.token=uid()+uid();obj.pwd=pwd;DB.customers.push(obj);save();closeModal();flash('Customer added — open 🔗 Link to share their sign-in');renderCustomers();}
+  if(id){const ex=custById(id);Object.assign(ex,obj);ex.creditsTotal={'1on1':tot1,'group':totG};ex.pwd=pwd;save();closeModal();flash('Customer saved');renderCustomers();}
+  else{obj.id=uid();obj.created=todayISO();obj.creditsTotal={'1on1':tot1,'group':totG};obj.packages=[];obj.token=uid()+uid();obj.pwd=pwd;DB.customers.push(obj);save();closeModal();flash('Customer added — open 🔗 Link to share their sign-in');renderCustomers();}
 }
 function delCustomer(id){if(!confirm('Delete this customer? Their sessions remain.'))return;DB.customers=DB.customers.filter(c=>c.id!==id);save();closeModal();flash('Customer deleted');renderCustomers();}
+
+/* ============================================================
+   LOCATIONS
+   ============================================================ */
+function renderLocations(){
+  const rows=DB.locations.map(l=>{
+    const cnt=DB.sessions.filter(s=>s.location===l.name).length;
+    return `<tr><td><b>${l.name}</b></td><td class="muted">${l.address||'—'}</td><td>${cnt} sessions</td>
+      <td class="right"><div class="actions"><button class="iconbtn" onclick="openLocation('${l.id}')">Edit</button><button class="iconbtn" onclick="delLocation('${l.id}')">✕</button></div></td></tr>`;
+  }).join('')||'<tr><td colspan="4"><div class="empty">No locations yet — add one.</div></td></tr>';
+  $('#view-locations').innerHTML=`
+    <h1 class="page">Locations</h1>
+    <div class="sub">Manage your training venues. These appear as choices when scheduling, and clients see the chosen location on their sessions.</div>
+    <div class="row" style="margin-bottom:16px"><button class="btn" onclick="openLocation()">+ Add Location</button></div>
+    <div class="panel" style="padding:6px 14px;overflow-x:auto"><table>
+      <thead><tr><th>Name</th><th>Address / notes</th><th>Used</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function openLocation(id){
+  const l=id?DB.locations.find(x=>x.id===id):{name:'',address:''};
+  openModal(id?'Edit Location':'Add Location',`
+    <div class="field"><label class="f">Name *</label><input id="lName" value="${l.name}" placeholder="e.g. Lexington Gym"></div>
+    <div class="field"><label class="f">Address / notes</label><input id="lAddr" value="${l.address||''}" placeholder="Street, city, or court info"></div>
+  `,`${id?`<button class="btn danger" onclick="delLocation('${id}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveLocation('${id}')">Save</button>`);
+}
+function saveLocation(id){
+  const name=$('#lName').value.trim();if(!name)return flash('Name is required',true);
+  const addr=$('#lAddr').value.trim();
+  if(id){const ex=DB.locations.find(x=>x.id===id);const old=ex.name;ex.name=name;ex.address=addr;
+    if(old!==name)DB.sessions.forEach(s=>{if(s.location===old)s.location=name;});}
+  else{DB.locations.push({id:uid(),name,address:addr});}
+  save();closeModal();flash('Location saved 📍');renderLocations();
+}
+function delLocation(id){
+  const l=DB.locations.find(x=>x.id===id);const cnt=DB.sessions.filter(s=>s.location===l.name).length;
+  if(!confirm('Delete location: '+l.name+'? '+(cnt?cnt+' session(s) keep the name as text.':'')))return;
+  DB.locations=DB.locations.filter(x=>x.id!==id);save();closeModal();flash('Location removed');renderLocations();
+}
 
 /* ============================================================
    FINANCE
@@ -892,9 +976,11 @@ function monthKey(d){return d.slice(0,7);}
 function monthLabel(k){const[y,m]=k.split('-');return new Date(y,m-1,1).toLocaleDateString('en-US',{month:'short'});}
 function renderFinance(){
   const cashSess=DB.sessions.filter(s=>s.paid&&s.paidVia==='cash'&&s.status!=='cancelled');
-  const allPkgs=DB.customers.flatMap(c=>c.packages.map(p=>({...p})));
+  const allPkgs=DB.customers.flatMap(c=>c.packages.map(p=>({...p,cust:c.name,custId:c.id})));
   const pkgRev=allPkgs.reduce((a,p)=>a+p.amount,0);
-  const cashRev=cashSess.reduce((a,s)=>a+s.price,0);
+  const sessCash=cashSess.reduce((a,s)=>a+s.price,0);
+  const otherCash=DB.cashEntries.reduce((a,e)=>a+e.amount,0);
+  const cashRev=sessCash+otherCash;
   const revenue=pkgRev+cashRev;
   const outstanding=DB.sessions.filter(s=>!s.paid&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
   const expenses=DB.expenses.reduce((a,e)=>a+e.amount,0);
@@ -907,6 +993,7 @@ function renderFinance(){
   for(let i=n-1;i>=0;i--){const d=new Date(base);d.setMonth(d.getMonth()-i);months.push(d.toISOString().slice(0,7));}
   const revByM={},expByM={};
   cashSess.forEach(s=>{const k=monthKey(s.date);revByM[k]=(revByM[k]||0)+s.price;});
+  DB.cashEntries.forEach(e=>{const k=monthKey(e.date);revByM[k]=(revByM[k]||0)+e.amount;});
   allPkgs.forEach(p=>{const k=monthKey(p.date);revByM[k]=(revByM[k]||0)+p.amount;});
   DB.expenses.forEach(e=>{const k=monthKey(e.date);expByM[k]=(expByM[k]||0)+e.amount;});
   const rev=months.map(m=>revByM[m]||0), exp=months.map(m=>expByM[m]||0), prof=months.map((m,i)=>rev[i]-exp[i]);
@@ -919,7 +1006,7 @@ function renderFinance(){
   const expRows=DB.expenses.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>`<tr>
     <td>${fmtDate(e.date)}</td><td>${e.cat}</td><td class="muted">${e.note||''}</td>
     <td class="right">${money(e.amount)}</td>
-    <td class="right"><button class="iconbtn" onclick="delExpense('${e.id}')">✕</button></td></tr>`).join('')
+    <td class="right"><div class="actions"><button class="iconbtn" onclick="openExpense('${e.id}')">Edit</button><button class="iconbtn" onclick="delExpense('${e.id}')">✕</button></div></td></tr>`).join('')
     ||'<tr><td colspan="5"><div class="empty">No expenses logged.</div></td></tr>';
 
   const unpaidRows=DB.sessions.filter(s=>!s.paid&&s.status!=='cancelled').sort((a,b)=>a.date.localeCompare(b.date)).map(s=>`<tr>
@@ -928,9 +1015,20 @@ function renderFinance(){
     <td class="right"><div class="actions">${sessionHasCredit(s)?`<button class="btn sm ghost" onclick="payCredit('${s.id}')">Credit</button>`:''}<button class="btn sm" onclick="payCash('${s.id}')">Cash</button></div></td></tr>`).join('')
     ||'<tr><td colspan="5"><div class="empty">All caught up — nothing outstanding! 🎉</div></td></tr>';
 
+  const manualRows=DB.cashEntries.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>`<tr>
+    <td>${fmtDate(e.date)}</td><td>Manual</td><td class="muted">${e.note||''}</td><td class="right">${money(e.amount)}</td>
+    <td class="right"><div class="actions"><button class="iconbtn" onclick="openCashEntry('${e.id}')">Edit</button><button class="iconbtn" onclick="delCashEntry('${e.id}')">✕</button></div></td></tr>`).join('');
+  const cashSessRows=cashSess.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(s=>`<tr>
+    <td>${fmtDate(s.date)}</td><td>${custNames(s.customerIds)}</td><td class="muted">${s.type==='1on1'?'1:1':'Group'} session</td><td class="right">${money(s.price)}</td>
+    <td class="right"><button class="iconbtn" onclick="openSession('${s.id}')">Edit</button></td></tr>`).join('');
+  const cashRows=(manualRows+cashSessRows)||'<tr><td colspan="5"><div class="empty">No cash income yet.</div></td></tr>';
+
+  const pkgRows=allPkgs.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>`<tr><td>${fmtDate(p.date)}</td><td>${p.cust}</td><td class="muted">${p.qty}× ${p.type==='1on1'?'1:1':'Group'}</td><td class="right">${money(p.amount)}</td>
+    <td class="right"><button class="iconbtn" onclick="openPackage('${p.custId}','${p.id}')">Edit</button></td></tr>`).join('')||'<tr><td colspan="5"><div class="empty">No packages sold.</div></td></tr>';
+
   $('#view-finance').innerHTML=`
     <h1 class="page">Finance</h1>
-    <div class="sub">Revenue, cashflow, profit, outstanding payments, and prepaid liability at a glance.</div>
+    <div class="sub">Revenue, cashflow, profit, outstanding payments, and prepaid liability at a glance. Everything below is editable.</div>
     <div class="stats">
       <div class="stat"><div class="k">Revenue (collected)</div><div class="v">${money(revenue)}</div><div class="d" style="color:var(--green)">Cash ${money(cashRev)} + packages ${money(pkgRev)}</div></div>
       <div class="stat"><div class="k">Outstanding</div><div class="v">${money(outstanding)}</div><div class="d" style="color:var(--red)">Awaiting payment</div></div>
@@ -967,16 +1065,11 @@ function renderFinance(){
         </div>
         <button class="btn sm" onclick="saveRates()">Save rates</button>
         <h3 style="margin-top:18px">Owner password</h3>
-        <div class="row">
-          <div class="field"><input type="password" id="newPwd" placeholder="New owner password (4+ chars)"></div>
-        </div>
+        <div class="row"><div class="field"><input type="password" id="newPwd" placeholder="New owner password (4+ chars)"></div></div>
         <button class="btn sm ghost" onclick="changePwd()">Update password</button>
         <h3 style="margin-top:18px">Default client password</h3>
-        <div class="row">
-          <div class="field"><input id="defCPwd" value="${DB.settings.defaultClientPwd}"></div>
-        </div>
+        <div class="row"><div class="field"><input id="defCPwd" value="${DB.settings.defaultClientPwd}"></div></div>
         <button class="btn sm ghost" onclick="saveDefCPwd()">Save default</button>
-        <div class="clienttag" style="margin-top:6px">Used for new clients. Reset any client's password in Customers → Edit.</div>
       </div>
     </div>
 
@@ -990,29 +1083,64 @@ function renderFinance(){
           <h3 style="margin:0">Expenses</h3><button class="btn sm" onclick="openExpense()">+ Add</button></div>
         <table><thead><tr><th>Date</th><th>Category</th><th>Note</th><th class="right">Amount</th><th></th></tr></thead><tbody>${expRows}</tbody></table>
       </div>
+    </div>
+
+    <div class="twocol" style="margin-top:16px">
+      <div class="panel" style="padding:6px 14px;overflow-x:auto">
+        <div class="row" style="justify-content:space-between;align-items:center;padding:12px 6px 0">
+          <h3 style="margin:0">Cash & other income</h3><button class="btn sm" onclick="openCashEntry()">+ Add cash</button></div>
+        <table><thead><tr><th>Date</th><th>Source</th><th>Note</th><th class="right">Amount</th><th></th></tr></thead><tbody>${cashRows}</tbody></table>
+        <div class="clienttag" style="padding:6px">Session payments edit via their session; manual cash is editable here.</div>
+      </div>
+      <div class="panel" style="padding:6px 14px;overflow-x:auto">
+        <div class="row" style="justify-content:space-between;align-items:center;padding:12px 6px 0"><h3 style="margin:0">Package revenue</h3></div>
+        <table><thead><tr><th>Date</th><th>Client</th><th>Package</th><th class="right">Amount</th><th></th></tr></thead><tbody>${pkgRows}</tbody></table>
+        <div class="clienttag" style="padding:6px">Edit a package to adjust its amount and the client's credit total.</div>
+      </div>
     </div>`;
   drawCashChart(months.map(monthLabel),rev,exp,prof);
 }
 function saveRates(){DB.settings.rate1on1=+$('#rate1').value;DB.settings.rateGroup=+$('#rateG').value;save();flash('Rates updated');renderFinance();}
 function changePwd(){const v=$('#newPwd').value;if((v||'').length<4)return flash('Password must be 4+ characters',true);DB.settings.ownerPwd=v;save();flash('Owner password updated 🔑');renderFinance();}
 function saveDefCPwd(){const v=($('#defCPwd').value||'').trim();if(v.length<4)return flash('Default must be 4+ characters',true);DB.settings.defaultClientPwd=v;save();flash('Default client password saved');renderFinance();}
-function openExpense(){
-  openModal('Add Expense',`
+function openExpense(id){
+  const e=id?DB.expenses.find(x=>x.id===id):{date:todayISO(),cat:'Gym Rental',amount:0,note:''};
+  const cats=['Gym Rental','Equipment','Travel','Marketing','Insurance','Other'];
+  openModal(id?'Edit Expense':'Add Expense',`
     <div class="row">
-      <div class="field"><label class="f">Date</label><input type="date" id="eDate" value="${todayISO()}"></div>
-      <div class="field"><label class="f">Amount ($)</label><input type="number" id="eAmt" value="0"></div>
+      <div class="field"><label class="f">Date</label><input type="date" id="eDate" value="${e.date}"></div>
+      <div class="field"><label class="f">Amount ($)</label><input type="number" id="eAmt" value="${e.amount}"></div>
     </div>
     <div class="field"><label class="f">Category</label>
-      <select id="eCat"><option>Gym Rental</option><option>Equipment</option><option>Travel</option><option>Marketing</option><option>Insurance</option><option>Other</option></select></div>
-    <div class="field"><label class="f">Note</label><input id="eNote"></div>
-  `,`<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveExpense()">Save</button>`);
+      <select id="eCat">${cats.map(c=>`<option ${e.cat===c?'selected':''}>${c}</option>`).join('')}</select></div>
+    <div class="field"><label class="f">Note</label><input id="eNote" value="${e.note||''}"></div>
+  `,`${id?`<button class="btn danger" onclick="delExpense('${id}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveExpense('${id}')">Save</button>`);
 }
-function saveExpense(){
+function saveExpense(id){
   const amt=+$('#eAmt').value;if(!amt)return flash('Enter an amount',true);
-  DB.expenses.push({id:uid(),date:$('#eDate').value,cat:$('#eCat').value,amount:amt,note:$('#eNote').value});
-  save();closeModal();flash('Expense added');renderFinance();
+  const obj={date:$('#eDate').value,cat:$('#eCat').value,amount:amt,note:$('#eNote').value};
+  if(id){Object.assign(DB.expenses.find(x=>x.id===id),obj);}else{obj.id=uid();DB.expenses.push(obj);}
+  save();closeModal();flash('Expense saved');renderFinance();
 }
-function delExpense(id){DB.expenses=DB.expenses.filter(e=>e.id!==id);save();flash('Expense removed');renderFinance();}
+function delExpense(id){if(!confirm('Delete this expense?'))return;DB.expenses=DB.expenses.filter(e=>e.id!==id);save();closeModal();flash('Expense removed');renderFinance();}
+function openCashEntry(id){
+  const e=id?DB.cashEntries.find(x=>x.id===id):{date:todayISO(),amount:0,note:''};
+  openModal(id?'Edit cash income':'Add cash income',`
+    <div class="row">
+      <div class="field"><label class="f">Date</label><input type="date" id="kDate" value="${e.date}"></div>
+      <div class="field"><label class="f">Amount ($)</label><input type="number" id="kAmt" value="${e.amount}"></div>
+    </div>
+    <div class="field"><label class="f">Note</label><input id="kNote" value="${e.note||''}" placeholder="e.g. drop-in clinic, walk-in cash"></div>
+    <p class="muted small">Use this for cash income not tied to a specific booked session. It counts toward revenue.</p>
+  `,`${id?`<button class="btn danger" onclick="delCashEntry('${id}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveCashEntry('${id}')">Save</button>`);
+}
+function saveCashEntry(id){
+  const amt=+$('#kAmt').value;if(!amt)return flash('Enter an amount',true);
+  const obj={date:$('#kDate').value,amount:amt,note:$('#kNote').value};
+  if(id){Object.assign(DB.cashEntries.find(x=>x.id===id),obj);}else{obj.id=uid();DB.cashEntries.push(obj);}
+  save();closeModal();flash('Cash income saved 💵');renderFinance();
+}
+function delCashEntry(id){if(!confirm('Delete this cash entry?'))return;DB.cashEntries=DB.cashEntries.filter(e=>e.id!==id);save();closeModal();flash('Cash entry removed');renderFinance();}
 
 /* lightweight canvas chart (no libraries) */
 function drawCashChart(labels,rev,exp,prof){
