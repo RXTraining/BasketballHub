@@ -385,7 +385,7 @@ const initials = n => n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase(
 const firstName = n => n.split(' ')[0];
 function computePrice(type,dur,n){const h=(dur||60)/60;return Math.round(type==='1on1'?DB.settings.rate1on1*h:DB.settings.rateGroup*h*(n||1));}
 function totalFor(c,type){return (c&&c.creditsTotal&&c.creditsTotal[type])||0;}
-function usedFor(c,type){if(!c)return 0;return DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.type===type&&s.paidVia==='package'&&s.status==='completed').length;}
+function usedFor(c,type){if(!c)return 0;const done=DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.type===type&&s.paidVia==='package'&&s.status==='completed').length;return Math.min(totalFor(c,type),done);}
 function completedCount(c){return DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status==='completed').length;}
 function bookedCount(c){return DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status==='scheduled'&&s.date>=todayISO()).length;}
 function creditsFor(c,type){return Math.max(0,totalFor(c,type)-usedFor(c,type));}
@@ -546,7 +546,10 @@ function exportExcel(){
     'Checked in':s.checkedIn?'Yes':'No',Payment:s.paid?(s.paidVia||'paid'):'unpaid',Price:s.price,Notes:s.notes,Feedback:s.feedback||'',Attachments:(s.media||[]).length})));
   add('Packages',DB.customers.flatMap(c=>c.packages.map(p=>({Client:c.name,Date:p.date,Type:p.type==='1on1'?'1:1':'Group',Sessions:p.qty,Amount:p.amount}))));
   add('Expenses',DB.expenses.map(e=>({Date:e.date,Category:e.cat,Note:e.note,Amount:e.amount})));
-  add('Cash income',DB.cashEntries.map(e=>({Date:e.date,Note:e.note,Amount:e.amount})));
+  add('Cash income',[
+    ...DB.sessions.filter(s=>s.paid&&s.paidVia==='cash'&&s.status!=='cancelled').map(s=>({Date:s.date,Source:custNames(s.customerIds)+' ('+(s.type==='1on1'?'1:1':'Group')+' session)',Note:s.notes||'',Amount:s.price})),
+    ...DB.cashEntries.map(e=>({Date:e.date,Source:'Manual',Note:e.note||'',Amount:e.amount}))
+  ]);
   XLSX.writeFile(wb,'RXTraining-export-'+todayISO()+'.xlsx');
   flash('Excel exported ⬇');
 }
