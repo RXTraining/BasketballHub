@@ -133,6 +133,8 @@
   .hidden{display:none!important}
   .credit{display:inline-block;font-size:11px;font-weight:800;color:#111;background:linear-gradient(135deg,var(--accent),var(--accent2));
     padding:3px 9px;border-radius:999px}
+  .creditbar{height:8px;background:var(--panel2);border-radius:5px;overflow:hidden;margin-top:6px}
+  .creditbar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
 
   .calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px}
   .calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
@@ -229,10 +231,10 @@ function seed(){
   return {
     settings:{rate1on1:30, rateGroup:20, defaultClientPwd:'rxtraining'},
     customers:[
-      {id:'c1',name:'Ethan Carter',phone:'781-555-0142',email:'ethan.c@example.com',parent:'Mia Carter',level:'AAU U14',notes:'Working on left-hand finishing.',created:minus(60),credits:{'1on1':7,'group':0},packages:[{id:'p1',type:'1on1',qty:10,amount:300,date:minus(34)}]},
-      {id:'c2',name:'Sophia Nguyen',phone:'781-555-0188',email:'sophia.n@example.com',parent:'',level:'Middle School',notes:'Great shooter, build defense.',created:minus(40),credits:{'1on1':0,'group':0},packages:[]},
-      {id:'c3',name:'Liam OBrien',phone:'617-555-0110',email:'liam.ob@example.com',parent:'Dan OBrien',level:'AAU U16',notes:'Conditioning + ball handling.',created:minus(20),credits:{'1on1':0,'group':0},packages:[]},
-      {id:'c4',name:'Ava Martinez',phone:'339-555-0173',email:'ava.m@example.com',parent:'Rosa Martinez',level:'Youth',notes:'',created:minus(8),credits:{'1on1':0,'group':0},packages:[]}
+      {id:'c1',name:'Ethan Carter',phone:'781-555-0142',email:'ethan.c@example.com',parent:'Mia Carter',level:'AAU U14',notes:'Working on left-hand finishing.',created:minus(60),credits:{'1on1':7,'group':0},creditsTotal:{'1on1':10,'group':0},packages:[{id:'p1',type:'1on1',qty:10,amount:300,date:minus(34)}]},
+      {id:'c2',name:'Sophia Nguyen',phone:'781-555-0188',email:'sophia.n@example.com',parent:'',level:'Middle School',notes:'Great shooter, build defense.',created:minus(40),credits:{'1on1':0,'group':0},creditsTotal:{'1on1':0,'group':0},packages:[]},
+      {id:'c3',name:'Liam OBrien',phone:'617-555-0110',email:'liam.ob@example.com',parent:'Dan OBrien',level:'AAU U16',notes:'Conditioning + ball handling.',created:minus(20),credits:{'1on1':0,'group':0},creditsTotal:{'1on1':0,'group':0},packages:[]},
+      {id:'c4',name:'Ava Martinez',phone:'339-555-0173',email:'ava.m@example.com',parent:'Rosa Martinez',level:'Youth',notes:'',created:minus(8),credits:{'1on1':0,'group':0},creditsTotal:{'1on1':0,'group':0},packages:[]}
     ],
     sessions:[
       {id:'s0a',customerIds:['c1'],type:'1on1',date:minus(34),time:'16:00',dur:60,price:30,status:'completed',paid:true,paidVia:'package',checkedIn:true,location:'Lexington Gym',notes:''},
@@ -258,7 +260,13 @@ function load(){
   if(!d){d=seed();}
   d.settings=d.settings||{rate1on1:30,rateGroup:20};
   if(d.settings.defaultClientPwd===undefined)d.settings.defaultClientPwd='rxtraining';
-  (d.customers||[]).forEach(c=>{if(!c.credits)c.credits={'1on1':0,'group':0};if(!c.packages)c.packages=[];if(!c.pwd)c.pwd=d.settings.defaultClientPwd;});
+  (d.customers||[]).forEach(c=>{
+    if(!c.credits)c.credits={'1on1':0,'group':0};
+    if(!c.packages)c.packages=[];
+    if(!c.creditsTotal){const tot={'1on1':0,'group':0};c.packages.forEach(p=>{tot[p.type]=(tot[p.type]||0)+p.qty;});
+      c.creditsTotal={'1on1':Math.max(tot['1on1']||0,c.credits['1on1']||0),'group':Math.max(tot['group']||0,c.credits['group']||0)};}
+    if(!c.pwd)c.pwd=d.settings.defaultClientPwd;
+  });
   (d.sessions||[]).forEach(s=>{if(s.paidVia===undefined)s.paidVia=s.paid?'cash':'';});
   localStorage.setItem(DB_KEY,JSON.stringify(d));
   return d;
@@ -272,9 +280,16 @@ const initials = n => n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase(
 const firstName = n => n.split(' ')[0];
 function computePrice(type,dur,n){const h=(dur||60)/60;return Math.round(type==='1on1'?DB.settings.rate1on1*h:DB.settings.rateGroup*h*(n||1));}
 function creditsFor(c,type){return (c&&c.credits&&c.credits[type])||0;}
+function totalFor(c,type){return (c&&c.creditsTotal&&c.creditsTotal[type])||0;}
+function usedFor(c,type){return Math.max(0,totalFor(c,type)-creditsFor(c,type));}
+function creditBadge(c){
+  const parts=[];
+  [['1on1','1:1'],['group','Grp']].forEach(([t,lab])=>{const tot=totalFor(c,t);if(tot>0)parts.push(lab+' '+usedFor(c,t)+'/'+tot+' used');});
+  return parts.length?parts.map(p=>'<span class="credit">'+p+'</span>').join(' '):'<span class="muted small">—</span>';
+}
 function sessionHasCredit(s){return s.customerIds.some(id=>creditsFor(custById(id),s.type)>0);}
 function consumeCredits(s){let u=0;s.customerIds.forEach(id=>{const c=custById(id);if(creditsFor(c,s.type)>0){c.credits[s.type]--;u++;}});return u;}
-function refundCredits(s){s.customerIds.forEach(id=>{const c=custById(id);if(c){c.credits[s.type]=creditsFor(c,s.type)+1;}});}
+function refundCredits(s){s.customerIds.forEach(id=>{const c=custById(id);if(c){c.credits[s.type]=Math.min(totalFor(c,s.type),creditsFor(c,s.type)+1);}});}
 
 let AUTH=null, ROLE='owner', TAB='about';
 let clientAs=null, pendingClient=null;
@@ -409,7 +424,7 @@ function renderAbout(){
      <div class="feat"><div class="ic">👥</div><h4>Group / Small-Group (1:N)</h4>
        <p>Train with teammates or friends — up to ${MAX_GROUP} players per group. Competitive drills, conditioning, and team concepts. <b style="color:var(--txt)">${money(DB.settings.rateGroup)} / hour per player</b>.</p></div>
      <div class="feat"><div class="ic">🎟️</div><h4>Session Packages</h4>
-       <p>Save time and lock in your spot — prepay for multiple sessions (e.g. a 10-pack of 1:1s). Credits are tracked automatically and checked in with one tap.</p></div>
+       <p>Save time and lock in your spot — prepay for multiple sessions (e.g. a 10-pack of 1:1s). Usage is tracked as used/total and checked in with one tap.</p></div>
    </div>
 
    <div class="panel" style="margin-top:18px">
@@ -417,8 +432,8 @@ function renderAbout(){
      <p class="muted small" style="line-height:1.7">
        1. Each client gets a personal sign-in link and password from the Owner — they land on <b style="color:var(--txt)">My Sessions</b>.<br>
        2. They request a 1:1 or group session — pick a date and time.<br>
-       3. On session day, they tap <b style="color:var(--txt)">Check In</b> — if they have a prepaid package, a credit is used automatically. The session can be added to a calendar with one click.<br>
-       4. The Owner confirms, manages the table & calendar, sells packages, and tracks finances here.
+       3. On session day, they tap <b style="color:var(--txt)">Check In</b> — if they have a prepaid package, a credit is used automatically (e.g. 4/10 used). The session can be added to a calendar with one click.<br>
+       4. The Owner confirms, edits sessions & credit balances, sells packages, and tracks finances here.
      </p>
    </div>`;
 }
@@ -542,18 +557,18 @@ function renderBookingClient(){
   const today=sortSessions(mine.filter(s=>s.date===now && s.status!=='cancelled'));
   const upcoming=sortSessions(mine.filter(s=>s.date>=now && s.status==='scheduled'));
   const past=sortSessions(mine.filter(s=>s.date<now || s.status==='completed')).reverse();
-  const cr1=creditsFor(c,'1on1'), crG=creditsFor(c,'group');
+  const t1=totalFor(c,'1on1'),u1=usedFor(c,'1on1'),tG=totalFor(c,'group'),uG=usedFor(c,'group');
 
   const card=s=>{
     const others=s.customerIds.length-1;
     return `<div class="panel" style="margin-bottom:12px">
       <div class="row" style="justify-content:space-between;align-items:center">
         <div>
-          <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} ${s.paid?'<span class="pill green">Prepaid</span>':''}
+          <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} ${s.paid?'<span class="pill green">Prepaid</span>':''} ${s.status==='completed'?'<span class="pill green">Completed</span>':s.status==='cancelled'?'<span class="pill red">Cancelled</span>':''}
           <div class="clienttag" style="margin-top:4px">${s.dur} min · ${s.location||'TBD'}${others>0?' · with '+others+' other player'+(others>1?'s':''):''}</div>
         </div>
         <div class="actions">
-          ${s.date===now && !s.checkedIn?`<button class="btn sm" onclick="clientCheckIn('${s.id}')">Check In</button>`:''}
+          ${s.date===now && !s.checkedIn && s.status==='scheduled'?`<button class="btn sm" onclick="clientCheckIn('${s.id}')">Check In</button>`:''}
           ${s.checkedIn?'<span class="pill green">✓ Checked in</span>':''}
           <button class="btn ghost sm" onclick="addToCalendar('${s.id}')">📅 Add to calendar</button>
         </div>
@@ -561,18 +576,19 @@ function renderBookingClient(){
     </div>`;
   };
   const pkgHist=c.packages.length?c.packages.slice().reverse().map(p=>`<div class="clienttag">• ${p.qty}× ${p.type==='1on1'?'1:1':'Group'} package — ${money(p.amount)} · ${fmtDate(p.date)}</div>`).join(''):'<div class="clienttag">No packages yet.</div>';
+  const balLine=(lab,tot,used)=>tot>0?`<div class="small" style="margin-top:6px"><b>${lab}: ${used}/${tot} used</b> · <span style="color:var(--accent2)">${tot-used} left</span><div class="creditbar"><i style="width:${tot?used/tot*100:0}%"></i></div></div>`:'';
 
   $('#view-booking').innerHTML=`
     <h1 class="page">Welcome, ${firstName(c.name)} 👋</h1>
     <div class="sub">Your sessions, check-ins and reminders — all in one place.</div>
     <div class="panel" style="margin-bottom:16px">
-      <div class="row" style="justify-content:space-between;align-items:center">
-        <div><b>Your prepaid balance</b>
-          <div class="clienttag">Credits are used automatically at check-in.</div></div>
-        <div style="text-align:right">
-          <div><span class="credit">${cr1} × 1:1</span>${crG?'&nbsp;<span class="credit">'+crG+' × Group</span>':''}</div>
-          <button class="btn ghost sm" style="margin-top:8px" onclick="openChangePwd()">🔑 Change password</button>
+      <div class="row" style="justify-content:space-between;align-items:flex-start">
+        <div style="flex:1;min-width:200px">
+          <b>Your prepaid sessions</b>
+          ${(t1>0||tG>0)?(balLine('1:1',t1,u1)+balLine('Group',tG,uG)):'<div class="clienttag" style="margin-top:6px">No package yet — ask the Owner about prepaid packs.</div>'}
+          <div class="clienttag" style="margin-top:8px">Credits are used automatically at check-in.</div>
         </div>
+        <button class="btn ghost sm" onclick="openChangePwd()">🔑 Change password</button>
       </div>
     </div>
     <div class="twocol">
@@ -582,7 +598,7 @@ function renderBookingClient(){
         ${upcoming.length?upcoming.map(card).join(''):'<div class="panel"><div class="empty">No upcoming sessions yet — request one →</div></div>'}
         ${past.length?`<h3 style="margin:18px 0 10px">Past sessions</h3>${past.slice(0,6).map(card).join('')}`:''}
         <div class="panel" style="margin-top:14px"><h3>Your packages</h3>${pkgHist}
-          <p class="muted small" style="margin-top:8px">To buy a package, ask the Owner — credits appear here automatically.</p></div>
+          <p class="muted small" style="margin-top:8px">To buy a package, ask the Owner — your used/total balance updates automatically.</p></div>
       </div>
       <div class="panel" style="align-self:start">
         <h3>Request a session</h3>
@@ -620,7 +636,7 @@ function ownerCheckIn(id){const s=DB.sessions.find(x=>x.id===id);s.checkedIn=tru
 /* session editor (owner) */
 function openSession(id){
   const s = id?DB.sessions.find(x=>x.id===id):{id:'',customerIds:[],type:'1on1',date:todayISO(),time:'16:00',dur:60,price:computePrice('1on1',60,1),status:'scheduled',paid:false,paidVia:'',checkedIn:false,location:'Lexington Gym',notes:''};
-  const opts = DB.customers.map(c=>`<option value="${c.id}" ${s.customerIds.includes(c.id)?'selected':''}>${c.name}${creditsFor(c,'1on1')||creditsFor(c,'group')?' ·credits:'+creditsFor(c,'1on1')+'/'+creditsFor(c,'group'):''}</option>`).join('');
+  const opts = DB.customers.map(c=>`<option value="${c.id}" ${s.customerIds.includes(c.id)?'selected':''}>${c.name}${totalFor(c,'1on1')||totalFor(c,'group')?' ·1:1 '+creditsFor(c,'1on1')+' left':''}</option>`).join('');
   const payVal = s.paid?(s.paidVia||'cash'):'';
   openModal(id?'Edit Session':'New Session',`
     <div class="field"><label class="f">Client(s) — Ctrl/Cmd-click for a group (max ${MAX_GROUP})</label>
@@ -635,7 +651,7 @@ function openSession(id){
     </div>
     <div class="row">
       <div class="field"><label class="f">Price ($) — auto, editable</label><input type="number" id="sPrice" value="${s.price}"></div>
-      <div class="field"><label class="f">Status</label><select id="sStatus">
+      <div class="field"><label class="f">Status — syncs to client</label><select id="sStatus">
         ${['scheduled','completed','cancelled'].map(v=>`<option ${s.status===v?'selected':''}>${v}</option>`).join('')}</select></div>
     </div>
     <div class="row">
@@ -735,13 +751,11 @@ function renderCustomers(){
   const rows=list.map(c=>{
     const sess=DB.sessions.filter(s=>s.customerIds.includes(c.id));
     const next=sortSessions(sess.filter(s=>s.date>=todayISO()&&s.status==='scheduled'))[0];
-    const cr1=creditsFor(c,'1on1'),crG=creditsFor(c,'group');
-    const credBadge=(cr1||crG)?`<span class="credit">${cr1?cr1+'×1:1':''}${cr1&&crG?' ':''}${crG?crG+'×Grp':''}</span>`:'<span class="muted small">—</span>';
     return `<tr>
       <td><div class="nameceil"><span class="av">${initials(c.name)}</span><div><b>${c.name}</b><div class="clienttag">${c.level||'—'}${c.parent?' · '+c.parent:''}</div></div></div></td>
       <td>${c.phone||''}<div class="clienttag">${c.email||''}</div></td>
       <td>${sess.length}<div class="clienttag">sessions</div></td>
-      <td>${credBadge}</td>
+      <td>${creditBadge(c)}</td>
       <td>${next?fmtDT(next.date,next.time):'<span class="muted">—</span>'}</td>
       <td class="right"><div class="actions">
         <button class="iconbtn" title="Copy personal login link" onclick="copyClientLink('${c.id}')">🔗 Link</button>
@@ -753,14 +767,14 @@ function renderCustomers(){
 
   $('#view-customers').innerHTML=`
     <h1 class="page">Customers</h1>
-    <div class="sub">Manage contacts, prepaid packages, login links & passwords, and each player's schedule.</div>
+    <div class="sub">Manage contacts, prepaid credit balances (used/total), login links & passwords, and each player's schedule.</div>
     <div class="row" style="margin-bottom:16px">
       <div class="field" style="max-width:280px;margin-bottom:0"><input placeholder="Search name or parent..." value="${custSearch}" oninput="custSearch=this.value;renderCustomers()"></div>
       <button class="btn" onclick="openCustomer()">+ Add Customer</button>
     </div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
       <table>
-        <thead><tr><th>Player</th><th>Contact</th><th>Sessions</th><th>Credits</th><th>Next session</th><th></th></tr></thead>
+        <thead><tr><th>Player</th><th>Contact</th><th>Sessions</th><th>Credits (used/total)</th><th>Next session</th><th></th></tr></thead>
         <tbody>${rows||'<tr><td colspan="6"><div class="empty">No customers found.</div></td></tr>'}</tbody>
       </table>
     </div>`;
@@ -773,6 +787,7 @@ function viewCustomer(id){
     <td>${s.paid?'<span class="pill green">'+(s.paidVia==='package'?'pkg':'paid')+'</span>':'<span class="pill red">unpaid</span>'}</td>
     <td class="right">${money(s.price/s.customerIds.length)}</td></tr>`).join('')||'<tr><td colspan="5"><div class="empty">No sessions yet.</div></td></tr>';
   const pkgs=c.packages.length?c.packages.slice().reverse().map(p=>`<tr><td>${fmtDate(p.date)}</td><td>${p.qty}× ${p.type==='1on1'?'1:1':'Group'}</td><td class="right">${money(p.amount)}</td></tr>`).join(''):'<tr><td colspan="3"><div class="empty">No packages.</div></td></tr>';
+  const credLine=(lab,t)=>totalFor(c,t)>0?`<div class="small" style="margin-top:4px">${lab}: <b>${usedFor(c,t)}/${totalFor(c,t)} used</b> · <span style="color:var(--accent2)">${creditsFor(c,t)} left</span></div>`:'';
   openModal(c.name,`
     <div class="row" style="margin-bottom:8px">
       <div class="field"><label class="f">Phone</label><div>${c.phone||'—'}</div></div>
@@ -785,7 +800,7 @@ function viewCustomer(id){
     ${c.notes?`<div class="field"><label class="f">Notes</label><div class="muted">${c.notes}</div></div>`:''}
     <div class="panel" style="background:var(--panel2);margin:6px 0 14px">
       <div class="row" style="justify-content:space-between;align-items:center">
-        <div><b>Prepaid credits:</b> <span class="credit">${creditsFor(c,'1on1')} × 1:1</span> ${creditsFor(c,'group')?'<span class="credit">'+creditsFor(c,'group')+' × Group</span>':''}</div>
+        <div><b>Prepaid sessions</b>${(totalFor(c,'1on1')||totalFor(c,'group'))?credLine('1:1','1on1')+credLine('Group','group'):'<div class="clienttag" style="margin-top:4px">No package yet.</div>'}</div>
         <button class="btn sm" onclick="openSellPackage('${id}')">+ Sell package</button>
       </div>
       <table style="margin-top:10px"><thead><tr><th>Date</th><th>Package</th><th class="right">Paid</th></tr></thead><tbody>${pkgs}</tbody></table>
@@ -807,13 +822,15 @@ function openSellPackage(id){
       <div class="field"><label class="f">Amount charged ($) — editable</label><input type="number" id="pkAmt" value="${10*DB.settings.rate1on1}"></div>
       <div class="field"><label class="f">Date</label><input type="date" id="pkDate" value="${todayISO()}"></div>
     </div>
-    <p class="muted small">Adds credits to the client and records the amount as revenue. Sessions paid with a credit aren't billed again.</p>
+    <p class="muted small">Adds to the client's total credits and records the amount as revenue. The balance shows as used/total; sessions paid with a credit aren't billed again.</p>
   `,`<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="savePackage('${id}')">Sell package</button>`);
 }
 function recalcPkg(){const type=$('#pkType').value,qty=+$('#pkQty').value||0;const rate=type==='1on1'?DB.settings.rate1on1:DB.settings.rateGroup;$('#pkAmt').value=qty*rate;}
 function savePackage(id){
   const c=custById(id);const type=$('#pkType').value;const qty=+$('#pkQty').value;const amt=+$('#pkAmt').value;
   if(!qty||qty<1)return flash('Enter a session count',true);
+  if(!c.creditsTotal)c.creditsTotal={'1on1':0,'group':0};
+  c.creditsTotal[type]=totalFor(c,type)+qty;
   c.credits[type]=creditsFor(c,type)+qty;
   c.packages.push({id:uid(),type,qty,amount:amt,date:$('#pkDate').value});
   save();closeModal();flash(qty+'× '+(type==='1on1'?'1:1':'Group')+' package sold 🎟️');
@@ -832,11 +849,18 @@ function openCustomer(id){
       <div class="field"><label class="f">Parent / Guardian</label><input id="cParent" value="${c.parent||''}"></div>
     </div>
     <div class="field"><label class="f">Notes</label><textarea id="cNotes">${c.notes||''}</textarea></div>
-    <div class="row">
-      <div class="field"><label class="f">1:1 credits (editable)</label><input type="number" id="cCr1" min="0" value="${id?creditsFor(c,'1on1'):0}"></div>
-      <div class="field"><label class="f">Group credits (editable)</label><input type="number" id="cCrG" min="0" value="${id?creditsFor(c,'group'):0}"></div>
+    <div class="panel" style="background:var(--panel2);padding:14px;margin-bottom:14px">
+      <b class="small">Credit status (used / total)</b>
+      <div class="row" style="margin-top:10px">
+        <div class="field" style="margin-bottom:8px"><label class="f">1:1 — total sessions</label><input type="number" id="cTot1" min="0" value="${id?totalFor(c,'1on1'):0}"></div>
+        <div class="field" style="margin-bottom:8px"><label class="f">1:1 — used</label><input type="number" id="cUsed1" min="0" value="${id?usedFor(c,'1on1'):0}"></div>
+      </div>
+      <div class="row">
+        <div class="field" style="margin-bottom:0"><label class="f">Group — total sessions</label><input type="number" id="cTotG" min="0" value="${id?totalFor(c,'group'):0}"></div>
+        <div class="field" style="margin-bottom:0"><label class="f">Group — used</label><input type="number" id="cUsedG" min="0" value="${id?usedFor(c,'group'):0}"></div>
+      </div>
+      <div class="clienttag" style="margin-top:8px">Totals grow when you sell a package; "used" rises as sessions are checked in. Remaining = total − used.</div>
     </div>
-    <div class="clienttag" style="margin:-6px 0 14px">Credits grow automatically when you sell a package — you can also adjust them here.</div>
     <div class="field"><label class="f">Client login password</label>
       <div class="row" style="gap:8px">
         <input id="cPwd" value="${id?(c.pwd||''):DB.settings.defaultClientPwd}" style="flex:1">
@@ -852,10 +876,11 @@ function openCustomer(id){
 function saveCustomer(id){
   const name=$('#cName').value.trim();if(!name)return flash('Name is required',true);
   const obj={name,phone:$('#cPhone').value,email:$('#cEmail').value,level:$('#cLevel').value,parent:$('#cParent').value,notes:$('#cNotes').value};
-  const cr1=Math.max(0,Math.round(+$('#cCr1').value||0)), crG=Math.max(0,Math.round(+$('#cCrG').value||0));
+  const tot1=Math.max(0,Math.round(+$('#cTot1').value||0)); let used1=Math.max(0,Math.round(+$('#cUsed1').value||0)); if(used1>tot1)used1=tot1;
+  const totG=Math.max(0,Math.round(+$('#cTotG').value||0)); let usedG=Math.max(0,Math.round(+$('#cUsedG').value||0)); if(usedG>totG)usedG=totG;
   const pwd=($('#cPwd').value||'').trim()||DB.settings.defaultClientPwd;
-  if(id){const ex=custById(id);Object.assign(ex,obj);ex.credits={'1on1':cr1,'group':crG};ex.pwd=pwd;save();closeModal();flash('Customer saved');renderCustomers();}
-  else{obj.id=uid();obj.created=todayISO();obj.credits={'1on1':cr1,'group':crG};obj.packages=[];obj.token=uid()+uid();obj.pwd=pwd;DB.customers.push(obj);save();closeModal();flash('Customer added — open 🔗 Link to share their sign-in');renderCustomers();}
+  if(id){const ex=custById(id);Object.assign(ex,obj);ex.creditsTotal={'1on1':tot1,'group':totG};ex.credits={'1on1':tot1-used1,'group':totG-usedG};ex.pwd=pwd;save();closeModal();flash('Customer saved');renderCustomers();}
+  else{obj.id=uid();obj.created=todayISO();obj.creditsTotal={'1on1':tot1,'group':totG};obj.credits={'1on1':tot1-used1,'group':totG-usedG};obj.packages=[];obj.token=uid()+uid();obj.pwd=pwd;DB.customers.push(obj);save();closeModal();flash('Customer added — open 🔗 Link to share their sign-in');renderCustomers();}
 }
 function delCustomer(id){if(!confirm('Delete this customer? Their sessions remain.'))return;DB.customers=DB.customers.filter(c=>c.id!==id);save();closeModal();flash('Customer deleted');renderCustomers();}
 
