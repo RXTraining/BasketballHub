@@ -323,7 +323,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail){
   const d={};
   d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):''};
   d.locations=(loc||[]).map(l=>({id:l.id,name:l.name,address:l.address||''}));
-  d.availability=(avail||[]).map(a=>({id:a.id,dow:a.dow,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||''}));
+  d.availability=(avail||[]).map(a=>({id:a.id,date:a.date,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||''}));
   d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',notes:c.notes||'',created:c.created||'',creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
     packages:(pkg||[]).filter(p=>p.customer_id===c.id).map(p=>({id:p.id,type:p.type,qty:p.qty,amount:Number(p.amount),date:p.date}))}));
   d.sessions=(ses||[]).map(s=>({id:s.id,customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[]}));
@@ -379,7 +379,7 @@ async function cloudPush(){
     await syncTable('sessions',DB.sessions.map(sessRow));
     await syncTable('expenses',DB.expenses.map(e=>({id:e.id,date:e.date,cat:e.cat,amount:e.amount,note:e.note||''})));
     await syncTable('cash_entries',DB.cashEntries.map(e=>({id:e.id,date:e.date,amount:e.amount,note:e.note||'',customer_id:e.customerId||null,type:e.type||null,qty:e.qty||null})));
-    await syncTable('availability',(DB.availability||[]).map(a=>({id:a.id,dow:a.dow,start_t:a.start,end_t:a.end,slot_min:a.slotMin,location:a.location||''})));
+    await syncTable('availability',(DB.availability||[]).map(a=>({id:a.id,date:a.date,start_t:a.start,end_t:a.end,slot_min:a.slotMin,location:a.location||''})));
   }catch(e){flash('Cloud save failed — saved on this device',true);}
 }
 
@@ -1193,36 +1193,39 @@ function delLocation(id){
 const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 function fmtT(t){const[h,m]=t.split(':').map(Number);const ap=h<12?'AM':'PM';const hh=((h+11)%12)+1;return hh+':'+String(m).padStart(2,'0')+' '+ap;}
 function renderAvailability(){
-  const rules=(DB.availability||[]).slice().sort((a,b)=>a.dow-b.dow||a.start.localeCompare(b.start));
-  const rows=rules.map(a=>`<tr>
-    <td><b>${DOW[a.dow]}</b></td><td>${fmtT(a.start)} – ${fmtT(a.end)}</td><td>${a.slotMin} min</td><td>${a.location||'—'}</td>
+  const now=todayISO();
+  const rules=(DB.availability||[]).slice().sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
+  const upcoming=rules.filter(a=>a.date>=now);
+  const rows=upcoming.map(a=>`<tr>
+    <td><b>${fmtDate(a.date)}</b><div class="clienttag">${DOW[new Date(a.date+'T00:00').getDay()]}</div></td><td>${fmtT(a.start)} – ${fmtT(a.end)}</td><td>${a.slotMin} min</td><td>${a.location||'—'}</td>
     <td class="right"><button class="iconbtn" onclick="delAvailability('${a.id}')">✕</button></td></tr>`).join('')
-    ||'<tr><td colspan="5"><div class="empty">No availability yet — add a weekly slot below.</div></td></tr>';
+    ||'<tr><td colspan="5"><div class="empty">No upcoming availability — add a date below.</div></td></tr>';
   const locOpt=DB.locations.map(l=>`<option>${l.name}</option>`).join('')||'<option value="">Add a location first</option>';
   $('#view-availability').innerHTML=`
     <h1 class="page">Availability</h1>
-    <div class="sub">Set the weekly time windows you're open. Clients can only request sessions inside these slots, at the location you choose.</div>
+    <div class="sub">Open specific dates and times. Clients can only request sessions inside these slots, at the location you choose. Set it fresh each week.</div>
     <div class="panel" style="margin-bottom:16px">
-      <h3>Add a weekly window</h3>
+      <h3>Open a date</h3>
       <div class="row">
-        <div class="field"><label class="f">Day</label><select id="avDow">${DOW.map((d,i)=>`<option value="${i}" ${i===1?'selected':''}>${d}</option>`).join('')}</select></div>
+        <div class="field"><label class="f">Date</label><input type="date" id="avDate" min="${now}" value="${now}"></div>
         <div class="field"><label class="f">From</label><input type="time" id="avStart" value="16:00"></div>
         <div class="field"><label class="f">To</label><input type="time" id="avEnd" value="19:00"></div>
         <div class="field"><label class="f">Slot length</label><select id="avSlot"><option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>60 min</option><option value="90">90 min</option></select></div>
         <div class="field"><label class="f">Location</label><select id="avLoc">${locOpt}</select></div>
       </div>
       <button class="btn" onclick="addAvailability()">+ Add window</button>
-      <p class="muted small" style="margin-top:8px">Example: Mon 4:00 PM–7:00 PM, 60-min slots → clients can book 4:00, 5:00 or 6:00 on Mondays. Booked times disappear automatically.</p>
+      <p class="muted small" style="margin-top:8px">Example: Jul 7, 4:00–7:00 PM, 60-min slots → clients can book 4:00, 5:00 or 6:00 that day. Add as many dates/windows as you like; booked times drop out automatically.</p>
     </div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
-      <table><thead><tr><th>Day</th><th>Window</th><th>Slot</th><th>Location</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+      <table><thead><tr><th>Date</th><th>Window</th><th>Slot</th><th>Location</th><th></th></tr></thead><tbody>${rows}</tbody></table>
     </div>`;
 }
 function addAvailability(){
+  const date=$('#avDate').value; if(!date)return flash('Pick a date',true);
   const start=$('#avStart').value, end=$('#avEnd').value;
   if(!start||!end||end<=start)return flash('Set a valid time range',true);
   const loc=$('#avLoc').value; if(!loc)return flash('Add a location first (Locations tab)',true);
-  DB.availability.push({id:uid(),dow:+$('#avDow').value,start,end,slotMin:+$('#avSlot').value,location:loc});
+  DB.availability.push({id:uid(),date,start,end,slotMin:+$('#avSlot').value,location:loc});
   save();flash('Availability added 📅');renderAvailability();
 }
 function delAvailability(id){DB.availability=DB.availability.filter(a=>a.id!==id);save();flash('Removed');renderAvailability();}
@@ -1231,10 +1234,9 @@ function delAvailability(id){DB.availability=DB.availability.filter(a=>a.id!==id
    1:1 needs an empty slot; group stays open until it holds 4 clients total. */
 function availableSlots(dateStr,type){
   if(!dateStr)return [];
-  const dow=new Date(dateStr+'T00:00').getDay();
   const now=new Date(); const seen={}; const out=[];
   const sessAt=t=>DB.sessions.filter(s=>s.date===dateStr&&s.time===t&&s.status!=='cancelled');
-  (DB.availability||[]).filter(r=>r.dow===dow).forEach(r=>{
+  (DB.availability||[]).filter(r=>r.date===dateStr).forEach(r=>{
     const step=r.slotMin||60; let [sh,sm]=r.start.split(':').map(Number); let [eh,em]=r.end.split(':').map(Number);
     let cur=sh*60+sm; const lim=eh*60+em;
     for(;cur+step<=lim;cur+=step){
