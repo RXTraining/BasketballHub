@@ -1189,8 +1189,16 @@ function renderFinance(){
   const outstanding=DB.sessions.filter(s=>!s.paid&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
   const expenses=DB.expenses.reduce((a,e)=>a+e.amount,0);
   const profit=revenue-expenses;
-  const remCredits=DB.customers.reduce((a,c)=>a+creditsFor(c,'1on1')+creditsFor(c,'group'),0);
-  const creditValue=DB.customers.reduce((a,c)=>a+creditsFor(c,'1on1')*DB.settings.rate1on1+creditsFor(c,'group')*DB.settings.rateGroup,0);
+  let remCredits=0, creditValue=0;
+  DB.customers.forEach(c=>{
+    ['1on1','group'].forEach(t=>{
+      const rem=creditsFor(c,t); remCredits+=rem;
+      const pk=c.packages.filter(p=>p.type===t);
+      const paid=pk.reduce((a,p)=>a+p.amount,0), qty=pk.reduce((a,p)=>a+p.qty,0);
+      const per=qty>0?paid/qty:(t==='1on1'?DB.settings.rate1on1:DB.settings.rateGroup); // price actually paid per session
+      creditValue+=rem*per;
+    });
+  });
 
   const months=[];const n=finRange==='12m'?12:finRange==='3m'?3:6;
   const base=new Date();base.setDate(1);
