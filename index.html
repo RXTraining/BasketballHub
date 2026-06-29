@@ -845,7 +845,20 @@ function emailClient(to,subject,text){
 function clientCancel(id){
   if(!confirm('Cancel this session?'))return;
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
-  s.status='cancelled';save();flash('Session cancelled');renderBooking();
+  s.status='cancelled';save();flash('Session cancelled');
+  const c=custById(s.customerIds[0]);
+  if(c&&c.email)emailClient(c.email,'RX Training — your session was cancelled',
+    'Hi '+firstName(c.name)+',\n\nYour session has been cancelled:\n'+fmtDT(s.date,s.time)+' · '+s.location+'\n\nNeed another time? Just request one in the app.\n\n— RX Training');
+  notifyCancel(s);
+  renderBooking();
+}
+function notifyCancel(s){
+  const emails=(DB.settings.notifyEmails||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(!emails.length||!(supa&&SUPA_OK))return;
+  const cn=custNames(s.customerIds);
+  supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:'rx@rxtraining.org',
+    subject:'RX Training — session CANCELLED by '+cn,
+    text:cn+' cancelled a session:\n'+(s.type==='1on1'?'1:1 Private':'Group')+'\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location}}).then(()=>{},()=>{});
 }
 function confirmSession(id){
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
