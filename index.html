@@ -375,6 +375,13 @@ async function syncTable(name,rows){
 async function cloudPush(){
   if(!supa||!SUPA_OK)return;
   try{
+    // Clients only write their OWN sessions (no deletes, never settings/customers/etc.)
+    // so a client action can never overwrite the owner's data.
+    if(AUTH==='client'){
+      const mine=DB.sessions.filter(s=>s.customerIds.includes(clientAs)).map(sessRow);
+      if(mine.length){const {error}=await supa.from('sessions').upsert(mine); if(error) throw error;}
+      return;
+    }
     await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null});
     await syncTable('locations',DB.locations.map(l=>({id:l.id,name:l.name,address:l.address||''})));
     await syncTable('customers',DB.customers.map(custRow));
@@ -520,7 +527,9 @@ function saveClientPwd(){
   if(($('#cpOld').value||'')!==(c.pwd||''))return flash('Current password is incorrect',true);
   const n=$('#cpNew').value||'';if(n.length<4)return flash('New password must be 4+ characters',true);
   if(n!==$('#cpNew2').value)return flash('Passwords do not match',true);
-  c.pwd=n;save();closeModal();flash('Password updated 🔑');
+  c.pwd=n;save();
+  if(supa&&SUPA_OK){supa.from('customers').update({pwd:n}).eq('id',clientAs).then(()=>{},()=>{});} // targeted, doesn't touch other fields
+  closeModal();flash('Password updated 🔑');
 }
 
 /* ---------- Export all data to Excel (multi-sheet) ---------- */
