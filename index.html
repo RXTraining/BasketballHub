@@ -383,7 +383,15 @@ async function pollSync(){
     if(sig!==lastSig){DB=fresh;lastSig=sig;refreshOwner();}
   }catch(e){}
 }
-function startPolling(){lastSig=dataSig(DB);clearInterval(pollTimer);pollTimer=setInterval(pollSync,10000);}
+let pollHooked=false;
+function startPolling(){
+  lastSig=dataSig(DB);clearInterval(pollTimer);pollTimer=setInterval(pollSync,8000);
+  if(!pollHooked){
+    pollHooked=true;
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)pollSync();}); // refresh the moment you return to the tab
+    window.addEventListener('focus',pollSync);
+  }
+}
 function stopPolling(){clearInterval(pollTimer);pollTimer=null;}
 
 function save(){
