@@ -383,16 +383,27 @@ async function pollSync(){
     if(sig!==lastSig){DB=fresh;lastSig=sig;refreshOwner();}
   }catch(e){}
 }
-let pollHooked=false;
+let pollHooked=false, rtChannel=null, rtTimer=null;
+/* Supabase Realtime: push updates instantly to every open device */
+function subscribeRealtime(){
+  if(!supa||!SUPA_OK||rtChannel||!supa.channel)return;
+  try{
+    rtChannel=supa.channel('rx-live')
+      .on('postgres_changes',{event:'*',schema:'public'},()=>{clearTimeout(rtTimer);rtTimer=setTimeout(pollSync,300);})
+      .subscribe();
+  }catch(e){}
+}
+function unsubscribeRealtime(){if(rtChannel){try{supa.removeChannel(rtChannel);}catch(e){}rtChannel=null;}}
 function startPolling(){
   lastSig=dataSig(DB);clearInterval(pollTimer);pollTimer=setInterval(pollSync,8000);
+  subscribeRealtime();
   if(!pollHooked){
     pollHooked=true;
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)pollSync();}); // refresh the moment you return to the tab
     window.addEventListener('focus',pollSync);
   }
 }
-function stopPolling(){clearInterval(pollTimer);pollTimer=null;}
+function stopPolling(){clearInterval(pollTimer);pollTimer=null;unsubscribeRealtime();}
 
 function save(){
   try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){}
