@@ -662,7 +662,8 @@ function renderBookingTable(){
 
   const rows = list.map(s=>{
     const statusPill = s.status==='completed'?'<span class="pill green">Completed</span>':
-      s.status==='cancelled'?'<span class="pill red">Cancelled</span>':'<span class="pill yellow">Scheduled</span>';
+      s.status==='cancelled'?'<span class="pill red">Cancelled</span>':
+      s.status==='pending'?'<span class="pill yellow">Pending</span>':'<span class="pill blue">Scheduled</span>';
     const checkCell = s.checkedIn?'<span class="pill green">✓ In</span>':
       (s.date<=now && s.status!=='cancelled'?`<button class="iconbtn" onclick="ownerCheckIn('${s.id}')">Check in</button>`:'<span class="pill">—</span>');
     let payCell;
@@ -678,6 +679,7 @@ function renderBookingTable(){
       <td>${payCell}</td>
       <td class="right">${money(s.price)}</td>
       <td class="right"><div class="actions">
+        ${s.status==='pending'?`<button class="btn sm" onclick="confirmSession('${s.id}')">Confirm</button>`:''}
         <button class="iconbtn" title="Calendar" onclick="addToCalendar('${s.id}')">📅</button>
         <button class="iconbtn" onclick="openSession('${s.id}')">Edit</button>
       </div></td>
@@ -742,12 +744,13 @@ function clientCard(s){
   return `<div class="panel" style="margin-bottom:12px">
     <div class="row" style="justify-content:space-between;align-items:center">
       <div>
-        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} ${s.paid?'<span class="pill green">Prepaid</span>':''} ${s.status==='completed'?'<span class="pill green">Completed</span>':s.status==='cancelled'?'<span class="pill red">Cancelled</span>':''}
+        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} ${s.paid?'<span class="pill green">Prepaid</span>':''} ${s.status==='pending'?'<span class="pill yellow">Pending</span>':s.status==='scheduled'?'<span class="pill blue">Booked</span>':s.status==='completed'?'<span class="pill green">Completed</span>':s.status==='cancelled'?'<span class="pill red">Cancelled</span>':''}
         <div class="clienttag" style="margin-top:4px">${s.dur} min · 📍 ${s.location||'TBD'}${others>0?' · with '+others+' other player'+(others>1?'s':''):''}</div>
       </div>
       <div class="actions">
         ${s.date===now && !s.checkedIn && s.status==='scheduled'?`<button class="btn sm" onclick="clientCheckIn('${s.id}')">Check In</button>`:''}
         ${s.checkedIn?'<span class="pill green">✓ Checked in</span>':''}
+        ${(s.status==='pending'||s.status==='scheduled')&&s.date>=now?`<button class="btn ghost sm" onclick="clientCancel('${s.id}')">Cancel</button>`:''}
         <button class="btn ghost sm" onclick="addToCalendar('${s.id}')">📅 Add to calendar</button>
       </div>
     </div>
@@ -762,7 +765,8 @@ function renderBookingClient(){
   const c=custById(clientAs);
   if(!c){$('#view-booking').innerHTML='<div class="panel"><div class="empty">Profile not found. Please sign in again.</div></div>';return;}
   const mine = DB.sessions.filter(s=>s.customerIds.includes(c.id));
-  const today=sortSessions(mine.filter(s=>s.date===now && s.status!=='cancelled'));
+  const today=sortSessions(mine.filter(s=>s.date===now && (s.status==='scheduled'||s.status==='pending')));
+  const pending=sortSessions(mine.filter(s=>s.date>=now && s.status==='pending'));
   const upcoming=sortSessions(mine.filter(s=>s.date>=now && s.status==='scheduled'));
   const t1=totalFor(c,'1on1'),u1=usedFor(c,'1on1'),tG=totalFor(c,'group'),uG=usedFor(c,'group');
   const pkgHist=c.packages.length?c.packages.slice().reverse().map(p=>`<div class="clienttag">• ${p.qty}× ${p.type==='1on1'?'1:1':'Group'} package — ${money(p.amount)} · ${fmtDate(p.date)}</div>`).join(''):'<div class="clienttag">No packages yet.</div>';
@@ -796,9 +800,10 @@ function renderBookingClient(){
           <p class="muted small" style="margin-top:8px">To buy a package, ask the Owner — your used/total balance updates automatically.</p></div>
       </div>
       <div>
-        ${today.length?`<h3 style="margin:0 0 10px">Today — ready to check in</h3>${today.map(clientCard).join('')}`:''}
-        <h3 style="margin:${today.length?'18px':'0'} 0 10px">Your upcoming sessions</h3>
-        ${upcoming.length?upcoming.map(clientCard).join(''):'<div class="panel"><div class="empty">No upcoming sessions yet — request one ←</div></div>'}
+        ${today.length?`<h3 style="margin:0 0 10px">Today</h3>${today.map(clientCard).join('')}`:''}
+        ${pending.length?`<h3 style="margin:${today.length?'18px':'0'} 0 10px">Pending — awaiting confirmation</h3>${pending.map(clientCard).join('')}`:''}
+        <h3 style="margin:${(today.length||pending.length)?'18px':'0'} 0 10px">Your booked sessions</h3>
+        ${upcoming.length?upcoming.map(clientCard).join(''):'<div class="panel"><div class="empty">No booked sessions yet — request one ←</div></div>'}
       </div>
     </div>`;
   renderSlots();
@@ -823,12 +828,32 @@ function submitRequest(){
   const [time,loc]=slot.split('|');
   const comment=($('#rqComment')?$('#rqComment').value:'').trim();
   const s={id:uid(),customerIds:[cid],type,date:$('#rqDate').value,time,
-    dur,price:computePrice(type,dur,1),status:'scheduled',paid:false,paidVia:'',checkedIn:false,location:loc||'TBD',
+    dur,price:computePrice(type,dur,1),status:'pending',paid:false,paidVia:'',checkedIn:false,location:loc||'TBD',
     notes:'Client request'+(comment?(' — '+comment):'')};
   DB.sessions.push(s);
-  save();flash('Session requested! 🏀');
+  save();flash('Request sent — awaiting confirmation 🏀');
   notifyOwner(s,comment);
   renderBooking();
+}
+/* email a single client via the Edge Function (replies route to rx@rxtraining.org) */
+function emailClient(to,subject,text){
+  if(!to)return flash('Client has no email on file',true);
+  if(!(supa&&SUPA_OK))return flash('Connect Supabase to send email',true);
+  supa.functions.invoke('send-request-email',{body:{to:[to],subject,text,replyTo:'rx@rxtraining.org'}})
+    .then(({error})=>{if(error)throw error;flash('Email sent to client 📧');},()=>flash('Email failed — check the function',true));
+}
+function clientCancel(id){
+  if(!confirm('Cancel this session?'))return;
+  const s=DB.sessions.find(x=>x.id===id);if(!s)return;
+  s.status='cancelled';save();flash('Session cancelled');renderBooking();
+}
+function confirmSession(id){
+  const s=DB.sessions.find(x=>x.id===id);if(!s)return;
+  s.status='scheduled';save();
+  const c=custById(s.customerIds[0]);
+  if(c&&c.email){emailClient(c.email,'RX Training — your session is confirmed',
+    'Hi '+firstName(c.name)+',\n\nYour '+(s.type==='1on1'?'1:1 Private':'group')+' session is confirmed:\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location+'\n\nReply to this email if you need to change anything.\n\n— RX Training');}
+  flash('Confirmed'+(c&&c.email?' & client emailed ✅':' ✅'));refreshOwner();
 }
 async function notifyOwner(s,comment){
   const emails=(DB.settings.notifyEmails||'').split(',').map(x=>x.trim()).filter(Boolean);
@@ -920,7 +945,7 @@ function openSession(id,returnCust){
     <div class="row">
       <div class="field"><label class="f">Price ($) — auto, editable</label><input type="number" id="sPrice" value="${s.price}"></div>
       <div class="field"><label class="f">Status — syncs to client</label><select id="sStatus">
-        ${['scheduled','completed','cancelled'].map(v=>`<option ${s.status===v?'selected':''}>${v}</option>`).join('')}</select></div>
+        ${['pending','scheduled','completed','cancelled'].map(v=>`<option ${s.status===v?'selected':''}>${v}</option>`).join('')}</select></div>
     </div>
     <div class="row">
       <div class="field"><label class="f">Payment</label><select id="sPay">
@@ -940,6 +965,7 @@ function openSession(id,returnCust){
     <p class="muted small">Marking payment as "package credit" counts one used session against the client's prepaid total. Manage venues in the Locations tab.</p>
   `,`
     ${id?`<button class="btn danger" onclick="delSession('${id}')">Delete</button>`:''}
+    ${id?`<button class="btn ghost" onclick="saveSession('${id}',true)">📧 Save & email client</button>`:''}
     <button class="btn ghost" onclick="closeSessionEditor()">Cancel</button>
     <button class="btn" onclick="saveSession('${id||''}')">Save</button>`);
   renderMediaPrev();
@@ -951,7 +977,7 @@ function recalcPrice(){
   $('#sPrice').value=computePrice(type,dur,n);
 }
 function afterSessionSave(){const rc=sessionReturnCust;sessionReturnCust=null;closeModal();if(rc&&custById(rc))viewCustomer(rc);else refreshOwner();}
-function saveSession(id){
+function saveSession(id,emailAfter){
   const ids=$$('.sCustCb').filter(cb=>cb.checked).map(cb=>cb.value);
   if(!ids.length)return flash('Tick at least one client',true);
   const type=$('#sType').value;
@@ -963,7 +989,14 @@ function saveSession(id){
     feedback:$('#sFeedback').value,media:editMedia.slice()};
   if(id){Object.assign(DB.sessions.find(x=>x.id===id),obj);}
   else{obj.id=uid();DB.sessions.push(obj);}
-  if(!save())return;flash('Session saved');afterSessionSave();
+  if(!save())return;flash('Session saved');
+  if(emailAfter){
+    const c=custById(ids[0]);
+    if(!c||!c.email){flash('Client has no email on file',true);}
+    else{emailClient(c.email,'RX Training — note about your '+fmtDate(obj.date)+' session',
+      'Hi '+firstName(c.name)+',\n\n'+(obj.feedback||'(no note)')+'\n\nSession: '+fmtDT(obj.date,obj.time)+' · '+obj.location+'\nReply to this email with any questions.\n\n— RX Training');}
+  }
+  afterSessionSave();
 }
 function delSession(id){if(!confirm('Delete this session?'))return;DB.sessions=DB.sessions.filter(x=>x.id!==id);save();flash('Session deleted');afterSessionSave();}
 
