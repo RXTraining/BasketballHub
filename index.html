@@ -340,26 +340,51 @@ async function migrateSource(){
   try{const {data}=await supa.from(STATE_TABLE).select('data').eq('id','main').maybeSingle();if(data&&data.data)return normalize(data.data);}catch(e){}
   return localData();
 }
+async function fetchCloud(){
+  const [st,loc,cus,pkg,ses,exp,cash,avail]=await Promise.all([
+    supa.from('settings').select('*').eq('id','main').maybeSingle(),
+    supa.from('locations').select('*'), supa.from('customers').select('*'),
+    supa.from('packages').select('*'), supa.from('sessions').select('*'),
+    supa.from('expenses').select('*'), supa.from('cash_entries').select('*'),
+    supa.from('availability').select('*')]);
+  const err=[st,loc,cus,pkg,ses,exp,cash,avail].find(r=>r.error); if(err) throw err.error;
+  return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data,avail.data);
+}
 async function bootLoad(){
   const cfg=getSupaCfg();
   if(cfg && window.supabase){
     try{
       supa=window.supabase.createClient(cfg.url,cfg.key);
-      const [st,loc,cus,pkg,ses,exp,cash,avail]=await Promise.all([
-        supa.from('settings').select('*').eq('id','main').maybeSingle(),
-        supa.from('locations').select('*'), supa.from('customers').select('*'),
-        supa.from('packages').select('*'), supa.from('sessions').select('*'),
-        supa.from('expenses').select('*'), supa.from('cash_entries').select('*'),
-        supa.from('availability').select('*')]);
-      const err=[st,loc,cus,pkg,ses,exp,cash,avail].find(r=>r.error); if(err) throw err.error;
+      const fresh=await fetchCloud();
       SUPA_OK=true;
-      const empty=!st.data && !(cus.data&&cus.data.length) && !(ses.data&&ses.data.length);
+      const empty=!fresh.customers.length && !fresh.sessions.length;
       if(empty){ DB=await migrateSource(); await cloudPush(); return DB; }
-      return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data,avail.data);
+      return fresh;
     }catch(e){console.warn('Supabase offline:',e.message);SUPA_OK=false;}
   }
   return localData();
 }
+/* ---- live-ish sync: poll the cloud and refresh the view when data changes ---- */
+let pollTimer=null, lastSig='';
+function dataSig(d){return JSON.stringify({
+  s:(d.sessions||[]).map(x=>[x.id,x.status,x.checkedIn,x.paidVia,x.date,x.time,x.price,x.feedback||'',(x.media||[]).length]),
+  c:(d.customers||[]).map(x=>[x.id,x.name,x.email,x.pwd,x.creditsTotal,x.packages.length]),
+  a:(d.availability||[]).map(x=>[x.id,x.date,x.start,x.end,x.location]),
+  e:(d.expenses||[]).length, k:(d.cashEntries||[]).length,
+  n:d.settings&&d.settings.notifyEmails});}
+async function pollSync(){
+  if(!supa||!SUPA_OK||cloudTimer)return;                       // skip if a local save is in flight
+  if($('#modal').classList.contains('show'))return;            // don't disrupt an open dialog
+  const ae=document.activeElement;
+  if(ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))return;  // don't wipe what someone's typing
+  try{
+    const fresh=await fetchCloud();
+    const sig=dataSig(fresh);
+    if(sig!==lastSig){DB=fresh;lastSig=sig;refreshOwner();}
+  }catch(e){}
+}
+function startPolling(){lastSig=dataSig(DB);clearInterval(pollTimer);pollTimer=setInterval(pollSync,10000);}
+function stopPolling(){clearInterval(pollTimer);pollTimer=null;}
 
 function save(){
   try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){}
@@ -464,8 +489,8 @@ function initAuth(){
   const m=location.hash.match(/[#&]c=([a-z0-9]+)/i);
   if(m){const c=DB.customers.find(x=>x.token===m[1]);if(c)pendingClient=c.id;}
   let ss=null;try{ss=JSON.parse(sessionStorage.getItem('rx_sess'));}catch(e){}
-  if(ss&&ss.auth==='owner'){AUTH='owner';ROLE='owner';TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();return;}
-  if(ss&&ss.auth==='client'&&custById(ss.clientAs)){AUTH='client';ROLE='client';clientAs=ss.clientAs;TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();return;}
+  if(ss&&ss.auth==='owner'){AUTH='owner';ROLE='owner';TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();startPolling();return;}
+  if(ss&&ss.auth==='client'&&custById(ss.clientAs)){AUTH='client';ROLE='client';clientAs=ss.clientAs;TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();startPolling();return;}
   showLogin();
 }
 function showLogin(){
@@ -486,7 +511,7 @@ function ownerLogin(){
   if(!DB.settings.ownerPwd){if((v||'').length<4)return flash('Choose a password with 4+ characters',true);DB.settings.ownerPwd=v;save();flash('Owner password set 🔑');}
   else if(v!==DB.settings.ownerPwd)return flash('Incorrect password',true);
   AUTH='owner';ROLE='owner';TAB='booking';
-  $('#login').classList.remove('show');renderWhoami();switchTab();
+  $('#login').classList.remove('show');renderWhoami();switchTab();startPolling();
 }
 function clientLoginPick(){
   const name=($('#loginClient').value||'').trim().toLowerCase();
@@ -499,10 +524,10 @@ function clientLoginPick(){
 }
 function loginAsClient(id){
   AUTH='client';ROLE='client';clientAs=id;TAB='booking';
-  $('#login').classList.remove('show');renderWhoami();switchTab();
+  $('#login').classList.remove('show');renderWhoami();switchTab();startPolling();
 }
 function signOut(){
-  AUTH=null;ROLE='owner';pendingClient=null;
+  AUTH=null;ROLE='owner';pendingClient=null;stopPolling();
   try{sessionStorage.removeItem('rx_sess');}catch(e){}
   if(location.hash) history.replaceState(null,'',location.pathname+location.search);
   showLogin();
