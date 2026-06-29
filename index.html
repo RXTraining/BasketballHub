@@ -301,6 +301,7 @@ function normalize(d){
   if(!d)d=seed();
   d.settings=d.settings||{rate1on1:30,rateGroup:20};
   if(d.settings.defaultClientPwd===undefined)d.settings.defaultClientPwd='rxtraining';
+  ['notifyEmails','ejService','ejTemplate','ejKey'].forEach(k=>{if(d.settings[k]===undefined)d.settings[k]='';});
   if(!d.cashEntries)d.cashEntries=[];
   if(!d.locations){const names=[...new Set((d.sessions||[]).map(s=>s.location).filter(Boolean))];if(!names.length)names.push('Lexington Gym');d.locations=names.map(n=>({id:uid(),name:n,address:''}));}
   if(!d.availability)d.availability=[];
@@ -323,7 +324,7 @@ function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.
 /* ----- relational mapping (separate tables in Supabase) ----- */
 function assemble(st,loc,cus,pkg,ses,exp,cash,avail){
   const d={};
-  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):''};
+  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):''};
   d.locations=(loc||[]).map(l=>({id:l.id,name:l.name,address:l.address||''}));
   d.availability=(avail||[]).map(a=>({id:a.id,date:a.date,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||''}));
   d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',notes:c.notes||'',created:c.created||'',creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
@@ -374,7 +375,7 @@ async function syncTable(name,rows){
 async function cloudPush(){
   if(!supa||!SUPA_OK)return;
   try{
-    await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null});
+    await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null});
     await syncTable('locations',DB.locations.map(l=>({id:l.id,name:l.name,address:l.address||''})));
     await syncTable('customers',DB.customers.map(custRow));
     await syncTable('packages',DB.customers.flatMap(c=>c.packages.map(p=>({id:p.id,customer_id:c.id,type:p.type,qty:p.qty,amount:p.amount,date:p.date}))));
@@ -778,8 +779,9 @@ function renderBookingClient(){
             <select id="rqType" onchange="renderSlots()"><option value="1on1">1:1 Private (${money(DB.settings.rate1on1)}/hr)</option><option value="group">Group / 1:N (${money(DB.settings.rateGroup)}/hr per player)</option></select></div>
           <div class="field"><label class="f">Date</label><input type="date" id="rqDate" min="${now}" value="${now}" onchange="renderSlots()"></div>
           <div class="field"><label class="f">Available time</label><select id="rqSlot"></select></div>
+          <div class="field"><label class="f">Comment (optional)</label><textarea id="rqComment" placeholder="e.g. I'd prefer a later time if possible, or any note for the coach…"></textarea></div>
           <button class="btn" style="width:100%" onclick="submitRequest()">Request Session</button>
-          <p class="muted small" style="margin-top:10px">Only the Owner's open time slots are shown. They'll confirm your request; if you have a prepaid package, your credit is applied when you check in.</p>
+          <p class="muted small" style="margin-top:10px">Only the Owner's open time slots are shown. Prefer a different time? Pick the closest slot and note it in the comment. The Owner is notified and will confirm.</p>
         </div>
         <div class="panel" style="margin-top:16px"><h3>Your packages</h3>${pkgHist}
           <p class="muted small" style="margin-top:8px">To buy a package, ask the Owner — your used/total balance updates automatically.</p></div>
@@ -810,9 +812,32 @@ function submitRequest(){
   const slot=$('#rqSlot')?$('#rqSlot').value:'';
   if(!slot)return flash('No open time slot selected — pick another date',true);
   const [time,loc]=slot.split('|');
-  DB.sessions.push({id:uid(),customerIds:[cid],type,date:$('#rqDate').value,time,
-    dur,price:computePrice(type,dur,1),status:'scheduled',paid:false,paidVia:'',checkedIn:false,location:loc||'TBD',notes:'Client request'});
-  save();flash('Session requested! 🏀');renderBooking();
+  const comment=($('#rqComment')?$('#rqComment').value:'').trim();
+  const s={id:uid(),customerIds:[cid],type,date:$('#rqDate').value,time,
+    dur,price:computePrice(type,dur,1),status:'scheduled',paid:false,paidVia:'',checkedIn:false,location:loc||'TBD',
+    notes:'Client request'+(comment?(' — '+comment):'')};
+  DB.sessions.push(s);
+  save();flash('Session requested! 🏀');
+  notifyOwner(s,comment);
+  renderBooking();
+}
+async function notifyOwner(s,comment){
+  const emails=(DB.settings.notifyEmails||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(!emails.length)return;
+  const cn=custNames(s.customerIds);
+  const subject='RX Training — new request from '+cn;
+  const body='New session request:\n\nClient: '+cn+'\nType: '+(s.type==='1on1'?'1:1 Private':'Group')+'\nDate: '+fmtDT(s.date,s.time)+'\nLocation: '+s.location+(comment?('\nComment: '+comment):'')+'\n\nOpen RX.TRAINING to confirm.';
+  if(supa && SUPA_OK){
+    try{
+      const {data,error}=await supa.functions.invoke('send-request-email',{body:{to:emails,subject,text:body}});
+      if(error||(data&&data.error))throw(error||data.error);
+      flash('Owner notified 📧');return;
+    }catch(e){console.warn('email function failed',e);} // fall back to a pre-filled email
+  }
+  mailtoOwner(emails,subject,body);
+}
+function mailtoOwner(emails,subject,body){
+  try{window.location.href='mailto:'+encodeURIComponent(emails.join(','))+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);}catch(e){}
 }
 
 function clientCheckIn(id){
@@ -1434,7 +1459,19 @@ function renderAdmin(){
         <button class="btn sm ghost" onclick="saveDefCPwd()">Save default</button>
         <div class="clienttag" style="margin-top:8px">Used for new clients. Reset any client's password in Customers → Edit.</div>
       </div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h3>Request notifications</h3>
+      <div class="field"><label class="f">Notify these email(s) when a client requests a session — comma-separated</label>
+        <input id="ntfEmails" value="${DB.settings.notifyEmails||''}" placeholder="coach@example.com, 5551234567@vtext.com"></div>
+      <div class="clienttag" style="margin:-6px 0 12px">Tip: add your carrier's email-to-SMS address (e.g. <b style="color:var(--txt)">number@vtext.com</b> Verizon, <b style="color:var(--txt)">@txt.att.net</b> AT&amp;T, <b style="color:var(--txt)">@tmomail.net</b> T-Mobile) to get a text message.</div>
+      <button class="btn sm" onclick="saveNotify()">Save notifications</button>
+      <div class="clienttag" style="margin-top:10px">Auto-send uses your secure Supabase Edge Function (<b style="color:var(--txt)">send-request-email</b>) with the Resend key kept server-side. If it isn't set up, the app opens a pre-filled email instead. Setup steps are in <b style="color:var(--txt)">supabase-edge-function.md</b>.</div>
     </div>`;
+}
+function saveNotify(){
+  DB.settings.notifyEmails=($('#ntfEmails').value||'').trim();
+  save();flash('Notification settings saved');
 }
 function openExpense(id){
   const e=id?DB.expenses.find(x=>x.id===id):{date:todayISO(),cat:'Gym Rental',amount:0,note:''};
