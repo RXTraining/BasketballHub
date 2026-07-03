@@ -196,11 +196,22 @@
   <div class="card" style="max-width:420px">
     <div class="logo" style="font-size:30px;margin-bottom:4px">RX<span class="dot">.</span>TRAINING</div>
     <div id="clientPanel">
-      <div class="muted small" style="margin-bottom:18px">Player sign in</div>
-      <p class="muted small" id="clientHint">Enter your name and password (or open your personal link).</p>
-      <input id="loginClient" placeholder="Your full name" autocomplete="off" onkeydown="if(event.key==='Enter')clientLoginPick()">
-      <input type="password" id="loginClientPwd" placeholder="Your password" style="margin-top:10px" onkeydown="if(event.key==='Enter')clientLoginPick()">
-      <button class="btn" style="width:100%;margin-top:14px" onclick="clientLoginPick()">Sign in</button>
+      <div class="seg" style="margin-bottom:16px">
+        <button id="roleTabPlayer" class="active" onclick="showLoginTab('client')">🏀 Player</button>
+        <button id="roleTabCoach" onclick="showLoginTab('coach')">📋 Coach</button>
+      </div>
+      <div id="playerLogin">
+        <p class="muted small" id="clientHint">Enter your name and password (or open your personal link).</p>
+        <input id="loginClient" placeholder="Your full name" autocomplete="off" onkeydown="if(event.key==='Enter')clientLoginPick()">
+        <input type="password" id="loginClientPwd" placeholder="Your password" style="margin-top:10px" onkeydown="if(event.key==='Enter')clientLoginPick()">
+        <button class="btn" style="width:100%;margin-top:14px" onclick="clientLoginPick()">Sign in as player</button>
+      </div>
+      <div id="coachLogin" class="hidden">
+        <p class="muted small">Coaches: sign in with your name and the password set by the owner.</p>
+        <input id="loginCoach" placeholder="Your name" autocomplete="off" onkeydown="if(event.key==='Enter')coachLoginPick()">
+        <input type="password" id="loginCoachPwd" placeholder="Your password" style="margin-top:10px" onkeydown="if(event.key==='Enter')coachLoginPick()">
+        <button class="btn" style="width:100%;margin-top:14px" onclick="coachLoginPick()">Sign in as coach</button>
+      </div>
     </div>
     <div id="ownerPanel" class="hidden">
       <div class="muted small" style="margin-bottom:18px">🔑 Owner sign in</div>
@@ -441,6 +452,12 @@ async function cloudPush(){
       if(mine.length){const {error}=await supa.from('sessions').upsert(mine); if(error) throw error;}
       return;
     }
+    // Coaches only write their OWN sessions' status (no deletes, never settings/customers/etc.)
+    if(AUTH==='coach'){
+      const mine=DB.sessions.filter(s=>s.coachId===coachAs).map(sessRow);
+      if(mine.length){const {error}=await supa.from('sessions').upsert(mine); if(error) throw error;}
+      return;
+    }
     await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null});
     await syncTable('coaches',(DB.coaches||[]).map(coachRow));
     await syncTable('locations',DB.locations.map(l=>({id:l.id,name:l.name,address:l.address||''})));
@@ -566,11 +583,20 @@ function initAuth(){
 function showLogin(){
   AUTH=null;renderWhoami();
   if(pendingClient){const pc=custById(pendingClient);if(pc){$('#loginClient').value=pc.name;$('#clientHint').textContent='Welcome back, '+firstName(pc.name)+' — enter your password.';}}
-  else{$('#loginClient').value='';$('#clientHint').textContent='Players & coaches: enter your name and password (players can also open their personal link).';}
+  else{$('#loginClient').value='';$('#clientHint').textContent='Players: enter your name and password (or open your personal link).';}
   $('#ownerHint').textContent=DB.settings.ownerPwd?'Enter your owner password.':'First time here — create an owner password (4+ characters).';
   $('#loginPwd').value='';if($('#loginClientPwd'))$('#loginClientPwd').value='';
+  if($('#loginCoach'))$('#loginCoach').value='';if($('#loginCoachPwd'))$('#loginCoachPwd').value='';
+  showLoginTab('client');
   toggleOwnerLogin(false);
   $('#login').classList.add('show');
+}
+function showLoginTab(which){
+  const coach=which==='coach';
+  if($('#playerLogin'))$('#playerLogin').classList.toggle('hidden',coach);
+  if($('#coachLogin'))$('#coachLogin').classList.toggle('hidden',!coach);
+  if($('#roleTabPlayer'))$('#roleTabPlayer').classList.toggle('active',!coach);
+  if($('#roleTabCoach'))$('#roleTabCoach').classList.toggle('active',coach);
 }
 function toggleOwnerLogin(showOwner){
   $('#ownerPanel').classList.toggle('hidden',!showOwner);
@@ -587,13 +613,23 @@ function clientLoginPick(){
   const name=($('#loginClient').value||'').trim().toLowerCase();
   if(!name)return flash('Enter your name',true);
   const pwd=$('#loginClientPwd').value;
-  // a coach and a client can both sign in here — check coaches first
-  const co=(DB.coaches||[]).find(x=>(x.name||'').trim().toLowerCase()===name && x.active!==false);
-  if(co){ if((co.pwd||'')!==pwd)return flash('Incorrect name or password',true); return loginAsCoach(co.id); }
-  const c=DB.customers.find(x=>(x.name||'').trim().toLowerCase()===name);
-  if(!c||(c.pwd||'')!==pwd)return flash('Incorrect name or password',true);
+  const matches=DB.customers.filter(x=>(x.name||'').trim().toLowerCase()===name);
+  if(!matches.length)return flash('No player found with that name',true);
+  // if several players share a name, the password picks the right one
+  const c=matches.find(x=>(x.pwd||'')===pwd);
+  if(!c)return flash('Incorrect password',true);
   loginAsClient(c.id);
   if(pwd===DB.settings.defaultClientPwd)flash('Tip: set your own password via “Change password”.');
+}
+function coachLoginPick(){
+  const name=($('#loginCoach').value||'').trim().toLowerCase();
+  if(!name)return flash('Enter your name',true);
+  const pwd=$('#loginCoachPwd').value;
+  const matches=(DB.coaches||[]).filter(x=>x.active!==false&&(x.name||'').trim().toLowerCase()===name);
+  if(!matches.length)return flash('No active coach found with that name',true);
+  const co=matches.find(x=>(x.pwd||'')===pwd);
+  if(!co)return flash('Incorrect password',true);
+  loginAsCoach(co.id);
 }
 function loginAsClient(id){
   AUTH='client';ROLE='client';clientAs=id;pickCoach=defaultCoachId();TAB='booking';
@@ -753,8 +789,9 @@ function renderBookingOwner(){
     <h1 class="page">Booking & Schedule</h1>
     <div class="sub">${AUTH==='coach'?'Your client arrangements — sessions, check-ins and your calendar.':'Client arrangements — manage sessions, check-ins, packages, locations and your calendar.'} <span class="pill ${scopeCoach()==='all'?'orange':'green'}" style="margin-left:6px">${scopeLbl}</span></div>
     <div class="row" style="margin-bottom:16px">
-      <button class="btn" onclick="openSession()">+ New Session</button>
+      ${AUTH!=='coach'?'<button class="btn" onclick="openSession()">+ New Session</button>':''}
       <button class="btn ghost" onclick="exportAllCal()">📅 Export all upcoming (.ics)</button>
+      ${AUTH==='coach'?'<span class="clienttag" style="align-self:center">Sessions are created & edited by the owner. You can update status (including cancel) and check players in.</span>':''}
     </div>
     <div class="seg">
       <button class="${bookView==='table'?'active':''}" onclick="bookView='table';renderBooking()">▤ Table</button>
@@ -779,9 +816,15 @@ function renderBookingTable(){
       (s.date<=now && s.status!=='cancelled'?`<button class="iconbtn" onclick="ownerCheckIn('${s.id}')">Check in</button>`:'<span class="pill">—</span>');
     let payCell;
     if(s.paid){payCell='<span class="pill green">Paid</span><div class="clienttag">'+(s.paidVia==='package'?'package':'cash')+'</div>';}
+    else if(AUTH==='coach'){payCell='<span class="pill red">Unpaid</span>';}
     else{payCell=`<div class="actions" style="justify-content:flex-start">
         ${sessionHasCredit(s)?`<button class="iconbtn" title="Use prepaid credit" onclick="payCredit('${s.id}')">Credit</button>`:''}
         <button class="iconbtn" onclick="payCash('${s.id}')">Cash</button></div>`;}
+    const actionCell = AUTH==='coach'
+      ? statusSelect(s)+`<button class="iconbtn" title="Calendar" onclick="addToCalendar('${s.id}')">📅</button>`
+      : `${s.status==='pending'?`<button class="btn sm" onclick="confirmSession('${s.id}')">Confirm</button>`:''}
+        <button class="iconbtn" title="Calendar" onclick="addToCalendar('${s.id}')">📅</button>
+        <button class="iconbtn" onclick="openSession('${s.id}')">Edit</button>`;
     return `<tr>
       <td><b>${fmtDT(s.date,s.time)}</b><div class="clienttag">${s.dur} min · ${s.location||''}</div></td>
       <td>${custNames(s.customerIds)}<div class="clienttag">${typePill(s)}</div></td>
@@ -789,11 +832,7 @@ function renderBookingTable(){
       <td>${checkCell}</td>
       <td>${payCell}</td>
       <td class="right">${money(s.price)}</td>
-      <td class="right"><div class="actions">
-        ${s.status==='pending'?`<button class="btn sm" onclick="confirmSession('${s.id}')">Confirm</button>`:''}
-        <button class="iconbtn" title="Calendar" onclick="addToCalendar('${s.id}')">📅</button>
-        <button class="iconbtn" onclick="openSession('${s.id}')">Edit</button>
-      </div></td>
+      <td class="right"><div class="actions">${actionCell}</div></td>
     </tr>`;
   }).join('');
 
@@ -824,7 +863,7 @@ function renderBookingCalendar(){
     const isToday = ds===todayISO();
     const chips=sortSessions(byDate[ds]||[]).map(s=>{
       const lab=(s.time)+' '+firstName(custNames(s.customerIds))+(s.customerIds.length>1?' +'+(s.customerIds.length-1):'');
-      return `<div class="cchip ${s.type==='1on1'?'t1on1':'tgroup'} ${s.status==='completed'?'done':''}" title="${custNames(s.customerIds)} · ${s.location||''}" onclick="openSession('${s.id}')">${lab}</div>`;
+      return `<div class="cchip ${s.type==='1on1'?'t1on1':'tgroup'} ${s.status==='completed'?'done':''}" title="${custNames(s.customerIds)} · ${s.location||''}" onclick="${AUTH==='coach'?`openCoachStatus('${s.id}')`:`openSession('${s.id}')`}">${lab}</div>`;
     }).join('');
     cells+=`<div class="calcell ${isToday?'today':''}"><div class="caldate">${d}</div>${chips}</div>`;
   }
@@ -845,6 +884,32 @@ function renderBookingCalendar(){
         <span class="muted">Click a session to edit · faded = completed</span>
       </div>
     </div>`;
+}
+/* coach: status-only control (no create/edit) — syncs to owner + client */
+function statusSelect(s){
+  const opts=['pending','scheduled','completed','cancelled'];
+  return '<select class="coachsel" title="Update status" onchange="coachSetStatus(\''+s.id+'\',this.value)">'+opts.map(o=>'<option '+(s.status===o?'selected':'')+'>'+o+'</option>').join('')+'</select>';
+}
+function coachSetStatus(id,val){
+  const s=DB.sessions.find(x=>x.id===id);if(!s)return;
+  const prev=s.status; if(prev===val)return; s.status=val; save();
+  const c=custById(s.customerIds[0]);
+  if(val==='scheduled'&&c&&c.email){emailClient(c.email,'RX Training — your session is confirmed',
+    'Hi '+firstName(c.name)+',\n\nYour '+(s.type==='1on1'?'1:1 Private':'group')+' session with '+coachName(s.coachId)+' is confirmed:\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location+'\n\n— RX Training');}
+  if(val==='cancelled'){
+    if(c&&c.email)emailClient(c.email,'RX Training — your session was cancelled',
+      'Hi '+firstName(c.name)+',\n\nYour session has been cancelled:\n'+fmtDT(s.date,s.time)+' · '+s.location+'\n\nNeed another time? Request one in the app.\n\n— RX Training');
+    notifyCancel(s);
+  }
+  flash('Status updated → '+val);refreshOwner();
+}
+function openCoachStatus(id){
+  const s=DB.sessions.find(x=>x.id===id);if(!s)return;
+  openModal('Update session status',`
+    <div class="clienttag" style="margin-bottom:12px"><b>${fmtDT(s.date,s.time)}</b> · ${s.type==='1on1'?'1:1':'Group'} · ${custNames(s.customerIds)}<br>📍 ${s.location||''}</div>
+    <div class="field"><label class="f">Status</label><select id="csStatus">${['pending','scheduled','completed','cancelled'].map(o=>`<option ${s.status===o?'selected':''}>${o}</option>`).join('')}</select></div>
+    <p class="muted small">Only the status can be changed here — session details are managed by the owner. Changes sync to the owner and the client.</p>
+  `,`<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="coachSetStatus('${id}',document.getElementById('csStatus').value);closeModal()">Save</button>`);
 }
 function calStep(n){calM+=n;if(calM<0){calM=11;calY--;}if(calM>11){calM=0;calY++;}renderBooking();}
 function calToday(){const n=new Date();calY=n.getFullYear();calM=n.getMonth();renderBooking();}
@@ -1367,8 +1432,10 @@ function saveCustomer(id){
   const obj={name,phone:$('#cPhone').value,email:$('#cEmail').value,level:$('#cLevel').value,parent:$('#cParent').value,notes:$('#cNotes').value};
   const tot1=Math.max(0,Math.round(+$('#cTot1').value||0)), totG=Math.max(0,Math.round(+$('#cTotG').value||0));
   const pwd=($('#cPwd').value||'').trim()||DB.settings.defaultClientPwd;
-  if(id){const ex=custById(id);Object.assign(ex,obj);ex.creditsTotal={'1on1':tot1,'group':totG};ex.pwd=pwd;save();closeModal();flash('Customer saved');renderCustomers();}
-  else{obj.id=uid();obj.created=todayISO();obj.creditsTotal={'1on1':tot1,'group':totG};obj.packages=[];obj.token=uid()+uid();obj.pwd=pwd;DB.customers.push(obj);save();closeModal();flash('Customer added — open 🔗 Link to share their sign-in');renderCustomers();}
+  const dupName=DB.customers.some(x=>x.id!==id&&(x.name||'').trim().toLowerCase()===name.toLowerCase());
+  const dupNote=dupName?' ⚠ Another player has this name — give each a unique password so they can sign in.':'';
+  if(id){const ex=custById(id);Object.assign(ex,obj);ex.creditsTotal={'1on1':tot1,'group':totG};ex.pwd=pwd;save();closeModal();flash('Customer saved'+dupNote,dupName);renderCustomers();}
+  else{obj.id=uid();obj.created=todayISO();obj.creditsTotal={'1on1':tot1,'group':totG};obj.packages=[];obj.token=uid()+uid();obj.pwd=pwd;DB.customers.push(obj);save();closeModal();flash('Customer added — open 🔗 Link to share their sign-in'+dupNote,dupName);renderCustomers();}
 }
 function delCustomer(id){if(!confirm('Delete this customer? Their sessions remain.'))return;DB.customers=DB.customers.filter(c=>c.id!==id);save();closeModal();flash('Customer deleted');renderCustomers();}
 function resetClientPwd(id){const c=custById(id);if(!c)return;if(!confirm('Reset '+c.name+'’s password to the default ('+DB.settings.defaultClientPwd+')?'))return;c.pwd=DB.settings.defaultClientPwd;save();flash('Password reset to default 🔑');viewCustomer(id);}
