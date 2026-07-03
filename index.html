@@ -60,6 +60,7 @@
   .pill.blue{color:var(--blue);border-color:rgba(74,168,255,.35)}
   .pill.yellow{color:var(--yellow);border-color:rgba(255,206,74,.35)}
   .pill.orange{color:var(--accent2);border-color:rgba(255,145,0,.35)}
+  .coachsel{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;max-width:170px}
   table{width:100%;border-collapse:collapse;font-size:13.5px}
   th{text-align:left;color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;
     letter-spacing:.5px;padding:10px 10px;border-bottom:1px solid var(--line)}
@@ -183,6 +184,7 @@
   <section class="view" id="view-booking"></section>
   <section class="view" id="view-past"></section>
   <section class="view" id="view-customers"></section>
+  <section class="view" id="view-coaches"></section>
   <section class="view" id="view-locations"></section>
   <section class="view" id="view-availability"></section>
   <section class="view" id="view-finance"></section>
@@ -251,6 +253,7 @@ function seed(){
   const plus = d=>{const x=new Date();x.setDate(x.getDate()+d);return x.toISOString().slice(0,10)};
   return {
     settings:{rate1on1:30, rateGroup:20, defaultClientPwd:'rxtraining'},
+    coaches:[{id:'rx1',name:'Raymond Xu',tagline:'Lexington, MA · AAU Level Training',bio:"Training isn't just about drills. It's about teaching you the love of the game — the dedication, the grind, the mindset that you never give up. That's what every session is built on.",affiliation:'AAU',affiliationSub:'Middlesex Magic',photo:'',pwd:'coach',active:true}],
     locations:[{id:'l1',name:'Lexington Gym',address:'Lexington, MA'},{id:'l2',name:'Community Center Court',address:''}],
     customers:[
       {id:'c1',name:'Ethan Carter',phone:'781-555-0142',email:'ethan.c@example.com',parent:'Mia Carter',level:'AAU U14',notes:'Working on left-hand finishing.',created:minus(60),creditsTotal:{'1on1':10,'group':0},packages:[{id:'p1',type:'1on1',qty:10,amount:300,date:minus(34)}]},
@@ -317,38 +320,49 @@ function normalize(d){
     if(!c.pwd)c.pwd=d.settings.defaultClientPwd;
   });
   (d.sessions||[]).forEach(s=>{if(s.paidVia===undefined)s.paidVia=s.paid?'cash':'';});
+  // ----- multi-coach: seed a coach + stamp coach_id on every record -----
+  if(!d.coaches||!d.coaches.length)d.coaches=[{id:'rx1',name:'Raymond Xu',tagline:'Lexington, MA · AAU Level Training',bio:"Training isn't just about drills. It's about teaching you the love of the game — the dedication, the grind, the mindset that you never give up. That's what every session is built on.",affiliation:'AAU',affiliationSub:'Middlesex Magic',photo:'',pwd:'coach',active:true}];
+  d.coaches.forEach(c=>{if(c.active===undefined)c.active=true;if(!c.pwd)c.pwd='coach';if(c.tagline===undefined)c.tagline='';if(c.bio===undefined)c.bio='';if(c.affiliation===undefined)c.affiliation='';if(c.affiliationSub===undefined)c.affiliationSub='';if(c.photo===undefined)c.photo='';});
+  const dcid=d.coaches[0].id;
+  (d.sessions||[]).forEach(s=>{if(!s.coachId)s.coachId=dcid;});
+  (d.availability||[]).forEach(a=>{if(!a.coachId)a.coachId=dcid;if(a.approved===undefined)a.approved=true;});
+  (d.expenses||[]).forEach(e=>{if(!e.coachId)e.coachId=dcid;});
+  (d.cashEntries||[]).forEach(e=>{if(!e.coachId)e.coachId=dcid;});
+  (d.customers||[]).forEach(c=>{(c.packages||[]).forEach(p=>{if(!p.coachId)p.coachId=dcid;});});
   return d;
 }
 function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.parse(r);}catch(e){}return normalize(d);}
 
 /* ----- relational mapping (separate tables in Supabase) ----- */
-function assemble(st,loc,cus,pkg,ses,exp,cash,avail){
+function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa){
   const d={};
   d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):''};
+  d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false}));
   d.locations=(loc||[]).map(l=>({id:l.id,name:l.name,address:l.address||''}));
-  d.availability=(avail||[]).map(a=>({id:a.id,date:a.date,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||''}));
+  d.availability=(avail||[]).map(a=>({id:a.id,coachId:a.coach_id||'',date:a.date,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||'',approved:a.approved!==false}));
   d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',notes:c.notes||'',created:c.created||'',creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
-    packages:(pkg||[]).filter(p=>p.customer_id===c.id).map(p=>({id:p.id,type:p.type,qty:p.qty,amount:Number(p.amount),date:p.date}))}));
-  d.sessions=(ses||[]).map(s=>({id:s.id,customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[]}));
-  d.expenses=(exp||[]).map(e=>({id:e.id,date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||''}));
-  d.cashEntries=(cash||[]).map(e=>({id:e.id,date:e.date,amount:Number(e.amount),note:e.note||'',customerId:e.customer_id||'',type:e.type||'1on1',qty:e.qty||1}));
+    packages:(pkg||[]).filter(p=>p.customer_id===c.id).map(p=>({id:p.id,coachId:p.coach_id||'',type:p.type,qty:p.qty,amount:Number(p.amount),date:p.date}))}));
+  d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[]}));
+  d.expenses=(exp||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||''}));
+  d.cashEntries=(cash||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,amount:Number(e.amount),note:e.note||'',customerId:e.customer_id||'',type:e.type||'1on1',qty:e.qty||1}));
   return normalize(d);
 }
+const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false});
 const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',notes:c.notes||'',created:c.created||'',credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
-const sessRow=s=>({id:s.id,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[]});
+const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[]});
 async function migrateSource(){
   try{const {data}=await supa.from(STATE_TABLE).select('data').eq('id','main').maybeSingle();if(data&&data.data)return normalize(data.data);}catch(e){}
   return localData();
 }
 async function fetchCloud(){
-  const [st,loc,cus,pkg,ses,exp,cash,avail]=await Promise.all([
+  const [st,loc,cus,pkg,ses,exp,cash,avail,coa]=await Promise.all([
     supa.from('settings').select('*').eq('id','main').maybeSingle(),
     supa.from('locations').select('*'), supa.from('customers').select('*'),
     supa.from('packages').select('*'), supa.from('sessions').select('*'),
     supa.from('expenses').select('*'), supa.from('cash_entries').select('*'),
-    supa.from('availability').select('*')]);
-  const err=[st,loc,cus,pkg,ses,exp,cash,avail].find(r=>r.error); if(err) throw err.error;
-  return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data,avail.data);
+    supa.from('availability').select('*'), supa.from('coaches').select('*')]);
+  const err=[st,loc,cus,pkg,ses,exp,cash,avail,coa].find(r=>r.error); if(err) throw err.error;
+  return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data,avail.data,coa.data);
 }
 async function bootLoad(){
   const cfg=getSupaCfg();
@@ -367,9 +381,10 @@ async function bootLoad(){
 /* ---- live-ish sync: poll the cloud and refresh the view when data changes ---- */
 let pollTimer=null, lastSig='';
 function dataSig(d){return JSON.stringify({
-  s:(d.sessions||[]).map(x=>[x.id,x.status,x.checkedIn,x.paidVia,x.date,x.time,x.price,x.feedback||'',(x.media||[]).length]),
+  s:(d.sessions||[]).map(x=>[x.id,x.coachId,x.status,x.checkedIn,x.paidVia,x.date,x.time,x.price,x.feedback||'',(x.media||[]).length]),
   c:(d.customers||[]).map(x=>[x.id,x.name,x.email,x.pwd,x.creditsTotal,x.packages.length]),
-  a:(d.availability||[]).map(x=>[x.id,x.date,x.start,x.end,x.location]),
+  a:(d.availability||[]).map(x=>[x.id,x.coachId,x.date,x.start,x.end,x.location]),
+  co:(d.coaches||[]).map(x=>[x.id,x.name,x.active,x.tagline,x.bio,x.affiliation]),
   e:(d.expenses||[]).length, k:(d.cashEntries||[]).length,
   n:d.settings&&d.settings.notifyEmails});}
 async function pollSync(){
@@ -427,13 +442,14 @@ async function cloudPush(){
       return;
     }
     await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null});
+    await syncTable('coaches',(DB.coaches||[]).map(coachRow));
     await syncTable('locations',DB.locations.map(l=>({id:l.id,name:l.name,address:l.address||''})));
     await syncTable('customers',DB.customers.map(custRow));
-    await syncTable('packages',DB.customers.flatMap(c=>c.packages.map(p=>({id:p.id,customer_id:c.id,type:p.type,qty:p.qty,amount:p.amount,date:p.date}))));
+    await syncTable('packages',DB.customers.flatMap(c=>c.packages.map(p=>({id:p.id,customer_id:c.id,coach_id:p.coachId||null,type:p.type,qty:p.qty,amount:p.amount,date:p.date}))));
     await syncTable('sessions',DB.sessions.map(sessRow));
-    await syncTable('expenses',DB.expenses.map(e=>({id:e.id,date:e.date,cat:e.cat,amount:e.amount,note:e.note||''})));
-    await syncTable('cash_entries',DB.cashEntries.map(e=>({id:e.id,date:e.date,amount:e.amount,note:e.note||'',customer_id:e.customerId||null,type:e.type||null,qty:e.qty||null})));
-    await syncTable('availability',(DB.availability||[]).map(a=>({id:a.id,date:a.date,start_t:a.start,end_t:a.end,slot_min:a.slotMin,location:a.location||''})));
+    await syncTable('expenses',DB.expenses.map(e=>({id:e.id,coach_id:e.coachId||null,date:e.date,cat:e.cat,amount:e.amount,note:e.note||''})));
+    await syncTable('cash_entries',DB.cashEntries.map(e=>({id:e.id,coach_id:e.coachId||null,date:e.date,amount:e.amount,note:e.note||'',customer_id:e.customerId||null,type:e.type||null,qty:e.qty||null})));
+    await syncTable('availability',(DB.availability||[]).map(a=>({id:a.id,coach_id:a.coachId||null,date:a.date,start_t:a.start,end_t:a.end,slot_min:a.slotMin,location:a.location||'',approved:a.approved!==false})));
   }catch(e){flash('Cloud save failed — saved on this device',true);}
 }
 
@@ -461,15 +477,35 @@ function locOptions(selected){
   if(!out) out='<option value="">Add a location first</option>';
   return out;
 }
+/* ---------- multi-coach helpers ---------- */
+const coachById = id => (DB.coaches||[]).find(c=>c.id===id);
+const coachName = id => {const c=coachById(id);return c?c.name:'—';};
+function activeCoaches(){return (DB.coaches||[]).filter(c=>c.active!==false);}
+function defaultCoachId(){const a=activeCoaches();return (a[0]||(DB.coaches&&DB.coaches[0])||{}).id||'rx1';}
+/* which coach is in scope for the current view */
+function scopeCoach(){
+  if(AUTH==='coach')return coachAs;
+  if(AUTH==='client')return pickCoach||defaultCoachId();
+  return mgCoach||defaultCoachId();       // owner
+}
+/* new records default to a concrete coach even when the owner is viewing "all" */
+function targetCoach(){const s=scopeCoach();return (!s||s==='all')?defaultCoachId():s;}
+function inScope(coachId){const s=scopeCoach();if(!s||s==='all')return true;return (coachId||defaultCoachId())===s;}
+function coachSelectOptions(sel,includeAll){
+  let out=includeAll?`<option value="all" ${sel==='all'?'selected':''}>All coaches</option>`:'';
+  out+=(DB.coaches||[]).map(c=>`<option value="${c.id}" ${sel===c.id?'selected':''}>${c.name}${c.active===false?' (inactive)':''}</option>`).join('');
+  return out;
+}
 
 let AUTH=null, ROLE='owner', TAB='about';
-let clientAs=null, pendingClient=null, sessionReturnCust=null, editMedia=[];
+let clientAs=null, coachAs=null, mgCoach=null, pickCoach=null, pendingClient=null, sessionReturnCust=null, editMedia=[];
 let calY, calM; {const n=new Date();calY=n.getFullYear();calM=n.getMonth();}
 const TABS=[
   {id:'about',label:'About'},
   {id:'booking',label:'Booking'},
   {id:'past',label:'Past Sessions'},
   {id:'customers',label:'Customers'},
+  {id:'coaches',label:'Coaches'},
   {id:'locations',label:'Locations'},
   {id:'availability',label:'Availability'},
   {id:'finance',label:'Finance'},
@@ -477,10 +513,15 @@ const TABS=[
 ];
 
 function renderTabs(){
-  const allowed = AUTH==='client' ? ['booking','past'] : TABS.map(t=>t.id).filter(x=>x!=='past');
-  if(!allowed.includes(TAB)) TAB = 'booking';
+  let allowed;
+  if(AUTH==='client') allowed=['booking','past'];
+  else if(AUTH==='coach') allowed=['about','booking','availability'];
+  else allowed = TABS.map(t=>t.id).filter(x=>x!=='past');   // owner: everything but the client-only Past tab
+  if(!allowed.includes(TAB)) TAB = AUTH==='client' ? 'booking' : (AUTH==='coach' ? 'booking' : 'booking');
   $('#tabs').innerHTML = TABS.filter(t=>allowed.includes(t.id)).map(t=>{
-    const label=(t.id==='booking'&&AUTH==='client')?'My Sessions':t.label;
+    let label=t.label;
+    if(t.id==='booking'&&AUTH==='client')label='My Sessions';
+    if(t.id==='about'&&AUTH==='coach')label='My Profile';
     return `<button data-tab="${t.id}" class="${TAB===t.id?'active':''}">${label}</button>`;
   }).join('');
   $$('#tabs button').forEach(b=>b.onclick=()=>{TAB=b.dataset.tab;switchTab();});
@@ -492,8 +533,8 @@ function switchTab(){
   refreshOwner();
   saveSess();
 }
-function saveSess(){try{sessionStorage.setItem('rx_sess',JSON.stringify({auth:AUTH,clientAs,tab:TAB}));}catch(e){}}
-function refreshOwner(){const f={about:renderAbout,booking:renderBooking,past:renderPast,customers:renderCustomers,locations:renderLocations,availability:renderAvailability,finance:renderFinance,admin:renderAdmin}[TAB];if(f)f();}
+function saveSess(){try{sessionStorage.setItem('rx_sess',JSON.stringify({auth:AUTH,clientAs,coachAs,mgCoach,pickCoach,tab:TAB}));}catch(e){}}
+function refreshOwner(){const f={about:renderAbout,booking:renderBooking,past:renderPast,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,admin:renderAdmin}[TAB];if(f)f();}
 
 /* ---------- Auth ---------- */
 function ensureTokens(){let ch=false;DB.customers.forEach(c=>{if(!c.token){c.token=uid()+uid();ch=true;}});if(ch)save();}
@@ -502,8 +543,13 @@ function liveHtml(){
   const ok=rtState==='SUBSCRIBED';
   return '<span class="pill '+(ok?'green':'yellow')+'" title="'+(ok?'Live — updates instantly':'Auto-syncing every few seconds')+'">'+(ok?'🟢 Live':'🟡 Sync')+'</span>';
 }
+function coachPicker(){
+  return '<select class="coachsel" title="Managing coach" onchange="setMgCoach(this.value)">'+coachSelectOptions(mgCoach,true)+'</select>';
+}
+function setMgCoach(v){mgCoach=v;saveSess();refreshOwner();}
 function renderWhoami(){
-  if(AUTH==='owner') $('#whoami').innerHTML=liveHtml()+'<button class="btn ghost sm" onclick="exportExcel()">⬇ Export</button><span class="pill orange">Owner</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';
+  if(AUTH==='owner') $('#whoami').innerHTML=liveHtml()+coachPicker()+'<button class="btn ghost sm" onclick="exportExcel()">⬇ Export</button><span class="pill orange">Owner</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';
+  else if(AUTH==='coach'){const co=coachById(coachAs);$('#whoami').innerHTML=liveHtml()+'<span class="pill green">🏀 Coach '+(co?firstName(co.name):'')+'</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';}
   else if(AUTH==='client'){const c=custById(clientAs);$('#whoami').innerHTML=liveHtml()+'<span class="pill blue">'+(c?c.name:'Client')+'</span><button class="btn ghost sm" onclick="openChangePwd()">🔑 Change password</button><button class="btn ghost sm" onclick="signOut()">Sign out</button>';}
   else $('#whoami').innerHTML='';
 }
@@ -512,14 +558,15 @@ function initAuth(){
   const m=location.hash.match(/[#&]c=([a-z0-9]+)/i);
   if(m){const c=DB.customers.find(x=>x.token===m[1]);if(c)pendingClient=c.id;}
   let ss=null;try{ss=JSON.parse(sessionStorage.getItem('rx_sess'));}catch(e){}
-  if(ss&&ss.auth==='owner'){AUTH='owner';ROLE='owner';TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();startPolling();return;}
-  if(ss&&ss.auth==='client'&&custById(ss.clientAs)){AUTH='client';ROLE='client';clientAs=ss.clientAs;TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();startPolling();return;}
+  if(ss&&ss.auth==='owner'){AUTH='owner';ROLE='owner';mgCoach=ss.mgCoach||defaultCoachId();TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();startPolling();return;}
+  if(ss&&ss.auth==='coach'&&coachById(ss.coachAs)){AUTH='coach';ROLE='coach';coachAs=ss.coachAs;TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();startPolling();return;}
+  if(ss&&ss.auth==='client'&&custById(ss.clientAs)){AUTH='client';ROLE='client';clientAs=ss.clientAs;pickCoach=ss.pickCoach||defaultCoachId();TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();startPolling();return;}
   showLogin();
 }
 function showLogin(){
   AUTH=null;renderWhoami();
   if(pendingClient){const pc=custById(pendingClient);if(pc){$('#loginClient').value=pc.name;$('#clientHint').textContent='Welcome back, '+firstName(pc.name)+' — enter your password.';}}
-  else{$('#loginClient').value='';$('#clientHint').textContent='Enter your name and password (or open your personal link).';}
+  else{$('#loginClient').value='';$('#clientHint').textContent='Players & coaches: enter your name and password (players can also open their personal link).';}
   $('#ownerHint').textContent=DB.settings.ownerPwd?'Enter your owner password.':'First time here — create an owner password (4+ characters).';
   $('#loginPwd').value='';if($('#loginClientPwd'))$('#loginClientPwd').value='';
   toggleOwnerLogin(false);
@@ -533,24 +580,32 @@ function ownerLogin(){
   const v=$('#loginPwd').value;
   if(!DB.settings.ownerPwd){if((v||'').length<4)return flash('Choose a password with 4+ characters',true);DB.settings.ownerPwd=v;save();flash('Owner password set 🔑');}
   else if(v!==DB.settings.ownerPwd)return flash('Incorrect password',true);
-  AUTH='owner';ROLE='owner';TAB='booking';
+  AUTH='owner';ROLE='owner';mgCoach=defaultCoachId();TAB='booking';
   $('#login').classList.remove('show');renderWhoami();switchTab();startPolling();
 }
 function clientLoginPick(){
   const name=($('#loginClient').value||'').trim().toLowerCase();
   if(!name)return flash('Enter your name',true);
-  const c=DB.customers.find(x=>(x.name||'').trim().toLowerCase()===name);
   const pwd=$('#loginClientPwd').value;
+  // a coach and a client can both sign in here — check coaches first
+  const co=(DB.coaches||[]).find(x=>(x.name||'').trim().toLowerCase()===name && x.active!==false);
+  if(co){ if((co.pwd||'')!==pwd)return flash('Incorrect name or password',true); return loginAsCoach(co.id); }
+  const c=DB.customers.find(x=>(x.name||'').trim().toLowerCase()===name);
   if(!c||(c.pwd||'')!==pwd)return flash('Incorrect name or password',true);
   loginAsClient(c.id);
   if(pwd===DB.settings.defaultClientPwd)flash('Tip: set your own password via “Change password”.');
 }
 function loginAsClient(id){
-  AUTH='client';ROLE='client';clientAs=id;TAB='booking';
+  AUTH='client';ROLE='client';clientAs=id;pickCoach=defaultCoachId();TAB='booking';
   $('#login').classList.remove('show');renderWhoami();switchTab();startPolling();
 }
+function loginAsCoach(id){
+  AUTH='coach';ROLE='coach';coachAs=id;TAB='booking';
+  $('#login').classList.remove('show');renderWhoami();switchTab();startPolling();
+  flash('Signed in as coach 🏀');
+}
 function signOut(){
-  AUTH=null;ROLE='owner';pendingClient=null;stopPolling();
+  AUTH=null;ROLE='owner';pendingClient=null;coachAs=null;pickCoach=null;stopPolling();
   try{sessionStorage.removeItem('rx_sess');}catch(e){}
   if(location.hash) history.replaceState(null,'',location.pathname+location.search);
   showLogin();
@@ -607,11 +662,13 @@ function exportExcel(){
     '1:1 used':usedFor(c,'1on1'),'1:1 total':totalFor(c,'1on1'),'1:1 left':creditsFor(c,'1on1'),
     'Group used':usedFor(c,'group'),'Group total':totalFor(c,'group'),'Group left':creditsFor(c,'group'),
     Password:c.pwd,Created:c.created,Notes:c.notes})));
+  add('Coaches',(DB.coaches||[]).map(co=>({Name:co.name,Tagline:co.tagline,Affiliation:co.affiliation,Detail:co.affiliationSub,
+    Active:co.active!==false?'Yes':'No',Sessions:DB.sessions.filter(s=>s.coachId===co.id&&s.status!=='cancelled').length})));
   add('Locations',DB.locations.map(l=>({Name:l.name,Address:l.address,Sessions:DB.sessions.filter(s=>s.location===l.name).length})));
-  add('Booking & Schedule',sortSessions(DB.sessions).map(s=>({Date:s.date,Time:s.time,Clients:custNames(s.customerIds),
+  add('Booking & Schedule',sortSessions(DB.sessions).map(s=>({Date:s.date,Time:s.time,Coach:coachName(s.coachId),Clients:custNames(s.customerIds),
     Type:s.type==='1on1'?'1:1':'Group',Players:s.customerIds.length,Duration:s.dur,Location:s.location,Status:s.status,
     'Checked in':s.checkedIn?'Yes':'No',Payment:s.paid?(s.paidVia||'paid'):'unpaid',Price:s.price,Notes:s.notes,Feedback:s.feedback||'',Attachments:(s.media||[]).length})));
-  add('Packages',DB.customers.flatMap(c=>c.packages.map(p=>({Client:c.name,Date:p.date,Type:p.type==='1on1'?'1:1':'Group',Sessions:p.qty,Amount:p.amount}))));
+  add('Packages',DB.customers.flatMap(c=>c.packages.map(p=>({Client:c.name,Coach:coachName(p.coachId),Date:p.date,Type:p.type==='1on1'?'1:1':'Group',Sessions:p.qty,Amount:p.amount}))));
   add('Expenses',DB.expenses.map(e=>({Date:e.date,Category:e.cat,Note:e.note,Amount:e.amount})));
   add('Cash income',[
     ...DB.sessions.filter(s=>s.paid&&s.paidVia==='cash'&&s.status!=='cancelled').map(s=>({Date:s.date,Source:custNames(s.customerIds)+' ('+(s.type==='1on1'?'1:1':'Group')+' session)',Note:s.notes||'',Amount:s.price})),
@@ -634,20 +691,25 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    ABOUT
    ============================================================ */
 function renderAbout(){
-  const upcoming = DB.sessions.filter(s=>s.status==='scheduled').length;
+  const co=coachById(scopeCoach())||(DB.coaches||[])[0]||{name:'Coach',tagline:'',bio:'',affiliation:'',affiliationSub:''};
+  const upcoming = DB.sessions.filter(s=>s.coachId===co.id&&s.status==='scheduled').length;
+  const editBtn = AUTH==='coach'?`<button class="btn ghost" onclick="openCoach('${co.id}')">✎ Edit my profile</button>`:'';
+  const photoBlock = co.photo?`<img src="${co.photo}" alt="${co.name}" style="width:96px;height:96px;object-fit:cover;border-radius:16px;margin-bottom:14px">`:'';
   $('#view-about').innerHTML = `
    <div class="hero">
-     <span class="badge">🏀 Lexington, MA · AAU Level Training</span>
-     <h2>Raymond Xu<br>Basketball Training</h2>
-     <p>Training isn't just about drills. It's about teaching you the <span class="hl">love of the game</span> — the dedication, the grind, the mindset that <span class="hl">you never give up</span>. That's what every session is built on.</p>
+     <span class="badge">🏀 ${co.tagline||'Basketball Training'}</span>
+     ${photoBlock}
+     <h2>${co.name}<br>Basketball Training</h2>
+     <p>${co.bio||''}</p>
      <div class="row" style="margin-top:22px">
-       <button class="btn" onclick="TAB='booking';switchTab()">📱 Book a Session</button>
+       <button class="btn" onclick="TAB='booking';switchTab()">📱 ${AUTH==='coach'?'My Bookings':'Book a Session'}</button>
        <button class="btn ghost" onclick="document.getElementById('offer').scrollIntoView({behavior:'smooth'})">See What I Offer →</button>
+       ${editBtn}
      </div>
    </div>
 
    <div class="stats">
-     <div class="stat"><div class="k">Affiliation</div><div class="v">AAU</div><div class="d muted">Middlesex Magic</div></div>
+     <div class="stat"><div class="k">Affiliation</div><div class="v">${co.affiliation||'—'}</div><div class="d muted">${co.affiliationSub||''}</div></div>
      <div class="stat"><div class="k">Session Types</div><div class="v">2</div><div class="d muted">1:1 & Group</div></div>
      <div class="stat"><div class="k">Player-Led Training</div><div class="v">100%</div><div class="d muted">Built around you</div></div>
      <div class="stat"><div class="k">Upcoming Sessions</div><div class="v">${upcoming}</div><div class="d muted">On the schedule</div></div>
@@ -686,9 +748,10 @@ function sortSessions(arr){return arr.slice().sort((a,b)=>(a.date+a.time).locale
 function typePill(s){return s.type==='1on1'?'<span class="pill blue">1:1</span>':'<span class="pill orange">Group ('+s.customerIds.length+')</span>';}
 
 function renderBookingOwner(){
+  const scopeLbl = AUTH==='coach' ? 'Your sessions' : (scopeCoach()==='all' ? 'All coaches' : 'Coach: '+coachName(scopeCoach()));
   $('#view-booking').innerHTML=`
     <h1 class="page">Booking & Schedule</h1>
-    <div class="sub">All client arrangements — manage sessions, check-ins, packages, locations and your calendar.</div>
+    <div class="sub">${AUTH==='coach'?'Your client arrangements — sessions, check-ins and your calendar.':'Client arrangements — manage sessions, check-ins, packages, locations and your calendar.'} <span class="pill ${scopeCoach()==='all'?'orange':'green'}" style="margin-left:6px">${scopeLbl}</span></div>
     <div class="row" style="margin-bottom:16px">
       <button class="btn" onclick="openSession()">+ New Session</button>
       <button class="btn ghost" onclick="exportAllCal()">📅 Export all upcoming (.ics)</button>
@@ -703,7 +766,7 @@ function renderBookingOwner(){
 
 function renderBookingTable(){
   const now=todayISO();
-  let list = sortSessions(DB.sessions);
+  let list = sortSessions(DB.sessions.filter(s=>inScope(s.coachId)));
   if(bookFilter==='upcoming') list=list.filter(s=>s.date>=now && s.status!=='cancelled');
   else if(bookFilter==='past') list=list.filter(s=>s.date<now||s.status==='completed').reverse();
   else if(bookFilter==='checkin') list=list.filter(s=>s.date===now);
@@ -752,7 +815,7 @@ function renderBookingCalendar(){
   const firstDow=ref.getDay();
   const daysIn=new Date(calY,calM+1,0).getDate();
   const byDate={};
-  DB.sessions.forEach(s=>{(byDate[s.date]=byDate[s.date]||[]).push(s);});
+  DB.sessions.filter(s=>inScope(s.coachId)).forEach(s=>{(byDate[s.date]=byDate[s.date]||[]).push(s);});
   const dows=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   let cells='';
   for(let i=0;i<firstDow;i++) cells+='<div class="calcell empty"></div>';
@@ -792,7 +855,7 @@ function clientCard(s){
   return `<div class="panel" style="margin-bottom:12px">
     <div class="row" style="justify-content:space-between;align-items:center">
       <div>
-        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} ${s.paid?'<span class="pill green">Prepaid</span>':''} ${s.status==='pending'?'<span class="pill yellow">Pending</span>':s.status==='scheduled'?'<span class="pill blue">Booked</span>':s.status==='completed'?'<span class="pill green">Completed</span>':s.status==='cancelled'?'<span class="pill red">Cancelled</span>':''}
+        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} <span class="pill">🏀 ${coachName(s.coachId)}</span> ${s.paid?'<span class="pill green">Prepaid</span>':''} ${s.status==='pending'?'<span class="pill yellow">Pending</span>':s.status==='scheduled'?'<span class="pill blue">Booked</span>':s.status==='completed'?'<span class="pill green">Completed</span>':s.status==='cancelled'?'<span class="pill red">Cancelled</span>':''}
         <div class="clienttag" style="margin-top:4px">${s.dur} min · 📍 ${s.location||'TBD'}${others>0?' · with '+others+' other player'+(others>1?'s':''):''}</div>
       </div>
       <div class="actions">
@@ -808,10 +871,22 @@ function clientCard(s){
     </div>`:''}
   </div>`;
 }
+function coachMiniProfile(co){
+  if(!co)return '';
+  return `<div class="panel" style="background:var(--panel2);padding:12px;margin-bottom:12px">
+    <div class="row" style="align-items:center;gap:10px">
+      ${co.photo?`<img src="${co.photo}" style="width:44px;height:44px;object-fit:cover;border-radius:10px">`:`<span class="av">${initials(co.name)}</span>`}
+      <div><b>${co.name}</b><div class="clienttag">${co.tagline||''}${co.affiliation?' · '+co.affiliation:''}</div></div>
+    </div>
+    ${co.bio?`<div class="small muted" style="margin-top:8px;line-height:1.6">${co.bio}</div>`:''}
+  </div>`;
+}
+function pickCoachChange(v){pickCoach=v;saveSess();renderBookingClient();}
 function renderBookingClient(){
   const now=todayISO();
   const c=custById(clientAs);
   if(!c){$('#view-booking').innerHTML='<div class="panel"><div class="empty">Profile not found. Please sign in again.</div></div>';return;}
+  if(!pickCoach||!coachById(pickCoach))pickCoach=defaultCoachId();
   const mine = DB.sessions.filter(s=>s.customerIds.includes(c.id));
   const today=sortSessions(mine.filter(s=>s.date===now && (s.status==='scheduled'||s.status==='pending')));
   const pending=sortSessions(mine.filter(s=>s.date>=now && s.status==='pending'));
@@ -836,6 +911,9 @@ function renderBookingClient(){
       <div>
         <div class="panel">
           <h3>Request a session</h3>
+          <div class="field"><label class="f">Coach</label>
+            <select id="rqCoach" onchange="pickCoachChange(this.value)">${activeCoaches().map(co=>`<option value="${co.id}" ${pickCoach===co.id?'selected':''}>${co.name}</option>`).join('')||'<option value="">No coaches available</option>'}</select></div>
+          ${coachMiniProfile(coachById(pickCoach))}
           <div class="field"><label class="f">Session type</label>
             <select id="rqType" onchange="renderSlots()"><option value="1on1">1:1 Private (${money(DB.settings.rate1on1)}/hr)</option><option value="group">Group / 1:N (${money(DB.settings.rateGroup)}/hr per player)</option></select></div>
           <div class="field"><label class="f">Date</label><input type="date" id="rqDate" min="${now}" value="${now}" onchange="renderSlots()"></div>
@@ -875,11 +953,12 @@ function submitRequest(){
   if(!slot)return flash('No open time slot selected — pick another date',true);
   const [time,loc]=slot.split('|');
   const comment=($('#rqComment')?$('#rqComment').value:'').trim();
-  const s={id:uid(),customerIds:[cid],type,date:$('#rqDate').value,time,
+  const coachId=($('#rqCoach')?$('#rqCoach').value:'')||pickCoach||defaultCoachId();
+  const s={id:uid(),coachId,customerIds:[cid],type,date:$('#rqDate').value,time,
     dur,price:computePrice(type,dur,1),status:'pending',paid:false,paidVia:'',checkedIn:false,location:loc||'TBD',
     notes:'Client request'+(comment?(' — '+comment):'')};
   DB.sessions.push(s);
-  save();flash('Request sent — awaiting confirmation 🏀');
+  save();flash('Request sent to '+coachName(coachId)+' — awaiting confirmation 🏀');
   notifyOwner(s,comment);
   renderBooking();
 }
@@ -921,7 +1000,7 @@ async function notifyOwner(s,comment){
   if(!emails.length)return;
   const cn=custNames(s.customerIds);
   const subject='RX Training — new request from '+cn;
-  const body='New session request:\n\nClient: '+cn+'\nType: '+(s.type==='1on1'?'1:1 Private':'Group')+'\nDate: '+fmtDT(s.date,s.time)+'\nLocation: '+s.location+(comment?('\nComment: '+comment):'')+'\n\nOpen RX.TRAINING to confirm.';
+  const body='New session request:\n\nClient: '+cn+'\nCoach: '+coachName(s.coachId)+'\nType: '+(s.type==='1on1'?'1:1 Private':'Group')+'\nDate: '+fmtDT(s.date,s.time)+'\nLocation: '+s.location+(comment?('\nComment: '+comment):'')+'\n\nOpen RX.TRAINING to confirm.';
   if(supa && SUPA_OK){
     try{
       const {data,error}=await supa.functions.invoke('send-request-email',{body:{to:emails,subject,text:body}});
@@ -987,12 +1066,13 @@ function mediaThumbs(s,owner){
 }
 function openSession(id,returnCust){
   sessionReturnCust=returnCust||null;
-  const blank={id:'',customerIds:returnCust?[returnCust]:[],type:'1on1',date:todayISO(),time:'16:00',dur:60,price:computePrice('1on1',60,1),status:'scheduled',paid:false,paidVia:'',checkedIn:false,location:(DB.locations[0]?DB.locations[0].name:''),notes:''};
+  const blank={id:'',coachId:targetCoach(),customerIds:returnCust?[returnCust]:[],type:'1on1',date:todayISO(),time:'16:00',dur:60,price:computePrice('1on1',60,1),status:'scheduled',paid:false,paidVia:'',checkedIn:false,location:(DB.locations[0]?DB.locations[0].name:''),notes:''};
   const s = id?DB.sessions.find(x=>x.id===id):blank;
   const opts = DB.customers.map(c=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 4px;cursor:pointer"><input type="checkbox" class="sCustCb" value="${c.id}" ${s.customerIds.includes(c.id)?'checked':''} style="width:auto" onchange="recalcPrice()"><span>${c.name}${totalFor(c,'1on1')||totalFor(c,'group')?' · 1:1 '+creditsFor(c,'1on1')+' left':''}</span></label>`).join('')||'<div class="clienttag">No customers yet — add one in the Customers tab first.</div>';
   const payVal = s.paid?(s.paidVia||'cash'):'';
   editMedia=(s.media||[]).slice();
   openModal(id?'Edit Session':'New Session',`
+    ${AUTH==='owner'?`<div class="field"><label class="f">Coach</label><select id="sCoach">${coachSelectOptions(s.coachId||targetCoach(),false)}</select></div>`:''}
     <div class="field"><label class="f">Client(s) — tick one for a 1:1, up to ${MAX_GROUP} for a group</label>
       <div id="sCustBox" style="max-height:160px;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px">${opts}</div></div>
     <div class="row">
@@ -1044,7 +1124,8 @@ function saveSession(id,emailAfter){
   const type=$('#sType').value;
   if(type==='group' && ids.length>MAX_GROUP) return flash('Groups are capped at '+MAX_GROUP+' players',true);
   const pay=$('#sPay').value;
-  const obj={customerIds:ids,type,dur:+$('#sDur').value,date:$('#sDate').value,time:$('#sTime').value,
+  const coachId=(AUTH==='coach')?coachAs:($('#sCoach')?$('#sCoach').value:targetCoach());
+  const obj={coachId,customerIds:ids,type,dur:+$('#sDur').value,date:$('#sDate').value,time:$('#sTime').value,
     price:+$('#sPrice').value,status:$('#sStatus').value,location:$('#sLoc').value,
     paid:pay!=='',paidVia:pay,checkedIn:$('#sCheck').checked,notes:$('#sNotes').value,
     feedback:$('#sFeedback').value,media:editMedia.slice()};
@@ -1188,6 +1269,7 @@ function openSellPackage(id){
   const clientField=id?'':`<div class="field"><label class="f">Client</label><select id="pkClient">${DB.customers.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')||'<option value="">No customers yet</option>'}</select></div>`;
   openModal('Sell package'+(c?' — '+c.name:''),`
     ${clientField}
+    <div class="field"><label class="f">Coach (credit applies to this coach)</label><select id="pkCoach">${coachSelectOptions(targetCoach(),false)}</select></div>
     <div class="row">
       <div class="field"><label class="f">Type</label><select id="pkType" onchange="recalcPkg()">
         <option value="1on1">1:1 Private (${money(DB.settings.rate1on1)}/hr)</option>
@@ -1209,7 +1291,8 @@ function savePackage(id){
   if(!qty||qty<1)return flash('Enter a session count',true);
   if(!c.creditsTotal)c.creditsTotal={'1on1':0,'group':0};
   c.creditsTotal[type]=totalFor(c,type)+qty;
-  c.packages.push({id:uid(),type,qty,amount:amt,date:$('#pkDate').value});
+  const pkgCoach=$('#pkCoach')?$('#pkCoach').value:targetCoach();
+  c.packages.push({id:uid(),coachId:pkgCoach,type,qty,amount:amt,date:$('#pkDate').value});
   save();flash(qty+'× '+(type==='1on1'?'1:1':'Group')+' package sold 🎟️');
   if(id)viewCustomer(id);else{closeModal();refreshOwner();}
 }
@@ -1291,6 +1374,78 @@ function delCustomer(id){if(!confirm('Delete this customer? Their sessions remai
 function resetClientPwd(id){const c=custById(id);if(!c)return;if(!confirm('Reset '+c.name+'’s password to the default ('+DB.settings.defaultClientPwd+')?'))return;c.pwd=DB.settings.defaultClientPwd;save();flash('Password reset to default 🔑');viewCustomer(id);}
 
 /* ============================================================
+   COACHES  (owner manages every coach; a coach manages their own booking)
+   ============================================================ */
+function coachStats(id){
+  const ss=DB.sessions.filter(s=>s.coachId===id&&s.status!=='cancelled');
+  const up=ss.filter(s=>s.date>=todayISO()&&s.status!=='completed').length;
+  return {total:ss.length,up};
+}
+function renderCoaches(){
+  const rows=(DB.coaches||[]).map(c=>{
+    const st=coachStats(c.id);
+    return `<tr>
+      <td><div class="nameceil"><span class="av">${initials(c.name)}</span><div><b>${c.name}</b><div class="clienttag">${c.tagline||'—'}</div></div></div></td>
+      <td>${c.affiliation||'—'}<div class="clienttag">${c.affiliationSub||''}</div></td>
+      <td>${c.active!==false?'<span class="pill green">Active</span>':'<span class="pill red">Inactive</span>'}</td>
+      <td>${st.total}<div class="clienttag">${st.up} upcoming</div></td>
+      <td class="right"><div class="actions">
+        <button class="iconbtn" title="Manage this coach" onclick="setMgCoach('${c.id}');flash('Now managing ${c.name.replace(/'/g,'')}')">Manage</button>
+        <button class="iconbtn" onclick="openCoach('${c.id}')">Edit</button>
+      </div></td></tr>`;
+  }).join('')||'<tr><td colspan="5"><div class="empty">No coaches yet — add your first coach.</div></td></tr>';
+  $('#view-coaches').innerHTML=`
+    <h1 class="page">Coaches</h1>
+    <div class="sub">Every coach's profile, sign-in and status. Use <b>Manage</b> (or the selector top-right) to work inside one coach's Booking, Availability and Finance. Coaches sign in with their name + password on the main sign-in screen.</div>
+    <div class="row" style="margin-bottom:16px"><button class="btn" onclick="openCoach()">+ Add Coach</button></div>
+    <div class="panel" style="padding:6px 14px;overflow-x:auto">
+      <table>
+        <thead><tr><th>Coach</th><th>Affiliation</th><th>Status</th><th>Sessions</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="clienttag" style="margin-top:10px">A coach signs in with their <b style="color:var(--txt)">name</b> and the password you set here, then sees only their own bookings, availability and profile. Clients pick a coach when they request a session.</div>`;
+}
+function openCoach(id){
+  const c=id?coachById(id):{id:'',name:'',tagline:'',bio:'',affiliation:'',affiliationSub:'',photo:'',pwd:'coach',active:true};
+  openModal(id?'Edit Coach':'Add Coach',`
+    <div class="field"><label class="f">Full name *</label><input id="coName" value="${(c.name||'').replace(/"/g,'&quot;')}"></div>
+    <div class="field"><label class="f">Tagline (under the name on their profile)</label><input id="coTag" value="${(c.tagline||'').replace(/"/g,'&quot;')}" placeholder="e.g. Lexington, MA · AAU Level Training"></div>
+    <div class="row">
+      <div class="field"><label class="f">Affiliation</label><input id="coAff" value="${(c.affiliation||'').replace(/"/g,'&quot;')}" placeholder="e.g. AAU"></div>
+      <div class="field"><label class="f">Affiliation detail</label><input id="coAffSub" value="${(c.affiliationSub||'').replace(/"/g,'&quot;')}" placeholder="e.g. Middlesex Magic"></div>
+    </div>
+    <div class="field"><label class="f">About / bio (shown to clients)</label><textarea id="coBio">${c.bio||''}</textarea></div>
+    <div class="field"><label class="f">Photo URL (optional)</label><input id="coPhoto" value="${(c.photo||'').replace(/"/g,'&quot;')}" placeholder="https://..."></div>
+    <div class="row">
+      <div class="field"><label class="f">Sign-in password</label><input id="coPwd" value="${(c.pwd||'coach').replace(/"/g,'&quot;')}"></div>
+      <div class="field" style="display:flex;align-items:flex-end"><label class="f" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="coActive" ${c.active!==false?'checked':''} style="width:auto"> Active (can sign in & be booked)</label></div>
+    </div>
+    <p class="muted small">The coach signs in on the main screen with their name and this password. Set them Inactive to hide them from clients without deleting their history.</p>
+  `,`
+    ${id?`<button class="btn danger" onclick="delCoach('${id}')">Delete</button>`:''}
+    <button class="btn ghost" onclick="closeModal()">Cancel</button>
+    <button class="btn" onclick="saveCoach('${id||''}')">Save</button>`);
+}
+function saveCoach(id){
+  const name=($('#coName').value||'').trim();if(!name)return flash('Name is required',true);
+  const dup=(DB.coaches||[]).find(x=>x.id!==id&&(x.name||'').trim().toLowerCase()===name.toLowerCase());
+  if(dup)return flash('Another coach already uses that name',true);
+  const obj={name,tagline:$('#coTag').value,bio:$('#coBio').value,affiliation:$('#coAff').value,affiliationSub:$('#coAffSub').value,photo:$('#coPhoto').value,pwd:($('#coPwd').value||'coach').trim(),active:$('#coActive').checked};
+  if(id){Object.assign(coachById(id),obj);}
+  else{obj.id=uid();DB.coaches.push(obj);}
+  save();closeModal();flash('Coach saved 🏀');renderCoaches();
+}
+function delCoach(id){
+  const st=coachStats(id);
+  if(st.total>0){if(!confirm('This coach has '+st.total+' session(s). Deleting keeps those sessions but leaves them without a coach. Consider setting Inactive instead. Delete anyway?'))return;}
+  else if(!confirm('Delete this coach?'))return;
+  DB.coaches=DB.coaches.filter(c=>c.id!==id);
+  if(mgCoach===id)mgCoach=defaultCoachId();
+  save();closeModal();flash('Coach deleted');renderWhoami();renderCoaches();
+}
+
+/* ============================================================
    LOCATIONS
    ============================================================ */
 function renderLocations(){
@@ -1334,7 +1489,8 @@ const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 function fmtT(t){const[h,m]=t.split(':').map(Number);const ap=h<12?'AM':'PM';const hh=((h+11)%12)+1;return hh+':'+String(m).padStart(2,'0')+' '+ap;}
 function renderAvailability(){
   const now=todayISO();
-  const rules=(DB.availability||[]).slice().sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
+  const scopeLbl = AUTH==='coach' ? 'Your availability' : (scopeCoach()==='all' ? 'All coaches' : 'Coach: '+coachName(scopeCoach()));
+  const rules=(DB.availability||[]).filter(a=>inScope(a.coachId)).slice().sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
   const upcoming=rules.filter(a=>a.date>=now);
   const rows=upcoming.map(a=>`<tr>
     <td><b>${fmtDate(a.date)}</b><div class="clienttag">${DOW[new Date(a.date+'T00:00').getDay()]}</div></td><td>${fmtT(a.start)} – ${fmtT(a.end)}</td><td>${a.slotMin} min</td><td>${a.location||'—'}</td>
@@ -1343,7 +1499,8 @@ function renderAvailability(){
   const locOpt=DB.locations.map(l=>`<option>${l.name}</option>`).join('')||'<option value="">Add a location first</option>';
   $('#view-availability').innerHTML=`
     <h1 class="page">Availability</h1>
-    <div class="sub">Open specific dates and times. Clients can only request sessions inside these slots, at the location you choose. Set it fresh each week.</div>
+    <div class="sub">Open specific dates and times. Clients can only request sessions inside these slots, at the location you choose. Set it fresh each week. <span class="pill ${scopeCoach()==='all'?'orange':'green'}" style="margin-left:6px">${scopeLbl}</span></div>
+    ${AUTH!=='coach'&&scopeCoach()==='all'?'<div class="clienttag" style="margin:-6px 0 12px">Pick a specific coach in the top-right selector to add availability for them.</div>':''}
     <div class="panel" style="margin-bottom:16px">
       <h3>Open a date</h3>
       <div class="row">
@@ -1365,18 +1522,18 @@ function addAvailability(){
   const start=$('#avStart').value, end=$('#avEnd').value;
   if(!start||!end||end<=start)return flash('Set a valid time range',true);
   const loc=$('#avLoc').value; if(!loc)return flash('Add a location first (Locations tab)',true);
-  DB.availability.push({id:uid(),date,start,end,slotMin:+$('#avSlot').value,location:loc});
+  DB.availability.push({id:uid(),coachId:targetCoach(),date,start,end,slotMin:+$('#avSlot').value,location:loc,approved:true});
   save();flash('Availability added 📅');renderAvailability();
 }
 function delAvailability(id){DB.availability=DB.availability.filter(a=>a.id!==id);save();flash('Removed');renderAvailability();}
 
 /* open slots for a given date + session type.
    1:1 needs an empty slot; group stays open until it holds 4 clients total. */
-function availableSlots(dateStr,type){
+function availableSlots(dateStr,type,cid){
   if(!dateStr)return [];
   const now=new Date(); const seen={}; const out=[];
-  const sessAt=t=>DB.sessions.filter(s=>s.date===dateStr&&s.time===t&&s.status!=='cancelled');
-  (DB.availability||[]).filter(r=>r.date===dateStr).forEach(r=>{
+  const sessAt=t=>DB.sessions.filter(s=>s.date===dateStr&&s.time===t&&s.status!=='cancelled'&&(!cid||s.coachId===cid));
+  (DB.availability||[]).filter(r=>r.date===dateStr&&(!cid||r.coachId===cid)&&r.approved!==false).forEach(r=>{
     const step=r.slotMin||60; let [sh,sm]=r.start.split(':').map(Number); let [eh,em]=r.end.split(':').map(Number);
     let cur=sh*60+sm; const lim=eh*60+em;
     for(;cur+step<=lim;cur+=step){
@@ -1400,7 +1557,7 @@ function availableSlots(dateStr,type){
 function renderSlots(){
   const sel=$('#rqSlot'); if(!sel)return;
   const type=$('#rqType')?$('#rqType').value:'1on1';
-  const slots=availableSlots($('#rqDate').value,type);
+  const slots=availableSlots($('#rqDate').value,type,pickCoach||defaultCoachId());
   sel.innerHTML=slots.length?slots.map(s=>`<option value="${s.time}|${s.location}">${fmtT(s.time)} · ${s.location}</option>`).join(''):'<option value="">No open times this day</option>';
 }
 
@@ -1411,23 +1568,28 @@ let finRange='6m';
 function monthKey(d){return d.slice(0,7);}
 function monthLabel(k){const[y,m]=k.split('-');return new Date(y,m-1,1).toLocaleDateString('en-US',{month:'short'});}
 function renderFinance(){
-  const cashSess=DB.sessions.filter(s=>s.paid&&s.paidVia==='cash'&&s.status!=='cancelled');
-  const allPkgs=DB.customers.flatMap(c=>c.packages.map(p=>({...p,cust:c.name,custId:c.id})));
+  // ----- everything on this page is scoped to the coach selected top-right -----
+  const S=DB.sessions.filter(s=>inScope(s.coachId));
+  const CE=DB.cashEntries.filter(e=>inScope(e.coachId));
+  const EX=DB.expenses.filter(e=>inScope(e.coachId));
+  const scopeLbl = scopeCoach()==='all' ? 'All coaches' : 'Coach: '+coachName(scopeCoach());
+  const cashSess=S.filter(s=>s.paid&&s.paidVia==='cash'&&s.status!=='cancelled');
+  const allPkgs=DB.customers.flatMap(c=>c.packages.filter(p=>inScope(p.coachId)).map(p=>({...p,cust:c.name,custId:c.id})));
   const pkgRev=allPkgs.reduce((a,p)=>a+p.amount,0);
   const sessCash=cashSess.reduce((a,s)=>a+s.price,0);
-  const otherCash=DB.cashEntries.reduce((a,e)=>a+e.amount,0);
+  const otherCash=CE.reduce((a,e)=>a+e.amount,0);
   const cashRev=sessCash+otherCash;
   const revenue=pkgRev+cashRev;
-  const outstanding=DB.sessions.filter(s=>!s.paid&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
-  const expenses=DB.expenses.reduce((a,e)=>a+e.amount,0);
+  const outstanding=S.filter(s=>!s.paid&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
+  const expenses=EX.reduce((a,e)=>a+e.amount,0);
   const profit=revenue-expenses;
   // Liability = money received for sessions not yet delivered (prepaid packages + cash sessions),
   // reduced by every completed (delivered) session, whether cash or prepaid.
-  const soldVal=DB.customers.reduce((a,c)=>a+c.packages.reduce((x,p)=>x+p.amount,0),0)
-              + DB.sessions.filter(s=>s.paidVia==='cash'&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
-  const soldCnt=DB.customers.reduce((a,c)=>a+c.packages.reduce((x,p)=>x+p.qty,0),0)
-              + DB.sessions.filter(s=>s.paidVia==='cash'&&s.status!=='cancelled').length;
-  const delivered=DB.sessions.filter(s=>s.status==='completed'&&(s.paidVia==='package'||s.paidVia==='cash'));
+  const soldVal=allPkgs.reduce((x,p)=>x+p.amount,0)
+              + S.filter(s=>s.paidVia==='cash'&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
+  const soldCnt=allPkgs.reduce((x,p)=>x+p.qty,0)
+              + S.filter(s=>s.paidVia==='cash'&&s.status!=='cancelled').length;
+  const delivered=S.filter(s=>s.status==='completed'&&(s.paidVia==='package'||s.paidVia==='cash'));
   const remCredits=Math.max(0, soldCnt - delivered.length);
   const creditValue=Math.max(0, soldVal - delivered.reduce((a,s)=>a+s.price,0));
 
@@ -1436,9 +1598,9 @@ function renderFinance(){
   for(let i=n-1;i>=0;i--){const d=new Date(base);d.setMonth(d.getMonth()-i);months.push(d.toISOString().slice(0,7));}
   const revByM={},expByM={};
   cashSess.forEach(s=>{const k=monthKey(s.date);revByM[k]=(revByM[k]||0)+s.price;});
-  DB.cashEntries.forEach(e=>{const k=monthKey(e.date);revByM[k]=(revByM[k]||0)+e.amount;});
+  CE.forEach(e=>{const k=monthKey(e.date);revByM[k]=(revByM[k]||0)+e.amount;});
   allPkgs.forEach(p=>{const k=monthKey(p.date);revByM[k]=(revByM[k]||0)+p.amount;});
-  DB.expenses.forEach(e=>{const k=monthKey(e.date);expByM[k]=(expByM[k]||0)+e.amount;});
+  EX.forEach(e=>{const k=monthKey(e.date);expByM[k]=(expByM[k]||0)+e.amount;});
   const rev=months.map(m=>revByM[m]||0), exp=months.map(m=>expByM[m]||0), prof=months.map((m,i)=>rev[i]-exp[i]);
 
   const byType={'1on1':0,'group':0};
@@ -1446,19 +1608,19 @@ function renderFinance(){
   allPkgs.forEach(p=>byType[p.type]+=p.amount);
   const maxType=Math.max(byType['1on1'],byType['group'],1);
 
-  const expRows=DB.expenses.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>`<tr>
+  const expRows=EX.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>`<tr>
     <td>${fmtDate(e.date)}</td><td>${e.cat}</td><td class="muted">${e.note||''}</td>
     <td class="right">${money(e.amount)}</td>
     <td class="right"><div class="actions"><button class="iconbtn" onclick="openExpense('${e.id}')">Edit</button><button class="iconbtn" onclick="delExpense('${e.id}')">✕</button></div></td></tr>`).join('')
     ||'<tr><td colspan="5"><div class="empty">No expenses logged.</div></td></tr>';
 
-  const unpaidRows=DB.sessions.filter(s=>!s.paid&&s.status!=='cancelled').sort((a,b)=>a.date.localeCompare(b.date)).map(s=>`<tr>
+  const unpaidRows=S.filter(s=>!s.paid&&s.status!=='cancelled').sort((a,b)=>a.date.localeCompare(b.date)).map(s=>`<tr>
     <td>${fmtDate(s.date)}</td><td>${custNames(s.customerIds)}</td>
     <td>${s.type==='1on1'?'1:1':'Group'}</td><td class="right">${money(s.price)}</td>
     <td class="right"><div class="actions">${sessionHasCredit(s)?`<button class="btn sm ghost" onclick="payCredit('${s.id}')">Credit</button>`:''}<button class="btn sm" onclick="payCash('${s.id}')">Cash</button></div></td></tr>`).join('')
     ||'<tr><td colspan="5"><div class="empty">All caught up — nothing outstanding! 🎉</div></td></tr>';
 
-  const manualRows=DB.cashEntries.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>{const cn=e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in';return `<tr>
+  const manualRows=CE.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>{const cn=e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in';return `<tr>
     <td>${fmtDate(e.date)}</td><td>${cn}</td><td class="muted">${e.qty||1}× ${e.type==='group'?'Group':'1:1'} (cash)${e.note?' · '+e.note:''}</td><td class="right">${money(e.amount)}</td>
     <td class="right"><div class="actions"><button class="iconbtn" onclick="openCashEntry('${e.id}')">Edit</button><button class="iconbtn" onclick="delCashEntry('${e.id}')">✕</button></div></td></tr>`}).join('');
   const cashSessRows=cashSess.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(s=>`<tr>
@@ -1471,7 +1633,7 @@ function renderFinance(){
 
   $('#view-finance').innerHTML=`
     <h1 class="page">Finance</h1>
-    <div class="sub">Revenue, cashflow, profit, outstanding payments, and prepaid liability at a glance. Everything below is editable.</div>
+    <div class="sub">Revenue, cashflow, profit, outstanding payments, and prepaid liability at a glance. Everything below is editable. <span class="pill ${scopeCoach()==='all'?'orange':'green'}" style="margin-left:6px">${scopeLbl}</span></div>
     <div class="stats">
       <div class="stat"><div class="k">Revenue (collected)</div><div class="v">${money(revenue)}</div><div class="d" style="color:var(--green)">Cash ${money(cashRev)} + packages ${money(pkgRev)}</div></div>
       <div class="stat"><div class="k">Outstanding</div><div class="v">${money(outstanding)}</div><div class="d" style="color:var(--red)">Awaiting payment</div></div>
@@ -1580,6 +1742,7 @@ function openExpense(id){
   const e=id?DB.expenses.find(x=>x.id===id):{date:todayISO(),cat:'Gym Rental',amount:0,note:''};
   const cats=['Gym Rental','Equipment','Travel','Marketing','Insurance','Other'];
   openModal(id?'Edit Expense':'Add Expense',`
+    <div class="field"><label class="f">Coach (whose expense)</label><select id="eCoach">${coachSelectOptions(e.coachId||targetCoach(),false)}</select></div>
     <div class="row">
       <div class="field"><label class="f">Date</label><input type="date" id="eDate" value="${e.date}"></div>
       <div class="field"><label class="f">Amount ($)</label><input type="number" id="eAmt" value="${e.amount}"></div>
@@ -1591,7 +1754,7 @@ function openExpense(id){
 }
 function saveExpense(id){
   const amt=+$('#eAmt').value;if(!amt)return flash('Enter an amount',true);
-  const obj={date:$('#eDate').value,cat:$('#eCat').value,amount:amt,note:$('#eNote').value};
+  const obj={coachId:($('#eCoach')?$('#eCoach').value:targetCoach()),date:$('#eDate').value,cat:$('#eCat').value,amount:amt,note:$('#eNote').value};
   if(id){Object.assign(DB.expenses.find(x=>x.id===id),obj);}else{obj.id=uid();DB.expenses.push(obj);}
   save();closeModal();flash('Expense saved');renderFinance();
 }
@@ -1600,6 +1763,7 @@ function openCashEntry(id,prefillCust){
   const e=id?DB.cashEntries.find(x=>x.id===id):{date:todayISO(),amount:0,note:'',customerId:prefillCust||'',type:'1on1',qty:1};
   const custOpts='<option value="">— none / walk-in —</option>'+DB.customers.map(c=>`<option value="${c.id}" ${e.customerId===c.id?'selected':''}>${c.name}</option>`).join('');
   openModal(id?'Edit cash income':'Sell cash sessions',`
+    <div class="field"><label class="f">Coach (whose revenue)</label><select id="kCoach">${coachSelectOptions(e.coachId||targetCoach(),false)}</select></div>
     <div class="row">
       <div class="field"><label class="f">Source (client)</label><select id="kCust">${custOpts}</select></div>
       <div class="field"><label class="f">Date</label><input type="date" id="kDate" value="${e.date}"></div>
@@ -1619,7 +1783,7 @@ function openCashEntry(id,prefillCust){
 function recalcCash(){const type=$('#kType').value,qty=+$('#kQty').value||0;const rate=type==='1on1'?DB.settings.rate1on1:DB.settings.rateGroup;$('#kAmt').value=qty*rate;}
 function saveCashEntry(id){
   const amt=+$('#kAmt').value;if(!amt)return flash('Enter an amount',true);
-  const obj={date:$('#kDate').value,amount:amt,note:$('#kNote').value,customerId:$('#kCust').value||'',type:$('#kType').value,qty:+$('#kQty').value||1};
+  const obj={coachId:($('#kCoach')?$('#kCoach').value:targetCoach()),date:$('#kDate').value,amount:amt,note:$('#kNote').value,customerId:$('#kCust').value||'',type:$('#kType').value,qty:+$('#kQty').value||1};
   if(id){Object.assign(DB.cashEntries.find(x=>x.id===id),obj);}else{obj.id=uid();DB.cashEntries.push(obj);}
   save();closeModal();flash('Cash income saved 💵');refreshOwner();
 }
