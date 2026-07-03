@@ -25,7 +25,7 @@
   .topin{max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:12px 18px}
   .logo{font-weight:900;letter-spacing:.5px;font-size:20px;flex:0 0 auto}
   .logo .dot{color:var(--accent)}
-  nav.tabs{display:flex;gap:3px;flex-wrap:nowrap;overflow-x:auto;margin-left:6px;flex:1 1 auto;min-width:0;-webkit-overflow-scrolling:touch}
+  nav.tabs{display:flex;gap:3px;flex-wrap:wrap;margin-left:6px;flex:1 1 auto;min-width:0}
   nav.tabs::-webkit-scrollbar{height:0}
   nav.tabs button{background:transparent;border:0;color:var(--muted);font-weight:600;white-space:nowrap;
     padding:9px 11px;border-radius:10px;cursor:pointer;font-size:13.5px;transition:.15s}
@@ -167,6 +167,40 @@
   .ownerbtn{position:absolute;top:18px;right:18px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);
     font-weight:700;font-size:12.5px;padding:8px 14px;border-radius:999px;cursor:pointer}
   .ownerbtn:hover{color:var(--txt);border-color:var(--accent)}
+
+  /* ---------- responsive / mobile ---------- */
+  @media(max-width:820px){
+    .topin{flex-wrap:wrap;gap:8px;padding:10px 14px}
+    .logo{font-size:18px}
+    nav.tabs{order:3;flex-basis:100%;margin-left:0;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+    nav.tabs button{padding:8px 10px;font-size:13px}
+    .rolewrap{margin-left:auto;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+    .coachsel{max-width:140px}
+  }
+  @media(max-width:600px){
+    .wrap{padding:0 12px 70px}
+    section.view{padding-top:18px}
+    h1.page{font-size:21px}
+    .sub{margin-bottom:16px}
+    .hero{padding:22px}
+    .hero h2{font-size:26px}
+    .hero .row{flex-direction:column;align-items:stretch}
+    .hero .row .btn{width:100%;text-align:center}
+    .panel{padding:15px}
+    .field{min-width:100%}
+    .stats{grid-template-columns:1fr 1fr;gap:10px}
+    .stat{padding:14px}
+    .stat .v{font-size:20px}
+    table{font-size:12.5px}
+    th,td{padding:9px 7px}
+    .modal{padding:0;align-items:flex-end}
+    .modal .box{max-width:100%;max-height:94vh;border-radius:16px 16px 0 0}
+    .modal .foot{justify-content:stretch}
+    .modal .foot .btn{flex:1;text-align:center}
+    .btn{padding:10px 14px}
+    .rolewrap .btn.ghost.sm{padding:6px 9px}
+  }
+  @media(max-width:380px){ .stats{grid-template-columns:1fr} }
   .login p{margin-bottom:12px}
 </style>
 </head>
@@ -803,6 +837,7 @@ function renderBookingOwner(){
 
 function renderBookingTable(){
   const now=todayISO();
+  const showCoach=AUTH==='owner';
   let list = sortSessions(DB.sessions.filter(s=>inScope(s.coachId)));
   if(bookFilter==='upcoming') list=list.filter(s=>s.date>=now && s.status!=='cancelled');
   else if(bookFilter==='past') list=list.filter(s=>s.date<now||s.status==='completed').reverse();
@@ -828,6 +863,7 @@ function renderBookingTable(){
     return `<tr>
       <td><b>${fmtDT(s.date,s.time)}</b><div class="clienttag">${s.dur} min · ${s.location||''}</div></td>
       <td>${custNames(s.customerIds)}<div class="clienttag">${typePill(s)}</div></td>
+      ${showCoach?`<td>🏀 ${coachName(s.coachId)}</td>`:''}
       <td>${statusPill}</td>
       <td>${checkCell}</td>
       <td>${payCell}</td>
@@ -842,8 +878,8 @@ function renderBookingTable(){
     </div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
       <table>
-        <thead><tr><th>When</th><th>Client(s)</th><th>Status</th><th>Check-in</th><th>Payment</th><th class="right">Price</th><th></th></tr></thead>
-        <tbody>${rows||'<tr><td colspan="7"><div class="empty">No sessions in this view.</div></td></tr>'}</tbody>
+        <thead><tr><th>When</th><th>Client(s)</th>${showCoach?'<th>Coach</th>':''}<th>Status</th><th>Check-in</th><th>Payment</th><th class="right">Price</th><th></th></tr></thead>
+        <tbody>${rows||`<tr><td colspan="${showCoach?8:7}"><div class="empty">No sessions in this view.</div></td></tr>`}</tbody>
       </table>
     </div>`;
 }
@@ -1263,6 +1299,7 @@ function renderCustomers(){
     return `<tr>
       <td><div class="nameceil"><span class="av">${initials(c.name)}</span><div><b>${c.name}</b><div class="clienttag">${c.level||'—'}${c.parent?' · '+c.parent:''}</div></div></div></td>
       <td>${c.phone||''}<div class="clienttag">${c.email||''}</div></td>
+      <td>${[...new Set(DB.sessions.filter(s=>s.customerIds.includes(c.id)).map(s=>coachName(s.coachId)))].join(', ')||'<span class="muted">—</span>'}</td>
       <td>${completedCount(c)}<div class="clienttag">completed</div></td>
       <td>${bookedCount(c)}<div class="clienttag">upcoming</div></td>
       <td>${creditBadge(c)}</td>
@@ -1285,8 +1322,8 @@ function renderCustomers(){
     </div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
       <table>
-        <thead><tr><th>Player</th><th>Contact</th><th>Completed</th><th>Booked</th><th>Credits (used/total)</th><th>Next session</th><th></th></tr></thead>
-        <tbody>${rows||'<tr><td colspan="7"><div class="empty">No customers found.</div></td></tr>'}</tbody>
+        <thead><tr><th>Player</th><th>Contact</th><th>Coaches</th><th>Completed</th><th>Booked</th><th>Credits (used/total)</th><th>Next session</th><th></th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="8"><div class="empty">No customers found.</div></td></tr>'}</tbody>
       </table>
     </div>`;
 }
@@ -1557,12 +1594,13 @@ function fmtT(t){const[h,m]=t.split(':').map(Number);const ap=h<12?'AM':'PM';con
 function renderAvailability(){
   const now=todayISO();
   const scopeLbl = AUTH==='coach' ? 'Your availability' : (scopeCoach()==='all' ? 'All coaches' : 'Coach: '+coachName(scopeCoach()));
+  const showCoach=AUTH==='owner';
   const rules=(DB.availability||[]).filter(a=>inScope(a.coachId)).slice().sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
   const upcoming=rules.filter(a=>a.date>=now);
   const rows=upcoming.map(a=>`<tr>
-    <td><b>${fmtDate(a.date)}</b><div class="clienttag">${DOW[new Date(a.date+'T00:00').getDay()]}</div></td><td>${fmtT(a.start)} – ${fmtT(a.end)}</td><td>${a.slotMin} min</td><td>${a.location||'—'}</td>
+    <td><b>${fmtDate(a.date)}</b><div class="clienttag">${DOW[new Date(a.date+'T00:00').getDay()]}</div></td>${showCoach?`<td>🏀 ${coachName(a.coachId)}</td>`:''}<td>${fmtT(a.start)} – ${fmtT(a.end)}</td><td>${a.slotMin} min</td><td>${a.location||'—'}</td>
     <td class="right"><button class="iconbtn" onclick="delAvailability('${a.id}')">✕</button></td></tr>`).join('')
-    ||'<tr><td colspan="5"><div class="empty">No upcoming availability — add a date below.</div></td></tr>';
+    ||`<tr><td colspan="${showCoach?6:5}"><div class="empty">No upcoming availability — add a date below.</div></td></tr>`;
   const locOpt=DB.locations.map(l=>`<option>${l.name}</option>`).join('')||'<option value="">Add a location first</option>';
   $('#view-availability').innerHTML=`
     <h1 class="page">Availability</h1>
@@ -1581,7 +1619,7 @@ function renderAvailability(){
       <p class="muted small" style="margin-top:8px">Example: Jul 7, 4:00–7:00 PM, 60-min slots → clients can book 4:00, 5:00 or 6:00 that day. Add as many dates/windows as you like; booked times drop out automatically.</p>
     </div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
-      <table><thead><tr><th>Date</th><th>Window</th><th>Slot</th><th>Location</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+      <table><thead><tr><th>Date</th>${showCoach?'<th>Coach</th>':''}<th>Window</th><th>Slot</th><th>Location</th><th></th></tr></thead><tbody>${rows}</tbody></table>
     </div>`;
 }
 function addAvailability(){
@@ -1676,27 +1714,27 @@ function renderFinance(){
   const maxType=Math.max(byType['1on1'],byType['group'],1);
 
   const expRows=EX.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>`<tr>
-    <td>${fmtDate(e.date)}</td><td>${e.cat}</td><td class="muted">${e.note||''}</td>
+    <td>${fmtDate(e.date)}</td><td>🏀 ${coachName(e.coachId)}</td><td>${e.cat}</td><td class="muted">${e.note||''}</td>
     <td class="right">${money(e.amount)}</td>
     <td class="right"><div class="actions"><button class="iconbtn" onclick="openExpense('${e.id}')">Edit</button><button class="iconbtn" onclick="delExpense('${e.id}')">✕</button></div></td></tr>`).join('')
-    ||'<tr><td colspan="5"><div class="empty">No expenses logged.</div></td></tr>';
+    ||'<tr><td colspan="6"><div class="empty">No expenses logged.</div></td></tr>';
 
   const unpaidRows=S.filter(s=>!s.paid&&s.status!=='cancelled').sort((a,b)=>a.date.localeCompare(b.date)).map(s=>`<tr>
-    <td>${fmtDate(s.date)}</td><td>${custNames(s.customerIds)}</td>
+    <td>${fmtDate(s.date)}</td><td>🏀 ${coachName(s.coachId)}</td><td>${custNames(s.customerIds)}</td>
     <td>${s.type==='1on1'?'1:1':'Group'}</td><td class="right">${money(s.price)}</td>
     <td class="right"><div class="actions">${sessionHasCredit(s)?`<button class="btn sm ghost" onclick="payCredit('${s.id}')">Credit</button>`:''}<button class="btn sm" onclick="payCash('${s.id}')">Cash</button></div></td></tr>`).join('')
-    ||'<tr><td colspan="5"><div class="empty">All caught up — nothing outstanding! 🎉</div></td></tr>';
+    ||'<tr><td colspan="6"><div class="empty">All caught up — nothing outstanding! 🎉</div></td></tr>';
 
   const manualRows=CE.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>{const cn=e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in';return `<tr>
-    <td>${fmtDate(e.date)}</td><td>${cn}</td><td class="muted">${e.qty||1}× ${e.type==='group'?'Group':'1:1'} (cash)${e.note?' · '+e.note:''}</td><td class="right">${money(e.amount)}</td>
+    <td>${fmtDate(e.date)}</td><td>🏀 ${coachName(e.coachId)}</td><td>${cn}</td><td class="muted">${e.qty||1}× ${e.type==='group'?'Group':'1:1'} (cash)${e.note?' · '+e.note:''}</td><td class="right">${money(e.amount)}</td>
     <td class="right"><div class="actions"><button class="iconbtn" onclick="openCashEntry('${e.id}')">Edit</button><button class="iconbtn" onclick="delCashEntry('${e.id}')">✕</button></div></td></tr>`}).join('');
   const cashSessRows=cashSess.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(s=>`<tr>
-    <td>${fmtDate(s.date)}</td><td>${custNames(s.customerIds)}</td><td class="muted">${s.type==='1on1'?'1:1':'Group'} session</td><td class="right">${money(s.price)}</td>
+    <td>${fmtDate(s.date)}</td><td>🏀 ${coachName(s.coachId)}</td><td>${custNames(s.customerIds)}</td><td class="muted">${s.type==='1on1'?'1:1':'Group'} session</td><td class="right">${money(s.price)}</td>
     <td class="right"><button class="iconbtn" onclick="openSession('${s.id}')">Edit</button></td></tr>`).join('');
-  const cashRows=(manualRows+cashSessRows)||'<tr><td colspan="5"><div class="empty">No cash income yet.</div></td></tr>';
+  const cashRows=(manualRows+cashSessRows)||'<tr><td colspan="6"><div class="empty">No cash income yet.</div></td></tr>';
 
-  const pkgRows=allPkgs.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>`<tr><td>${fmtDate(p.date)}</td><td>${p.cust}</td><td class="muted">${p.qty}× ${p.type==='1on1'?'1:1':'Group'}</td><td class="right">${money(p.amount)}</td>
-    <td class="right"><button class="iconbtn" onclick="openPackage('${p.custId}','${p.id}')">Edit</button></td></tr>`).join('')||'<tr><td colspan="5"><div class="empty">No packages sold.</div></td></tr>';
+  const pkgRows=allPkgs.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>`<tr><td>${fmtDate(p.date)}</td><td>🏀 ${coachName(p.coachId)}</td><td>${p.cust}</td><td class="muted">${p.qty}× ${p.type==='1on1'?'1:1':'Group'}</td><td class="right">${money(p.amount)}</td>
+    <td class="right"><button class="iconbtn" onclick="openPackage('${p.custId}','${p.id}')">Edit</button></td></tr>`).join('')||'<tr><td colspan="6"><div class="empty">No packages sold.</div></td></tr>';
 
   $('#view-finance').innerHTML=`
     <h1 class="page">Finance</h1>
@@ -1738,12 +1776,12 @@ function renderFinance(){
       <div class="panel" style="padding:6px 14px;overflow-x:auto">
         <div class="row" style="justify-content:space-between;align-items:center;padding:12px 6px 0">
           <h3 style="margin:0">Cash & other income</h3><button class="btn sm" onclick="openCashEntry()">+ Add cash</button></div>
-        <table><thead><tr><th>Date</th><th>Source</th><th>Note</th><th class="right">Amount</th><th></th></tr></thead><tbody>${cashRows}</tbody></table>
+        <table><thead><tr><th>Date</th><th>Coach</th><th>Source</th><th>Note</th><th class="right">Amount</th><th></th></tr></thead><tbody>${cashRows}</tbody></table>
         <div class="clienttag" style="padding:6px">Session payments edit via their session; manual cash is editable here.</div>
       </div>
       <div class="panel" style="padding:6px 14px;overflow-x:auto">
         <div class="row" style="justify-content:space-between;align-items:center;padding:12px 6px 0"><h3 style="margin:0">Package revenue</h3><button class="btn sm" onclick="openSellPackage()">+ Add package</button></div>
-        <table><thead><tr><th>Date</th><th>Client</th><th>Package</th><th class="right">Amount</th><th></th></tr></thead><tbody>${pkgRows}</tbody></table>
+        <table><thead><tr><th>Date</th><th>Coach</th><th>Client</th><th>Package</th><th class="right">Amount</th><th></th></tr></thead><tbody>${pkgRows}</tbody></table>
         <div class="clienttag" style="padding:6px">Edit a package to adjust its amount and the client's credit total.</div>
       </div>
     </div>
@@ -1751,12 +1789,12 @@ function renderFinance(){
     <div class="twocol" style="margin-top:16px">
       <div class="panel" style="padding:6px 14px;overflow-x:auto">
         <div class="row" style="justify-content:space-between;align-items:center;padding:12px 6px 0"><h3 style="margin:0">Outstanding payments</h3></div>
-        <table><thead><tr><th>Date</th><th>Client</th><th>Type</th><th class="right">Amount</th><th></th></tr></thead><tbody>${unpaidRows}</tbody></table>
+        <table><thead><tr><th>Date</th><th>Coach</th><th>Client</th><th>Type</th><th class="right">Amount</th><th></th></tr></thead><tbody>${unpaidRows}</tbody></table>
       </div>
       <div class="panel" style="padding:6px 14px;overflow-x:auto">
         <div class="row" style="justify-content:space-between;align-items:center;padding:12px 6px 0">
           <h3 style="margin:0">Expenses</h3><button class="btn sm" onclick="openExpense()">+ Add</button></div>
-        <table><thead><tr><th>Date</th><th>Category</th><th>Note</th><th class="right">Amount</th><th></th></tr></thead><tbody>${expRows}</tbody></table>
+        <table><thead><tr><th>Date</th><th>Coach</th><th>Category</th><th>Note</th><th class="right">Amount</th><th></th></tr></thead><tbody>${expRows}</tbody></table>
       </div>
     </div>`;
   drawCashChart(months.map(monthLabel),rev,exp,prof);
