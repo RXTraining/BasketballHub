@@ -18,14 +18,14 @@
     background:radial-gradient(1200px 600px at 80% -10%,rgba(255,106,0,.12),transparent 60%),var(--bg);
     color:var(--txt);min-height:100vh;-webkit-font-smoothing:antialiased}
   a{color:inherit}
-  .wrap{max-width:1180px;margin:0 auto;padding:0 18px 80px}
+  .wrap{max-width:1720px;margin:0 auto;padding:0 28px 80px}
 
   header.top{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
     background:rgba(10,10,12,.82);border-bottom:1px solid var(--line)}
-  .topin{max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:12px 18px}
+  .topin{max-width:1720px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:12px 28px;flex-wrap:nowrap}
   .logo{font-weight:900;letter-spacing:.5px;font-size:20px;flex:0 0 auto}
   .logo .dot{color:var(--accent)}
-  nav.tabs{display:flex;gap:3px;flex-wrap:wrap;margin-left:6px;flex:1 1 auto;min-width:0}
+  nav.tabs{display:flex;gap:3px;flex-wrap:nowrap;overflow-x:auto;margin-left:6px;flex:1 1 auto;min-width:0;-webkit-overflow-scrolling:touch}
   nav.tabs::-webkit-scrollbar{height:0}
   nav.tabs button{background:transparent;border:0;color:var(--muted);font-weight:600;white-space:nowrap;
     padding:9px 11px;border-radius:10px;cursor:pointer;font-size:13.5px;transition:.15s}
