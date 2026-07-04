@@ -898,6 +898,7 @@ function renderBookingTable(){
   const now=todayISO();
   const showCoach=AUTH==='owner';
   let list = sortSessions(DB.sessions.filter(s=>inScope(s.coachId)));
+  if(bkChartFilter) list=list.filter(s=>periodKey(s.date,bkChartFilter.period).key===bkChartFilter.key);
   if(bookFilter==='upcoming') list=list.filter(s=>s.date>=now && s.status!=='cancelled');
   else if(bookFilter==='past') list=list.filter(s=>s.date<now||s.status==='completed').reverse();
   else if(bookFilter==='checkin') list=list.filter(s=>s.date===now);
@@ -932,6 +933,7 @@ function renderBookingTable(){
   }).join('');
 
   $('#bookBody').innerHTML=`
+    ${bkChartFilter?`<div style="margin-bottom:10px">${filterChip('Chart: '+bkChartFilter.label,'bkChartFilter=null;renderBooking()')}</div>`:''}
     <div class="seg">
       ${['upcoming','checkin','past','all'].map(f=>`<button class="${bookFilter===f?'active':''}" onclick="bookFilter='${f}';renderBooking()">${({upcoming:'Upcoming',checkin:'Today / Check-in',past:'Past',all:'All'})[f]}</button>`).join('')}
     </div>
@@ -1372,7 +1374,8 @@ function exportAllCal(){
 let custSearch='';
 function renderCustomers(){
   const q=custSearch.toLowerCase();
-  const list=DB.customers.filter(c=>!q||c.name.toLowerCase().includes(q)||(c.parent||'').toLowerCase().includes(q));
+  let list=DB.customers.filter(c=>!q||c.name.toLowerCase().includes(q)||(c.parent||'').toLowerCase().includes(q));
+  if(custDateFilter)list=list.filter(c=>c.created&&periodKey(c.created,custDateFilter.period).key===custDateFilter.key);
   const rows=list.map(c=>{
     const next=sortSessions(DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.date>=todayISO()&&s.status==='scheduled'))[0];
     return `<tr>
@@ -1397,6 +1400,7 @@ function renderCustomers(){
     <h1 class="page">Customers</h1>
     <div class="sub">Manage contacts, prepaid credits (used/total), packages, session history, login links & passwords.</div>
     ${custAnalyticsHtml()}
+    ${custDateFilter?`<div style="margin-bottom:10px">${filterChip('New in '+custDateFilter.label,'custDateFilter=null;renderCustomers()')}</div>`:''}
     <div class="row" style="margin-bottom:16px">
       <div class="field" style="max-width:280px;margin-bottom:0"><input placeholder="Search name or parent..." value="${custSearch}" oninput="custSearch=this.value;renderCustomers()"></div>
       <button class="btn" onclick="openCustomer()">+ Add Customer</button>
@@ -1574,7 +1578,10 @@ function coachStats(id){
 }
 function renderCoaches(){
   const pendCount=(DB.coaches||[]).filter(c=>c.pending).length;
-  const rows=(DB.coaches||[]).map(c=>{
+  let coachList=(DB.coaches||[]);
+  if(coachDateFilter)coachList=coachList.filter(c=>c.created&&periodKey(c.created,coachDateFilter.period).key===coachDateFilter.key);
+  if(coachTableFilter)coachList=coachList.filter(c=>c.id===coachTableFilter);
+  const rows=coachList.map(c=>{
     const st=coachStats(c.id);
     return `<tr>
       <td><div class="nameceil"><span class="av">${initials(c.name)}</span><div><b>${c.name}</b><div class="clienttag">${c.tagline||'—'}</div></div></div></td>
@@ -1594,6 +1601,7 @@ function renderCoaches(){
     <h1 class="page">Coaches</h1>
     <div class="sub">Every coach's profile, rates, sign-in and status. Use <b>Manage</b> (or the selector top-right) to work inside one coach's Booking, Availability and Finance. ${pendCount?`<span class="pill yellow" style="margin-left:6px">⏳ ${pendCount} awaiting approval</span>`:''}</div>
     ${coachAnalyticsHtml()}
+    ${(coachDateFilter||coachTableFilter)?`<div style="margin-bottom:10px">${filterChip(coachTableFilter?('Coach: '+coachName(coachTableFilter)):('New in '+coachDateFilter.label),'coachDateFilter=null;coachTableFilter=null;renderCoaches()')}</div>`:''}
     <div class="row" style="margin-bottom:16px"><button class="btn" onclick="openCoach()">+ Add Coach</button></div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
       <table>
@@ -2222,7 +2230,9 @@ function delCashEntry(id){if(!confirm('Delete this cash entry?'))return;DB.cashE
 /* ---------- Sessions analytics: summary + stacked column chart by period ---------- */
 const STATUS_META=[['completed','Completed','#39d98a'],['scheduled','Booked','#4aa8ff'],['pending','Pending','#ffce4a'],['cancelled','Cancelled','#ff5d6c']];
 let sessChartRange='month';   // day | week | month | quarter | year
-function setSessRange(r){sessChartRange=r;refreshOwner();}
+let bkChartFilter=null, custDateFilter=null, coachDateFilter=null, coachTableFilter=null;   // chart→table filters
+function setSessRange(r){sessChartRange=r;bkChartFilter=null;refreshOwner();}
+function filterChip(label,clearFn){return `<span class="pill blue" style="cursor:default">🔎 ${label} <b style="cursor:pointer;margin-left:4px" onclick="${clearFn}">✕</b></span>`;}
 function sessionSummary(list){const s={completed:0,scheduled:0,pending:0,cancelled:0,total:list.length};list.forEach(x=>{if(s[x.status]!==undefined)s[x.status]++;});return s;}
 function sessionsBuckets(list,period,maxN){
   const map={};
@@ -2253,30 +2263,34 @@ function sessionsDashHtml(canvasId){
 }
 function mountSessionsChart(canvasId){
   const list=DB.sessions.filter(s=>inScope(s.coachId));
-  drawStackedBars(canvasId,sessionsBuckets(list,sessChartRange,sessChartRange==='day'?14:12));
+  const buckets=sessionsBuckets(list,sessChartRange,sessChartRange==='day'?14:12);
+  drawStackedBars(canvasId,buckets,(b)=>{bkChartFilter=(bkChartFilter&&bkChartFilter.key===b.key)?null:{period:sessChartRange,key:b.key,label:b.label};renderBooking();},bkChartFilter&&bkChartFilter.key);
 }
-function drawStackedBars(canvasId,buckets){
+function drawStackedBars(canvasId,buckets,onClick,selectedKey){
   const cv=$('#'+canvasId);if(!cv)return;
   const dpr=window.devicePixelRatio||1;const W=cv.clientWidth||600,H=cv.clientHeight||230;
   cv.width=W*dpr;cv.height=H*dpr;const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
-  const padL=28,padR=8,padT=12,padB=26,x0=28,x1=W-padR,y0=padT,y1=H-padB;
+  const padR=8,padT=12,padB=26,x0=28,x1=W-padR,y0=padT,y1=H-padB;
   const totals=buckets.map(b=>b.completed+b.scheduled+b.pending+b.cancelled);
   const max=Math.max(...totals,4);
   const yfor=v=>y1-(v/max)*(y1-y0);
   ctx.strokeStyle='rgba(255,255,255,.07)';ctx.fillStyle='#9a9aa5';ctx.font='10px sans-serif';ctx.textAlign='start';
   for(let g=0;g<=4;g++){const v=Math.round(max*g/4);const y=yfor(v);ctx.beginPath();ctx.moveTo(x0,y);ctx.lineTo(x1,y);ctx.stroke();ctx.fillText(String(v),4,y+3);}
-  if(!buckets.length){ctx.textAlign='center';ctx.fillText('No sessions in range',W/2,H/2);ctx.textAlign='start';return;}
-  const n=buckets.length,slot=(x1-x0)/n,bw=Math.min(34,slot*0.62);
+  const n=buckets.length,slot=n?(x1-x0)/n:0,bw=Math.min(34,slot*0.62);
+  if(!buckets.length){ctx.textAlign='center';ctx.fillText('No sessions in range',W/2,H/2);ctx.textAlign='start';cv.onclick=null;return;}
   const cols={completed:'#39d98a',scheduled:'#4aa8ff',pending:'#ffce4a',cancelled:'#ff5d6c'};
-  buckets.forEach((b,i)=>{const cx=x0+slot*(i+0.5);let yTop=y1;
-    ['completed','scheduled','pending','cancelled'].forEach(k=>{const val=b[k];if(!val)return;const h=(val/max)*(y1-y0);ctx.fillStyle=cols[k];ctx.fillRect(cx-bw/2,yTop-h,bw,h);yTop-=h;});});
+  buckets.forEach((b,i)=>{const cx=x0+slot*(i+0.5);
+    if(selectedKey&&b.key===selectedKey){ctx.fillStyle='rgba(255,255,255,.10)';ctx.fillRect(cx-slot/2+2,y0,slot-4,y1-y0);}
+    let yTop=y1;['completed','scheduled','pending','cancelled'].forEach(k=>{const val=b[k];if(!val)return;const h=(val/max)*(y1-y0);ctx.fillStyle=cols[k];ctx.fillRect(cx-bw/2,yTop-h,bw,h);yTop-=h;});});
   ctx.fillStyle='#9a9aa5';ctx.textAlign='center';ctx.font='9px sans-serif';
   buckets.forEach((b,i)=>ctx.fillText(b.label,x0+slot*(i+0.5),H-8));
   ctx.textAlign='start';
+  cv.style.cursor=onClick?'pointer':'default';
+  cv.onclick=onClick?(e=>{const r=cv.getBoundingClientRect();const i=Math.floor((e.clientX-r.left-x0)/slot);if(i>=0&&i<buckets.length)onClick(buckets[i]);}):null;
 }
 /* ---------- Customer & Coach analytics (value ranking + recruiting growth) ---------- */
 let growthRange='month';   // month | quarter | year
-function setGrowthRange(r){growthRange=r;refreshOwner();}
+function setGrowthRange(r){growthRange=r;custDateFilter=null;coachDateFilter=null;refreshOwner();}
 function bucketByPeriodCount(dates,period,maxN){
   const map={};
   dates.forEach(dt=>{const {key,label}=periodKey(dt,period);if(!map[key])map[key]={key,label,value:0};map[key].value++;});
@@ -2284,7 +2298,7 @@ function bucketByPeriodCount(dates,period,maxN){
   if(maxN&&arr.length>maxN)arr=arr.slice(arr.length-maxN);
   return arr;
 }
-function drawBars(canvasId,items,color){
+function drawBars(canvasId,items,color,onClick,selectedKey){
   const cv=$('#'+canvasId);if(!cv)return;
   const dpr=window.devicePixelRatio||1;const W=cv.clientWidth||600,H=cv.clientHeight||230;
   cv.width=W*dpr;cv.height=H*dpr;const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
@@ -2292,11 +2306,15 @@ function drawBars(canvasId,items,color){
   const max=Math.max(...items.map(i=>i.value),4);const yfor=v=>y1-(v/max)*(y1-y0);
   ctx.strokeStyle='rgba(255,255,255,.07)';ctx.fillStyle='#9a9aa5';ctx.font='10px sans-serif';ctx.textAlign='start';
   for(let g=0;g<=4;g++){const v=Math.round(max*g/4);const y=yfor(v);ctx.beginPath();ctx.moveTo(x0,y);ctx.lineTo(x1,y);ctx.stroke();ctx.fillText(String(v),4,y+3);}
-  if(!items.length){ctx.textAlign='center';ctx.fillText('No data yet',W/2,H/2);ctx.textAlign='start';return;}
-  const n=items.length,slot=(x1-x0)/n,bw=Math.min(34,slot*0.62);
-  items.forEach((it,i)=>{const cx=x0+slot*(i+0.5),h=(it.value/max)*(y1-y0);ctx.fillStyle=color;ctx.fillRect(cx-bw/2,y1-h,bw,h);});
+  const n=items.length,slot=n?(x1-x0)/n:0,bw=Math.min(34,slot*0.62);
+  if(!items.length){ctx.textAlign='center';ctx.fillText('No data yet',W/2,H/2);ctx.textAlign='start';cv.onclick=null;return;}
+  items.forEach((it,i)=>{const cx=x0+slot*(i+0.5),h=(it.value/max)*(y1-y0);
+    if(selectedKey&&it.key===selectedKey){ctx.fillStyle='rgba(255,255,255,.10)';ctx.fillRect(cx-slot/2+2,y0,slot-4,y1-y0);}
+    ctx.fillStyle=color;ctx.fillRect(cx-bw/2,y1-h,bw,h);});
   ctx.fillStyle='#9a9aa5';ctx.textAlign='center';ctx.font='9px sans-serif';
   items.forEach((it,i)=>ctx.fillText(it.label,x0+slot*(i+0.5),H-8));ctx.textAlign='start';
+  cv.style.cursor=onClick?'pointer':'default';
+  cv.onclick=onClick?(e=>{const r=cv.getBoundingClientRect();const i=Math.floor((e.clientX-r.left-x0)/slot);if(i>=0&&i<items.length)onClick(items[i]);}):null;
 }
 function growthSeg(){return `<div class="seg" style="margin:0">${['month','quarter','year'].map(r=>`<button class="${growthRange===r?'active':''}" onclick="setGrowthRange('${r}')">${r[0].toUpperCase()+r.slice(1)}</button>`).join('')}</div>`;}
 function custValue(c){return clientPayments(c.id).reduce((x,i)=>x+i.amount,0);}
@@ -2309,7 +2327,7 @@ function custAnalyticsHtml(){
   const ranked=custs.map(c=>({c,val:custValue(c),sess:DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status!=='cancelled').length})).sort((a,b)=>b.val-a.val).slice(0,8);
   const maxV=Math.max(1,...ranked.map(r=>r.val));
   const chip=(k,v,col)=>`<div class="stat"><div class="k">${k}</div><div class="v"${col?` style="color:${col}"`:''}>${v}</div></div>`;
-  const topRows=ranked.length&&maxV>0?ranked.map(r=>`<div class="barrow"><div class="lab" style="width:130px">${r.c.name}</div><div class="bar"><i style="width:${r.val/maxV*100}%"></i></div><div class="val">${money(r.val)}<div class="clienttag" style="text-align:right">${r.sess} sess</div></div></div>`).join(''):'<div class="empty">No customer payments yet.</div>';
+  const topRows=ranked.length&&maxV>0?ranked.map(r=>`<div class="barrow" style="cursor:pointer" title="Filter table to ${r.c.name}" onclick="custSearch='${(r.c.name||'').replace(/'/g,"\\'")}';renderCustomers()"><div class="lab" style="width:130px">${r.c.name}</div><div class="bar"><i style="width:${r.val/maxV*100}%"></i></div><div class="val">${money(r.val)}<div class="clienttag" style="text-align:right">${r.sess} sess</div></div></div>`).join(''):'<div class="empty">No customer payments yet.</div>';
   return `<div class="stats" style="margin-bottom:14px">
       ${chip('Total customers',total)}
       ${chip('New this month',newThisMonth,'var(--green)')}
@@ -2324,7 +2342,7 @@ function custAnalyticsHtml(){
       <div class="panel"><h3>Most valuable customers</h3>${topRows}<div class="clienttag" style="margin-top:8px">Ranked by lifetime money paid (packages + cash).</div></div>
     </div>`;
 }
-function mountCustGrowth(){drawBars('custGrowth',bucketByPeriodCount(DB.customers.map(c=>c.created).filter(Boolean),growthRange,12),'#4aa8ff');}
+function mountCustGrowth(){drawBars('custGrowth',bucketByPeriodCount(DB.customers.map(c=>c.created).filter(Boolean),growthRange,12),'#4aa8ff',(it)=>{custDateFilter=(custDateFilter&&custDateFilter.key===it.key)?null:{period:growthRange,key:it.key,label:it.label};renderCustomers();},custDateFilter&&custDateFilter.key);}
 function coachValue(id){return coachEarnings(id).reduce((x,i)=>x+i.amount,0);}
 function coachAnalyticsHtml(){
   const coaches=DB.coaches,now=todayISO();
@@ -2333,7 +2351,7 @@ function coachAnalyticsHtml(){
   const maxV=Math.max(1,...ranked.map(r=>r.val));
   const totalEarn=ranked.reduce((a,r)=>a+r.val,0);
   const chip=(k,v,col)=>`<div class="stat"><div class="k">${k}</div><div class="v"${col?` style="color:${col}"`:''}>${v}</div></div>`;
-  const rows=ranked.length&&maxV>0?ranked.map(r=>`<div class="barrow"><div class="lab" style="width:130px">${r.c.name}</div><div class="bar"><i style="width:${r.val/maxV*100}%"></i></div><div class="val">${money(r.val)}<div class="clienttag" style="text-align:right">${r.done} done</div></div></div>`).join(''):'<div class="empty">No coach earnings yet.</div>';
+  const rows=ranked.length&&maxV>0?ranked.map(r=>`<div class="barrow" style="cursor:pointer" title="Filter table to ${r.c.name}" onclick="coachTableFilter='${r.c.id}';renderCoaches()"><div class="lab" style="width:130px">${r.c.name}</div><div class="bar"><i style="width:${r.val/maxV*100}%"></i></div><div class="val">${money(r.val)}<div class="clienttag" style="text-align:right">${r.done} done</div></div></div>`).join(''):'<div class="empty">No coach earnings yet.</div>';
   return `<div class="stats" style="margin-bottom:14px">
       ${chip('Total coaches',total)}
       ${chip('Active',active,'var(--green)')}
@@ -2347,7 +2365,7 @@ function coachAnalyticsHtml(){
       </div>
     </div>`;
 }
-function mountCoachGrowth(){drawBars('coachGrowth',bucketByPeriodCount(DB.coaches.map(c=>c.created).filter(Boolean),growthRange,12),'#ff9100');}
+function mountCoachGrowth(){drawBars('coachGrowth',bucketByPeriodCount(DB.coaches.map(c=>c.created).filter(Boolean),growthRange,12),'#ff9100',(it)=>{coachDateFilter=(coachDateFilter&&coachDateFilter.key===it.key)?null:{period:growthRange,key:it.key,label:it.label};renderCoaches();},coachDateFilter&&coachDateFilter.key);}
 function drawCashChart(labels,rev,exp,prof){
   const cv=$('#cashChart');if(!cv)return;
   const dpr=window.devicePixelRatio||1;const W=cv.clientWidth||600,H=cv.clientHeight||230;
