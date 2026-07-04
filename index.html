@@ -979,7 +979,7 @@ function renderBookingTable(){
   const showCoach=AUTH==='owner';
   let list = sortSessions(DB.sessions.filter(s=>inScope(s.coachId)));
   if(bkChartFilter) list=list.filter(s=>periodKey(s.date,bkChartFilter.period).key===bkChartFilter.key);
-  if(bookFilter==='upcoming') list=list.filter(s=>s.date>=now && s.status!=='cancelled');
+  if(bookFilter==='upcoming') list=list.filter(s=>s.date>=now && s.status!=='cancelled' && s.status!=='completed');
   else if(bookFilter==='past') list=list.filter(s=>s.date<now||s.status==='completed').reverse();
   else if(bookFilter==='checkin') list=list.filter(s=>s.date===now);
 
