@@ -447,13 +447,19 @@ function dataSig(d){return JSON.stringify({
 async function pollSync(){
   if(!supa||!SUPA_OK||cloudTimer)return;                       // skip if a local save is in flight
   if($('#modal').classList.contains('show'))return;            // don't disrupt an open dialog
+  let fresh; try{ fresh=await fetchCloud(); }catch(e){ return; }
+  const sig=dataSig(fresh);
+  if(sig===lastSig)return;                                     // nothing changed
+  DB=fresh; lastSig=sig;
   const ae=document.activeElement;
-  if(ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))return;  // don't wipe what someone's typing
-  try{
-    const fresh=await fetchCloud();
-    const sig=dataSig(fresh);
-    if(sig!==lastSig){DB=fresh;lastSig=sig;refreshOwner();}
-  }catch(e){}
+  const typing = ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName);
+  if(typing){
+    // someone is mid-edit — don't blow away their form. Still push the important
+    // read-only updates: a client's booked/pending list refreshes on its own panel.
+    if(AUTH==='client' && TAB==='booking') refreshClientStatus();
+    return;
+  }
+  refreshOwner();
 }
 let pollHooked=false, rtChannel=null, rtTimer=null, rtState='';
 /* Supabase Realtime: push updates instantly to every open device */
@@ -1060,15 +1066,24 @@ function renderBookingClient(){
         <div class="panel" style="margin-top:16px"><h3>Your packages</h3>${pkgHist}
           <p class="muted small" style="margin-top:8px">To buy a package, ask the Owner — your used/total balance updates automatically.</p></div>
       </div>
-      <div>
-        ${today.length?`<h3 style="margin:0 0 10px">Today</h3>${today.map(clientCard).join('')}`:''}
-        ${pending.length?`<h3 style="margin:${today.length?'18px':'0'} 0 10px">Pending — awaiting confirmation</h3>${pending.map(clientCard).join('')}`:''}
-        <h3 style="margin:${(today.length||pending.length)?'18px':'0'} 0 10px">Your booked sessions</h3>
-        ${upcoming.length?upcoming.map(clientCard).join(''):'<div class="panel"><div class="empty">No booked sessions yet — request one ←</div></div>'}
-      </div>
+      <div id="clientStatus">${clientStatusHtml(c)}</div>
     </div>`;
   renderSlots();
 }
+/* just the Today / Pending / Booked panels — can refresh on its own so live updates
+   don't wipe out what the client is typing in the request form */
+function clientStatusHtml(c){
+  const now=todayISO();
+  const mine=DB.sessions.filter(s=>s.customerIds.includes(c.id));
+  const today=sortSessions(mine.filter(s=>s.date===now && (s.status==='scheduled'||s.status==='pending')));
+  const pending=sortSessions(mine.filter(s=>s.date>=now && s.status==='pending'));
+  const upcoming=sortSessions(mine.filter(s=>s.date>=now && s.status==='scheduled'));
+  return `${today.length?`<h3 style="margin:0 0 10px">Today</h3>${today.map(clientCard).join('')}`:''}
+    ${pending.length?`<h3 style="margin:${today.length?'18px':'0'} 0 10px">Pending — awaiting confirmation</h3>${pending.map(clientCard).join('')}`:''}
+    <h3 style="margin:${(today.length||pending.length)?'18px':'0'} 0 10px">Your booked sessions</h3>
+    ${upcoming.length?upcoming.map(clientCard).join(''):'<div class="panel"><div class="empty">No booked sessions yet — request one ←</div></div>'}`;
+}
+function refreshClientStatus(){const c=custById(clientAs);const el=$('#clientStatus');if(c&&el)el.innerHTML=clientStatusHtml(c);}
 function renderPast(){
   const c=custById(clientAs);
   if(!c){$('#view-past').innerHTML='<div class="panel"><div class="empty">Please sign in again.</div></div>';return;}
