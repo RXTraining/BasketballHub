@@ -14,11 +14,21 @@
 /* generate an orange "RX" home-screen icon so the iOS icon isn't a black screenshot */
 (function(){try{
   var c=document.createElement('canvas');c.width=c.height=180;var x=c.getContext('2d');
-  var g=x.createLinearGradient(0,0,180,180);g.addColorStop(0,'#ff6a00');g.addColorStop(1,'#ff9100');
+  var g=x.createLinearGradient(0,0,180,180);g.addColorStop(0,'#ff7a12');g.addColorStop(1,'#ff9d2e');
   x.fillStyle=g;x.fillRect(0,0,180,180);
   x.textAlign='center';x.textBaseline='middle';
-  x.fillStyle='#ffffff';x.font='800 78px -apple-system,Segoe UI,Arial,sans-serif';x.fillText('RX',90,94);
-  x.fillStyle='#111111';x.font='800 20px -apple-system,Segoe UI,Arial,sans-serif';x.fillText('.TRAINING',90,140);
+  // big white RX up top
+  x.fillStyle='#ffffff';x.font='800 88px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
+  x.shadowColor='rgba(0,0,0,.18)';x.shadowBlur=6;x.shadowOffsetY=2;
+  x.fillText('RX',90,72);
+  x.shadowColor='transparent';x.shadowBlur=0;x.shadowOffsetY=0;
+  // divider line
+  x.strokeStyle='rgba(0,0,0,.30)';x.lineWidth=3;x.beginPath();x.moveTo(46,120);x.lineTo(134,120);x.stroke();
+  // TRAINING below, black, spaced
+  x.fillStyle='#111111';x.font='700 20px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
+  try{x.letterSpacing='3px';}catch(e){}
+  x.fillText('TRAINING',91,146);
+  try{x.letterSpacing='0px';}catch(e){}
   var url=c.toDataURL('image/png');
   var a=document.getElementById('appleIcon');if(a)a.href=url;
   var f=document.getElementById('favIcon');if(f)f.href=url;
