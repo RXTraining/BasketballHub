@@ -403,7 +403,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa){
     pending:(c.pending||null),created:c.created||''}));
   d.locations=(loc||[]).map(l=>({id:l.id,name:l.name,address:l.address||''}));
   d.availability=(avail||[]).map(a=>({id:a.id,coachId:a.coach_id||'',date:a.date,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||'',approved:a.approved!==false}));
-  d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',notes:c.notes||'',created:c.created||'',creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
+  d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',inGroup:!!c.in_group,creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
     packages:(pkg||[]).filter(p=>p.customer_id===c.id).map(p=>({id:p.id,coachId:p.coach_id||'',type:p.type,qty:p.qty,amount:Number(p.amount),date:p.date}))}));
   d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||''}));
   d.expenses=(exp||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||''}));
@@ -411,7 +411,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa){
   return normalize(d);
 }
 const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),pending:(c.pending||null),created:c.created||null});
-const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',notes:c.notes||'',created:c.created||'',credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
+const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
 const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null});
 async function migrateSource(){
   try{const {data}=await supa.from(STATE_TABLE).select('data').eq('id','main').maybeSingle();if(data&&data.data)return normalize(data.data);}catch(e){}
@@ -784,7 +784,7 @@ function exportExcel(){
     {Metric:'1:1 rate / hr',Amount:DB.settings.rate1on1},
     {Metric:'Group rate / hr',Amount:DB.settings.rateGroup}
   ]);
-  add('Customers',DB.customers.map(c=>({Name:c.name,Phone:c.phone,Email:c.email,Parent:c.parent,Level:c.level,
+  add('Customers',DB.customers.map(c=>({Name:c.name,Phone:c.phone,Email:c.email,WeChat:c.wechat||'','In group':c.inGroup?'Yes':'No',Parent:c.parent,Level:c.level,
     '1:1 used':usedFor(c,'1on1'),'1:1 total':totalFor(c,'1on1'),'1:1 left':creditsFor(c,'1on1'),
     'Group used':usedFor(c,'group'),'Group total':totalFor(c,'group'),'Group left':creditsFor(c,'group'),
     Password:c.pwd,Created:c.created,Notes:c.notes})));
@@ -1382,6 +1382,7 @@ function renderCustomers(){
     return `<tr>
       <td><div class="nameceil"><span class="av">${initials(c.name)}</span><div><b>${c.name}</b><div class="clienttag">${c.level||'—'}${c.parent?' · '+c.parent:''}</div></div></div></td>
       <td>${c.phone||''}<div class="clienttag">${c.email||''}</div></td>
+      <td>${c.wechat||'<span class="muted">—</span>'}<div class="clienttag">${c.inGroup?'<span style="color:var(--green)">✓ in group</span>':'not in group'}</div></td>
       <td>${[...new Set(DB.sessions.filter(s=>s.customerIds.includes(c.id)).map(s=>coachName(s.coachId)))].join(', ')||'<span class="muted">—</span>'}</td>
       <td>${completedCount(c)}<div class="clienttag">completed</div></td>
       <td>${bookedCount(c)}<div class="clienttag">upcoming</div></td>
@@ -1409,8 +1410,8 @@ function renderCustomers(){
     </div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
       <table>
-        <thead><tr><th>Player</th><th>Contact</th><th>Coaches</th><th>Completed</th><th>Booked</th><th>Cancels</th><th>Credits (used/total)</th><th>Joined</th><th>Next session</th><th></th></tr></thead>
-        <tbody>${rows||'<tr><td colspan="10"><div class="empty">No customers found.</div></td></tr>'}</tbody>
+        <thead><tr><th>Player</th><th>Contact</th><th>WeChat</th><th>Coaches</th><th>Completed</th><th>Booked</th><th>Cancels</th><th>Credits (used/total)</th><th>Joined</th><th>Next session</th><th></th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="11"><div class="empty">No customers found.</div></td></tr>'}</tbody>
       </table>
     </div>`;
   mountCustGrowth();
@@ -1433,6 +1434,10 @@ function viewCustomer(id){
     <div class="row" style="margin-bottom:8px">
       <div class="field"><label class="f">Level</label><div>${c.level||'—'}</div></div>
       <div class="field"><label class="f">Parent/Guardian</label><div>${c.parent||'—'}</div></div>
+    </div>
+    <div class="row" style="margin-bottom:8px">
+      <div class="field"><label class="f">WeChat</label><div>${c.wechat||'—'}</div></div>
+      <div class="field"><label class="f">WeChat group</label><div>${c.inGroup?'<span style="color:var(--green)">✓ In group</span>':'Not in group'}</div></div>
     </div>
     ${c.notes?`<div class="field"><label class="f">Notes</label><div class="muted">${c.notes}</div></div>`:''}
     <div class="panel" style="background:var(--panel2);margin:6px 0 14px">
@@ -1535,6 +1540,10 @@ function openCustomer(id){
       <div class="field"><label class="f">Level / Age group</label><input id="cLevel" value="${c.level||''}" placeholder="e.g. AAU U14"></div>
       <div class="field"><label class="f">Parent / Guardian</label><input id="cParent" value="${c.parent||''}"></div>
     </div>
+    <div class="row">
+      <div class="field"><label class="f">WeChat number</label><input id="cWechat" value="${(c.wechat||'').replace(/"/g,'&quot;')}" placeholder="WeChat ID"></div>
+      <div class="field" style="display:flex;align-items:flex-end"><label class="f" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="cInGroup" ${c.inGroup?'checked':''} style="width:auto"> In WeChat group</label></div>
+    </div>
     <div class="field" style="max-width:220px"><label class="f">Joined date</label><input type="date" id="cCreated" value="${id?(c.created||todayISO()):todayISO()}"><div class="clienttag" style="margin-top:4px">Used for recruiting stats.</div></div>
     <div class="field"><label class="f">Notes</label><textarea id="cNotes">${c.notes||''}</textarea></div>
     <div class="panel" style="background:var(--panel2);padding:14px;margin-bottom:14px">
@@ -1559,7 +1568,7 @@ function openCustomer(id){
 }
 function saveCustomer(id){
   const name=$('#cName').value.trim();if(!name)return flash('Name is required',true);
-  const obj={name,phone:$('#cPhone').value,email:$('#cEmail').value,level:$('#cLevel').value,parent:$('#cParent').value,notes:$('#cNotes').value};
+  const obj={name,phone:$('#cPhone').value,email:$('#cEmail').value,level:$('#cLevel').value,parent:$('#cParent').value,notes:$('#cNotes').value,wechat:($('#cWechat')?$('#cWechat').value:'').trim(),inGroup:!!($('#cInGroup')&&$('#cInGroup').checked)};
   const tot1=Math.max(0,Math.round(+$('#cTot1').value||0)), totG=Math.max(0,Math.round(+$('#cTotG').value||0));
   const pwd=($('#cPwd').value||'').trim()||DB.settings.defaultClientPwd;
   const created=($('#cCreated')&&$('#cCreated').value)||todayISO();
