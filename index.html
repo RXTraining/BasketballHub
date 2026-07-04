@@ -65,6 +65,14 @@
   .slotchip{background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:7px 11px;font-size:12.5px;cursor:pointer;font-weight:600}
   .slotchip:hover{border-color:var(--accent);color:#fff}
   .slotchip.sel{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#111;border-color:transparent}
+  .evbanner{background:linear-gradient(135deg,rgba(255,106,0,.18),rgba(255,145,0,.05));border:1px solid rgba(255,145,0,.4);border-radius:12px;overflow:hidden;margin-bottom:16px;display:flex;align-items:center;gap:10px;padding:8px 10px}
+  .evbanner .tag{flex:0 0 auto;font-weight:800;color:var(--accent2);font-size:12.5px;display:flex;align-items:center;gap:6px}
+  .evbanner .mq{flex:1;overflow:hidden;position:relative;min-width:0}
+  .mq-track{display:inline-flex;gap:28px;white-space:nowrap;animation:mqscroll linear infinite;will-change:transform}
+  .evbanner:hover .mq-track,.evbanner.paused .mq-track{animation-play-state:paused}
+  @keyframes mqscroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  .mq-item{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--txt)}
+  .mq-item .btn{padding:4px 11px;font-size:12px}
   table{width:100%;border-collapse:collapse;font-size:13.5px}
   th{text-align:left;color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;
     letter-spacing:.5px;padding:10px 10px;border-bottom:1px solid var(--line)}
@@ -475,7 +483,7 @@ function isTextEntry(ae){
   return false;
 }
 async function pollSync(){
-  if(!supa||!SUPA_OK||cloudTimer)return;                       // skip if a local save is in flight
+  if(!supa||!SUPA_OK||cloudTimer||pushing)return;              // skip if a local save/push is in flight
   if($('#modal').classList.contains('show'))return;            // don't disrupt an open dialog
   let fresh; try{ fresh=await fetchCloud(); }catch(e){ return; }
   const sig=dataSig(fresh);
@@ -521,8 +529,10 @@ async function syncTable(name,rows){
   if(ids.length){await supa.from(name).delete().not('id','in','('+ids.map(x=>'"'+x+'"').join(',')+')');}
   else{await supa.from(name).delete().neq('id','__none__');}
 }
+let pushing=false;
 async function cloudPush(){
   if(!supa||!SUPA_OK)return;
+  pushing=true;
   try{
     // Clients only write their OWN sessions (no deletes, never settings/customers/etc.)
     // so a client action can never overwrite the owner's data.
@@ -558,6 +568,7 @@ async function cloudPush(){
     await syncTable('events',(DB.events||[]).map(eventRow));
     await syncTable('event_regs',(DB.eventRegs||[]).map(eventRegRow));
   }catch(e){flash('Cloud save failed — saved on this device',true);}
+  finally{pushing=false;}
 }
 
 /* ---------- helpers ---------- */
@@ -1085,6 +1096,7 @@ function renderBookingClient(){
   $('#view-booking').innerHTML=`
     <h1 class="page">Welcome, ${firstName(c.name)} 👋</h1>
     <div class="sub">Request a session and manage your upcoming sessions. Past sessions are in the Past Sessions tab.</div>
+    ${clientEventBanner()}
     <div class="panel" style="margin-bottom:16px">
       <div class="row" style="justify-content:space-between;align-items:flex-start">
         <div style="flex:1;min-width:200px">
@@ -2163,6 +2175,21 @@ function clientCancelEventReg(id){
   if(!confirm('Cancel your registration?'))return;
   const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;
   r.status='cancelled';save();flash('Registration cancelled');renderEvents();
+}
+/* scrolling events reminder shown on the client's My Sessions page */
+function clientEventBanner(){
+  const now=todayISO();
+  const evs=(DB.events||[]).filter(e=>e.active!==false&&e.date>=now&&!myEventReg(e.id,clientAs)&&eventSpotsLeft(e)>0)
+    .sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
+  if(!evs.length)return '';
+  const item=ev=>`<span class="mq-item">📣 <b>${ev.title}</b> · ${eventWhen(ev)} · ${ev.price?money(ev.price):'Free'} <button class="btn sm" onclick="event.stopPropagation();registerEvent('${ev.id}')">Register</button></span>`;
+  const items=evs.map(item).join('');
+  const dur=Math.max(14,evs.length*9);
+  return `<div class="evbanner" onclick="this.classList.toggle('paused')" title="Tap to pause / resume">
+    <span class="tag">🎉 Events</span>
+    <div class="mq"><div class="mq-track" style="animation-duration:${dur}s">${items}${items}</div></div>
+    <button class="btn ghost sm" style="flex:0 0 auto" onclick="event.stopPropagation();TAB='events';switchTab()">See all →</button>
+  </div>`;
 }
 
 /* ============================================================
