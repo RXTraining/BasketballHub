@@ -1919,4 +1919,123 @@ function renderAdmin(){
     <h1 class="page">Admin</h1>
     <div class="sub">Pricing and access settings.</div>
     <div class="twocol">
-      <div class="pane
+      <div class="panel">
+        <h3>Default rates (fallback)</h3>
+        <div class="row">
+          <div class="field"><label class="f">1:1 rate ($/hr)</label><input type="number" id="rate1" value="${DB.settings.rate1on1}"></div>
+          <div class="field"><label class="f">Group rate ($/hr/player)</label><input type="number" id="rateG" value="${DB.settings.rateGroup}"></div>
+        </div>
+        <button class="btn sm" onclick="saveRates()">Save default rates</button>
+        <div class="clienttag" style="margin-top:8px">Each coach now has their own rates (set in the <b style="color:var(--txt)">Coaches</b> tab). These defaults apply only to a coach who hasn't set their own.</div>
+      </div>
+      <div class="panel">
+        <h3>Owner password</h3>
+        <div class="row"><div class="field"><input type="password" id="newPwd" placeholder="New owner password (4+ chars)"></div></div>
+        <button class="btn sm ghost" onclick="changePwd()">Update password</button>
+        <h3 style="margin-top:18px">Default client password</h3>
+        <div class="row"><div class="field"><input id="defCPwd" value="${DB.settings.defaultClientPwd}"></div></div>
+        <button class="btn sm ghost" onclick="saveDefCPwd()">Save default</button>
+        <div class="clienttag" style="margin-top:8px">Used for new clients. Reset any client's password in Customers → Edit.</div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h3>Request notifications</h3>
+      <div class="field"><label class="f">Notify these email(s) when a client requests a session — comma-separated</label>
+        <input id="ntfEmails" value="${DB.settings.notifyEmails||''}" placeholder="coach@example.com, 5551234567@vtext.com"></div>
+      <div class="clienttag" style="margin:-6px 0 12px">Tip: add your carrier's email-to-SMS address (e.g. <b style="color:var(--txt)">number@vtext.com</b> Verizon, <b style="color:var(--txt)">@txt.att.net</b> AT&amp;T, <b style="color:var(--txt)">@tmomail.net</b> T-Mobile) to get a text message.</div>
+      <button class="btn sm" onclick="saveNotify()">Save notifications</button>
+      <div class="clienttag" style="margin-top:10px">Auto-send uses your secure Supabase Edge Function (<b style="color:var(--txt)">send-request-email</b>) with the Resend key kept server-side. If it isn't set up, the app opens a pre-filled email instead. Setup steps are in <b style="color:var(--txt)">supabase-edge-function.md</b>.</div>
+    </div>`;
+}
+function saveNotify(){
+  DB.settings.notifyEmails=($('#ntfEmails').value||'').trim();
+  save();flash('Notification settings saved');
+}
+function openExpense(id){
+  const e=id?DB.expenses.find(x=>x.id===id):{date:todayISO(),cat:'Gym Rental',amount:0,note:''};
+  const cats=['Gym Rental','Equipment','Travel','Marketing','Insurance','Other'];
+  openModal(id?'Edit Expense':'Add Expense',`
+    <div class="field"><label class="f">Coach (whose expense)</label><select id="eCoach">${coachSelectOptions(e.coachId||targetCoach(),false)}</select></div>
+    <div class="row">
+      <div class="field"><label class="f">Date</label><input type="date" id="eDate" value="${e.date}"></div>
+      <div class="field"><label class="f">Amount ($)</label><input type="number" id="eAmt" value="${e.amount}"></div>
+    </div>
+    <div class="field"><label class="f">Category</label>
+      <select id="eCat">${cats.map(c=>`<option ${e.cat===c?'selected':''}>${c}</option>`).join('')}</select></div>
+    <div class="field"><label class="f">Note</label><input id="eNote" value="${e.note||''}"></div>
+  `,`${id?`<button class="btn danger" onclick="delExpense('${id}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveExpense('${id||''}')">Save</button>`);
+}
+function saveExpense(id){
+  const amt=+$('#eAmt').value;if(!amt)return flash('Enter an amount',true);
+  const obj={coachId:($('#eCoach')?$('#eCoach').value:targetCoach()),date:$('#eDate').value,cat:$('#eCat').value,amount:amt,note:$('#eNote').value};
+  if(id){Object.assign(DB.expenses.find(x=>x.id===id),obj);}else{obj.id=uid();DB.expenses.push(obj);}
+  save();closeModal();flash('Expense saved');renderFinance();
+}
+function delExpense(id){if(!confirm('Delete this expense?'))return;DB.expenses=DB.expenses.filter(e=>e.id!==id);save();closeModal();flash('Expense removed');renderFinance();}
+function openCashEntry(id,prefillCust){
+  const e=id?DB.cashEntries.find(x=>x.id===id):{date:todayISO(),amount:0,note:'',customerId:prefillCust||'',type:'1on1',qty:1};
+  const custOpts='<option value="">— none / walk-in —</option>'+DB.customers.map(c=>`<option value="${c.id}" ${e.customerId===c.id?'selected':''}>${c.name}</option>`).join('');
+  openModal(id?'Edit cash income':'Sell cash sessions',`
+    <div class="field"><label class="f">Coach (whose revenue)</label><select id="kCoach">${coachSelectOptions(e.coachId||targetCoach(),false)}</select></div>
+    <div class="row">
+      <div class="field"><label class="f">Source (client)</label><select id="kCust">${custOpts}</select></div>
+      <div class="field"><label class="f">Date</label><input type="date" id="kDate" value="${e.date}"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label class="f">Session type</label><select id="kType" onchange="recalcCash()"><option value="1on1" ${e.type==='1on1'?'selected':''}>1:1 Private (${money(coachRate(e.coachId||targetCoach(),'1on1'))}/hr)</option><option value="group" ${e.type==='group'?'selected':''}>Group / 1:N (${money(coachRate(e.coachId||targetCoach(),'group'))}/hr)</option></select></div>
+      <div class="field"><label class="f">Sessions (qty)</label><input type="number" id="kQty" min="1" value="${e.qty||1}" onchange="recalcCash()" oninput="recalcCash()"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label class="f">Amount ($) — auto, editable</label><input type="number" id="kAmt" value="${e.amount}"></div>
+      <div class="field"><label class="f">Note</label><input id="kNote" value="${e.note||''}" placeholder="optional"></div>
+    </div>
+    <p class="muted small">Records cash received for one or more sessions (1:1 or group). Counts toward revenue. Pick the client as source, or leave blank for a walk-in.</p>
+  `,`${id?`<button class="btn danger" onclick="delCashEntry('${id}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveCashEntry('${id||''}')">Save</button>`);
+  if(!id)recalcCash();
+}
+function recalcCash(){const type=$('#kType').value,qty=+$('#kQty').value||0;const cid=$('#kCoach')?$('#kCoach').value:targetCoach();const rate=coachRate(cid,type);$('#kAmt').value=qty*rate;}
+function saveCashEntry(id){
+  const amt=+$('#kAmt').value;if(!amt)return flash('Enter an amount',true);
+  const obj={coachId:($('#kCoach')?$('#kCoach').value:targetCoach()),date:$('#kDate').value,amount:amt,note:$('#kNote').value,customerId:$('#kCust').value||'',type:$('#kType').value,qty:+$('#kQty').value||1};
+  if(id){Object.assign(DB.cashEntries.find(x=>x.id===id),obj);}else{obj.id=uid();DB.cashEntries.push(obj);}
+  save();closeModal();flash('Cash income saved 💵');refreshOwner();
+}
+function delCashEntry(id){if(!confirm('Delete this cash entry?'))return;DB.cashEntries=DB.cashEntries.filter(e=>e.id!==id);save();closeModal();flash('Cash entry removed');renderFinance();}
+
+/* lightweight canvas chart (no libraries) */
+function drawCashChart(labels,rev,exp,prof){
+  const cv=$('#cashChart');if(!cv)return;
+  const dpr=window.devicePixelRatio||1;const W=cv.clientWidth||600,H=cv.clientHeight||230;
+  cv.width=W*dpr;cv.height=H*dpr;const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,W,H);
+  const padL=44,padR=8,padT=12,padB=24;
+  const all=rev.concat(exp,prof);let max=Math.max(...all,10),min=Math.min(...prof,0);
+  const range=max-min||1;
+  const x0=padL,x1=W-padR,y0=padT,y1=H-padB;
+  const xfor=i=>x0+(x1-x0)*(labels.length<=1?0.5:i/(labels.length-1));
+  const yfor=v=>y1-(v-min)/range*(y1-y0);
+  ctx.strokeStyle='rgba(255,255,255,.07)';ctx.fillStyle='#9a9aa5';ctx.font='10px sans-serif';
+  for(let g=0;g<=4;g++){const v=min+range*g/4;const y=yfor(v);
+    ctx.beginPath();ctx.moveTo(x0,y);ctx.lineTo(x1,y);ctx.stroke();
+    ctx.fillText('$'+Math.round(v),4,y+3);}
+  ctx.textAlign='center';labels.forEach((l,i)=>ctx.fillText(l,xfor(i),H-8));ctx.textAlign='start';
+  const bw=Math.min(16,(x1-x0)/labels.length/3);
+  rev.forEach((v,i)=>{const x=xfor(i);
+    ctx.fillStyle='#ff6a00';ctx.fillRect(x-bw-1,yfor(v),bw,y1-yfor(v));
+    ctx.fillStyle='#ff5d6c';ctx.fillRect(x+1,yfor(exp[i]),bw,y1-yfor(exp[i]));});
+  ctx.strokeStyle='#39d98a';ctx.lineWidth=2.5;ctx.beginPath();
+  prof.forEach((v,i)=>{const x=xfor(i),y=yfor(v);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();
+  ctx.fillStyle='#39d98a';prof.forEach((v,i)=>{ctx.beginPath();ctx.arc(xfor(i),yfor(v),3,0,7);ctx.fill();});
+}
+window.addEventListener('resize',()=>{if(TAB==='finance'&&AUTH==='owner')renderFinance();});
+
+/* ---------- boot ---------- */
+(async function(){
+  if(!getSupaCfg()){ $('#connect').classList.add('show');return; }  // only if no credentials baked in
+  DB = await bootLoad();
+  if(!SUPA_OK) flash('Cloud offline — check connection and refresh',true);
+  initAuth();
+})();
+</script>
+</body>
+</html>
