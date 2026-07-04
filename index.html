@@ -16,9 +16,9 @@
   var c=document.createElement('canvas');c.width=c.height=180;var x=c.getContext('2d');
   var g=x.createLinearGradient(0,0,180,180);g.addColorStop(0,'#ff6a00');g.addColorStop(1,'#ff9100');
   x.fillStyle=g;x.fillRect(0,0,180,180);
-  x.fillStyle='#111';x.font='800 78px -apple-system,Segoe UI,Arial,sans-serif';x.textAlign='center';x.textBaseline='middle';
-  x.fillText('RX',90,94);
-  x.fillStyle='#ffffff';x.font='800 20px -apple-system,Segoe UI,Arial,sans-serif';x.fillText('.TRAINING',90,140);
+  x.textAlign='center';x.textBaseline='middle';
+  x.fillStyle='#ffffff';x.font='800 78px -apple-system,Segoe UI,Arial,sans-serif';x.fillText('RX',90,94);
+  x.fillStyle='#111111';x.font='800 20px -apple-system,Segoe UI,Arial,sans-serif';x.fillText('.TRAINING',90,140);
   var url=c.toDataURL('image/png');
   var a=document.getElementById('appleIcon');if(a)a.href=url;
   var f=document.getElementById('favIcon');if(f)f.href=url;
@@ -581,17 +581,22 @@ async function cloudPush(){
       else{await supa.from('availability').delete().eq('coach_id',coachAs);}
       return;
     }
-    await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null});
-    await syncTable('coaches',(DB.coaches||[]).map(coachRow));
-    await syncTable('locations',DB.locations.map(l=>({id:l.id,name:l.name,address:l.address||''})));
-    await syncTable('customers',DB.customers.map(custRow));
-    await syncTable('packages',DB.customers.flatMap(c=>c.packages.map(p=>({id:p.id,customer_id:c.id,coach_id:p.coachId||null,type:p.type,qty:p.qty,amount:p.amount,date:p.date}))));
-    await syncTable('sessions',DB.sessions.map(sessRow));
-    await syncTable('expenses',DB.expenses.map(e=>({id:e.id,coach_id:e.coachId||null,date:e.date,cat:e.cat,amount:e.amount,note:e.note||''})));
-    await syncTable('cash_entries',DB.cashEntries.map(e=>({id:e.id,coach_id:e.coachId||null,date:e.date,amount:e.amount,note:e.note||'',customer_id:e.customerId||null,type:e.type||null,qty:e.qty||null})));
-    await syncTable('availability',(DB.availability||[]).map(a=>({id:a.id,coach_id:a.coachId||null,date:a.date,start_t:a.start,end_t:a.end,slot_min:a.slotMin,location:a.location||'',approved:a.approved!==false})));
-    try{ await syncTable('events',(DB.events||[]).map(eventRow)); await syncTable('event_regs',(DB.eventRegs||[]).map(eventRegRow)); }
-    catch(ev){ console.warn('events tables not set up yet — run supabase-setup.sql',ev); }
+    // Each table syncs independently so one schema gap (e.g. a column you haven't
+    // added yet) can't block everything else — the critical stuff still saves.
+    const fails=[];
+    const push=async(name,fn)=>{try{await fn();}catch(e){fails.push(name);console.warn('sync failed:',name,e&&e.message);}};
+    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null});if(error)throw error;});
+    await push('coaches',()=>syncTable('coaches',(DB.coaches||[]).map(coachRow)));
+    await push('locations',()=>syncTable('locations',DB.locations.map(l=>({id:l.id,name:l.name,address:l.address||''}))));
+    await push('customers',()=>syncTable('customers',DB.customers.map(custRow)));
+    await push('packages',()=>syncTable('packages',DB.customers.flatMap(c=>c.packages.map(p=>({id:p.id,customer_id:c.id,coach_id:p.coachId||null,type:p.type,qty:p.qty,amount:p.amount,date:p.date})))));
+    await push('sessions',()=>syncTable('sessions',DB.sessions.map(sessRow)));
+    await push('expenses',()=>syncTable('expenses',DB.expenses.map(e=>({id:e.id,coach_id:e.coachId||null,date:e.date,cat:e.cat,amount:e.amount,note:e.note||''}))));
+    await push('cash_entries',()=>syncTable('cash_entries',DB.cashEntries.map(e=>({id:e.id,coach_id:e.coachId||null,date:e.date,amount:e.amount,note:e.note||'',customer_id:e.customerId||null,type:e.type||null,qty:e.qty||null}))));
+    await push('availability',()=>syncTable('availability',(DB.availability||[]).map(a=>({id:a.id,coach_id:a.coachId||null,date:a.date,start_t:a.start,end_t:a.end,slot_min:a.slotMin,location:a.location||'',approved:a.approved!==false}))));
+    await push('events',()=>syncTable('events',(DB.events||[]).map(eventRow)));
+    await push('event_regs',()=>syncTable('event_regs',(DB.eventRegs||[]).map(eventRegRow)));
+    if(fails.length)flash('⚠ These tables need setup — run supabase-setup.sql: '+fails.join(', '),true);
   }catch(e){flash('Cloud save failed — saved on this device',true);}
   finally{pushing=false;}
 }
