@@ -1470,6 +1470,7 @@ function renderCustomers(){
   const q=custSearch.toLowerCase();
   let list=DB.customers.filter(c=>!q||c.name.toLowerCase().includes(q)||(c.parent||'').toLowerCase().includes(q)||(c.town||'').toLowerCase().includes(q));
   if(custDateFilter)list=list.filter(c=>c.created&&periodKey(c.created,custDateFilter.period).key===custDateFilter.key);
+  list=list.slice().sort((a,b)=>(a.name||'').toLowerCase().localeCompare((b.name||'').toLowerCase()));
   const rows=list.map(c=>{
     const next=sortSessions(DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.date>=todayISO()&&s.status==='scheduled'))[0];
     return `<tr>
@@ -1690,7 +1691,7 @@ function coachStats(id){
 }
 function renderCoaches(){
   const pendCount=(DB.coaches||[]).filter(c=>c.pending).length;
-  let coachList=(DB.coaches||[]);
+  let coachList=(DB.coaches||[]).slice().sort((a,b)=>(a.name||'').toLowerCase().localeCompare((b.name||'').toLowerCase()));
   if(coachDateFilter)coachList=coachList.filter(c=>c.created&&periodKey(c.created,coachDateFilter.period).key===coachDateFilter.key);
   if(coachTableFilter)coachList=coachList.filter(c=>c.id===coachTableFilter);
   const rows=coachList.map(c=>{
