@@ -221,6 +221,7 @@
   <section class="view active" id="view-about"></section>
   <section class="view" id="view-booking"></section>
   <section class="view" id="view-past"></section>
+  <section class="view" id="view-money"></section>
   <section class="view" id="view-customers"></section>
   <section class="view" id="view-coaches"></section>
   <section class="view" id="view-locations"></section>
@@ -601,6 +602,7 @@ const TABS=[
   {id:'about',label:'About'},
   {id:'booking',label:'Booking'},
   {id:'past',label:'Past Sessions'},
+  {id:'money',label:'Payments'},
   {id:'customers',label:'Customers'},
   {id:'coaches',label:'Coaches'},
   {id:'locations',label:'Locations'},
@@ -611,14 +613,15 @@ const TABS=[
 
 function renderTabs(){
   let allowed;
-  if(AUTH==='client') allowed=['booking','past'];
-  else if(AUTH==='coach') allowed=['about','booking','availability'];
-  else allowed = TABS.map(t=>t.id).filter(x=>x!=='past');   // owner: everything but the client-only Past tab
-  if(!allowed.includes(TAB)) TAB = AUTH==='client' ? 'booking' : (AUTH==='coach' ? 'booking' : 'booking');
+  if(AUTH==='client') allowed=['booking','past','money'];
+  else if(AUTH==='coach') allowed=['about','booking','availability','money'];
+  else allowed = TABS.map(t=>t.id).filter(x=>x!=='past'&&x!=='money');   // owner uses the full Finance tab instead
+  if(!allowed.includes(TAB)) TAB = 'booking';
   $('#tabs').innerHTML = TABS.filter(t=>allowed.includes(t.id)).map(t=>{
     let label=t.label;
     if(t.id==='booking'&&AUTH==='client')label='My Sessions';
     if(t.id==='about'&&AUTH==='coach')label='My Profile';
+    if(t.id==='money')label=AUTH==='coach'?'Earnings':'Payments';
     return `<button data-tab="${t.id}" class="${TAB===t.id?'active':''}">${label}</button>`;
   }).join('');
   $$('#tabs button').forEach(b=>b.onclick=()=>{TAB=b.dataset.tab;switchTab();});
@@ -631,7 +634,7 @@ function switchTab(){
   saveSess();
 }
 function saveSess(){try{sessionStorage.setItem('rx_sess',JSON.stringify({auth:AUTH,clientAs,coachAs,mgCoach,pickCoach,tab:TAB}));}catch(e){}}
-function refreshOwner(){const f={about:renderAbout,booking:renderBooking,past:renderPast,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,admin:renderAdmin}[TAB];if(f)f();if(AUTH==='owner')renderWhoami();}
+function refreshOwner(){const f={about:renderAbout,booking:renderBooking,past:renderPast,money:renderMoney,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,admin:renderAdmin}[TAB];if(f)f();if(AUTH==='owner')renderWhoami();}
 
 /* ---------- Auth ---------- */
 function ensureTokens(){let ch=false;DB.customers.forEach(c=>{if(!c.token){c.token=uid()+uid();ch=true;}});if(ch)save();}
@@ -1038,7 +1041,8 @@ function coachMiniProfile(co){
     ${co.bio?`<div class="small muted" style="margin-top:8px;line-height:1.6">${co.bio}</div>`:''}
   </div>`;
 }
-function pickCoachChange(v){pickCoach=v;saveSess();renderBookingClient();}
+let reqSel=null;   // {date,time,loc} chosen from the open-times list
+function pickCoachChange(v){pickCoach=v;reqSel=null;saveSess();renderBookingClient();}
 function renderBookingClient(){
   const now=todayISO();
   const c=custById(clientAs);
@@ -1072,20 +1076,18 @@ function renderBookingClient(){
             <select id="rqCoach" onchange="pickCoachChange(this.value)">${activeCoaches().map(co=>`<option value="${co.id}" ${pickCoach===co.id?'selected':''}>${co.name}</option>`).join('')||'<option value="">No coaches available</option>'}</select></div>
           ${coachMiniProfile(coachById(pickCoach))}
           <div class="field"><label class="f">Session type</label>
-            <select id="rqType" onchange="renderSlots()"><option value="1on1">1:1 Private (${money(coachRate(pickCoach,'1on1'))}/hr)</option><option value="group">Group / 1:N (${money(coachRate(pickCoach,'group'))}/hr per player)</option></select></div>
-          <div class="field"><label class="f">Open times with ${coachName(pickCoach)} — tap one</label><div id="openSlots" class="slotlist"></div></div>
-          <div class="field"><label class="f">Date</label><input type="date" id="rqDate" min="${now}" value="${now}" onchange="renderSlots()"></div>
-          <div class="field"><label class="f">Available time</label><select id="rqSlot"></select></div>
-          <div class="field"><label class="f">Comment (optional)</label><textarea id="rqComment" placeholder="e.g. I'd prefer a later time if possible, or any note for the coach…"></textarea></div>
+            <select id="rqType" onchange="reqSel=null;renderOpenSlots()"><option value="1on1">1:1 Private (${money(coachRate(pickCoach,'1on1'))}/hr)</option><option value="group">Group / 1:N (${money(coachRate(pickCoach,'group'))}/hr per player)</option></select></div>
+          <div class="field"><label class="f">Open times with ${coachName(pickCoach)} — tap one to select</label><div id="openSlots" class="slotlist"></div></div>
+          <div class="field"><label class="f">Comment (optional)</label><textarea id="rqComment" placeholder="e.g. any note for the coach…"></textarea></div>
           <button class="btn" style="width:100%" onclick="submitRequest()">Request Session</button>
-          <p class="muted small" style="margin-top:10px">Only the Owner's open time slots are shown. Prefer a different time? Pick the closest slot and note it in the comment. The Owner is notified and will confirm. <b style="color:var(--txt)">All times are Boston (ET).</b></p>
+          <p class="muted small" style="margin-top:10px">Tap one of the coach's open times above, then Request Session. The Owner is notified and will confirm. <b style="color:var(--txt)">All times are Boston (ET).</b></p>
         </div>
         <div class="panel" style="margin-top:16px"><h3>Your packages</h3>${pkgHist}
           <p class="muted small" style="margin-top:8px">To buy a package, ask the Owner — your used/total balance updates automatically.</p></div>
       </div>
       <div id="clientStatus">${clientStatusHtml(c)}</div>
     </div>`;
-  renderSlots();
+  renderOpenSlots();
 }
 /* just the Today / Pending / Booked panels — can refresh on its own so live updates
    don't wipe out what the client is typing in the request form */
@@ -1114,17 +1116,19 @@ function renderPast(){
 
 function submitRequest(){
   const cid=clientAs;if(!cid)return flash('Please sign in again',true);
-  const type=$('#rqType').value;
+  if(!reqSel)return flash('Tap one of the coach’s open times above to select it',true);
+  const type=$('#rqType')?$('#rqType').value:'1on1';
   const dur=type==='1on1'?60:90;
-  const slot=$('#rqSlot')?$('#rqSlot').value:'';
-  if(!slot)return flash('No open time slot selected — pick another date',true);
-  const [time,loc]=slot.split('|');
-  const comment=($('#rqComment')?$('#rqComment').value:'').trim();
   const coachId=($('#rqCoach')?$('#rqCoach').value:'')||pickCoach||defaultCoachId();
-  const s={id:uid(),coachId,customerIds:[cid],type,date:$('#rqDate').value,time,
-    dur,price:computePrice(type,dur,1,coachId),status:'pending',paid:false,paidVia:'',checkedIn:false,location:loc||'TBD',
+  // re-check the slot is still open (another client may have just taken it)
+  const stillOpen=availableSlots(reqSel.date,type,coachId).some(s=>s.time===reqSel.time&&s.location===reqSel.loc);
+  if(!stillOpen){reqSel=null;renderOpenSlots();return flash('That time was just taken — please pick another',true);}
+  const comment=($('#rqComment')?$('#rqComment').value:'').trim();
+  const s={id:uid(),coachId,customerIds:[cid],type,date:reqSel.date,time:reqSel.time,
+    dur,price:computePrice(type,dur,1,coachId),status:'pending',paid:false,paidVia:'',checkedIn:false,location:reqSel.loc||'TBD',
     notes:'Client request'+(comment?(' — '+comment):'')};
   DB.sessions.push(s);
+  reqSel=null;
   save();flash('Request sent to '+coachName(coachId)+' — awaiting confirmation 🏀');
   notifyOwner(s,comment);
   renderBooking();
@@ -1561,7 +1565,8 @@ function resetClientPwd(id){const c=custById(id);if(!c)return;if(!confirm('Reset
 function coachStats(id){
   const ss=DB.sessions.filter(s=>s.coachId===id&&s.status!=='cancelled');
   const up=ss.filter(s=>s.date>=todayISO()&&s.status!=='completed').length;
-  return {total:ss.length,up};
+  const done=ss.filter(s=>s.status==='completed').length;
+  return {total:ss.length,up,done};
 }
 function renderCoaches(){
   const pendCount=(DB.coaches||[]).filter(c=>c.pending).length;
@@ -1572,6 +1577,7 @@ function renderCoaches(){
       <td>${c.affiliation||'—'}<div class="clienttag">${c.affiliationSub||''}</div></td>
       <td>1:1 ${money(coachRate(c.id,'1on1'))}<div class="clienttag">Group ${money(coachRate(c.id,'group'))}/player</div></td>
       <td>${c.active!==false?'<span class="pill green">Active</span>':'<span class="pill red">Inactive</span>'}${c.pending?' <span class="pill yellow">⏳ Pending</span>':''}</td>
+      <td>${st.done}<div class="clienttag">completed</div></td>
       <td>${st.total}<div class="clienttag">${st.up} upcoming</div></td>
       <td>${cancelBadge(coachCancelCount(c.id))}<div class="clienttag">cancels</div></td>
       <td class="right"><div class="actions">
@@ -1579,14 +1585,14 @@ function renderCoaches(){
         <button class="iconbtn" title="Manage this coach" onclick="setMgCoach('${c.id}');flash('Now managing ${c.name.replace(/'/g,'')}')">Manage</button>
         <button class="iconbtn" onclick="openCoach('${c.id}')">Edit</button>
       </div></td></tr>`;
-  }).join('')||'<tr><td colspan="7"><div class="empty">No coaches yet — add your first coach.</div></td></tr>';
+  }).join('')||'<tr><td colspan="8"><div class="empty">No coaches yet — add your first coach.</div></td></tr>';
   $('#view-coaches').innerHTML=`
     <h1 class="page">Coaches</h1>
     <div class="sub">Every coach's profile, rates, sign-in and status. Use <b>Manage</b> (or the selector top-right) to work inside one coach's Booking, Availability and Finance. ${pendCount?`<span class="pill yellow" style="margin-left:6px">⏳ ${pendCount} awaiting approval</span>`:''}</div>
     <div class="row" style="margin-bottom:16px"><button class="btn" onclick="openCoach()">+ Add Coach</button></div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
       <table>
-        <thead><tr><th>Coach</th><th>Affiliation</th><th>Rates ($/hr)</th><th>Status</th><th>Sessions</th><th>Cancels</th><th></th></tr></thead>
+        <thead><tr><th>Coach</th><th>Affiliation</th><th>Rates ($/hr)</th><th>Status</th><th>Completed</th><th>Sessions</th><th>Cancels</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -1872,18 +1878,7 @@ function clientOpenSlots(cid,type){
   dates.forEach(dt=>availableSlots(dt,type,cid).forEach(s=>out.push({date:dt,time:s.time,location:s.location,slotMin:s.slotMin})));
   return out;
 }
-function renderSlots(){
-  const type=$('#rqType')?$('#rqType').value:'1on1';
-  const cid=pickCoach||defaultCoachId();
-  const sel=$('#rqSlot');
-  if(sel){
-    const prev=sel.value;
-    const slots=availableSlots($('#rqDate').value,type,cid);
-    sel.innerHTML=slots.length?slots.map(s=>`<option value="${s.time}|${s.location}">${fmtT(s.time)} · ${s.location}</option>`).join(''):'<option value="">No open times this day</option>';
-    if(prev&&[...sel.options].some(o=>o.value===prev))sel.value=prev;
-  }
-  renderOpenSlots();
-}
+function renderSlots(){renderOpenSlots();}   // alias kept for any older callers
 function renderOpenSlots(){
   const list=$('#openSlots'); if(!list)return;
   const type=$('#rqType')?$('#rqType').value:'1on1';
@@ -1891,19 +1886,75 @@ function renderOpenSlots(){
   const open=clientOpenSlots(cid,type);
   if(!open.length){list.innerHTML='<div class="clienttag">No open times posted yet — check back soon.</div>';return;}
   const byd={};open.forEach(s=>{(byd[s.date]=byd[s.date]||[]).push(s);});
-  const curSel=$('#rqSlot')?$('#rqSlot').value:'';const curDate=$('#rqDate')?$('#rqDate').value:'';
-  list.innerHTML=Object.keys(byd).sort().map(dt=>`<div style="margin-bottom:8px"><div class="clienttag" style="margin-bottom:5px"><b style="color:var(--txt)">${fmtDate(dt)}</b></div><div class="row" style="gap:6px">${byd[dt].map(s=>{const val=s.time+'|'+s.location;const on=(dt===curDate&&val===curSel);return `<button type="button" class="slotchip${on?' sel':''}" onclick="setReqSlot('${dt}','${s.time}','${(s.location||'').replace(/'/g,"\\'")}')">${fmtT(s.time)} · ${s.location}</button>`;}).join('')}</div></div>`).join('');
+  list.innerHTML=Object.keys(byd).sort().map(dt=>`<div style="margin-bottom:8px"><div class="clienttag" style="margin-bottom:5px"><b style="color:var(--txt)">${fmtDate(dt)}</b></div><div class="row" style="gap:6px">${byd[dt].map(s=>{const on=(reqSel&&reqSel.date===dt&&reqSel.time===s.time&&reqSel.loc===s.location);return `<button type="button" class="slotchip${on?' sel':''}" onclick="setReqSlot('${dt}','${s.time}','${(s.location||'').replace(/'/g,"\\'")}')">${fmtT(s.time)} · ${s.location}</button>`;}).join('')}</div></div>`).join('');
 }
 function setReqSlot(date,time,loc){
-  const dd=$('#rqDate'); if(dd)dd.value=date;
-  const sel=$('#rqSlot');
-  if(sel){ // rebuild options for the chosen date, then select the tapped time
-    const slots=availableSlots(date,$('#rqType')?$('#rqType').value:'1on1',pickCoach||defaultCoachId());
-    sel.innerHTML=slots.map(s=>`<option value="${s.time}|${s.location}">${fmtT(s.time)} · ${s.location}</option>`).join('');
-    sel.value=time+'|'+loc;
-  }
-  renderOpenSlots();   // refresh highlight only — does NOT rebuild the time dropdown
+  reqSel={date,time,loc};
+  renderOpenSlots();   // refresh highlight
   flash('Selected '+fmtDate(date)+' · '+fmtT(time)+' — tap Request Session');
+}
+
+/* ============================================================
+   PAYMENTS / EARNINGS dashboard (client + coach), by period
+   ============================================================ */
+let payRange='month';   // week | month | quarter | year
+function periodKey(dateStr,period){
+  const [y,m,d]=dateStr.split('-').map(Number);
+  if(period==='year')return {key:String(y),label:String(y)};
+  if(period==='quarter'){const q=Math.floor((m-1)/3)+1;return {key:y+'-Q'+q,label:'Q'+q+' '+y};}
+  if(period==='month')return {key:y+'-'+String(m).padStart(2,'0'),label:new Date(y,m-1,1).toLocaleDateString('en-US',{month:'short',year:'numeric'})};
+  const dt=new Date(y,m-1,d); const dow=(dt.getDay()+6)%7; dt.setDate(dt.getDate()-dow); // Monday of that week
+  const k=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+  return {key:k,label:'Week of '+dt.toLocaleDateString('en-US',{month:'short',day:'numeric'})};
+}
+function bucketPayments(items,period){
+  const map={};
+  items.forEach(it=>{const {key,label}=periodKey(it.date,period);if(!map[key])map[key]={key,label,total:0,n:0};map[key].total+=it.amount;map[key].n++;});
+  return Object.values(map).sort((a,b)=>b.key.localeCompare(a.key));
+}
+function clientPayments(id){
+  const c=custById(id); if(!c)return [];
+  const out=[];
+  (c.packages||[]).forEach(p=>out.push({date:p.date,amount:p.amount,label:p.qty+'× '+(p.type==='1on1'?'1:1':'Group')+' package · '+coachName(p.coachId)}));
+  DB.cashEntries.filter(e=>e.customerId===id).forEach(e=>out.push({date:e.date,amount:e.amount,label:(e.qty||1)+'× '+(e.type==='group'?'Group':'1:1')+' (cash) · '+coachName(e.coachId)}));
+  DB.sessions.filter(s=>s.customerIds.includes(id)&&s.paid&&s.paidVia==='cash'&&s.status!=='cancelled').forEach(s=>out.push({date:s.date,amount:s.price/s.customerIds.length,label:(s.type==='1on1'?'1:1':'Group')+' session (cash) · '+coachName(s.coachId)}));
+  return out;
+}
+function coachEarnings(id){
+  const out=[];
+  DB.customers.forEach(c=>(c.packages||[]).filter(p=>p.coachId===id).forEach(p=>out.push({date:p.date,amount:p.amount,label:c.name+' — '+p.qty+'× '+(p.type==='1on1'?'1:1':'Group')+' package'})));
+  DB.cashEntries.filter(e=>e.coachId===id).forEach(e=>{const cn=e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in';out.push({date:e.date,amount:e.amount,label:cn+' — '+(e.qty||1)+'× '+(e.type==='group'?'Group':'1:1')+' (cash)'});});
+  DB.sessions.filter(s=>s.coachId===id&&s.paid&&s.paidVia==='cash'&&s.status!=='cancelled').forEach(s=>out.push({date:s.date,amount:s.price,label:custNames(s.customerIds)+' — '+(s.type==='1on1'?'1:1':'Group')+' session (cash)'}));
+  return out;
+}
+function setPayRange(r){payRange=r;renderMoney();}
+function renderMoney(){
+  const isCoach=AUTH==='coach';
+  const targetId=isCoach?coachAs:clientAs;
+  const items=(isCoach?coachEarnings(targetId):clientPayments(targetId)).slice().sort((a,b)=>b.date.localeCompare(a.date));
+  const total=items.reduce((a,i)=>a+i.amount,0);
+  const buckets=bucketPayments(items,payRange);
+  const maxB=Math.max(1,...buckets.map(b=>b.total));
+  const title=isCoach?'Earnings':'My Payments';
+  const bucketHtml=buckets.length?buckets.map(b=>`<div class="barrow"><div class="lab" style="width:140px">${b.label}</div><div class="bar"><i style="width:${b.total/maxB*100}%"></i></div><div class="val">${money(b.total)}<div class="clienttag" style="text-align:right">${b.n}</div></div></div>`).join(''):'<div class="empty">No payments in range.</div>';
+  const detail=items.length?items.map(i=>`<tr><td>${fmtDate(i.date)}</td><td>${i.label}</td><td class="right">${money(i.amount)}</td></tr>`).join(''):'<tr><td colspan="3"><div class="empty">No payments recorded yet.</div></td></tr>';
+  $('#view-money').innerHTML=`
+    <h1 class="page">${title}</h1>
+    <div class="sub">${isCoach?'Money collected for your sessions & packages, grouped by period.':'All money you\'ve paid, grouped by period.'} <b style="color:var(--txt)">Boston (ET).</b></div>
+    <div class="stats">
+      <div class="stat"><div class="k">Total ${isCoach?'collected':'paid'}</div><div class="v">${money(total)}</div><div class="d muted">${items.length} payment(s) all-time</div></div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="margin:0">By period</h3>
+        <div class="seg" style="margin:0">${['week','month','quarter','year'].map(r=>`<button class="${payRange===r?'active':''}" onclick="setPayRange('${r}')">${r[0].toUpperCase()+r.slice(1)}</button>`).join('')}</div>
+      </div>
+      ${bucketHtml}
+    </div>
+    <div class="panel" style="margin-top:16px;padding:6px 14px;overflow-x:auto">
+      <h3 style="padding:12px 6px 4px">All payments</h3>
+      <table><thead><tr><th>Date</th><th>Detail</th><th class="right">Amount</th></tr></thead><tbody>${detail}</tbody></table>
+    </div>`;
 }
 
 /* ============================================================
