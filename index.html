@@ -382,7 +382,7 @@ function normalize(d){
   d.coaches.forEach(c=>{if(c.active===undefined)c.active=true;if(!c.pwd)c.pwd='coach';if(c.tagline===undefined)c.tagline='';if(c.bio===undefined)c.bio='';if(c.affiliation===undefined)c.affiliation='';if(c.affiliationSub===undefined)c.affiliationSub='';if(c.photo===undefined)c.photo='';
     if(c.rate1on1===undefined||c.rate1on1===null||c.rate1on1==='')c.rate1on1=gR1;
     if(c.rateGroup===undefined||c.rateGroup===null||c.rateGroup==='')c.rateGroup=gRG;
-    if(c.pending===undefined)c.pending=null;});
+    if(c.pending===undefined)c.pending=null;if(!c.created)c.created=todayISO();});
   const dcid=d.coaches[0].id;
   (d.sessions||[]).forEach(s=>{if(!s.coachId)s.coachId=dcid;});
   (d.availability||[]).forEach(a=>{if(!a.coachId)a.coachId=dcid;if(a.approved===undefined)a.approved=true;});
@@ -399,7 +399,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa){
   d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):''};
   d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,
     rate1on1:(c.rate_1on1!=null?Number(c.rate_1on1):undefined),rateGroup:(c.rate_group!=null?Number(c.rate_group):undefined),
-    pending:(c.pending||null)}));
+    pending:(c.pending||null),created:c.created||''}));
   d.locations=(loc||[]).map(l=>({id:l.id,name:l.name,address:l.address||''}));
   d.availability=(avail||[]).map(a=>({id:a.id,coachId:a.coach_id||'',date:a.date,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||'',approved:a.approved!==false}));
   d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',notes:c.notes||'',created:c.created||'',creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
@@ -409,7 +409,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa){
   d.cashEntries=(cash||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,amount:Number(e.amount),note:e.note||'',customerId:e.customer_id||'',type:e.type||'1on1',qty:e.qty||1}));
   return normalize(d);
 }
-const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),pending:(c.pending||null)});
+const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),pending:(c.pending||null),created:c.created||null});
 const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',notes:c.notes||'',created:c.created||'',credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
 const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null});
 async function migrateSource(){
@@ -1396,7 +1396,7 @@ function renderCustomers(){
   $('#view-customers').innerHTML=`
     <h1 class="page">Customers</h1>
     <div class="sub">Manage contacts, prepaid credits (used/total), packages, session history, login links & passwords.</div>
-    ${sessionsDashHtml('custChart')}
+    ${custAnalyticsHtml()}
     <div class="row" style="margin-bottom:16px">
       <div class="field" style="max-width:280px;margin-bottom:0"><input placeholder="Search name or parent..." value="${custSearch}" oninput="custSearch=this.value;renderCustomers()"></div>
       <button class="btn" onclick="openCustomer()">+ Add Customer</button>
@@ -1407,7 +1407,7 @@ function renderCustomers(){
         <tbody>${rows||'<tr><td colspan="9"><div class="empty">No customers found.</div></td></tr>'}</tbody>
       </table>
     </div>`;
-  mountSessionsChart('custChart');
+  mountCustGrowth();
 }
 function viewCustomer(id){
   const c=custById(id);
@@ -1593,7 +1593,7 @@ function renderCoaches(){
   $('#view-coaches').innerHTML=`
     <h1 class="page">Coaches</h1>
     <div class="sub">Every coach's profile, rates, sign-in and status. Use <b>Manage</b> (or the selector top-right) to work inside one coach's Booking, Availability and Finance. ${pendCount?`<span class="pill yellow" style="margin-left:6px">⏳ ${pendCount} awaiting approval</span>`:''}</div>
-    ${sessionsDashHtml('coChart')}
+    ${coachAnalyticsHtml()}
     <div class="row" style="margin-bottom:16px"><button class="btn" onclick="openCoach()">+ Add Coach</button></div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
       <table>
@@ -1602,7 +1602,7 @@ function renderCoaches(){
       </table>
     </div>
     <div class="clienttag" style="margin-top:10px">Coaches sign in with their <b style="color:var(--txt)">name</b> + password (Coach tab). They can propose profile & rate changes; changes go live only after you <b style="color:var(--txt)">Approve</b> them here. You can edit anything directly at any time.</div>`;
-  mountSessionsChart('coChart');
+  mountCoachGrowth();
 }
 function pendingSummary(c){
   const p=c.pending||{};const out=[];
@@ -2274,6 +2274,80 @@ function drawStackedBars(canvasId,buckets){
   buckets.forEach((b,i)=>ctx.fillText(b.label,x0+slot*(i+0.5),H-8));
   ctx.textAlign='start';
 }
+/* ---------- Customer & Coach analytics (value ranking + recruiting growth) ---------- */
+let growthRange='month';   // month | quarter | year
+function setGrowthRange(r){growthRange=r;refreshOwner();}
+function bucketByPeriodCount(dates,period,maxN){
+  const map={};
+  dates.forEach(dt=>{const {key,label}=periodKey(dt,period);if(!map[key])map[key]={key,label,value:0};map[key].value++;});
+  let arr=Object.values(map).sort((a,b)=>a.key.localeCompare(b.key));
+  if(maxN&&arr.length>maxN)arr=arr.slice(arr.length-maxN);
+  return arr;
+}
+function drawBars(canvasId,items,color){
+  const cv=$('#'+canvasId);if(!cv)return;
+  const dpr=window.devicePixelRatio||1;const W=cv.clientWidth||600,H=cv.clientHeight||230;
+  cv.width=W*dpr;cv.height=H*dpr;const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
+  const padR=8,padT=12,padB=26,x0=28,x1=W-padR,y0=padT,y1=H-padB;
+  const max=Math.max(...items.map(i=>i.value),4);const yfor=v=>y1-(v/max)*(y1-y0);
+  ctx.strokeStyle='rgba(255,255,255,.07)';ctx.fillStyle='#9a9aa5';ctx.font='10px sans-serif';ctx.textAlign='start';
+  for(let g=0;g<=4;g++){const v=Math.round(max*g/4);const y=yfor(v);ctx.beginPath();ctx.moveTo(x0,y);ctx.lineTo(x1,y);ctx.stroke();ctx.fillText(String(v),4,y+3);}
+  if(!items.length){ctx.textAlign='center';ctx.fillText('No data yet',W/2,H/2);ctx.textAlign='start';return;}
+  const n=items.length,slot=(x1-x0)/n,bw=Math.min(34,slot*0.62);
+  items.forEach((it,i)=>{const cx=x0+slot*(i+0.5),h=(it.value/max)*(y1-y0);ctx.fillStyle=color;ctx.fillRect(cx-bw/2,y1-h,bw,h);});
+  ctx.fillStyle='#9a9aa5';ctx.textAlign='center';ctx.font='9px sans-serif';
+  items.forEach((it,i)=>ctx.fillText(it.label,x0+slot*(i+0.5),H-8));ctx.textAlign='start';
+}
+function growthSeg(){return `<div class="seg" style="margin:0">${['month','quarter','year'].map(r=>`<button class="${growthRange===r?'active':''}" onclick="setGrowthRange('${r}')">${r[0].toUpperCase()+r.slice(1)}</button>`).join('')}</div>`;}
+function custValue(c){return clientPayments(c.id).reduce((x,i)=>x+i.amount,0);}
+function custAnalyticsHtml(){
+  const custs=DB.customers,now=todayISO();
+  const total=custs.length;
+  const newThisMonth=custs.filter(c=>(c.created||'').slice(0,7)===now.slice(0,7)).length;
+  const active=custs.filter(c=>bookedCount(c)>0).length;
+  const totalPaid=custs.reduce((a,c)=>a+custValue(c),0);
+  const ranked=custs.map(c=>({c,val:custValue(c),sess:DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status!=='cancelled').length})).sort((a,b)=>b.val-a.val).slice(0,8);
+  const maxV=Math.max(1,...ranked.map(r=>r.val));
+  const chip=(k,v,col)=>`<div class="stat"><div class="k">${k}</div><div class="v"${col?` style="color:${col}"`:''}>${v}</div></div>`;
+  const topRows=ranked.length&&maxV>0?ranked.map(r=>`<div class="barrow"><div class="lab" style="width:130px">${r.c.name}</div><div class="bar"><i style="width:${r.val/maxV*100}%"></i></div><div class="val">${money(r.val)}<div class="clienttag" style="text-align:right">${r.sess} sess</div></div></div>`).join(''):'<div class="empty">No customer payments yet.</div>';
+  return `<div class="stats" style="margin-bottom:14px">
+      ${chip('Total customers',total)}
+      ${chip('New this month',newThisMonth,'var(--green)')}
+      ${chip('Active (booked)',active,'var(--blue)')}
+      ${chip('Lifetime revenue',money(totalPaid),'var(--accent2)')}
+    </div>
+    <div class="twocol" style="margin-bottom:16px">
+      <div class="panel">
+        <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="margin:0">New customers added</h3>${growthSeg()}</div>
+        <div class="chart-wrap"><canvas id="custGrowth"></canvas></div>
+      </div>
+      <div class="panel"><h3>Most valuable customers</h3>${topRows}<div class="clienttag" style="margin-top:8px">Ranked by lifetime money paid (packages + cash).</div></div>
+    </div>`;
+}
+function mountCustGrowth(){drawBars('custGrowth',bucketByPeriodCount(DB.customers.map(c=>c.created).filter(Boolean),growthRange,12),'#4aa8ff');}
+function coachValue(id){return coachEarnings(id).reduce((x,i)=>x+i.amount,0);}
+function coachAnalyticsHtml(){
+  const coaches=DB.coaches,now=todayISO();
+  const total=coaches.length,active=coaches.filter(c=>c.active!==false).length;
+  const ranked=coaches.map(c=>({c,val:coachValue(c.id),done:coachStats(c.id).done})).sort((a,b)=>b.val-a.val);
+  const maxV=Math.max(1,...ranked.map(r=>r.val));
+  const totalEarn=ranked.reduce((a,r)=>a+r.val,0);
+  const chip=(k,v,col)=>`<div class="stat"><div class="k">${k}</div><div class="v"${col?` style="color:${col}"`:''}>${v}</div></div>`;
+  const rows=ranked.length&&maxV>0?ranked.map(r=>`<div class="barrow"><div class="lab" style="width:130px">${r.c.name}</div><div class="bar"><i style="width:${r.val/maxV*100}%"></i></div><div class="val">${money(r.val)}<div class="clienttag" style="text-align:right">${r.done} done</div></div></div>`).join(''):'<div class="empty">No coach earnings yet.</div>';
+  return `<div class="stats" style="margin-bottom:14px">
+      ${chip('Total coaches',total)}
+      ${chip('Active',active,'var(--green)')}
+      ${chip('Total earnings',money(totalEarn),'var(--accent2)')}
+    </div>
+    <div class="twocol" style="margin-bottom:16px">
+      <div class="panel"><h3>Earnings by coach</h3>${rows}<div class="clienttag" style="margin-top:8px">Most valuable coach by money collected.</div></div>
+      <div class="panel">
+        <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="margin:0">New coaches added</h3>${growthSeg()}</div>
+        <div class="chart-wrap"><canvas id="coachGrowth"></canvas></div>
+      </div>
+    </div>`;
+}
+function mountCoachGrowth(){drawBars('coachGrowth',bucketByPeriodCount(DB.coaches.map(c=>c.created).filter(Boolean),growthRange,12),'#ff9100');}
 function drawCashChart(labels,rev,exp,prof){
   const cv=$('#cashChart');if(!cv)return;
   const dpr=window.devicePixelRatio||1;const W=cv.clientWidth||600,H=cv.clientHeight||230;
