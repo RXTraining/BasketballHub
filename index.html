@@ -683,7 +683,8 @@ function setMgCoach(v){mgCoach=v;availDraft=[];saveSess();refreshOwner();}
 function approvalsCount(){
   const cp=(DB.coaches||[]).filter(c=>c.pending).length;
   const ap=(DB.availability||[]).filter(a=>a.approved===false && a.date>=todayISO()).length;
-  return cp+ap;
+  const er=(DB.eventRegs||[]).filter(r=>r.status==='pending'&&eventById(r.eventId)).length;
+  return cp+ap+er;
 }
 function renderWhoami(){
   if(AUTH==='owner'){const n=approvalsCount();const appr=n?`<button class="btn sm" style="background:var(--yellow);color:#211c00;font-weight:800;border:0" onclick="openApprovals()">⏳ ${n} to approve</button>`:'';
@@ -1135,10 +1136,18 @@ function clientStatusHtml(c){
   const today=sortSessions(mine.filter(s=>s.date===now && (s.status==='scheduled'||s.status==='pending')));
   const pending=sortSessions(mine.filter(s=>s.date>=now && s.status==='pending'));
   const upcoming=sortSessions(mine.filter(s=>s.date>=now && s.status==='scheduled'));
+  const myEvents=(DB.eventRegs||[]).filter(r=>r.customerId===c.id&&r.status!=='cancelled').map(r=>({r,ev:eventById(r.eventId)})).filter(x=>x.ev&&x.ev.date>=now).sort((a,b)=>((a.ev.date||'')+(a.ev.time||'')).localeCompare((b.ev.date||'')+(b.ev.time||'')));
+  const evCard=x=>`<div class="panel" style="margin-bottom:12px">
+      <div class="row" style="justify-content:space-between;align-items:center;gap:10px">
+        <div style="flex:1;min-width:180px"><b>🎉 ${x.ev.title}</b> ${x.r.status==='pending'?'<span class="pill yellow">⏳ Pending</span>':'<span class="pill green">Registered</span>'} ${x.r.paid?'<span class="pill green">Paid</span>':(x.ev.price?'<span class="pill orange">'+money(x.ev.price)+'</span>':'<span class="pill green">Free</span>')}
+          <div class="clienttag" style="margin-top:4px">📅 ${eventWhen(x.ev)} · 📍 ${x.ev.location||'TBD'}</div></div>
+        <button class="btn ghost sm" onclick="clientCancelEventReg('${x.r.id}')">Cancel</button>
+      </div></div>`;
   return `${today.length?`<h3 style="margin:0 0 10px">Today</h3>${today.map(clientCard).join('')}`:''}
     ${pending.length?`<h3 style="margin:${today.length?'18px':'0'} 0 10px">Pending — awaiting confirmation</h3>${pending.map(clientCard).join('')}`:''}
     <h3 style="margin:${(today.length||pending.length)?'18px':'0'} 0 10px">Your booked sessions</h3>
-    ${upcoming.length?upcoming.map(clientCard).join(''):'<div class="panel"><div class="empty">No booked sessions yet — request one ←</div></div>'}`;
+    ${upcoming.length?upcoming.map(clientCard).join(''):'<div class="panel"><div class="empty">No booked sessions yet — request one ←</div></div>'}
+    ${myEvents.length?`<h3 style="margin:18px 0 10px">Your events</h3>${myEvents.map(evCard).join('')}`:''}`;
 }
 function refreshClientStatus(){const c=custById(clientAs);const el=$('#clientStatus');if(c&&el)el.innerHTML=clientStatusHtml(c);}
 function renderPast(){
@@ -1684,9 +1693,14 @@ function rejectCoach(id){const c=coachById(id);if(!c)return;c.pending=null;save(
 function openApprovals(){
   const coaches=(DB.coaches||[]).filter(c=>c.pending);
   const avail=(DB.availability||[]).filter(a=>a.approved===false&&a.date>=todayISO()).sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
+  const evregs=eventPendingRegs();
   let body='';
-  if(!coaches.length&&!avail.length){body='<div class="empty">Nothing pending — all caught up! 🎉</div>';}
+  if(!coaches.length&&!avail.length&&!evregs.length){body='<div class="empty">Nothing pending — all caught up! 🎉</div>';}
   else{
+    if(evregs.length){
+      body+=`<h3 style="margin:4px 0 8px">Event registrations (${evregs.length})</h3>`;
+      body+='<div style="overflow-x:auto"><table><thead><tr><th>Client</th><th>Event</th><th>When</th><th></th></tr></thead><tbody>'+evregs.map(r=>{const ev=eventById(r.eventId);const c=custById(r.customerId);return `<tr><td>${c?c.name:'?'}</td><td>${ev?ev.title:'?'}${ev&&ev.price?(' · '+money(ev.price)):''}</td><td>${ev?eventWhen(ev):''}</td><td class="right"><div class="actions"><button class="btn sm" onclick="doApproveEventReg('${r.id}')">Approve</button><button class="iconbtn" title="Reject" onclick="doRejectEventReg('${r.id}')">✕</button></div></td></tr>`;}).join('')+'</tbody></table></div>';
+    }
     if(coaches.length){
       body+='<h3 style="margin:4px 0 8px">Profile & rate changes</h3>'+coaches.map(c=>`<div class="panel" style="background:var(--panel2);margin-bottom:10px">
         <b>🏀 ${c.name}</b><div class="small" style="margin-top:4px">${pendingSummary(c)}</div>
@@ -1705,6 +1719,8 @@ function doRejectCoach(id){const c=coachById(id);if(c){c.pending=null;save();fla
 function doApproveAvail(id){const a=(DB.availability||[]).find(x=>x.id===id);if(a){a.approved=true;save();flash('Availability approved ✅');}refreshApprovals();}
 function doRejectAvail(id){DB.availability=(DB.availability||[]).filter(x=>x.id!==id);save();flash('Removed');refreshApprovals();}
 function doApproveAllAvail(){let n=0;(DB.availability||[]).forEach(a=>{if(a.approved===false&&a.date>=todayISO()){a.approved=true;n++;}});if(n){save();flash(n+' window(s) approved ✅');}refreshApprovals();}
+function doApproveEventReg(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(r){r.status='registered';save();flash('Registration approved ✅');}refreshApprovals();}
+function doRejectEventReg(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(r){r.status='cancelled';save();flash('Registration rejected');}refreshApprovals();}
 function openCoach(id){
   const isCoach=AUTH==='coach';
   if(isCoach)id=coachAs;
@@ -2029,6 +2045,8 @@ function eventSpotsLeft(ev){if(!ev.capacity)return Infinity;return Math.max(0,ev
 function eventRevenue(ev){return eventRegsFor(ev.id).filter(r=>r.paid).length*(ev.price||0);}
 function myEventReg(eid,cid){return (DB.eventRegs||[]).find(r=>r.eventId===eid&&r.customerId===cid&&r.status!=='cancelled');}
 function eventWhen(ev){return ev.date?fmtDT(ev.date,ev.time):'Date TBD';}
+function eventPendingRegs(){return (DB.eventRegs||[]).filter(r=>r.status==='pending'&&(eventById(r.eventId)));}
+function eventRegApprove(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;r.status='registered';save();flash('Registration approved ✅');viewEventRegs(r.eventId);}
 
 function renderEvents(){ if(AUTH==='client') return renderEventsClient(); renderEventsOwner(); }
 
@@ -2036,7 +2054,7 @@ function renderEventsOwner(){
   const now=todayISO();
   const evs=(DB.events||[]).slice().sort((a,b)=>((b.date||'')+(b.time||'')).localeCompare((a.date||'')+(a.time||'')));
   const rows=evs.map(ev=>{
-    const regs=eventRegsFor(ev.id);const paid=regs.filter(r=>r.paid).length;
+    const regs=eventRegsFor(ev.id);const paid=regs.filter(r=>r.paid).length;const pend=regs.filter(r=>r.status==='pending').length;const conf=regs.length-pend;
     const cap=ev.capacity?('/'+ev.capacity):'';
     const st=ev.active===false?'<span class="pill">Draft</span>':(ev.date<now?'<span class="pill">Past</span>':'<span class="pill green">Published</span>');
     return `<tr>
@@ -2044,7 +2062,7 @@ function renderEventsOwner(){
       <td>${eventWhen(ev)}<div class="clienttag">📍 ${ev.location||'TBD'}</div></td>
       <td>${ev.coachId?('🏀 '+coachName(ev.coachId)):'<span class="muted">General</span>'}</td>
       <td>${ev.price?money(ev.price):'Free'}</td>
-      <td>${regs.length}${cap}<div class="clienttag">${paid} paid</div></td>
+      <td>${conf}${cap}<div class="clienttag">${pend?('⏳ '+pend+' pending · '):''}${paid} paid</div></td>
       <td class="right">${money(eventRevenue(ev))}</td>
       <td>${st}</td>
       <td class="right"><div class="actions">
@@ -2109,13 +2127,15 @@ function viewEventRegs(id){
   const regs=(DB.eventRegs||[]).filter(r=>r.eventId===id&&r.status!=='cancelled');
   const rows=regs.map(r=>{const c=custById(r.customerId);return `<tr>
     <td>${c?c.name:'?'}</td>
+    <td>${r.status==='pending'?'<span class="pill yellow">⏳ Pending</span>':'<span class="pill green">Registered</span>'}</td>
     <td>${r.paid?'<span class="pill green">Paid</span>':(ev.price?'<span class="pill red">Unpaid</span>':'<span class="pill">Free</span>')}</td>
     <td>${r.checkedIn?'<span class="pill green">✓ In</span>':'—'}</td>
     <td class="right"><div class="actions">
+      ${r.status==='pending'?`<button class="btn sm" onclick="eventRegApprove('${r.id}')">Approve</button>`:''}
       ${ev.price&&!r.paid?`<button class="iconbtn" onclick="eventRegPay('${r.id}')">Mark paid</button>`:''}
       <button class="iconbtn" onclick="eventRegCheckin('${r.id}')">${r.checkedIn?'Undo in':'Check in'}</button>
       <button class="iconbtn" onclick="eventRegRemove('${r.id}')">✕</button>
-    </div></td></tr>`;}).join('')||'<tr><td colspan="4"><div class="empty">No registrations yet.</div></td></tr>';
+    </div></td></tr>`;}).join('')||'<tr><td colspan="5"><div class="empty">No registrations yet.</div></td></tr>';
   const custOpts='<option value="">— add a client —</option>'+DB.customers.filter(c=>!myEventReg(id,c.id)).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
   openModal('Registrations — '+ev.title,`
     <div class="clienttag" style="margin-bottom:10px">${eventWhen(ev)} · 📍 ${ev.location||'TBD'} · ${ev.price?money(ev.price):'Free'} · ${regs.length}${ev.capacity?('/'+ev.capacity):''} registered · collected ${money(eventRevenue(ev))}</div>
@@ -2123,7 +2143,7 @@ function viewEventRegs(id){
       <div class="field" style="margin-bottom:0"><label class="f">Register a client</label><select id="evAddCust">${custOpts}</select></div>
       <button class="btn sm" onclick="ownerAddReg('${id}')">Add</button>
     </div>
-    <div class="panel" style="padding:6px 14px;overflow-x:auto"><table><thead><tr><th>Client</th><th>Payment</th><th>Check-in</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="panel" style="padding:6px 14px;overflow-x:auto"><table><thead><tr><th>Client</th><th>Status</th><th>Payment</th><th>Check-in</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
   `,`<button class="btn" onclick="closeModal()">Close</button>`);
 }
 function ownerAddReg(eid){
@@ -2152,7 +2172,7 @@ function renderEventsClient(){
           ${ev.detail?`<div class="small muted" style="margin-top:8px;line-height:1.6">${ev.detail}</div>`:''}
         </div>
         <div class="actions">
-          ${reg?`<span class="pill green">✓ Registered</span>${reg.paid?'<span class="pill green">Paid</span>':''}<button class="btn ghost sm" onclick="clientCancelEventReg('${reg.id}')">Cancel</button>`
+          ${reg?`${reg.status==='pending'?'<span class="pill yellow">⏳ Pending approval</span>':'<span class="pill green">✓ Registered</span>'}${reg.paid?'<span class="pill green">Paid</span>':''}<button class="btn ghost sm" onclick="clientCancelEventReg('${reg.id}')">Cancel</button>`
              :(full?'<span class="pill red">Full</span>':`<button class="btn sm" onclick="registerEvent('${ev.id}')">Register</button>`)}
         </div>
       </div>
@@ -2165,11 +2185,19 @@ function renderEventsClient(){
 }
 function registerEvent(eid){
   const ev=eventById(eid);if(!ev||!clientAs)return;
-  if(myEventReg(eid,clientAs))return flash('You are already registered');
+  if(myEventReg(eid,clientAs))return flash('You already have a registration for this');
   if(eventSpotsLeft(ev)<=0)return flash('Sorry, this event is full',true);
-  DB.eventRegs.push({id:uid(),eventId:eid,customerId:clientAs,status:'registered',paid:false,paidVia:'',checkedIn:false,created:todayISO()});
-  save();flash('Registered for “'+ev.title+'” 🎉'+(ev.price?(' — '+money(ev.price)+' due, the coach will collect'):''));
+  DB.eventRegs.push({id:uid(),eventId:eid,customerId:clientAs,status:'pending',paid:false,paidVia:'',checkedIn:false,created:todayISO()});
+  save();flash('Requested “'+ev.title+'” — awaiting owner approval ⏳');
+  notifyOwnerEventReg(ev,custById(clientAs));
   renderEvents();
+}
+function notifyOwnerEventReg(ev,c){
+  const emails=(DB.settings.notifyEmails||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(!emails.length||!(supa&&SUPA_OK))return;
+  supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:'rx@rxtraining.org',
+    subject:'RX Training — event registration: '+ev.title,
+    text:(c?c.name:'A client')+' registered for “'+ev.title+'” ('+eventWhen(ev)+').\nApprove in RX.TRAINING → Events.'}}).then(()=>{},()=>{});
 }
 function clientCancelEventReg(id){
   if(!confirm('Cancel your registration?'))return;
