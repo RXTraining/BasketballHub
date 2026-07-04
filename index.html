@@ -137,7 +137,7 @@
   .barrow .lab{width:90px;font-size:12px;color:var(--muted)}
   .bar{flex:1;height:10px;background:var(--panel2);border-radius:6px;overflow:hidden}
   .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
-  .barrow .val{width:70px;text-align:right;font-size:12.5px;font-weight:700}
+  .barrow .val{width:92px;flex:0 0 auto;text-align:right;font-size:12.5px;font-weight:700;white-space:nowrap}
   .clienttag{font-size:11px;color:var(--muted)}
   .hidden{display:none!important}
   .credit{display:inline-block;font-size:11px;font-weight:800;color:#111;background:linear-gradient(135deg,var(--accent),var(--accent2));
@@ -2346,7 +2346,7 @@ function custAnalyticsHtml(){
         <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="margin:0">New customers added</h3>${growthSeg()}</div>
         <div class="chart-wrap"><canvas id="custGrowth"></canvas></div>
       </div>
-      <div class="panel"><h3>Most valuable customers</h3><div style="max-height:240px;overflow:auto">${topRows}</div><div class="clienttag" style="margin-top:8px">All customers with a completed session, ranked by lifetime money paid.</div></div>
+      <div class="panel"><h3>Most valuable customers</h3><div style="max-height:240px;overflow-y:auto;padding-right:12px">${topRows}</div><div class="clienttag" style="margin-top:8px">All customers with a completed session, ranked by lifetime money paid.</div></div>
     </div>`;
 }
 function mountCustGrowth(){drawBars('custGrowth',bucketByPeriodCount(DB.customers.map(c=>c.created).filter(Boolean),growthRange,12),'#4aa8ff',(it)=>{custDateFilter=(custDateFilter&&custDateFilter.key===it.key)?null:{period:growthRange,key:it.key,label:it.label};renderCustomers();},custDateFilter&&custDateFilter.key);}
