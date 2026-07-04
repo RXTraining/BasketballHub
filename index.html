@@ -1074,6 +1074,7 @@ function renderBookingClient(){
       </div>
     </div>
     <div class="twocol">
+      <div id="clientStatus">${clientStatusHtml(c)}</div>
       <div>
         <div class="panel">
           <h3>Request a session</h3>
@@ -1090,7 +1091,6 @@ function renderBookingClient(){
         <div class="panel" style="margin-top:16px"><h3>Your packages</h3>${pkgHist}
           <p class="muted small" style="margin-top:8px">To buy a package, ask the Owner — your used/total balance updates automatically.</p></div>
       </div>
-      <div id="clientStatus">${clientStatusHtml(c)}</div>
     </div>`;
   renderOpenSlots();
 }
