@@ -288,14 +288,20 @@ const $$ = (s,el=document)=>[...el.querySelectorAll(s)];
 const money = n => '$'+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
 const fmtDate = d => d? new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
 const fmtDT = (d,t)=> d? new Date(d+'T'+(t||'00:00')).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
-const todayISO = ()=> new Date().toISOString().slice(0,10);
+/* ---- Everything is anchored to Boston (US Eastern), regardless of the device's timezone ---- */
+const TZ='America/New_York';
+const todayISO = ()=> new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+/* a Date whose local fields represent the current Boston wall-clock (for "now" comparisons) */
+function nowBoston(){return new Date(new Date().toLocaleString('en-US',{timeZone:TZ}));}
 const uid = ()=> Math.random().toString(36).slice(2,9);
 const MAX_GROUP = 4;
 
 /* ---------- Seed data ---------- */
 function seed(){
-  const minus = d=>{const x=new Date();x.setDate(x.getDate()-d);return x.toISOString().slice(0,10)};
-  const plus = d=>{const x=new Date();x.setDate(x.getDate()+d);return x.toISOString().slice(0,10)};
+  const p2=n=>String(n).padStart(2,'0');
+  const bd=off=>{const x=nowBoston();x.setDate(x.getDate()+off);return x.getFullYear()+'-'+p2(x.getMonth()+1)+'-'+p2(x.getDate());};
+  const minus = d=>bd(-d);
+  const plus = d=>bd(d);
   return {
     settings:{rate1on1:30, rateGroup:20, defaultClientPwd:'rxtraining'},
     coaches:[{id:'rx1',name:'Raymond Xu',tagline:'Lexington, MA · AAU Level Training',bio:"Training isn't just about drills. It's about teaching you the love of the game — the dedication, the grind, the mindset that you never give up. That's what every session is built on.",affiliation:'AAU',affiliationSub:'Middlesex Magic',photo:'',pwd:'coach',active:true}],
@@ -570,7 +576,7 @@ function coachSelectOptions(sel,includeAll){
 
 let AUTH=null, ROLE='owner', TAB='about';
 let clientAs=null, coachAs=null, mgCoach=null, pickCoach=null, pendingClient=null, sessionReturnCust=null, editMedia=[];
-let calY, calM; {const n=new Date();calY=n.getFullYear();calM=n.getMonth();}
+let calY, calM; {const n=nowBoston();calY=n.getFullYear();calM=n.getMonth();}
 const TABS=[
   {id:'about',label:'About'},
   {id:'booking',label:'Booking'},
@@ -970,7 +976,7 @@ function openCoachStatus(id){
   `,`<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="coachSetStatus('${id}',document.getElementById('csStatus').value);closeModal()">Save</button>`);
 }
 function calStep(n){calM+=n;if(calM<0){calM=11;calY--;}if(calM>11){calM=0;calY++;}renderBooking();}
-function calToday(){const n=new Date();calY=n.getFullYear();calM=n.getMonth();renderBooking();}
+function calToday(){const n=nowBoston();calY=n.getFullYear();calM=n.getMonth();renderBooking();}
 
 /* ---- client view (locked to the logged-in client only) ---- */
 function clientCard(s){
@@ -1043,7 +1049,7 @@ function renderBookingClient(){
           <div class="field"><label class="f">Available time</label><select id="rqSlot"></select></div>
           <div class="field"><label class="f">Comment (optional)</label><textarea id="rqComment" placeholder="e.g. I'd prefer a later time if possible, or any note for the coach…"></textarea></div>
           <button class="btn" style="width:100%" onclick="submitRequest()">Request Session</button>
-          <p class="muted small" style="margin-top:10px">Only the Owner's open time slots are shown. Prefer a different time? Pick the closest slot and note it in the comment. The Owner is notified and will confirm.</p>
+          <p class="muted small" style="margin-top:10px">Only the Owner's open time slots are shown. Prefer a different time? Pick the closest slot and note it in the comment. The Owner is notified and will confirm. <b style="color:var(--txt)">All times are Boston (ET).</b></p>
         </div>
         <div class="panel" style="margin-top:16px"><h3>Your packages</h3>${pkgHist}
           <p class="muted small" style="margin-top:8px">To buy a package, ask the Owner — your used/total balance updates automatically.</p></div>
@@ -1677,7 +1683,7 @@ function renderAvailability(){
   const locOpt=DB.locations.map(l=>`<option>${l.name}</option>`).join('')||'<option value="">Add a location first</option>';
   $('#view-availability').innerHTML=`
     <h1 class="page">Availability</h1>
-    <div class="sub">Open specific dates and times. Clients can only request sessions inside these slots, at the location you choose. Set it fresh each week. <span class="pill ${scopeCoach()==='all'?'orange':'green'}" style="margin-left:6px">${scopeLbl}</span></div>
+    <div class="sub">Open specific dates and times (Boston / ET). Clients can only request sessions inside these slots, at the location you choose. Set it fresh each week. <span class="pill ${scopeCoach()==='all'?'orange':'green'}" style="margin-left:6px">${scopeLbl}</span></div>
     ${AUTH!=='coach'&&scopeCoach()==='all'?'<div class="clienttag" style="margin:-6px 0 12px">Pick a specific coach in the top-right selector to add availability for them.</div>':''}
     ${AUTH==='coach'?'<div class="clienttag" style="margin:-6px 0 12px">⏳ Slots you add are sent to the owner for approval before clients can book them.</div>':''}
     <div class="panel" style="margin-bottom:16px">
@@ -1712,7 +1718,7 @@ function delAvailability(id){DB.availability=DB.availability.filter(a=>a.id!==id
    1:1 needs an empty slot; group stays open until it holds 4 clients total. */
 function availableSlots(dateStr,type,cid){
   if(!dateStr)return [];
-  const now=new Date(); const seen={}; const out=[];
+  const now=nowBoston(); const seen={}; const out=[];
   const sessAt=t=>DB.sessions.filter(s=>s.date===dateStr&&s.time===t&&s.status!=='cancelled'&&(!cid||s.coachId===cid));
   (DB.availability||[]).filter(r=>r.date===dateStr&&(!cid||r.coachId===cid)&&r.approved!==false).forEach(r=>{
     const step=r.slotMin||60; let [sh,sm]=r.start.split(':').map(Number); let [eh,em]=r.end.split(':').map(Number);
@@ -1775,8 +1781,9 @@ function renderFinance(){
   const creditValue=Math.max(0, soldVal - delivered.reduce((a,s)=>a+s.price,0));
 
   const months=[];const n=finRange==='12m'?12:finRange==='3m'?3:6;
-  const base=new Date();base.setDate(1);
-  for(let i=n-1;i>=0;i--){const d=new Date(base);d.setMonth(d.getMonth()-i);months.push(d.toISOString().slice(0,7));}
+  const [by,bm]=todayISO().split('-').map(Number);
+  const base=new Date(by,bm-1,1);
+  for(let i=n-1;i>=0;i--){const d=new Date(base);d.setMonth(d.getMonth()-i);months.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));}
   const revByM={},expByM={};
   cashSess.forEach(s=>{const k=monthKey(s.date);revByM[k]=(revByM[k]||0)+s.price;});
   CE.forEach(e=>{const k=monthKey(e.date);revByM[k]=(revByM[k]||0)+e.amount;});
@@ -1912,11 +1919,4 @@ function renderAdmin(){
     <h1 class="page">Admin</h1>
     <div class="sub">Pricing and access settings.</div>
     <div class="twocol">
-      <div class="panel">
-        <h3>Default rates (fallback)</h3>
-        <div class="row">
-          <div class="field"><label class="f">1:1 rate ($/hr)</label><input type="number" id="rate1" value="${DB.settings.rate1on1}"></div>
-          <div class="field"><label class="f">Group rate ($/hr/player)</label><input type="number" id="rateG" value="${DB.settings.rateGroup}"></div>
-        </div>
-        <button class="btn sm" onclick="saveRates()">Save default rates</button>
-        <div class="clienttag" style="margin-top:8px">Each coach now has their own rates (set in the <b st
+      <div class="pane
