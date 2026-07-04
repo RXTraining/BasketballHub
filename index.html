@@ -223,6 +223,7 @@
   <section class="view" id="view-booking"></section>
   <section class="view" id="view-past"></section>
   <section class="view" id="view-money"></section>
+  <section class="view" id="view-events"></section>
   <section class="view" id="view-customers"></section>
   <section class="view" id="view-coaches"></section>
   <section class="view" id="view-locations"></section>
@@ -333,7 +334,11 @@ function seed(){
       {id:'e1',date:minus(15),cat:'Gym Rental',amount:200,note:'Court time'},
       {id:'e2',date:minus(10),cat:'Equipment',amount:85,note:'Cones & balls'}
     ],
-    cashEntries:[]
+    cashEntries:[],
+    events:[
+      {id:'ev1',title:'Workshop with a D2 Guard',detail:'2-hour skills workshop with a college D2 guard — ball-handling, shooting under pressure, and Q&A on the recruiting path.',date:plus(12),time:'10:00',location:'Lexington Gym',coachId:'rx1',price:40,capacity:12,active:true,created:todayISO()}
+    ],
+    eventRegs:[]
   };
 }
 /* ===== Supabase config — paste here to enable cloud sync on ALL devices ===== */
@@ -390,12 +395,16 @@ function normalize(d){
   (d.expenses||[]).forEach(e=>{if(!e.coachId)e.coachId=dcid;});
   (d.cashEntries||[]).forEach(e=>{if(!e.coachId)e.coachId=dcid;});
   (d.customers||[]).forEach(c=>{(c.packages||[]).forEach(p=>{if(!p.coachId)p.coachId=dcid;});});
+  if(!d.events)d.events=[];
+  if(!d.eventRegs)d.eventRegs=[];
+  d.events.forEach(e=>{if(e.active===undefined)e.active=true;if(e.price==null)e.price=0;if(e.capacity==null)e.capacity=0;if(!e.created)e.created=todayISO();if(e.coachId===undefined)e.coachId='';if(!e.detail)e.detail=e.detail||'';});
+  d.eventRegs.forEach(r=>{if(!r.status)r.status='registered';if(r.paid===undefined)r.paid=false;if(r.paidVia===undefined)r.paidVia='';if(r.checkedIn===undefined)r.checkedIn=false;});
   return d;
 }
 function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.parse(r);}catch(e){}return normalize(d);}
 
 /* ----- relational mapping (separate tables in Supabase) ----- */
-function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa){
+function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs){
   const d={};
   d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):''};
   d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,
@@ -408,24 +417,29 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa){
   d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||''}));
   d.expenses=(exp||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||''}));
   d.cashEntries=(cash||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,amount:Number(e.amount),note:e.note||'',customerId:e.customer_id||'',type:e.type||'1on1',qty:e.qty||1}));
+  d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||''}));
+  d.eventRegs=(regs||[]).map(r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||''}));
   return normalize(d);
 }
 const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),pending:(c.pending||null),created:c.created||null});
 const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
 const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null});
+const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:e.coachId||null,price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||''});
+const eventRegRow=r=>({id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||''});
 async function migrateSource(){
   try{const {data}=await supa.from(STATE_TABLE).select('data').eq('id','main').maybeSingle();if(data&&data.data)return normalize(data.data);}catch(e){}
   return localData();
 }
 async function fetchCloud(){
-  const [st,loc,cus,pkg,ses,exp,cash,avail,coa]=await Promise.all([
+  const [st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs]=await Promise.all([
     supa.from('settings').select('*').eq('id','main').maybeSingle(),
     supa.from('locations').select('*'), supa.from('customers').select('*'),
     supa.from('packages').select('*'), supa.from('sessions').select('*'),
     supa.from('expenses').select('*'), supa.from('cash_entries').select('*'),
-    supa.from('availability').select('*'), supa.from('coaches').select('*')]);
-  const err=[st,loc,cus,pkg,ses,exp,cash,avail,coa].find(r=>r.error); if(err) throw err.error;
-  return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data,avail.data,coa.data);
+    supa.from('availability').select('*'), supa.from('coaches').select('*'),
+    supa.from('events').select('*'), supa.from('event_regs').select('*')]);
+  const err=[st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs].find(r=>r.error); if(err) throw err.error;
+  return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data,avail.data,coa.data,evs.data,regs.data);
 }
 async function bootLoad(){
   const cfg=getSupaCfg();
@@ -449,6 +463,8 @@ function dataSig(d){return JSON.stringify({
   a:(d.availability||[]).map(x=>[x.id,x.coachId,x.date,x.start,x.end,x.location]),
   co:(d.coaches||[]).map(x=>[x.id,x.name,x.active,x.tagline,x.bio,x.affiliation,x.rate1on1,x.rateGroup,x.pending]),
   e:(d.expenses||[]).length, k:(d.cashEntries||[]).length,
+  ev:(d.events||[]).map(x=>[x.id,x.title,x.date,x.time,x.price,x.capacity,x.active,x.location]),
+  er:(d.eventRegs||[]).map(x=>[x.id,x.eventId,x.customerId,x.status,x.paid,x.checkedIn]),
   n:d.settings&&d.settings.notifyEmails});}
 /* only protect real text entry — a focused dropdown (e.g. the header coach selector)
    must NOT block live refreshes, or the owner's view goes stale */
@@ -513,6 +529,8 @@ async function cloudPush(){
     if(AUTH==='client'){
       const mine=DB.sessions.filter(s=>s.customerIds.includes(clientAs)).map(sessRow);
       if(mine.length){const {error}=await supa.from('sessions').upsert(mine); if(error) throw error;}
+      const myRegs=(DB.eventRegs||[]).filter(r=>r.customerId===clientAs).map(eventRegRow);
+      if(myRegs.length){const {error}=await supa.from('event_regs').upsert(myRegs); if(error) throw error;}
       return;
     }
     // Coaches only write their OWN records (sessions status, own profile/rate proposal, own availability).
@@ -537,6 +555,8 @@ async function cloudPush(){
     await syncTable('expenses',DB.expenses.map(e=>({id:e.id,coach_id:e.coachId||null,date:e.date,cat:e.cat,amount:e.amount,note:e.note||''})));
     await syncTable('cash_entries',DB.cashEntries.map(e=>({id:e.id,coach_id:e.coachId||null,date:e.date,amount:e.amount,note:e.note||'',customer_id:e.customerId||null,type:e.type||null,qty:e.qty||null})));
     await syncTable('availability',(DB.availability||[]).map(a=>({id:a.id,coach_id:a.coachId||null,date:a.date,start_t:a.start,end_t:a.end,slot_min:a.slotMin,location:a.location||'',approved:a.approved!==false})));
+    await syncTable('events',(DB.events||[]).map(eventRow));
+    await syncTable('event_regs',(DB.eventRegs||[]).map(eventRegRow));
   }catch(e){flash('Cloud save failed — saved on this device',true);}
 }
 
@@ -604,6 +624,7 @@ const TABS=[
   {id:'booking',label:'Booking'},
   {id:'past',label:'Past Sessions'},
   {id:'money',label:'Payments'},
+  {id:'events',label:'Events'},
   {id:'customers',label:'Customers'},
   {id:'coaches',label:'Coaches'},
   {id:'locations',label:'Locations'},
@@ -614,7 +635,7 @@ const TABS=[
 
 function renderTabs(){
   let allowed;
-  if(AUTH==='client') allowed=['booking','past','money'];
+  if(AUTH==='client') allowed=['booking','past','money','events'];
   else if(AUTH==='coach') allowed=['about','booking','availability','money'];
   else allowed = TABS.map(t=>t.id).filter(x=>x!=='past'&&x!=='money');   // owner uses the full Finance tab instead
   if(!allowed.includes(TAB)) TAB = 'booking';
@@ -635,7 +656,7 @@ function switchTab(){
   saveSess();
 }
 function saveSess(){try{sessionStorage.setItem('rx_sess',JSON.stringify({auth:AUTH,clientAs,coachAs,mgCoach,pickCoach,tab:TAB}));}catch(e){}}
-function refreshOwner(){const f={about:renderAbout,booking:renderBooking,past:renderPast,money:renderMoney,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,admin:renderAdmin}[TAB];if(f)f();if(AUTH==='owner')renderWhoami();}
+function refreshOwner(){const f={about:renderAbout,booking:renderBooking,past:renderPast,money:renderMoney,events:renderEvents,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,admin:renderAdmin}[TAB];if(f)f();if(AUTH==='owner')renderWhoami();}
 
 /* ---------- Auth ---------- */
 function ensureTokens(){let ch=false;DB.customers.forEach(c=>{if(!c.token){c.token=uid()+uid();ch=true;}});if(ch)save();}
@@ -1988,6 +2009,163 @@ function renderMoney(){
 }
 
 /* ============================================================
+   EVENTS (owner announces; clients register; can be charged)
+   ============================================================ */
+const eventById=id=>(DB.events||[]).find(e=>e.id===id);
+function eventRegsFor(eid){return (DB.eventRegs||[]).filter(r=>r.eventId===eid&&r.status!=='cancelled');}
+function eventSpotsLeft(ev){if(!ev.capacity)return Infinity;return Math.max(0,ev.capacity-eventRegsFor(ev.id).length);}
+function eventRevenue(ev){return eventRegsFor(ev.id).filter(r=>r.paid).length*(ev.price||0);}
+function myEventReg(eid,cid){return (DB.eventRegs||[]).find(r=>r.eventId===eid&&r.customerId===cid&&r.status!=='cancelled');}
+function eventWhen(ev){return ev.date?fmtDT(ev.date,ev.time):'Date TBD';}
+
+function renderEvents(){ if(AUTH==='client') return renderEventsClient(); renderEventsOwner(); }
+
+function renderEventsOwner(){
+  const now=todayISO();
+  const evs=(DB.events||[]).slice().sort((a,b)=>((b.date||'')+(b.time||'')).localeCompare((a.date||'')+(a.time||'')));
+  const rows=evs.map(ev=>{
+    const regs=eventRegsFor(ev.id);const paid=regs.filter(r=>r.paid).length;
+    const cap=ev.capacity?('/'+ev.capacity):'';
+    const st=ev.active===false?'<span class="pill">Draft</span>':(ev.date<now?'<span class="pill">Past</span>':'<span class="pill green">Published</span>');
+    return `<tr>
+      <td><b>${ev.title||'(untitled)'}</b><div class="clienttag">${(ev.detail||'').slice(0,60)}${(ev.detail||'').length>60?'…':''}</div></td>
+      <td>${eventWhen(ev)}<div class="clienttag">📍 ${ev.location||'TBD'}</div></td>
+      <td>${ev.coachId?('🏀 '+coachName(ev.coachId)):'<span class="muted">General</span>'}</td>
+      <td>${ev.price?money(ev.price):'Free'}</td>
+      <td>${regs.length}${cap}<div class="clienttag">${paid} paid</div></td>
+      <td class="right">${money(eventRevenue(ev))}</td>
+      <td>${st}</td>
+      <td class="right"><div class="actions">
+        <button class="btn sm" onclick="viewEventRegs('${ev.id}')">Registrations</button>
+        ${ev.email_note?'':''}<button class="iconbtn" title="Email all clients about this" onclick="announceEvent('${ev.id}')">📣</button>
+        <button class="iconbtn" onclick="openEvent('${ev.id}')">Edit</button>
+      </div></td></tr>`;
+  }).join('')||'<tr><td colspan="8"><div class="empty">No events yet — create your first announcement.</div></td></tr>';
+  $('#view-events').innerHTML=`
+    <h1 class="page">Events</h1>
+    <div class="sub">Announce workshops, guest sessions, team visits and more. Publish to clients, take registrations, and charge if needed. Times are Boston (ET).</div>
+    <div class="row" style="margin-bottom:16px"><button class="btn" onclick="openEvent()">+ New Event</button></div>
+    <div class="panel" style="padding:6px 14px;overflow-x:auto">
+      <table><thead><tr><th>Event</th><th>When</th><th>Coach</th><th>Price</th><th>Registered</th><th class="right">Collected</th><th>Status</th><th></th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    </div>`;
+}
+function openEvent(id){
+  const ev=id?eventById(id):{id:'',title:'',detail:'',date:todayISO(),time:'10:00',location:(DB.locations[0]?DB.locations[0].name:''),coachId:'',price:0,capacity:0,active:true};
+  const coachOpts='<option value="">General (no specific coach)</option>'+(DB.coaches||[]).map(c=>`<option value="${c.id}" ${ev.coachId===c.id?'selected':''}>${c.name}</option>`).join('');
+  openModal(id?'Edit Event':'New Event',`
+    <div class="field"><label class="f">Title *</label><input id="evTitle" value="${(ev.title||'').replace(/"/g,'&quot;')}" placeholder="e.g. Workshop with a D2 Guard"></div>
+    <div class="field"><label class="f">Details (shown to clients)</label><textarea id="evDetail">${ev.detail||''}</textarea></div>
+    <div class="row">
+      <div class="field"><label class="f">Date</label><input type="date" id="evDate" value="${ev.date||todayISO()}"></div>
+      <div class="field"><label class="f">Time</label><input type="time" id="evTime" value="${ev.time||'10:00'}"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label class="f">Location</label><select id="evLoc">${locOptions(ev.location)}</select></div>
+      <div class="field"><label class="f">Host coach (optional)</label><select id="evCoach">${coachOpts}</select></div>
+    </div>
+    <div class="row">
+      <div class="field"><label class="f">Price per person ($) — 0 = free</label><input type="number" id="evPrice" value="${ev.price||0}"></div>
+      <div class="field"><label class="f">Capacity — 0 = unlimited</label><input type="number" id="evCap" value="${ev.capacity||0}"></div>
+    </div>
+    <label class="f" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="evActive" ${ev.active!==false?'checked':''} style="width:auto"> Published (visible to clients)</label>
+    <p class="muted small" style="margin-top:8px">Uncheck Published to keep it a draft. Use 📣 in the list to email all clients once it's ready.</p>
+  `,`
+    ${id?`<button class="btn danger" onclick="delEvent('${id}')">Delete</button>`:''}
+    <button class="btn ghost" onclick="closeModal()">Cancel</button>
+    <button class="btn" onclick="saveEvent('${id||''}')">Save</button>`);
+}
+function saveEvent(id){
+  const title=($('#evTitle').value||'').trim();if(!title)return flash('Title is required',true);
+  const obj={title,detail:$('#evDetail').value,date:$('#evDate').value,time:$('#evTime').value,location:$('#evLoc').value,coachId:$('#evCoach').value||'',price:Math.max(0,+$('#evPrice').value||0),capacity:Math.max(0,Math.round(+$('#evCap').value||0)),active:$('#evActive').checked};
+  if(id){Object.assign(eventById(id),obj);}
+  else{obj.id=uid();obj.created=todayISO();DB.events.push(obj);}
+  save();closeModal();flash('Event saved 📅');renderEvents();
+}
+function delEvent(id){if(!confirm('Delete this event? Registrations will be removed too.'))return;DB.events=DB.events.filter(e=>e.id!==id);DB.eventRegs=DB.eventRegs.filter(r=>r.eventId!==id);save();closeModal();flash('Event deleted');renderEvents();}
+function announceEvent(id){
+  const ev=eventById(id);if(!ev)return;
+  if(!(supa&&SUPA_OK))return flash('Connect Supabase to email clients',true);
+  const emails=DB.customers.map(c=>c.email).filter(Boolean);
+  if(!emails.length)return flash('No client emails on file',true);
+  if(!confirm('Email '+emails.length+' client(s) about “'+ev.title+'”?'))return;
+  const text='New RX Training event:\n\n'+ev.title+'\n'+eventWhen(ev)+'\n📍 '+(ev.location||'TBD')+'\n'+(ev.price?('Price: '+money(ev.price)+' per person'):'Free')+'\n\n'+(ev.detail||'')+'\n\nSign in to the app to register.';
+  supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:'rx@rxtraining.org',subject:'RX Training — '+ev.title,text}}).then(({error})=>{if(error)throw error;flash('Announced to '+emails.length+' client(s) 📣');},()=>flash('Email failed — check the function',true));
+}
+function viewEventRegs(id){
+  const ev=eventById(id);if(!ev)return;
+  const regs=(DB.eventRegs||[]).filter(r=>r.eventId===id&&r.status!=='cancelled');
+  const rows=regs.map(r=>{const c=custById(r.customerId);return `<tr>
+    <td>${c?c.name:'?'}</td>
+    <td>${r.paid?'<span class="pill green">Paid</span>':(ev.price?'<span class="pill red">Unpaid</span>':'<span class="pill">Free</span>')}</td>
+    <td>${r.checkedIn?'<span class="pill green">✓ In</span>':'—'}</td>
+    <td class="right"><div class="actions">
+      ${ev.price&&!r.paid?`<button class="iconbtn" onclick="eventRegPay('${r.id}')">Mark paid</button>`:''}
+      <button class="iconbtn" onclick="eventRegCheckin('${r.id}')">${r.checkedIn?'Undo in':'Check in'}</button>
+      <button class="iconbtn" onclick="eventRegRemove('${r.id}')">✕</button>
+    </div></td></tr>`;}).join('')||'<tr><td colspan="4"><div class="empty">No registrations yet.</div></td></tr>';
+  const custOpts='<option value="">— add a client —</option>'+DB.customers.filter(c=>!myEventReg(id,c.id)).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  openModal('Registrations — '+ev.title,`
+    <div class="clienttag" style="margin-bottom:10px">${eventWhen(ev)} · 📍 ${ev.location||'TBD'} · ${ev.price?money(ev.price):'Free'} · ${regs.length}${ev.capacity?('/'+ev.capacity):''} registered · collected ${money(eventRevenue(ev))}</div>
+    <div class="row" style="align-items:flex-end;gap:8px;margin-bottom:8px">
+      <div class="field" style="margin-bottom:0"><label class="f">Register a client</label><select id="evAddCust">${custOpts}</select></div>
+      <button class="btn sm" onclick="ownerAddReg('${id}')">Add</button>
+    </div>
+    <div class="panel" style="padding:6px 14px;overflow-x:auto"><table><thead><tr><th>Client</th><th>Payment</th><th>Check-in</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+  `,`<button class="btn" onclick="closeModal()">Close</button>`);
+}
+function ownerAddReg(eid){
+  const cid=$('#evAddCust')?$('#evAddCust').value:'';if(!cid)return flash('Pick a client',true);
+  const ev=eventById(eid);if(eventSpotsLeft(ev)<=0)return flash('Event is full',true);
+  if(myEventReg(eid,cid))return flash('Already registered',true);
+  DB.eventRegs.push({id:uid(),eventId:eid,customerId:cid,status:'registered',paid:false,paidVia:'',checkedIn:false,created:todayISO()});
+  save();flash('Registered');viewEventRegs(eid);
+}
+function eventRegPay(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;r.paid=true;r.paidVia='cash';save();flash('Marked paid 💵');viewEventRegs(r.eventId);}
+function eventRegCheckin(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;r.checkedIn=!r.checkedIn;save();viewEventRegs(r.eventId);}
+function eventRegRemove(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;if(!confirm('Remove this registration?'))return;const eid=r.eventId;r.status='cancelled';save();flash('Removed');viewEventRegs(eid);}
+
+/* ---- client view ---- */
+function renderEventsClient(){
+  const now=todayISO();
+  const evs=(DB.events||[]).filter(e=>e.active!==false&&e.date>=now).sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
+  const mine=(DB.eventRegs||[]).filter(r=>r.customerId===clientAs&&r.status!=='cancelled');
+  const card=ev=>{
+    const reg=myEventReg(ev.id,clientAs);const left=eventSpotsLeft(ev);const full=left<=0;
+    return `<div class="panel" style="margin-bottom:12px">
+      <div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px">
+        <div style="flex:1;min-width:200px">
+          <b style="font-size:15px">${ev.title}</b> ${ev.coachId?`<span class="pill">🏀 ${coachName(ev.coachId)}</span>`:''} ${ev.price?`<span class="pill orange">${money(ev.price)}</span>`:'<span class="pill green">Free</span>'}
+          <div class="clienttag" style="margin-top:4px">📅 ${eventWhen(ev)} · 📍 ${ev.location||'TBD'}${ev.capacity?` · ${left} spot${left===1?'':'s'} left`:''}</div>
+          ${ev.detail?`<div class="small muted" style="margin-top:8px;line-height:1.6">${ev.detail}</div>`:''}
+        </div>
+        <div class="actions">
+          ${reg?`<span class="pill green">✓ Registered</span>${reg.paid?'<span class="pill green">Paid</span>':''}<button class="btn ghost sm" onclick="clientCancelEventReg('${reg.id}')">Cancel</button>`
+             :(full?'<span class="pill red">Full</span>':`<button class="btn sm" onclick="registerEvent('${ev.id}')">Register</button>`)}
+        </div>
+      </div>
+    </div>`;
+  };
+  $('#view-events').innerHTML=`
+    <h1 class="page">Events</h1>
+    <div class="sub">Workshops, guest sessions and more. Register for anything that interests you. Times are Boston (ET).</div>
+    ${evs.length?evs.map(card).join(''):'<div class="panel"><div class="empty">No upcoming events right now — check back soon.</div></div>'}`;
+}
+function registerEvent(eid){
+  const ev=eventById(eid);if(!ev||!clientAs)return;
+  if(myEventReg(eid,clientAs))return flash('You are already registered');
+  if(eventSpotsLeft(ev)<=0)return flash('Sorry, this event is full',true);
+  DB.eventRegs.push({id:uid(),eventId:eid,customerId:clientAs,status:'registered',paid:false,paidVia:'',checkedIn:false,created:todayISO()});
+  save();flash('Registered for “'+ev.title+'” 🎉'+(ev.price?(' — '+money(ev.price)+' due, the coach will collect'):''));
+  renderEvents();
+}
+function clientCancelEventReg(id){
+  if(!confirm('Cancel your registration?'))return;
+  const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;
+  r.status='cancelled';save();flash('Registration cancelled');renderEvents();
+}
+
+/* ============================================================
    FINANCE
    ============================================================ */
 let finRange='6m';
@@ -2004,7 +2182,8 @@ function renderFinance(){
   const pkgRev=allPkgs.reduce((a,p)=>a+p.amount,0);
   const sessCash=cashSess.reduce((a,s)=>a+s.price,0);
   const otherCash=CE.reduce((a,e)=>a+e.amount,0);
-  const cashRev=sessCash+otherCash;
+  const eventInc=(DB.eventRegs||[]).filter(r=>r.paid&&r.status!=='cancelled').reduce((a,r)=>{const ev=eventById(r.eventId);return (ev&&inScope(ev.coachId))?a+(ev.price||0):a;},0);
+  const cashRev=sessCash+otherCash+eventInc;
   const revenue=pkgRev+cashRev;
   const outstanding=S.filter(s=>!s.paid&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
   const expenses=EX.reduce((a,e)=>a+e.amount,0);
