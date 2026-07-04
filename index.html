@@ -1387,6 +1387,7 @@ function renderCustomers(){
       <td>${bookedCount(c)}<div class="clienttag">upcoming</div></td>
       <td>${cancelBadge(clientCancelCount(c))}<div class="clienttag">cancels</div></td>
       <td>${creditBadge(c)}</td>
+      <td>${c.created?fmtDate(c.created):'<span class="muted">—</span>'}</td>
       <td>${next?fmtDT(next.date,next.time):'<span class="muted">—</span>'}</td>
       <td class="right"><div class="actions">
         <button class="iconbtn" title="Copy personal login link" onclick="copyClientLink('${c.id}')">🔗 Link</button>
@@ -1408,8 +1409,8 @@ function renderCustomers(){
     </div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
       <table>
-        <thead><tr><th>Player</th><th>Contact</th><th>Coaches</th><th>Completed</th><th>Booked</th><th>Cancels</th><th>Credits (used/total)</th><th>Next session</th><th></th></tr></thead>
-        <tbody>${rows||'<tr><td colspan="9"><div class="empty">No customers found.</div></td></tr>'}</tbody>
+        <thead><tr><th>Player</th><th>Contact</th><th>Coaches</th><th>Completed</th><th>Booked</th><th>Cancels</th><th>Credits (used/total)</th><th>Joined</th><th>Next session</th><th></th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="10"><div class="empty">No customers found.</div></td></tr>'}</tbody>
       </table>
     </div>`;
   mountCustGrowth();
@@ -1594,12 +1595,13 @@ function renderCoaches(){
       <td>${st.done}<div class="clienttag">completed</div></td>
       <td>${st.total}<div class="clienttag">${st.up} upcoming</div></td>
       <td>${cancelBadge(coachCancelCount(c.id))}<div class="clienttag">cancels</div></td>
+      <td>${c.created?fmtDate(c.created):'<span class="muted">—</span>'}</td>
       <td class="right"><div class="actions">
         ${c.pending?`<button class="btn sm" onclick="openCoach('${c.id}')">Review</button>`:''}
         <button class="iconbtn" title="Manage this coach" onclick="setMgCoach('${c.id}');flash('Now managing ${c.name.replace(/'/g,'')}')">Manage</button>
         <button class="iconbtn" onclick="openCoach('${c.id}')">Edit</button>
       </div></td></tr>`;
-  }).join('')||'<tr><td colspan="8"><div class="empty">No coaches yet — add your first coach.</div></td></tr>';
+  }).join('')||'<tr><td colspan="9"><div class="empty">No coaches yet — add your first coach.</div></td></tr>';
   $('#view-coaches').innerHTML=`
     <h1 class="page">Coaches</h1>
     <div class="sub">Every coach's profile, rates, sign-in and status. Use <b>Manage</b> (or the selector top-right) to work inside one coach's Booking, Availability and Finance. ${pendCount?`<span class="pill yellow" style="margin-left:6px">⏳ ${pendCount} awaiting approval</span>`:''}</div>
@@ -1608,7 +1610,7 @@ function renderCoaches(){
     <div class="row" style="margin-bottom:16px"><button class="btn" onclick="openCoach()">+ Add Coach</button></div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
       <table>
-        <thead><tr><th>Coach</th><th>Affiliation</th><th>Rates ($/hr)</th><th>Status</th><th>Completed</th><th>Sessions</th><th>Cancels</th><th></th></tr></thead>
+        <thead><tr><th>Coach</th><th>Affiliation</th><th>Rates ($/hr)</th><th>Status</th><th>Completed</th><th>Sessions</th><th>Cancels</th><th>Joined</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -2328,10 +2330,11 @@ function custAnalyticsHtml(){
   const newThisMonth=custs.filter(c=>(c.created||'').slice(0,7)===now.slice(0,7)).length;
   const active=custs.filter(c=>bookedCount(c)>0).length;
   const totalPaid=custs.reduce((a,c)=>a+custValue(c),0);
-  const ranked=custs.map(c=>({c,val:custValue(c),sess:DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status!=='cancelled').length})).sort((a,b)=>b.val-a.val).slice(0,8);
+  // all customers who have at least one completed session, ranked by lifetime value
+  const ranked=custs.map(c=>({c,val:custValue(c),done:completedCount(c)})).filter(r=>r.done>0).sort((a,b)=>b.val-a.val);
   const maxV=Math.max(1,...ranked.map(r=>r.val));
   const chip=(k,v,col)=>`<div class="stat"><div class="k">${k}</div><div class="v"${col?` style="color:${col}"`:''}>${v}</div></div>`;
-  const topRows=ranked.length&&maxV>0?ranked.map(r=>`<div class="barrow" style="cursor:pointer" title="Filter table to ${r.c.name}" onclick="custSearch='${(r.c.name||'').replace(/'/g,"\\'")}';renderCustomers()"><div class="lab" style="width:130px">${r.c.name}</div><div class="bar"><i style="width:${r.val/maxV*100}%"></i></div><div class="val">${money(r.val)}<div class="clienttag" style="text-align:right">${r.sess} sess</div></div></div>`).join(''):'<div class="empty">No customer payments yet.</div>';
+  const topRows=ranked.length?ranked.map(r=>`<div class="barrow" style="cursor:pointer" title="Filter table to ${r.c.name}" onclick="custSearch='${(r.c.name||'').replace(/'/g,"\\'")}';renderCustomers()"><div class="lab" style="width:130px">${r.c.name}</div><div class="bar"><i style="width:${r.val/maxV*100}%"></i></div><div class="val">${money(r.val)}<div class="clienttag" style="text-align:right">${r.done} done</div></div></div>`).join(''):'<div class="empty">No completed sessions yet.</div>';
   return `<div class="stats" style="margin-bottom:14px">
       ${chip('Total customers',total)}
       ${chip('New this month',newThisMonth,'var(--green)')}
@@ -2343,7 +2346,7 @@ function custAnalyticsHtml(){
         <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="margin:0">New customers added</h3>${growthSeg()}</div>
         <div class="chart-wrap"><canvas id="custGrowth"></canvas></div>
       </div>
-      <div class="panel"><h3>Most valuable customers</h3>${topRows}<div class="clienttag" style="margin-top:8px">Ranked by lifetime money paid (packages + cash).</div></div>
+      <div class="panel"><h3>Most valuable customers</h3><div style="max-height:240px;overflow:auto">${topRows}</div><div class="clienttag" style="margin-top:8px">All customers with a completed session, ranked by lifetime money paid.</div></div>
     </div>`;
 }
 function mountCustGrowth(){drawBars('custGrowth',bucketByPeriodCount(DB.customers.map(c=>c.created).filter(Boolean),growthRange,12),'#4aa8ff',(it)=>{custDateFilter=(custDateFilter&&custDateFilter.key===it.key)?null:{period:growthRange,key:it.key,label:it.label};renderCustomers();},custDateFilter&&custDateFilter.key);}
