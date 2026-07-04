@@ -399,14 +399,14 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa){
   d.availability=(avail||[]).map(a=>({id:a.id,coachId:a.coach_id||'',date:a.date,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||'',approved:a.approved!==false}));
   d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',notes:c.notes||'',created:c.created||'',creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
     packages:(pkg||[]).filter(p=>p.customer_id===c.id).map(p=>({id:p.id,coachId:p.coach_id||'',type:p.type,qty:p.qty,amount:Number(p.amount),date:p.date}))}));
-  d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[]}));
+  d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||''}));
   d.expenses=(exp||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||''}));
   d.cashEntries=(cash||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,amount:Number(e.amount),note:e.note||'',customerId:e.customer_id||'',type:e.type||'1on1',qty:e.qty||1}));
   return normalize(d);
 }
 const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),pending:(c.pending||null)});
 const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',notes:c.notes||'',created:c.created||'',credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
-const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[]});
+const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null});
 async function migrateSource(){
   try{const {data}=await supa.from(STATE_TABLE).select('data').eq('id','main').maybeSingle();if(data&&data.data)return normalize(data.data);}catch(e){}
   return localData();
@@ -444,22 +444,27 @@ function dataSig(d){return JSON.stringify({
   co:(d.coaches||[]).map(x=>[x.id,x.name,x.active,x.tagline,x.bio,x.affiliation,x.rate1on1,x.rateGroup,x.pending]),
   e:(d.expenses||[]).length, k:(d.cashEntries||[]).length,
   n:d.settings&&d.settings.notifyEmails});}
+/* only protect real text entry — a focused dropdown (e.g. the header coach selector)
+   must NOT block live refreshes, or the owner's view goes stale */
+function isTextEntry(ae){
+  if(!ae)return false;
+  if(ae.tagName==='TEXTAREA')return true;
+  if(ae.tagName==='INPUT'){const t=(ae.type||'text').toLowerCase();return ['text','password','number','email','search','tel','url'].includes(t);}
+  return false;
+}
 async function pollSync(){
   if(!supa||!SUPA_OK||cloudTimer)return;                       // skip if a local save is in flight
   if($('#modal').classList.contains('show'))return;            // don't disrupt an open dialog
   let fresh; try{ fresh=await fetchCloud(); }catch(e){ return; }
   const sig=dataSig(fresh);
   if(sig===lastSig)return;                                     // nothing changed
-  DB=fresh; lastSig=sig;
-  const ae=document.activeElement;
-  const typing = ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName);
-  if(typing){
-    // someone is mid-edit — don't blow away their form. Still push the important
-    // read-only updates: a client's booked/pending list refreshes on its own panel.
-    if(AUTH==='client' && TAB==='booking') refreshClientStatus();
-    return;
+  if(isTextEntry(document.activeElement)){
+    // someone is typing — don't blow away their text. A client on the booking page
+    // still gets a non-destructive status-panel refresh; owner/coach retry next tick.
+    if(AUTH==='client' && TAB==='booking'){DB=fresh;lastSig=sig;refreshClientStatus();}
+    return;                                                    // leave lastSig so we refresh once typing stops
   }
-  refreshOwner();
+  DB=fresh; lastSig=sig; refreshOwner();
 }
 let pollHooked=false, rtChannel=null, rtTimer=null, rtState='';
 /* Supabase Realtime: push updates instantly to every open device */
@@ -546,6 +551,11 @@ function totalFor(c,type){return (c&&c.creditsTotal&&c.creditsTotal[type])||0;}
 function usedFor(c,type){if(!c)return 0;const done=DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.type===type&&s.paidVia==='package'&&s.status==='completed').length;return Math.min(totalFor(c,type),done);}
 function completedCount(c){return DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status==='completed').length;}
 function bookedCount(c){return DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status==='scheduled'&&s.date>=todayISO()).length;}
+/* integrity tally: how many sessions each side cancelled */
+function clientCancelCount(c){return DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status==='cancelled'&&s.cancelledBy==='client').length;}
+function coachCancelCount(id){return DB.sessions.filter(s=>s.coachId===id&&s.status==='cancelled'&&s.cancelledBy==='coach').length;}
+function cancelBadge(n){return n>0?'<span class="pill red" title="Cancellations">✖ '+n+'</span>':'<span class="muted small">0</span>';}
+function cancelledByLabel(s){return s.status==='cancelled'&&s.cancelledBy?'<span class="pill red">Cancelled · by '+(s.cancelledBy==='client'?'client':s.cancelledBy==='coach'?'coach':'owner')+'</span>':(s.status==='cancelled'?'<span class="pill red">Cancelled</span>':'');}
 function creditsFor(c,type){return Math.max(0,totalFor(c,type)-usedFor(c,type));}
 function creditBadge(c){
   const parts=[];
@@ -885,7 +895,7 @@ function renderBookingTable(){
 
   const rows = list.map(s=>{
     const statusPill = s.status==='completed'?'<span class="pill green">Completed</span>':
-      s.status==='cancelled'?'<span class="pill red">Cancelled</span>':
+      s.status==='cancelled'?cancelledByLabel(s):
       s.status==='pending'?'<span class="pill yellow">Pending</span>':'<span class="pill blue">Scheduled</span>';
     const checkCell = s.checkedIn?'<span class="pill green">✓ In</span>':
       (s.date<=now && s.status!=='cancelled'?`<button class="iconbtn" onclick="ownerCheckIn('${s.id}')">Check in</button>`:'<span class="pill">—</span>');
@@ -968,7 +978,9 @@ function statusSelect(s){
 }
 function coachSetStatus(id,val){
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
-  const prev=s.status; if(prev===val)return; s.status=val; save();
+  const prev=s.status; if(prev===val)return;
+  if(val==='cancelled'){markCancelled(s,'coach');}else{s.status=val;clearCancel(s);}
+  save();
   const c=custById(s.customerIds[0]);
   if(val==='scheduled'&&c&&c.email){emailClient(c.email,'RX Training — your session is confirmed',
     'Hi '+firstName(c.name)+',\n\nYour '+(s.type==='1on1'?'1:1 Private':'group')+' session with '+coachName(s.coachId)+' is confirmed:\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location+'\n\n— RX Training');}
@@ -996,7 +1008,7 @@ function clientCard(s){
   return `<div class="panel" style="margin-bottom:12px">
     <div class="row" style="justify-content:space-between;align-items:center">
       <div>
-        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} <span class="pill">🏀 ${coachName(s.coachId)}</span> ${s.paid?'<span class="pill green">Prepaid</span>':''} ${s.status==='pending'?'<span class="pill yellow">Pending</span>':s.status==='scheduled'?'<span class="pill blue">Booked</span>':s.status==='completed'?'<span class="pill green">Completed</span>':s.status==='cancelled'?'<span class="pill red">Cancelled</span>':''}
+        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} <span class="pill">🏀 ${coachName(s.coachId)}</span> ${s.paid?'<span class="pill green">Prepaid</span>':''} ${s.status==='pending'?'<span class="pill yellow">Pending</span>':s.status==='scheduled'?'<span class="pill blue">Booked</span>':s.status==='completed'?'<span class="pill green">Completed</span>':s.status==='cancelled'?cancelledByLabel(s):''}
         <div class="clienttag" style="margin-top:4px">${s.dur} min · 📍 ${s.location||'TBD'}${others>0?' · with '+others+' other player'+(others>1?'s':''):''}</div>
       </div>
       <div class="actions">
@@ -1119,10 +1131,13 @@ function emailClient(to,subject,text){
   supa.functions.invoke('send-request-email',{body:{to:[to],subject,text,replyTo:'rx@rxtraining.org'}})
     .then(({error})=>{if(error)throw error;flash('Email sent to client 📧');},()=>flash('Email failed — check the function',true));
 }
+/* record who cancelled (client / coach / owner) + when, for the integrity tally */
+function markCancelled(s,who){s.status='cancelled';s.cancelledBy=who;s.cancelledAt=new Date().toISOString();}
+function clearCancel(s){s.cancelledBy='';s.cancelledAt='';}
 function clientCancel(id){
   if(!confirm('Cancel this session?'))return;
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
-  s.status='cancelled';save();flash('Session cancelled');
+  markCancelled(s,'client');save();flash('Session cancelled');
   const c=custById(s.customerIds[0]);
   if(c&&c.email)emailClient(c.email,'RX Training — your session was cancelled',
     'Hi '+firstName(c.name)+',\n\nYour session has been cancelled:\n'+fmtDT(s.date,s.time)+' · '+s.location+'\n\nNeed another time? Just request one in the app.\n\n— RX Training');
@@ -1139,7 +1154,7 @@ function notifyCancel(s){
 }
 function confirmSession(id){
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
-  s.status='scheduled';save();
+  s.status='scheduled';clearCancel(s);save();
   const c=custById(s.customerIds[0]);
   if(c&&c.email){emailClient(c.email,'RX Training — your session is confirmed',
     'Hi '+firstName(c.name)+',\n\nYour '+(s.type==='1on1'?'1:1 Private':'group')+' session is confirmed:\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location+'\n\nReply to this email if you need to change anything.\n\n— RX Training');}
@@ -1280,6 +1295,9 @@ function saveSession(id,emailAfter){
     price:+$('#sPrice').value,status:$('#sStatus').value,location:$('#sLoc').value,
     paid:pay!=='',paidVia:pay,checkedIn:$('#sCheck').checked,notes:$('#sNotes').value,
     feedback:$('#sFeedback').value,media:editMedia.slice()};
+  const exSess=id?DB.sessions.find(x=>x.id===id):null;
+  if(obj.status==='cancelled'){obj.cancelledBy=(exSess&&exSess.cancelledBy)||'owner';obj.cancelledAt=(exSess&&exSess.cancelledAt)||new Date().toISOString();}
+  else{obj.cancelledBy='';obj.cancelledAt='';}
   if(id){Object.assign(DB.sessions.find(x=>x.id===id),obj);}
   else{obj.id=uid();DB.sessions.push(obj);}
   if(!save())return;flash('Session saved');
@@ -1352,6 +1370,7 @@ function renderCustomers(){
       <td>${[...new Set(DB.sessions.filter(s=>s.customerIds.includes(c.id)).map(s=>coachName(s.coachId)))].join(', ')||'<span class="muted">—</span>'}</td>
       <td>${completedCount(c)}<div class="clienttag">completed</div></td>
       <td>${bookedCount(c)}<div class="clienttag">upcoming</div></td>
+      <td>${cancelBadge(clientCancelCount(c))}<div class="clienttag">cancels</div></td>
       <td>${creditBadge(c)}</td>
       <td>${next?fmtDT(next.date,next.time):'<span class="muted">—</span>'}</td>
       <td class="right"><div class="actions">
@@ -1372,8 +1391,8 @@ function renderCustomers(){
     </div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
       <table>
-        <thead><tr><th>Player</th><th>Contact</th><th>Coaches</th><th>Completed</th><th>Booked</th><th>Credits (used/total)</th><th>Next session</th><th></th></tr></thead>
-        <tbody>${rows||'<tr><td colspan="8"><div class="empty">No customers found.</div></td></tr>'}</tbody>
+        <thead><tr><th>Player</th><th>Contact</th><th>Coaches</th><th>Completed</th><th>Booked</th><th>Cancels</th><th>Credits (used/total)</th><th>Next session</th><th></th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="9"><div class="empty">No customers found.</div></td></tr>'}</tbody>
       </table>
     </div>`;
 }
@@ -1381,7 +1400,7 @@ function viewCustomer(id){
   const c=custById(id);
   const sess=sortSessions(DB.sessions.filter(s=>s.customerIds.includes(c.id))).reverse();
   const hist=sess.map(s=>`<tr><td>${fmtDT(s.date,s.time)}<div class="clienttag">📍 ${s.location||''}</div></td><td>${s.type==='1on1'?'1:1':'Group'}</td>
-    <td><span class="pill ${s.status==='completed'?'green':s.status==='cancelled'?'red':'yellow'}">${s.status}</span></td>
+    <td><span class="pill ${s.status==='completed'?'green':s.status==='cancelled'?'red':'yellow'}">${s.status}</span>${s.status==='cancelled'&&s.cancelledBy?`<div class="clienttag">by ${s.cancelledBy}</div>`:''}</td>
     <td>${s.paid?'<span class="pill green">'+(s.paidVia==='package'?'pkg':'paid')+'</span>':'<span class="pill red">unpaid</span>'}</td>
     <td class="right">${money(s.price/s.customerIds.length)}</td>
     <td class="right"><button class="iconbtn" onclick="openSession('${s.id}','${id}')">Edit</button></td></tr>`).join('')||'<tr><td colspan="6"><div class="empty">No sessions yet.</div></td></tr>';
@@ -1397,6 +1416,10 @@ function viewCustomer(id){
       <div class="field"><label class="f">Parent/Guardian</label><div>${c.parent||'—'}</div></div>
     </div>
     ${c.notes?`<div class="field"><label class="f">Notes</label><div class="muted">${c.notes}</div></div>`:''}
+    <div class="panel" style="background:var(--panel2);margin:6px 0 14px">
+      <b class="small">Integrity</b>
+      <div class="small" style="margin-top:4px">${completedCount(c)} completed · <span style="color:${clientCancelCount(c)?'var(--red)':'var(--muted)'}">${clientCancelCount(c)} cancelled by client</span></div>
+    </div>
     <div class="panel" style="background:var(--panel2);margin:6px 0 14px;display:flex;justify-content:space-between;align-items:center;gap:10px">
       <div><b class="small">Client login password</b><div style="margin-top:4px;font-family:monospace">${c.pwd||'—'}</div></div>
       <div class="actions"><button class="btn ghost sm" onclick="resetClientPwd('${id}')">Reset to default</button><button class="btn ghost sm" onclick="openCustomer('${id}')">Change…</button></div>
@@ -1545,19 +1568,20 @@ function renderCoaches(){
       <td>1:1 ${money(coachRate(c.id,'1on1'))}<div class="clienttag">Group ${money(coachRate(c.id,'group'))}/player</div></td>
       <td>${c.active!==false?'<span class="pill green">Active</span>':'<span class="pill red">Inactive</span>'}${c.pending?' <span class="pill yellow">⏳ Pending</span>':''}</td>
       <td>${st.total}<div class="clienttag">${st.up} upcoming</div></td>
+      <td>${cancelBadge(coachCancelCount(c.id))}<div class="clienttag">cancels</div></td>
       <td class="right"><div class="actions">
         ${c.pending?`<button class="btn sm" onclick="openCoach('${c.id}')">Review</button>`:''}
         <button class="iconbtn" title="Manage this coach" onclick="setMgCoach('${c.id}');flash('Now managing ${c.name.replace(/'/g,'')}')">Manage</button>
         <button class="iconbtn" onclick="openCoach('${c.id}')">Edit</button>
       </div></td></tr>`;
-  }).join('')||'<tr><td colspan="6"><div class="empty">No coaches yet — add your first coach.</div></td></tr>';
+  }).join('')||'<tr><td colspan="7"><div class="empty">No coaches yet — add your first coach.</div></td></tr>';
   $('#view-coaches').innerHTML=`
     <h1 class="page">Coaches</h1>
     <div class="sub">Every coach's profile, rates, sign-in and status. Use <b>Manage</b> (or the selector top-right) to work inside one coach's Booking, Availability and Finance. ${pendCount?`<span class="pill yellow" style="margin-left:6px">⏳ ${pendCount} awaiting approval</span>`:''}</div>
     <div class="row" style="margin-bottom:16px"><button class="btn" onclick="openCoach()">+ Add Coach</button></div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
       <table>
-        <thead><tr><th>Coach</th><th>Affiliation</th><th>Rates ($/hr)</th><th>Status</th><th>Sessions</th><th></th></tr></thead>
+        <thead><tr><th>Coach</th><th>Affiliation</th><th>Rates ($/hr)</th><th>Status</th><th>Sessions</th><th>Cancels</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
