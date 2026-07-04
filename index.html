@@ -420,7 +420,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs){
     pending:(c.pending||null),created:c.created||''}));
   d.locations=(loc||[]).map(l=>({id:l.id,name:l.name,address:l.address||''}));
   d.availability=(avail||[]).map(a=>({id:a.id,coachId:a.coach_id||'',date:a.date,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||'',approved:a.approved!==false}));
-  d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',inGroup:!!c.in_group,creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
+  d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',inGroup:!!c.in_group,creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
     packages:(pkg||[]).filter(p=>p.customer_id===c.id).map(p=>({id:p.id,coachId:p.coach_id||'',type:p.type,qty:p.qty,amount:Number(p.amount),date:p.date}))}));
   d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||''}));
   d.expenses=(exp||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||''}));
@@ -430,7 +430,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs){
   return normalize(d);
 }
 const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),pending:(c.pending||null),created:c.created||null});
-const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
+const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
 const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null});
 const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:e.coachId||null,price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||''});
 const eventRegRow=r=>({id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||''});
@@ -684,7 +684,8 @@ function approvalsCount(){
   const cp=(DB.coaches||[]).filter(c=>c.pending).length;
   const ap=(DB.availability||[]).filter(a=>a.approved===false && a.date>=todayISO()).length;
   const er=(DB.eventRegs||[]).filter(r=>r.status==='pending'&&eventById(r.eventId)).length;
-  return cp+ap+er;
+  const se=(DB.sessions||[]).filter(s=>s.status==='pending').length;
+  return cp+ap+er+se;
 }
 function renderWhoami(){
   if(AUTH==='owner'){const n=approvalsCount();const appr=n?`<button class="btn sm" style="background:var(--yellow);color:#211c00;font-weight:800;border:0" onclick="openApprovals()">⏳ ${n} to approve</button>`:'';
@@ -817,7 +818,7 @@ function exportExcel(){
     {Metric:'1:1 rate / hr',Amount:DB.settings.rate1on1},
     {Metric:'Group rate / hr',Amount:DB.settings.rateGroup}
   ]);
-  add('Customers',DB.customers.map(c=>({Name:c.name,Phone:c.phone,Email:c.email,WeChat:c.wechat||'','In group':c.inGroup?'Yes':'No',Parent:c.parent,Level:c.level,
+  add('Customers',DB.customers.map(c=>({Name:c.name,Phone:c.phone,Email:c.email,Town:c.town||'',WeChat:c.wechat||'','In group':c.inGroup?'Yes':'No',Parent:c.parent,Level:c.level,
     '1:1 used':usedFor(c,'1on1'),'1:1 total':totalFor(c,'1on1'),'1:1 left':creditsFor(c,'1on1'),
     'Group used':usedFor(c,'group'),'Group total':totalFor(c,'group'),'Group left':creditsFor(c,'group'),
     Password:c.pwd,Created:c.created,Notes:c.notes})));
@@ -1141,7 +1142,7 @@ function clientStatusHtml(c){
       <div class="row" style="justify-content:space-between;align-items:center;gap:10px">
         <div style="flex:1;min-width:180px"><b>🎉 ${x.ev.title}</b> ${x.r.status==='pending'?'<span class="pill yellow">⏳ Pending</span>':'<span class="pill green">Registered</span>'} ${x.r.paid?'<span class="pill green">Paid</span>':(x.ev.price?'<span class="pill orange">'+money(x.ev.price)+'</span>':'<span class="pill green">Free</span>')}
           <div class="clienttag" style="margin-top:4px">📅 ${eventWhen(x.ev)} · 📍 ${x.ev.location||'TBD'}</div></div>
-        <button class="btn ghost sm" onclick="clientCancelEventReg('${x.r.id}')">Cancel</button>
+        <div class="actions">${x.r.status==='registered'?`<button class="btn ghost sm" onclick="addEventToCalendar('${x.ev.id}')">📅 Calendar</button>`:''}<button class="btn ghost sm" onclick="clientCancelEventReg('${x.r.id}')">Cancel</button></div>
       </div></div>`;
   return `${today.length?`<h3 style="margin:0 0 10px">Today</h3>${today.map(clientCard).join('')}`:''}
     ${pending.length?`<h3 style="margin:${today.length?'18px':'0'} 0 10px">Pending — awaiting confirmation</h3>${pending.map(clientCard).join('')}`:''}
@@ -1417,13 +1418,14 @@ function exportAllCal(){
 let custSearch='';
 function renderCustomers(){
   const q=custSearch.toLowerCase();
-  let list=DB.customers.filter(c=>!q||c.name.toLowerCase().includes(q)||(c.parent||'').toLowerCase().includes(q));
+  let list=DB.customers.filter(c=>!q||c.name.toLowerCase().includes(q)||(c.parent||'').toLowerCase().includes(q)||(c.town||'').toLowerCase().includes(q));
   if(custDateFilter)list=list.filter(c=>c.created&&periodKey(c.created,custDateFilter.period).key===custDateFilter.key);
   const rows=list.map(c=>{
     const next=sortSessions(DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.date>=todayISO()&&s.status==='scheduled'))[0];
     return `<tr>
       <td><div class="nameceil"><span class="av">${initials(c.name)}</span><div><b>${c.name}</b><div class="clienttag">${c.level||'—'}${c.parent?' · '+c.parent:''}</div></div></div></td>
       <td>${c.phone||''}<div class="clienttag">${c.email||''}</div></td>
+      <td>${c.town||'<span class="muted">—</span>'}</td>
       <td>${c.wechat||'<span class="muted">—</span>'}<div class="clienttag">${c.inGroup?'<span style="color:var(--green)">✓ in group</span>':'not in group'}</div></td>
       <td>${[...new Set(DB.sessions.filter(s=>s.customerIds.includes(c.id)).map(s=>coachName(s.coachId)))].join(', ')||'<span class="muted">—</span>'}</td>
       <td>${completedCount(c)}<div class="clienttag">completed</div></td>
@@ -1452,8 +1454,8 @@ function renderCustomers(){
     </div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
       <table>
-        <thead><tr><th>Player</th><th>Contact</th><th>WeChat</th><th>Coaches</th><th>Completed</th><th>Booked</th><th>Cancels</th><th>Credits (used/total)</th><th>Joined</th><th>Next session</th><th></th></tr></thead>
-        <tbody>${rows||'<tr><td colspan="11"><div class="empty">No customers found.</div></td></tr>'}</tbody>
+        <thead><tr><th>Player</th><th>Contact</th><th>Town</th><th>WeChat</th><th>Coaches</th><th>Completed</th><th>Booked</th><th>Cancels</th><th>Credits (used/total)</th><th>Joined</th><th>Next session</th><th></th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="12"><div class="empty">No customers found.</div></td></tr>'}</tbody>
       </table>
     </div>`;
   mountCustGrowth();
@@ -1476,6 +1478,10 @@ function viewCustomer(id){
     <div class="row" style="margin-bottom:8px">
       <div class="field"><label class="f">Level</label><div>${c.level||'—'}</div></div>
       <div class="field"><label class="f">Parent/Guardian</label><div>${c.parent||'—'}</div></div>
+    </div>
+    <div class="row" style="margin-bottom:8px">
+      <div class="field"><label class="f">Town</label><div>${c.town||'—'}</div></div>
+      <div class="field"></div>
     </div>
     <div class="row" style="margin-bottom:8px">
       <div class="field"><label class="f">WeChat</label><div>${c.wechat||'—'}</div></div>
@@ -1582,6 +1588,7 @@ function openCustomer(id){
       <div class="field"><label class="f">Level / Age group</label><input id="cLevel" value="${c.level||''}" placeholder="e.g. AAU U14"></div>
       <div class="field"><label class="f">Parent / Guardian</label><input id="cParent" value="${c.parent||''}"></div>
     </div>
+    <div class="field" style="max-width:260px"><label class="f">Town / City</label><input id="cTown" value="${(c.town||'').replace(/"/g,'&quot;')}" placeholder="e.g. Lexington"></div>
     <div class="row">
       <div class="field"><label class="f">WeChat number</label><input id="cWechat" value="${(c.wechat||'').replace(/"/g,'&quot;')}" placeholder="WeChat ID"></div>
       <div class="field" style="display:flex;align-items:flex-end"><label class="f" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="cInGroup" ${c.inGroup?'checked':''} style="width:auto"> In WeChat group</label></div>
@@ -1610,7 +1617,7 @@ function openCustomer(id){
 }
 function saveCustomer(id){
   const name=$('#cName').value.trim();if(!name)return flash('Name is required',true);
-  const obj={name,phone:$('#cPhone').value,email:$('#cEmail').value,level:$('#cLevel').value,parent:$('#cParent').value,notes:$('#cNotes').value,wechat:($('#cWechat')?$('#cWechat').value:'').trim(),inGroup:!!($('#cInGroup')&&$('#cInGroup').checked)};
+  const obj={name,phone:$('#cPhone').value,email:$('#cEmail').value,level:$('#cLevel').value,parent:$('#cParent').value,town:($('#cTown')?$('#cTown').value:'').trim(),notes:$('#cNotes').value,wechat:($('#cWechat')?$('#cWechat').value:'').trim(),inGroup:!!($('#cInGroup')&&$('#cInGroup').checked)};
   const tot1=Math.max(0,Math.round(+$('#cTot1').value||0)), totG=Math.max(0,Math.round(+$('#cTotG').value||0));
   const pwd=($('#cPwd').value||'').trim()||DB.settings.defaultClientPwd;
   const created=($('#cCreated')&&$('#cCreated').value)||todayISO();
@@ -1694,9 +1701,14 @@ function openApprovals(){
   const coaches=(DB.coaches||[]).filter(c=>c.pending);
   const avail=(DB.availability||[]).filter(a=>a.approved===false&&a.date>=todayISO()).sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
   const evregs=eventPendingRegs();
+  const psess=(DB.sessions||[]).filter(s=>s.status==='pending').sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
   let body='';
-  if(!coaches.length&&!avail.length&&!evregs.length){body='<div class="empty">Nothing pending — all caught up! 🎉</div>';}
+  if(!coaches.length&&!avail.length&&!evregs.length&&!psess.length){body='<div class="empty">Nothing pending — all caught up! 🎉</div>';}
   else{
+    if(psess.length){
+      body+=`<h3 style="margin:4px 0 8px">Session requests (${psess.length})</h3>`;
+      body+='<div style="overflow-x:auto"><table><thead><tr><th>Client</th><th>Coach</th><th>When</th><th>Type</th><th></th></tr></thead><tbody>'+psess.map(s=>`<tr><td>${custNames(s.customerIds)}</td><td>${coachName(s.coachId)}</td><td>${fmtDT(s.date,s.time)}</td><td>${s.type==='1on1'?'1:1':'Group'}</td><td class="right"><div class="actions"><button class="btn sm" onclick="doApproveSession('${s.id}')">Approve</button><button class="iconbtn" title="Decline" onclick="doRejectSession('${s.id}')">✕</button></div></td></tr>`).join('')+'</tbody></table></div>';
+    }
     if(evregs.length){
       body+=`<h3 style="margin:4px 0 8px">Event registrations (${evregs.length})</h3>`;
       body+='<div style="overflow-x:auto"><table><thead><tr><th>Client</th><th>Event</th><th>When</th><th></th></tr></thead><tbody>'+evregs.map(r=>{const ev=eventById(r.eventId);const c=custById(r.customerId);return `<tr><td>${c?c.name:'?'}</td><td>${ev?ev.title:'?'}${ev&&ev.price?(' · '+money(ev.price)):''}</td><td>${ev?eventWhen(ev):''}</td><td class="right"><div class="actions"><button class="btn sm" onclick="doApproveEventReg('${r.id}')">Approve</button><button class="iconbtn" title="Reject" onclick="doRejectEventReg('${r.id}')">✕</button></div></td></tr>`;}).join('')+'</tbody></table></div>';
@@ -1721,6 +1733,20 @@ function doRejectAvail(id){DB.availability=(DB.availability||[]).filter(x=>x.id!
 function doApproveAllAvail(){let n=0;(DB.availability||[]).forEach(a=>{if(a.approved===false&&a.date>=todayISO()){a.approved=true;n++;}});if(n){save();flash(n+' window(s) approved ✅');}refreshApprovals();}
 function doApproveEventReg(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(r){r.status='registered';save();flash('Registration approved ✅');}refreshApprovals();}
 function doRejectEventReg(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(r){r.status='cancelled';save();flash('Registration rejected');}refreshApprovals();}
+function doApproveSession(id){
+  const s=DB.sessions.find(x=>x.id===id);if(s){s.status='scheduled';clearCancel(s);save();
+    const c=custById(s.customerIds[0]);
+    if(c&&c.email)emailClient(c.email,'RX Training — your session is confirmed','Hi '+firstName(c.name)+',\n\nYour '+(s.type==='1on1'?'1:1 Private':'group')+' session with '+coachName(s.coachId)+' is confirmed:\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location+'\n\n— RX Training');
+    flash('Session confirmed ✅');}
+  refreshApprovals();
+}
+function doRejectSession(id){
+  const s=DB.sessions.find(x=>x.id===id);if(s){markCancelled(s,'owner');save();
+    const c=custById(s.customerIds[0]);
+    if(c&&c.email)emailClient(c.email,'RX Training — your request was declined','Hi '+firstName(c.name)+',\n\nUnfortunately your requested session ('+fmtDT(s.date,s.time)+') could not be confirmed. Please request another time in the app.\n\n— RX Training');
+    flash('Request declined');}
+  refreshApprovals();
+}
 function openCoach(id){
   const isCoach=AUTH==='coach';
   if(isCoach)id=coachAs;
@@ -2172,7 +2198,7 @@ function renderEventsClient(){
           ${ev.detail?`<div class="small muted" style="margin-top:8px;line-height:1.6">${ev.detail}</div>`:''}
         </div>
         <div class="actions">
-          ${reg?`${reg.status==='pending'?'<span class="pill yellow">⏳ Pending approval</span>':'<span class="pill green">✓ Registered</span>'}${reg.paid?'<span class="pill green">Paid</span>':''}<button class="btn ghost sm" onclick="clientCancelEventReg('${reg.id}')">Cancel</button>`
+          ${reg?`${reg.status==='pending'?'<span class="pill yellow">⏳ Pending approval</span>':'<span class="pill green">✓ Registered</span>'}${reg.paid?'<span class="pill green">Paid</span>':''}${reg.status==='registered'?`<button class="btn ghost sm" onclick="addEventToCalendar('${ev.id}')">📅 Add to calendar</button>`:''}<button class="btn ghost sm" onclick="clientCancelEventReg('${reg.id}')">Cancel</button>`
              :(full?'<span class="pill red">Full</span>':`<button class="btn sm" onclick="registerEvent('${ev.id}')">Register</button>`)}
         </div>
       </div>
@@ -2203,6 +2229,15 @@ function clientCancelEventReg(id){
   if(!confirm('Cancel your registration?'))return;
   const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;
   r.status='cancelled';save();flash('Registration cancelled');renderEvents();
+}
+function addEventToCalendar(eid){
+  const ev=eventById(eid);if(!ev)return;
+  const start=icsStamp(ev.date,ev.time);
+  const endDt=new Date(ev.date+'T'+(ev.time||'00:00'));endDt.setMinutes(endDt.getMinutes()+120);
+  const end=endDt.getFullYear()+pad(endDt.getMonth()+1)+pad(endDt.getDate())+'T'+pad(endDt.getHours())+pad(endDt.getMinutes())+'00';
+  const ics='BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//RX.TRAINING//Events//EN\nCALSCALE:GREGORIAN\nBEGIN:VEVENT\nUID:'+ev.id+'@rxtraining\nDTSTART:'+start+'\nDTEND:'+end+'\nSUMMARY:RX Training — '+ev.title+'\nLOCATION:'+(ev.location||'')+'\nDESCRIPTION:'+(ev.detail||'RX Training event').replace(/\n/g,' ')+'\nBEGIN:VALARM\nTRIGGER:-PT1H\nACTION:DISPLAY\nDESCRIPTION:RX Training reminder\nEND:VALARM\nEND:VEVENT\nEND:VCALENDAR';
+  downloadICS('RXTraining-'+ev.id+'.ics',ics);
+  flash('Event added to calendar 📅');
 }
 /* scrolling events reminder shown on the client's My Sessions page */
 function clientEventBanner(){
@@ -2578,6 +2613,11 @@ function custAnalyticsHtml(){
   const maxV=Math.max(1,...ranked.map(r=>r.val));
   const chip=(k,v,col)=>`<div class="stat"><div class="k">${k}</div><div class="v"${col?` style="color:${col}"`:''}>${v}</div></div>`;
   const topRows=ranked.length?ranked.map(r=>`<div class="barrow" style="cursor:pointer" title="Filter table to ${r.c.name}" onclick="custSearch='${(r.c.name||'').replace(/'/g,"\\'")}';renderCustomers()"><div class="lab" style="width:130px">${r.c.name}</div><div class="bar"><i style="width:${r.val/maxV*100}%"></i></div><div class="val">${money(r.val)}<div class="clienttag" style="text-align:right">${r.done} done</div></div></div>`).join(''):'<div class="empty">No completed sessions yet.</div>';
+  // customers by town
+  const townMap={};custs.forEach(c=>{const t=(c.town||'').trim()||'(no town)';townMap[t]=(townMap[t]||0)+1;});
+  const towns=Object.entries(townMap).sort((a,b)=>b[1]-a[1]);
+  const maxT=Math.max(1,...towns.map(t=>t[1]));
+  const townRows=towns.length?towns.map(([t,n])=>{const real=t!=='(no town)';return `<div class="barrow"${real?` style="cursor:pointer" title="Filter table to ${t}" onclick="custSearch='${t.replace(/'/g,"\\'")}';renderCustomers()"`:''}><div class="lab" style="width:130px">${t}</div><div class="bar"><i style="width:${n/maxT*100}%"></i></div><div class="val">${n}</div></div>`;}).join(''):'<div class="empty">No customers yet.</div>';
   return `<div class="stats" style="margin-bottom:14px">
       ${chip('Total customers',total)}
       ${chip('New this month',newThisMonth,'var(--green)')}
@@ -2590,7 +2630,8 @@ function custAnalyticsHtml(){
         <div class="chart-wrap"><canvas id="custGrowth"></canvas></div>
       </div>
       <div class="panel"><h3>Most valuable customers</h3><div style="max-height:240px;overflow-y:auto;padding-right:12px">${topRows}</div><div class="clienttag" style="margin-top:8px">All customers with a completed session, ranked by lifetime money paid.</div></div>
-    </div>`;
+    </div>
+    <div class="panel" style="margin-bottom:16px"><h3>Customers by town</h3><div style="max-height:240px;overflow-y:auto;padding-right:12px">${townRows}</div><div class="clienttag" style="margin-top:8px">Where your players come from. Click a town to filter the table.</div></div>`;
 }
 function mountCustGrowth(){drawBars('custGrowth',bucketByPeriodCount(DB.customers.map(c=>c.created).filter(Boolean),growthRange,12),'#4aa8ff',(it)=>{custDateFilter=(custDateFilter&&custDateFilter.key===it.key)?null:{period:growthRange,key:it.key,label:it.label};renderCustomers();},custDateFilter&&custDateFilter.key);}
 function coachValue(id){return coachEarnings(id).reduce((x,i)=>x+i.amount,0);}
