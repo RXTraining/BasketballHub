@@ -611,7 +611,7 @@ function switchTab(){
   saveSess();
 }
 function saveSess(){try{sessionStorage.setItem('rx_sess',JSON.stringify({auth:AUTH,clientAs,coachAs,mgCoach,pickCoach,tab:TAB}));}catch(e){}}
-function refreshOwner(){const f={about:renderAbout,booking:renderBooking,past:renderPast,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,admin:renderAdmin}[TAB];if(f)f();}
+function refreshOwner(){const f={about:renderAbout,booking:renderBooking,past:renderPast,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,admin:renderAdmin}[TAB];if(f)f();if(AUTH==='owner')renderWhoami();}
 
 /* ---------- Auth ---------- */
 function ensureTokens(){let ch=false;DB.customers.forEach(c=>{if(!c.token){c.token=uid()+uid();ch=true;}});if(ch)save();}
@@ -623,9 +623,15 @@ function liveHtml(){
 function coachPicker(){
   return '<select class="coachsel" title="Managing coach" onchange="setMgCoach(this.value)">'+coachSelectOptions(mgCoach,true)+'</select>';
 }
-function setMgCoach(v){mgCoach=v;saveSess();refreshOwner();}
+function setMgCoach(v){mgCoach=v;availDraft=[];saveSess();refreshOwner();}
+function approvalsCount(){
+  const cp=(DB.coaches||[]).filter(c=>c.pending).length;
+  const ap=(DB.availability||[]).filter(a=>a.approved===false && a.date>=todayISO()).length;
+  return cp+ap;
+}
 function renderWhoami(){
-  if(AUTH==='owner') $('#whoami').innerHTML=liveHtml()+coachPicker()+'<button class="btn ghost sm" onclick="exportExcel()">⬇ Export</button><span class="pill orange">Owner</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';
+  if(AUTH==='owner'){const n=approvalsCount();const appr=n?`<button class="btn sm" style="background:var(--yellow);color:#211c00;font-weight:800;border:0" onclick="openApprovals()">⏳ ${n} to approve</button>`:'';
+    $('#whoami').innerHTML=liveHtml()+appr+coachPicker()+'<button class="btn ghost sm" onclick="exportExcel()">⬇ Export</button><span class="pill orange">Owner</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';}
   else if(AUTH==='coach'){const co=coachById(coachAs);$('#whoami').innerHTML=liveHtml()+'<span class="pill green">🏀 Coach '+(co?firstName(co.name):'')+'</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';}
   else if(AUTH==='client'){const c=custById(clientAs);$('#whoami').innerHTML=liveHtml()+'<span class="pill blue">'+(c?c.name:'Client')+'</span><button class="btn ghost sm" onclick="openChangePwd()">🔑 Change password</button><button class="btn ghost sm" onclick="signOut()">Sign out</button>';}
   else $('#whoami').innerHTML='';
@@ -1562,6 +1568,32 @@ function approveCoach(id){
   c.pending=null;save();closeModal();flash('Approved — changes are live ✅');renderCoaches();
 }
 function rejectCoach(id){const c=coachById(id);if(!c)return;c.pending=null;save();closeModal();flash('Proposal rejected');renderCoaches();}
+
+/* ---------- Owner Approvals center (global — availability + profile/rate changes) ---------- */
+function openApprovals(){
+  const coaches=(DB.coaches||[]).filter(c=>c.pending);
+  const avail=(DB.availability||[]).filter(a=>a.approved===false&&a.date>=todayISO()).sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
+  let body='';
+  if(!coaches.length&&!avail.length){body='<div class="empty">Nothing pending — all caught up! 🎉</div>';}
+  else{
+    if(coaches.length){
+      body+='<h3 style="margin:4px 0 8px">Profile & rate changes</h3>'+coaches.map(c=>`<div class="panel" style="background:var(--panel2);margin-bottom:10px">
+        <b>🏀 ${c.name}</b><div class="small" style="margin-top:4px">${pendingSummary(c)}</div>
+        <div class="row" style="margin-top:10px"><button class="btn sm" onclick="doApproveCoach('${c.id}')">✓ Approve</button><button class="btn sm ghost" onclick="doRejectCoach('${c.id}')">Reject</button></div></div>`).join('');
+    }
+    if(avail.length){
+      body+=`<div class="row" style="justify-content:space-between;align-items:center;margin:14px 0 8px"><h3 style="margin:0">Availability (${avail.length})</h3><button class="btn sm" onclick="doApproveAllAvail()">Approve all</button></div>`;
+      body+='<div style="overflow-x:auto"><table><thead><tr><th>Coach</th><th>Date</th><th>Window</th><th>Location</th><th></th></tr></thead><tbody>'+avail.map(a=>`<tr><td>${coachName(a.coachId)}</td><td>${fmtDate(a.date)}</td><td>${fmtT(a.start)} – ${fmtT(a.end)} · ${a.slotMin}m</td><td>${a.location||'—'}</td><td class="right"><div class="actions"><button class="btn sm" onclick="doApproveAvail('${a.id}')">Approve</button><button class="iconbtn" title="Reject" onclick="doRejectAvail('${a.id}')">✕</button></div></td></tr>`).join('')+'</tbody></table></div>';
+    }
+  }
+  openModal('⏳ Pending approvals',body,`<button class="btn" onclick="closeModal()">Close</button>`);
+}
+function refreshApprovals(){renderWhoami();if($('#modal').classList.contains('show'))openApprovals();if(AUTH==='owner')refreshOwner();}
+function doApproveCoach(id){const c=coachById(id);if(c&&c.pending){const p=c.pending;['tagline','bio','affiliation','affiliationSub','photo'].forEach(k=>{if(p[k]!=null)c[k]=p[k];});if(p.rate1on1!=null&&!isNaN(p.rate1on1))c.rate1on1=+p.rate1on1;if(p.rateGroup!=null&&!isNaN(p.rateGroup))c.rateGroup=+p.rateGroup;c.pending=null;save();flash('Approved ✅');}refreshApprovals();}
+function doRejectCoach(id){const c=coachById(id);if(c){c.pending=null;save();flash('Rejected');}refreshApprovals();}
+function doApproveAvail(id){const a=(DB.availability||[]).find(x=>x.id===id);if(a){a.approved=true;save();flash('Availability approved ✅');}refreshApprovals();}
+function doRejectAvail(id){DB.availability=(DB.availability||[]).filter(x=>x.id!==id);save();flash('Removed');refreshApprovals();}
+function doApproveAllAvail(){let n=0;(DB.availability||[]).forEach(a=>{if(a.approved===false&&a.date>=todayISO()){a.approved=true;n++;}});if(n){save();flash(n+' window(s) approved ✅');}refreshApprovals();}
 function openCoach(id){
   const isCoach=AUTH==='coach';
   if(isCoach)id=coachAs;
@@ -1669,23 +1701,38 @@ function delLocation(id){
    ============================================================ */
 const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 function fmtT(t){const[h,m]=t.split(':').map(Number);const ap=h<12?'AM':'PM';const hh=((h+11)%12)+1;return hh+':'+String(m).padStart(2,'0')+' '+ap;}
+let availDraft=[];
 function renderAvailability(){
   const now=todayISO();
   const scopeLbl = AUTH==='coach' ? 'Your availability' : (scopeCoach()==='all' ? 'All coaches' : 'Coach: '+coachName(scopeCoach()));
   const showCoach=AUTH==='owner';
   const rules=(DB.availability||[]).filter(a=>inScope(a.coachId)).slice().sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
   const upcoming=rules.filter(a=>a.date>=now);
+  const pending=upcoming.filter(a=>a.approved===false);
   const rows=upcoming.map(a=>`<tr>
     <td><b>${fmtDate(a.date)}</b><div class="clienttag">${DOW[new Date(a.date+'T00:00').getDay()]}</div></td>${showCoach?`<td>🏀 ${coachName(a.coachId)}</td>`:''}<td>${fmtT(a.start)} – ${fmtT(a.end)}</td><td>${a.slotMin} min</td><td>${a.location||'—'}</td>
     <td>${a.approved!==false?'<span class="pill green">Open</span>':'<span class="pill yellow">⏳ Pending</span>'}</td>
     <td class="right"><div class="actions">${(AUTH==='owner'&&a.approved===false)?`<button class="btn sm" onclick="approveAvailability('${a.id}')">Approve</button>`:''}<button class="iconbtn" onclick="delAvailability('${a.id}')">✕</button></div></td></tr>`).join('')
     ||`<tr><td colspan="${showCoach?7:6}"><div class="empty">No upcoming availability — add a date below.</div></td></tr>`;
   const locOpt=DB.locations.map(l=>`<option>${l.name}</option>`).join('')||'<option value="">Add a location first</option>';
+  const isCoach=AUTH==='coach';
+  const draftHtml=availDraft.length?`<div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+      <b class="small">Windows to submit (${availDraft.length})</b>
+      <div style="margin-top:6px">${availDraft.map((w,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px"><span>📅 ${fmtDate(w.date)} · ${fmtT(w.start)} – ${fmtT(w.end)} · ${w.slotMin} min · 📍 ${w.location}</span><button class="iconbtn" onclick="rmAvailDraft(${i})">✕</button></div>`).join('')}</div>
+      <button class="btn" style="margin-top:12px" onclick="submitAvailDraft()">${isCoach?`Submit ${availDraft.length} window(s) for approval`:`Add ${availDraft.length} window(s)`}</button>
+    </div>`:'';
+  const pendingPanel=(AUTH==='owner'&&pending.length)?`<div class="panel" style="border-color:var(--yellow);margin-bottom:16px">
+      <div class="row" style="justify-content:space-between;align-items:center"><h3 style="margin:0">⏳ Pending approval (${pending.length})</h3><button class="btn sm" onclick="approveAllAvailability()">Approve all</button></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Coach</th><th>Window</th><th>Slot</th><th>Location</th><th></th></tr></thead>
+      <tbody>${pending.map(a=>`<tr><td>${fmtDate(a.date)}</td><td>🏀 ${coachName(a.coachId)}</td><td>${fmtT(a.start)} – ${fmtT(a.end)}</td><td>${a.slotMin} min</td><td>${a.location||'—'}</td>
+        <td class="right"><div class="actions"><button class="btn sm" onclick="approveAvailability('${a.id}')">Approve</button><button class="iconbtn" title="Reject" onclick="delAvailability('${a.id}')">✕</button></div></td></tr>`).join('')}</tbody></table></div>
+    </div>`:'';
   $('#view-availability').innerHTML=`
     <h1 class="page">Availability</h1>
-    <div class="sub">Open specific dates and times (Boston / ET). Clients can only request sessions inside these slots, at the location you choose. Set it fresh each week. <span class="pill ${scopeCoach()==='all'?'orange':'green'}" style="margin-left:6px">${scopeLbl}</span></div>
-    ${AUTH!=='coach'&&scopeCoach()==='all'?'<div class="clienttag" style="margin:-6px 0 12px">Pick a specific coach in the top-right selector to add availability for them.</div>':''}
-    ${AUTH==='coach'?'<div class="clienttag" style="margin:-6px 0 12px">⏳ Slots you add are sent to the owner for approval before clients can book them.</div>':''}
+    <div class="sub">Open specific dates and times (Boston / ET). Clients can only request sessions inside these slots, at the location you choose. Add several windows to the list, then submit once. <span class="pill ${scopeCoach()==='all'?'orange':'green'}" style="margin-left:6px">${scopeLbl}</span></div>
+    ${AUTH==='owner'&&scopeCoach()==='all'&&!pending.length?'<div class="clienttag" style="margin:-6px 0 12px">Pick a specific coach in the top-right selector to add availability for them. Coach-submitted slots awaiting approval appear at the top.</div>':''}
+    ${isCoach?'<div class="clienttag" style="margin:-6px 0 12px">⏳ Windows you submit are sent to the owner for approval before clients can book them.</div>':''}
+    ${pendingPanel}
     <div class="panel" style="margin-bottom:16px">
       <h3>Open a date</h3>
       <div class="row">
@@ -1695,12 +1742,43 @@ function renderAvailability(){
         <div class="field"><label class="f">Slot length</label><select id="avSlot"><option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>60 min</option><option value="90">90 min</option></select></div>
         <div class="field"><label class="f">Location</label><select id="avLoc">${locOpt}</select></div>
       </div>
-      <button class="btn" onclick="addAvailability()">+ Add window</button>
-      <p class="muted small" style="margin-top:8px">Example: Jul 7, 4:00–7:00 PM, 60-min slots → clients can book 4:00, 5:00 or 6:00 that day. Add as many dates/windows as you like; booked times drop out automatically.</p>
+      <button class="btn ghost" onclick="addAvailDraft()">+ Add to list</button>
+      ${draftHtml}
+      <p class="muted small" style="margin-top:10px">Add each date/time window to the list (e.g. Jul 7, 4:00–7:00 PM, 60-min slots → 4:00, 5:00, 6:00), then ${isCoach?'submit them all for the owner to approve':'add them all at once'}. Booked times drop out automatically.</p>
     </div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
       <table><thead><tr><th>Date</th>${showCoach?'<th>Coach</th>':''}<th>Window</th><th>Slot</th><th>Location</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table>
     </div>`;
+}
+function addAvailDraft(){
+  const date=$('#avDate').value; if(!date)return flash('Pick a date',true);
+  const start=$('#avStart').value, end=$('#avEnd').value;
+  if(!start||!end||end<=start)return flash('Set a valid time range',true);
+  const loc=$('#avLoc').value; if(!loc)return flash('Add a location first (Locations tab)',true);
+  availDraft.push({date,start,end,slotMin:+$('#avSlot').value,location:loc});
+  renderAvailability();
+}
+function rmAvailDraft(i){availDraft.splice(i,1);renderAvailability();}
+function submitAvailDraft(){
+  if(!availDraft.length)return flash('Add at least one window to the list',true);
+  const isCoach=AUTH==='coach', cid=targetCoach(), n=availDraft.length;
+  availDraft.forEach(w=>DB.availability.push({id:uid(),coachId:cid,date:w.date,start:w.start,end:w.end,slotMin:w.slotMin,location:w.location,approved:!isCoach}));
+  availDraft=[];
+  save();flash(isCoach?`${n} window(s) submitted for approval ⏳`:`${n} window(s) added 📅`);
+  if(isCoach)notifyOwnerAvail(n,cid);
+  renderAvailability();
+}
+function notifyOwnerAvail(n,cid){
+  const emails=(DB.settings.notifyEmails||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(!emails.length||!(supa&&SUPA_OK))return;
+  supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:'rx@rxtraining.org',
+    subject:'RX Training — '+coachName(cid)+' submitted availability',
+    text:coachName(cid)+' submitted '+n+' availability window(s) for approval.\nOpen RX.TRAINING → Availability to approve.'}}).then(()=>{},()=>{});
+}
+function approveAllAvailability(){
+  let n=0;(DB.availability||[]).forEach(a=>{if(a.approved===false&&inScope(a.coachId)){a.approved=true;n++;}});
+  if(!n)return flash('Nothing pending',true);
+  save();flash(n+' window(s) approved ✅');renderAvailability();
 }
 function addAvailability(){
   const date=$('#avDate').value; if(!date)return flash('Pick a date',true);
