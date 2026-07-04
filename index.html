@@ -4,6 +4,26 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RX.TRAINING</title>
+<meta name="theme-color" content="#ff6a00">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="RX.TRAINING">
+<link id="appleIcon" rel="apple-touch-icon">
+<link id="favIcon" rel="icon" type="image/png">
+<script>
+/* generate an orange "RX" home-screen icon so the iOS icon isn't a black screenshot */
+(function(){try{
+  var c=document.createElement('canvas');c.width=c.height=180;var x=c.getContext('2d');
+  var g=x.createLinearGradient(0,0,180,180);g.addColorStop(0,'#ff6a00');g.addColorStop(1,'#ff9100');
+  x.fillStyle=g;x.fillRect(0,0,180,180);
+  x.fillStyle='#111';x.font='800 78px -apple-system,Segoe UI,Arial,sans-serif';x.textAlign='center';x.textBaseline='middle';
+  x.fillText('RX',90,94);
+  x.fillStyle='#ffffff';x.font='800 20px -apple-system,Segoe UI,Arial,sans-serif';x.fillText('.TRAINING',90,140);
+  var url=c.toDataURL('image/png');
+  var a=document.getElementById('appleIcon');if(a)a.href=url;
+  var f=document.getElementById('favIcon');if(f)f.href=url;
+}catch(e){}})();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -805,19 +825,21 @@ function exportExcel(){
   const cashSess=DB.sessions.filter(s=>s.paid&&s.paidVia==='cash'&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
   const pkgRev=DB.customers.flatMap(c=>c.packages).reduce((a,p)=>a+p.amount,0);
   const otherCash=DB.cashEntries.reduce((a,e)=>a+e.amount,0);
+  const eventInc=(DB.eventRegs||[]).filter(r=>r.paid&&r.status!=='cancelled').reduce((a,r)=>{const ev=eventById(r.eventId);return ev?a+(ev.price||0):a;},0);
   const expenses=DB.expenses.reduce((a,e)=>a+e.amount,0);
   const outstanding=DB.sessions.filter(s=>!s.paid&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
-  const revenue=cashSess+pkgRev+otherCash;
+  const revenue=cashSess+pkgRev+otherCash+eventInc;
   add('Finance',[
     {Metric:'Revenue (collected)',Amount:revenue},
     {Metric:'  Cash — sessions',Amount:cashSess},
     {Metric:'  Cash — other income',Amount:otherCash},
     {Metric:'  Packages',Amount:pkgRev},
+    {Metric:'  Events',Amount:eventInc},
     {Metric:'Outstanding (unpaid)',Amount:outstanding},
     {Metric:'Expenses',Amount:expenses},
     {Metric:'Net profit',Amount:revenue-expenses},
-    {Metric:'1:1 rate / hr',Amount:DB.settings.rate1on1},
-    {Metric:'Group rate / hr',Amount:DB.settings.rateGroup}
+    {Metric:'1:1 rate / hr (default)',Amount:DB.settings.rate1on1},
+    {Metric:'Group rate / hr (default)',Amount:DB.settings.rateGroup}
   ]);
   add('Customers',DB.customers.map(c=>({Name:c.name,Phone:c.phone,Email:c.email,Town:c.town||'',WeChat:c.wechat||'','In group':c.inGroup?'Yes':'No',Parent:c.parent,Level:c.level,
     '1:1 used':usedFor(c,'1on1'),'1:1 total':totalFor(c,'1on1'),'1:1 left':creditsFor(c,'1on1'),
@@ -835,6 +857,9 @@ function exportExcel(){
     ...DB.sessions.filter(s=>s.paid&&s.paidVia==='cash'&&s.status!=='cancelled').map(s=>({Date:s.date,Source:custNames(s.customerIds)+' ('+(s.type==='1on1'?'1:1':'Group')+' session)',Note:s.notes||'',Amount:s.price})),
     ...DB.cashEntries.map(e=>({Date:e.date,Source:(e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in')+' ('+(e.qty||1)+'× '+(e.type==='group'?'Group':'1:1')+' cash)',Note:e.note||'',Amount:e.amount}))
   ]);
+  add('Availability',(DB.availability||[]).map(a=>({Coach:coachName(a.coachId),Date:a.date,From:a.start,To:a.end,'Slot (min)':a.slotMin,Location:a.location,Approved:a.approved!==false?'Yes':'No'})));
+  add('Events',(DB.events||[]).map(e=>({Title:e.title,Date:e.date,Time:e.time,Location:e.location,Coach:e.coachId?coachName(e.coachId):'General',Price:e.price,Capacity:e.capacity,Published:e.active!==false?'Yes':'No',Registered:eventRegsFor(e.id).length,Collected:eventRevenue(e),Details:e.detail||''})));
+  add('Event registrations',(DB.eventRegs||[]).map(r=>{const ev=eventById(r.eventId);const c=custById(r.customerId);return {Event:ev?ev.title:'(deleted)',Client:c?c.name:'?',Status:r.status,Paid:r.paid?'Yes':'No','Checked in':r.checkedIn?'Yes':'No','Event date':ev?ev.date:'',Registered:r.created||''};}));
   XLSX.writeFile(wb,'RXTraining-export-'+todayISO()+'.xlsx');
   flash('Excel exported ⬇');
 }
@@ -987,7 +1012,7 @@ function renderBookingCalendar(){
   const firstDow=ref.getDay();
   const daysIn=new Date(calY,calM+1,0).getDate();
   const byDate={};
-  DB.sessions.filter(s=>inScope(s.coachId)).forEach(s=>{(byDate[s.date]=byDate[s.date]||[]).push(s);});
+  DB.sessions.filter(s=>inScope(s.coachId)&&s.status!=='cancelled').forEach(s=>{(byDate[s.date]=byDate[s.date]||[]).push(s);});
   const dows=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   let cells='';
   for(let i=0;i<firstDow;i++) cells+='<div class="calcell empty"></div>';
