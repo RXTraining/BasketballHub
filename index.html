@@ -523,6 +523,11 @@ function save(){
   if(supa&&SUPA_OK){clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{cloudTimer=null;cloudPush();},500);} // reset the flag so polling resumes after the push
   return true;
 }
+/* targeted single-record upsert for client actions (never bulk) */
+function pushRows(table,rows){
+  if(!(supa&&SUPA_OK)||!rows||!rows.length)return;
+  supa.from(table).upsert(rows).then(r=>{if(r&&r.error)flash('Cloud save failed — saved on this device',true);},()=>flash('Cloud save failed — saved on this device',true));
+}
 async function syncTable(name,rows){
   if(rows.length) {const {error}=await supa.from(name).upsert(rows); if(error) throw error;}
   const ids=rows.map(r=>r.id);
@@ -536,13 +541,9 @@ async function cloudPush(){
   try{
     // Clients only write their OWN sessions (no deletes, never settings/customers/etc.)
     // so a client action can never overwrite the owner's data.
-    if(AUTH==='client'){
-      const mine=DB.sessions.filter(s=>s.customerIds.includes(clientAs)).map(sessRow);
-      if(mine.length){const {error}=await supa.from('sessions').upsert(mine); if(error) throw error;}
-      const myRegs=(DB.eventRegs||[]).filter(r=>r.customerId===clientAs).map(eventRegRow);
-      if(myRegs.length){const {error}=await supa.from('event_regs').upsert(myRegs); if(error) throw error;}
-      return;
-    }
+    // Clients write ONLY the single record they just changed, via pushRows() at each action —
+    // never a bulk upsert — so a client can never revert an owner's approval/edit.
+    if(AUTH==='client'){return;}
     // Coaches only write their OWN records (sessions status, own profile/rate proposal, own availability).
     // Never settings/customers/other coaches — so a coach can't clobber anyone else's data.
     if(AUTH==='coach'){
@@ -1177,7 +1178,7 @@ function submitRequest(){
     notes:'Client request'+(comment?(' — '+comment):'')};
   DB.sessions.push(s);
   reqSel=null;
-  save();flash('Request sent to '+coachName(coachId)+' — awaiting confirmation 🏀');
+  save();pushRows('sessions',[sessRow(s)]);flash('Request sent to '+coachName(coachId)+' — awaiting confirmation 🏀');
   notifyOwner(s,comment);
   renderBooking();
 }
@@ -1194,7 +1195,7 @@ function clearCancel(s){s.cancelledBy='';s.cancelledAt='';}
 function clientCancel(id){
   if(!confirm('Cancel this session?'))return;
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
-  markCancelled(s,'client');save();flash('Session cancelled');
+  markCancelled(s,'client');save();pushRows('sessions',[sessRow(s)]);flash('Session cancelled');
   const c=custById(s.customerIds[0]);
   if(c&&c.email)emailClient(c.email,'RX Training — your session was cancelled',
     'Hi '+firstName(c.name)+',\n\nYour session has been cancelled:\n'+fmtDT(s.date,s.time)+' · '+s.location+'\n\nNeed another time? Just request one in the app.\n\n— RX Training');
@@ -1243,6 +1244,7 @@ function clientCheckIn(id){
     s.paid=true;s.paidVia='package';
     save();flash("Checked in — 1 credit used. Let's work! 🔥");
   }else{save();flash("Checked in — let's work! 🔥");}
+  pushRows('sessions',[sessRow(s)]);
   renderBooking();
 }
 function ownerCheckIn(id){const s=DB.sessions.find(x=>x.id===id);s.checkedIn=true;save();flash('Checked in');refreshOwner();}
@@ -2213,8 +2215,9 @@ function registerEvent(eid){
   const ev=eventById(eid);if(!ev||!clientAs)return;
   if(myEventReg(eid,clientAs))return flash('You already have a registration for this');
   if(eventSpotsLeft(ev)<=0)return flash('Sorry, this event is full',true);
-  DB.eventRegs.push({id:uid(),eventId:eid,customerId:clientAs,status:'pending',paid:false,paidVia:'',checkedIn:false,created:todayISO()});
-  save();flash('Requested “'+ev.title+'” — awaiting owner approval ⏳');
+  const reg={id:uid(),eventId:eid,customerId:clientAs,status:'pending',paid:false,paidVia:'',checkedIn:false,created:todayISO()};
+  DB.eventRegs.push(reg);
+  save();pushRows('event_regs',[eventRegRow(reg)]);flash('Requested “'+ev.title+'” — awaiting owner approval ⏳');
   notifyOwnerEventReg(ev,custById(clientAs));
   renderEvents();
 }
@@ -2228,7 +2231,7 @@ function notifyOwnerEventReg(ev,c){
 function clientCancelEventReg(id){
   if(!confirm('Cancel your registration?'))return;
   const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;
-  r.status='cancelled';save();flash('Registration cancelled');renderEvents();
+  r.status='cancelled';save();pushRows('event_regs',[eventRegRow(r)]);flash('Registration cancelled');renderEvents();
 }
 function addEventToCalendar(eid){
   const ev=eventById(eid);if(!ev)return;
