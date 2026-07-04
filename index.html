@@ -61,6 +61,10 @@
   .pill.yellow{color:var(--yellow);border-color:rgba(255,206,74,.35)}
   .pill.orange{color:var(--accent2);border-color:rgba(255,145,0,.35)}
   .coachsel{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;max-width:170px}
+  .slotlist{max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--panel2)}
+  .slotchip{background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:7px 11px;font-size:12.5px;cursor:pointer;font-weight:600}
+  .slotchip:hover{border-color:var(--accent);color:#fff}
+  .slotchip.sel{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#111;border-color:transparent}
   table{width:100%;border-collapse:collapse;font-size:13.5px}
   th{text-align:left;color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;
     letter-spacing:.5px;padding:10px 10px;border-bottom:1px solid var(--line)}
@@ -490,7 +494,7 @@ function stopPolling(){clearInterval(pollTimer);pollTimer=null;unsubscribeRealti
 
 function save(){
   try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){}
-  if(supa&&SUPA_OK){clearTimeout(cloudTimer);cloudTimer=setTimeout(cloudPush,500);}
+  if(supa&&SUPA_OK){clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{cloudTimer=null;cloudPush();},500);} // reset the flag so polling resumes after the push
   return true;
 }
 async function syncTable(name,rows){
@@ -1069,6 +1073,7 @@ function renderBookingClient(){
           ${coachMiniProfile(coachById(pickCoach))}
           <div class="field"><label class="f">Session type</label>
             <select id="rqType" onchange="renderSlots()"><option value="1on1">1:1 Private (${money(coachRate(pickCoach,'1on1'))}/hr)</option><option value="group">Group / 1:N (${money(coachRate(pickCoach,'group'))}/hr per player)</option></select></div>
+          <div class="field"><label class="f">Open times with ${coachName(pickCoach)} — tap one</label><div id="openSlots" class="slotlist"></div></div>
           <div class="field"><label class="f">Date</label><input type="date" id="rqDate" min="${now}" value="${now}" onchange="renderSlots()"></div>
           <div class="field"><label class="f">Available time</label><select id="rqSlot"></select></div>
           <div class="field"><label class="f">Comment (optional)</label><textarea id="rqComment" placeholder="e.g. I'd prefer a later time if possible, or any note for the coach…"></textarea></div>
@@ -1858,11 +1863,47 @@ function availableSlots(dateStr,type,cid){
   });
   return out.sort((a,b)=>a.time.localeCompare(b.time));
 }
+/* all upcoming open slots for a coach + type (respects capacity from other clients' bookings
+   and drops past times — availableSlots already enforces both) */
+function clientOpenSlots(cid,type){
+  const now=todayISO();
+  const dates=[...new Set((DB.availability||[]).filter(a=>a.coachId===cid&&a.approved!==false&&a.date>=now).map(a=>a.date))].sort();
+  const out=[];
+  dates.forEach(dt=>availableSlots(dt,type,cid).forEach(s=>out.push({date:dt,time:s.time,location:s.location,slotMin:s.slotMin})));
+  return out;
+}
 function renderSlots(){
-  const sel=$('#rqSlot'); if(!sel)return;
   const type=$('#rqType')?$('#rqType').value:'1on1';
-  const slots=availableSlots($('#rqDate').value,type,pickCoach||defaultCoachId());
-  sel.innerHTML=slots.length?slots.map(s=>`<option value="${s.time}|${s.location}">${fmtT(s.time)} · ${s.location}</option>`).join(''):'<option value="">No open times this day</option>';
+  const cid=pickCoach||defaultCoachId();
+  const sel=$('#rqSlot');
+  if(sel){
+    const prev=sel.value;
+    const slots=availableSlots($('#rqDate').value,type,cid);
+    sel.innerHTML=slots.length?slots.map(s=>`<option value="${s.time}|${s.location}">${fmtT(s.time)} · ${s.location}</option>`).join(''):'<option value="">No open times this day</option>';
+    if(prev&&[...sel.options].some(o=>o.value===prev))sel.value=prev;
+  }
+  renderOpenSlots();
+}
+function renderOpenSlots(){
+  const list=$('#openSlots'); if(!list)return;
+  const type=$('#rqType')?$('#rqType').value:'1on1';
+  const cid=pickCoach||defaultCoachId();
+  const open=clientOpenSlots(cid,type);
+  if(!open.length){list.innerHTML='<div class="clienttag">No open times posted yet — check back soon.</div>';return;}
+  const byd={};open.forEach(s=>{(byd[s.date]=byd[s.date]||[]).push(s);});
+  const curSel=$('#rqSlot')?$('#rqSlot').value:'';const curDate=$('#rqDate')?$('#rqDate').value:'';
+  list.innerHTML=Object.keys(byd).sort().map(dt=>`<div style="margin-bottom:8px"><div class="clienttag" style="margin-bottom:5px"><b style="color:var(--txt)">${fmtDate(dt)}</b></div><div class="row" style="gap:6px">${byd[dt].map(s=>{const val=s.time+'|'+s.location;const on=(dt===curDate&&val===curSel);return `<button type="button" class="slotchip${on?' sel':''}" onclick="setReqSlot('${dt}','${s.time}','${(s.location||'').replace(/'/g,"\\'")}')">${fmtT(s.time)} · ${s.location}</button>`;}).join('')}</div></div>`).join('');
+}
+function setReqSlot(date,time,loc){
+  const dd=$('#rqDate'); if(dd)dd.value=date;
+  const sel=$('#rqSlot');
+  if(sel){ // rebuild options for the chosen date, then select the tapped time
+    const slots=availableSlots(date,$('#rqType')?$('#rqType').value:'1on1',pickCoach||defaultCoachId());
+    sel.innerHTML=slots.map(s=>`<option value="${s.time}|${s.location}">${fmtT(s.time)} · ${s.location}</option>`).join('');
+    sel.value=time+'|'+loc;
+  }
+  renderOpenSlots();   // refresh highlight only — does NOT rebuild the time dropdown
+  flash('Selected '+fmtDate(date)+' · '+fmtT(time)+' — tap Request Session');
 }
 
 /* ============================================================
