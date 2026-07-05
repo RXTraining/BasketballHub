@@ -274,24 +274,25 @@
 
 <div class="login" id="login">
   <button class="ownerbtn" onclick="toggleOwnerLogin(true)" title="Owner sign in">🔑 Owner</button>
+  <button class="ownerbtn" style="right:auto;left:18px" title="Language" onclick="setLang(nextLang())">🌐 <span id="langLbl"></span></button>
   <div class="card" style="max-width:420px">
     <div class="logo" style="font-size:30px;margin-bottom:4px">RX<span class="dot">.</span>TRAINING</div>
     <div id="clientPanel">
       <div class="seg" style="margin-bottom:16px">
-        <button id="roleTabPlayer" class="active" onclick="showLoginTab('client')">🏀 Player</button>
-        <button id="roleTabCoach" onclick="showLoginTab('coach')">📋 Coach</button>
+        <button id="roleTabPlayer" class="active" onclick="showLoginTab('client')">🏀 <span id="roleTabPlayerLbl">Player</span></button>
+        <button id="roleTabCoach" onclick="showLoginTab('coach')">📋 <span id="roleTabCoachLbl">Coach</span></button>
       </div>
       <div id="playerLogin">
         <p class="muted small" id="clientHint">Enter your name and password (or open your personal link).</p>
         <input id="loginClient" placeholder="Your full name" autocomplete="off" onkeydown="if(event.key==='Enter')clientLoginPick()">
         <input type="password" id="loginClientPwd" placeholder="Your password" style="margin-top:10px" onkeydown="if(event.key==='Enter')clientLoginPick()">
-        <button class="btn" style="width:100%;margin-top:14px" onclick="clientLoginPick()">Sign in as player</button>
+        <button class="btn" id="playerSignInBtn" style="width:100%;margin-top:14px" onclick="clientLoginPick()">Sign in as player</button>
       </div>
       <div id="coachLogin" class="hidden">
-        <p class="muted small">Coaches: sign in with your name and the password set by the owner.</p>
+        <p class="muted small" id="coachHint">Coaches: sign in with your name and the password set by the owner.</p>
         <input id="loginCoach" placeholder="Your name" autocomplete="off" onkeydown="if(event.key==='Enter')coachLoginPick()">
         <input type="password" id="loginCoachPwd" placeholder="Your password" style="margin-top:10px" onkeydown="if(event.key==='Enter')coachLoginPick()">
-        <button class="btn" style="width:100%;margin-top:14px" onclick="coachLoginPick()">Sign in as coach</button>
+        <button class="btn" id="coachSignInBtn" style="width:100%;margin-top:14px" onclick="coachLoginPick()">Sign in as coach</button>
       </div>
     </div>
     <div id="ownerPanel" class="hidden">
@@ -330,6 +331,91 @@
    RX.TRAINING Manager — single-file app, localStorage backed
    ============================================================ */
 const DB_KEY = 'rxtraining_v2';
+/* ---------- i18n: English / 中文 (client-facing) ---------- */
+let LANG='en'; try{LANG=localStorage.getItem('rx_lang')||'en';}catch(e){}
+const ZH={
+  // tabs / roles
+  'My Sessions':'我的课程','Past Sessions':'历史课程','Payments':'付款','Events':'活动',
+  'Player':'学员','Coach':'教练',
+  // login
+  'Players: enter your name and password (or open your personal link).':'学员：输入姓名和密码（或打开您的专属链接）。',
+  'Your full name':'您的姓名','Your password':'您的密码','Your name':'您的姓名',
+  'Sign in as player':'学员登录','Sign in as coach':'教练登录',
+  'Coaches: sign in with your name and the password set by the owner.':'教练：使用姓名和管理员设置的密码登录。',
+  '🔑 Change password':'🔑 修改密码','Sign out':'退出',
+  // my sessions
+  'Welcome,':'欢迎，',
+  'Request a session and manage your upcoming sessions. Past sessions are in the Past Sessions tab.':'预约课程并管理您即将开始的课程。历史课程在“历史课程”标签中。',
+  'Your prepaid sessions':'您的预付课程',
+  'No package yet — ask the Owner about prepaid packs.':'暂无套餐 — 可向管理员咨询预付套餐。',
+  'Request a session':'预约课程','Session type':'课程类型','Date':'日期','Comment (optional)':'备注（可选）',
+  'Request Session':'提交预约','Your packages':'您的套餐',
+  'To buy a package, ask the Owner — your used/total balance updates automatically.':'购买套餐请联系管理员 — 已用/总数会自动更新。',
+  'Today':'今天','Pending — awaiting confirmation':'待确认','Your booked sessions':'已预约课程',
+  'No booked sessions yet — request one ←':'暂无已预约课程 — 去预约 ←','Your events':'我的活动',
+  'left':'剩余','used':'已用','completed':'已完成','Prepaid':'已预付','Pending':'待确认','Booked':'已预约',
+  'Completed':'已完成','Cancelled':'已取消','Check In':'签到','✓ Checked in':'✓ 已签到','Cancel':'取消',
+  '📅 Add to calendar':'📅 加入日历','Coach feedback:':'教练反馈：',
+  'tap one to select':'点击选择','Register a session and manage your upcoming sessions.':'预约并管理您的课程。',
+  // past
+  'Your completed sessions, with any coach feedback and attachments.':'您已完成的课程，含教练反馈与附件。',
+  'No past sessions yet.':'暂无历史课程。',
+  // events
+  'Workshops, guest sessions and more. Register for anything that interests you. Times are Boston (ET).':'工作坊、嘉宾课程等。感兴趣即可报名。时间为波士顿时间（ET）。',
+  'No upcoming events right now — check back soon.':'暂无即将开始的活动 — 请稍后再来。',
+  'Register':'报名','Full':'已满','✓ Registered':'✓ 已报名','⏳ Pending approval':'⏳ 待审核','Paid':'已付款','Free':'免费',
+  'See all →':'查看全部 →',
+  // payments
+  'My Payments':'我的付款','All money you\'ve paid, grouped by period.':'您的所有付款，按周期汇总。',
+  'Total paid':'累计付款','By period':'按周期','All payments':'全部付款','Detail':'明细','Amount':'金额',
+  'Week':'周','Month':'月','Quarter':'季度','Year':'年',
+  'payment(s) all-time':'笔付款（累计）',
+  'All times are Boston (ET).':'所有时间为波士顿时间（ET）。',
+  '🎉 Events':'🎉 活动',
+  // flashes
+  'Session cancelled':'课程已取消','Registration cancelled':'报名已取消'
+};
+const KO={
+  'My Sessions':'내 수업','Past Sessions':'지난 수업','Payments':'결제','Events':'이벤트',
+  'Player':'회원','Coach':'코치',
+  'Players: enter your name and password (or open your personal link).':'회원: 이름과 비밀번호를 입력하세요 (또는 개인 링크를 여세요).',
+  'Your full name':'이름','Your password':'비밀번호','Your name':'이름',
+  'Sign in as player':'회원 로그인','Sign in as coach':'코치 로그인',
+  'Coaches: sign in with your name and the password set by the owner.':'코치: 이름과 관리자가 설정한 비밀번호로 로그인하세요.',
+  '🔑 Change password':'🔑 비밀번호 변경','Sign out':'로그아웃',
+  'Welcome,':'환영합니다,',
+  'Request a session and manage your upcoming sessions. Past sessions are in the Past Sessions tab.':'수업을 예약하고 예정된 수업을 관리하세요. 지난 수업은 "지난 수업" 탭에 있습니다.',
+  'Your prepaid sessions':'선불 수업',
+  'No package yet — ask the Owner about prepaid packs.':'아직 패키지가 없습니다 — 관리자에게 선불 패키지를 문의하세요.',
+  'Request a session':'수업 예약','Session type':'수업 유형','Date':'날짜','Comment (optional)':'메모 (선택)',
+  'Request Session':'예약 요청','Your packages':'내 패키지',
+  'To buy a package, ask the Owner — your used/total balance updates automatically.':'패키지 구매는 관리자에게 문의하세요 — 사용/총 잔액은 자동으로 업데이트됩니다.',
+  'Today':'오늘','Pending — awaiting confirmation':'확인 대기 중','Your booked sessions':'예약된 수업',
+  'No booked sessions yet — request one ←':'아직 예약된 수업이 없습니다 — 예약하세요 ←','Your events':'내 이벤트',
+  'left':'남음','used':'사용','completed':'완료','Prepaid':'선불','Pending':'대기','Booked':'예약됨',
+  'Completed':'완료','Cancelled':'취소됨','Check In':'체크인','✓ Checked in':'✓ 체크인 완료','Cancel':'취소',
+  '📅 Add to calendar':'📅 캘린더에 추가','Coach feedback:':'코치 피드백:',
+  'tap one to select':'선택하려면 탭하세요',
+  'Your completed sessions, with any coach feedback and attachments.':'완료된 수업 (코치 피드백 및 첨부파일 포함).',
+  'No past sessions yet.':'아직 지난 수업이 없습니다.',
+  'Workshops, guest sessions and more. Register for anything that interests you. Times are Boston (ET).':'워크숍, 게스트 세션 등. 관심 있는 항목에 등록하세요. 시간은 보스턴 시간(ET)입니다.',
+  'No upcoming events right now — check back soon.':'예정된 이벤트가 없습니다 — 나중에 다시 확인하세요.',
+  'Register':'등록','Full':'마감','✓ Registered':'✓ 등록됨','⏳ Pending approval':'⏳ 승인 대기','Paid':'결제됨','Free':'무료',
+  'See all →':'전체 보기 →',
+  'My Payments':'내 결제',"All money you've paid, grouped by period.":'기간별 결제 내역입니다.',
+  'Total paid':'총 결제액','By period':'기간별','All payments':'전체 결제','Detail':'상세','Amount':'금액',
+  'Week':'주','Month':'월','Quarter':'분기','Year':'년',
+  'payment(s) all-time':'건 (누적)',
+  'All times are Boston (ET).':'모든 시간은 보스턴 시간(ET)입니다.',
+  '🎉 Events':'🎉 이벤트',
+  'Session cancelled':'수업이 취소되었습니다','Registration cancelled':'등록이 취소되었습니다'
+};
+const LANGDICT={zh:ZH,ko:KO};
+const LANG_NAMES={en:'EN',zh:'中文',ko:'한국어'};
+function nextLang(){const o=['en','zh','ko'];return o[(o.indexOf(LANG)+1)%o.length];}
+function t(s){const d=LANGDICT[LANG];return (d&&d[s])?d[s]:s;}
+function setLang(l){LANG=l;try{localStorage.setItem('rx_lang',l);}catch(e){}try{if(!AUTH&&$('#login')&&$('#login').classList.contains('show')){showLogin();}else{renderWhoami();renderTabs();refreshOwner();}}catch(e){}}
+function langToggleHtml(){return '<select class="coachsel" title="Language" onchange="setLang(this.value)">'+Object.keys(LANG_NAMES).map(k=>'<option value="'+k+'" '+(LANG===k?'selected':'')+'>'+LANG_NAMES[k]+'</option>').join('')+'</select>';}
 const $ = (s,el=document)=>el.querySelector(s);
 const $$ = (s,el=document)=>[...el.querySelectorAll(s)];
 const money = n => '$'+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
@@ -689,14 +775,14 @@ function renderTabs(){
   let allowed;
   if(AUTH==='client') allowed=['booking','past','money','events'];
   else if(AUTH==='coach') allowed=['about','booking','availability','money'];
-  else allowed = TABS.map(t=>t.id).filter(x=>x!=='past'&&x!=='money');   // owner uses the full Finance tab instead
+  else allowed = TABS.map(tb=>tb.id).filter(x=>x!=='past'&&x!=='money');   // owner uses the full Finance tab instead
   if(!allowed.includes(TAB)) TAB = 'booking';
-  $('#tabs').innerHTML = TABS.filter(t=>allowed.includes(t.id)).map(t=>{
-    let label=t.label;
-    if(t.id==='booking'&&AUTH==='client')label='My Sessions';
-    if(t.id==='about'&&AUTH==='coach')label='My Profile';
-    if(t.id==='money')label=AUTH==='coach'?'Earnings':'Payments';
-    return `<button data-tab="${t.id}" class="${TAB===t.id?'active':''}">${label}</button>`;
+  $('#tabs').innerHTML = TABS.filter(tb=>allowed.includes(tb.id)).map(tb=>{
+    let label=tb.label;
+    if(tb.id==='booking'&&AUTH==='client')label='My Sessions';
+    if(tb.id==='about'&&AUTH==='coach')label='My Profile';
+    if(tb.id==='money')label=AUTH==='coach'?'Earnings':'Payments';
+    return `<button data-tab="${tb.id}" class="${TAB===tb.id?'active':''}">${t(label)}</button>`;
   }).join('');
   $$('#tabs button').forEach(b=>b.onclick=()=>{TAB=b.dataset.tab;switchTab();});
 }
@@ -731,8 +817,8 @@ function approvalsCount(){
 function renderWhoami(){
   if(AUTH==='owner'){const n=approvalsCount();const appr=n?`<button class="btn sm" style="background:var(--yellow);color:#211c00;font-weight:800;border:0" onclick="openApprovals()">⏳ ${n} to approve</button>`:'';
     $('#whoami').innerHTML=liveHtml()+appr+coachPicker()+'<button class="btn ghost sm" onclick="exportExcel()">⬇ Export</button><span class="pill orange">Owner</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';}
-  else if(AUTH==='coach'){const co=coachById(coachAs);$('#whoami').innerHTML=liveHtml()+'<span class="pill green">🏀 Coach '+(co?firstName(co.name):'')+'</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';}
-  else if(AUTH==='client'){const c=custById(clientAs);$('#whoami').innerHTML=liveHtml()+'<span class="pill blue">'+(c?c.name:'Client')+'</span><button class="btn ghost sm" onclick="openChangePwd()">🔑 Change password</button><button class="btn ghost sm" onclick="signOut()">Sign out</button>';}
+  else if(AUTH==='coach'){const co=coachById(coachAs);$('#whoami').innerHTML=liveHtml()+langToggleHtml()+'<span class="pill green">🏀 Coach '+(co?firstName(co.name):'')+'</span><button class="btn ghost sm" onclick="signOut()">'+t('Sign out')+'</button>';}
+  else if(AUTH==='client'){const c=custById(clientAs);$('#whoami').innerHTML=liveHtml()+langToggleHtml()+'<span class="pill blue">'+(c?c.name:'Client')+'</span><button class="btn ghost sm" onclick="openChangePwd()">'+t('🔑 Change password')+'</button><button class="btn ghost sm" onclick="signOut()">'+t('Sign out')+'</button>';}
   else $('#whoami').innerHTML='';
 }
 function initAuth(){
@@ -745,13 +831,26 @@ function initAuth(){
   if(ss&&ss.auth==='client'&&custById(ss.clientAs)){AUTH='client';ROLE='client';clientAs=ss.clientAs;pickCoach=ss.pickCoach||defaultCoachId();TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();startPolling();return;}
   showLogin();
 }
+function applyLoginLang(){
+  const set=(id,v)=>{const e=$('#'+id);if(e)e.textContent=v;};
+  set('langLbl',LANG_NAMES[LANG]||'EN');
+  set('roleTabPlayerLbl',t('Player'));set('roleTabCoachLbl',t('Coach'));
+  set('playerSignInBtn',t('Sign in as player'));
+  const cs=$('#coachSignInBtn');if(cs)cs.textContent=t('Sign in as coach');
+  const lc=$('#loginClient');if(lc)lc.placeholder=t('Your full name');
+  const lp=$('#loginClientPwd');if(lp)lp.placeholder=t('Your password');
+  const lco=$('#loginCoach');if(lco)lco.placeholder=t('Your name');
+  const lcp=$('#loginCoachPwd');if(lcp)lcp.placeholder=t('Your password');
+  const ch=$('#coachHint');if(ch)ch.textContent=t('Coaches: sign in with your name and the password set by the owner.');
+}
 function showLogin(){
   AUTH=null;renderWhoami();
-  if(pendingClient){const pc=custById(pendingClient);if(pc){$('#loginClient').value=pc.name;$('#clientHint').textContent='Welcome back, '+firstName(pc.name)+' — enter your password.';}}
-  else{$('#loginClient').value='';$('#clientHint').textContent='Players: enter your name and password (or open your personal link).';}
+  if(pendingClient){const pc=custById(pendingClient);if(pc){$('#loginClient').value=pc.name;$('#clientHint').textContent=(LANG==='zh'?('欢迎回来，'+firstName(pc.name)+' — 请输入密码。'):('Welcome back, '+firstName(pc.name)+' — enter your password.'));}}
+  else{$('#loginClient').value='';$('#clientHint').textContent=t('Players: enter your name and password (or open your personal link).');}
   $('#ownerHint').textContent=DB.settings.ownerPwd?'Enter your owner password.':'First time here — create an owner password (4+ characters).';
   $('#loginPwd').value='';if($('#loginClientPwd'))$('#loginClientPwd').value='';
   if($('#loginCoach'))$('#loginCoach').value='';if($('#loginCoachPwd'))$('#loginCoachPwd').value='';
+  applyLoginLang();
   showLoginTab('client');
   toggleOwnerLogin(false);
   $('#login').classList.add('show');
@@ -1104,18 +1203,18 @@ function clientCard(s){
   return `<div class="panel" style="margin-bottom:12px">
     <div class="row" style="justify-content:space-between;align-items:center">
       <div>
-        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} <span class="pill">🏀 ${coachName(s.coachId)}</span> ${s.paid?'<span class="pill green">Prepaid</span>':''} ${s.status==='pending'?'<span class="pill yellow">Pending</span>':s.status==='scheduled'?'<span class="pill blue">Booked</span>':s.status==='completed'?'<span class="pill green">Completed</span>':s.status==='cancelled'?cancelledByLabel(s):''}
+        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} <span class="pill">🏀 ${coachName(s.coachId)}</span> ${s.paid?'<span class="pill green">'+t('Prepaid')+'</span>':''} ${s.status==='pending'?'<span class="pill yellow">'+t('Pending')+'</span>':s.status==='scheduled'?'<span class="pill blue">'+t('Booked')+'</span>':s.status==='completed'?'<span class="pill green">'+t('Completed')+'</span>':s.status==='cancelled'?cancelledByLabel(s):''}
         <div class="clienttag" style="margin-top:4px">${s.dur} min · 📍 ${s.location||'TBD'}${others>0?' · with '+others+' other player'+(others>1?'s':''):''}</div>
       </div>
       <div class="actions">
-        ${s.date===now && !s.checkedIn && s.status==='scheduled'?`<button class="btn sm" onclick="clientCheckIn('${s.id}')">Check In</button>`:''}
-        ${s.checkedIn?'<span class="pill green">✓ Checked in</span>':''}
-        ${(s.status==='pending'||s.status==='scheduled')&&s.date>=now?`<button class="btn ghost sm" onclick="clientCancel('${s.id}')">Cancel</button>`:''}
-        <button class="btn ghost sm" onclick="addToCalendar('${s.id}')">📅 Add to calendar</button>
+        ${s.date===now && !s.checkedIn && s.status==='scheduled'?`<button class="btn sm" onclick="clientCheckIn('${s.id}')">${t('Check In')}</button>`:''}
+        ${s.checkedIn?'<span class="pill green">'+t('✓ Checked in')+'</span>':''}
+        ${(s.status==='pending'||s.status==='scheduled')&&s.date>=now?`<button class="btn ghost sm" onclick="clientCancel('${s.id}')">${t('Cancel')}</button>`:''}
+        <button class="btn ghost sm" onclick="addToCalendar('${s.id}')">${t('📅 Add to calendar')}</button>
       </div>
     </div>
     ${(s.feedback||(s.media&&s.media.length))?`<div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
-      ${s.feedback?`<div class="small"><b style="color:var(--accent2)">📣 Coach feedback:</b> ${s.feedback}</div>`:''}
+      ${s.feedback?`<div class="small"><b style="color:var(--accent2)">📣 ${t('Coach feedback:')}</b> ${s.feedback}</div>`:''}
       ${mediaThumbs(s)?`<div style="margin-top:4px">${mediaThumbs(s)}</div>`:''}
     </div>`:''}
   </div>`;
@@ -1146,15 +1245,15 @@ function renderBookingClient(){
   const balLine=(lab,tot,used)=>tot>0?`<div class="small" style="margin-top:6px"><b>${lab}: ${used}/${tot} used</b> · <span style="color:var(--accent2)">${tot-used} left</span><div class="creditbar"><i style="width:${tot?used/tot*100:0}%"></i></div></div>`:'';
 
   $('#view-booking').innerHTML=`
-    <h1 class="page">Welcome, ${firstName(c.name)} 👋</h1>
-    <div class="sub">Request a session and manage your upcoming sessions. Past sessions are in the Past Sessions tab.</div>
+    <h1 class="page">${t('Welcome,')} ${firstName(c.name)} 👋</h1>
+    <div class="sub">${t('Request a session and manage your upcoming sessions. Past sessions are in the Past Sessions tab.')}</div>
     ${clientEventBanner()}
     <div class="panel" style="margin-bottom:16px">
       <div class="row" style="justify-content:space-between;align-items:flex-start">
         <div style="flex:1;min-width:200px">
-          <b>Your prepaid sessions</b>
-          ${(t1>0||tG>0)?(balLine('1:1',t1,u1)+balLine('Group',tG,uG)):'<div class="clienttag" style="margin-top:6px">No package yet — ask the Owner about prepaid packs.</div>'}
-          <div class="clienttag" style="margin-top:8px">${completedCount(c)} sessions completed · a credit counts as used once a session is completed.</div>
+          <b>${t('Your prepaid sessions')}</b>
+          ${(t1>0||tG>0)?(balLine('1:1',t1,u1)+balLine(t('Group'),tG,uG)):'<div class="clienttag" style="margin-top:6px">'+t('No package yet — ask the Owner about prepaid packs.')+'</div>'}
+          <div class="clienttag" style="margin-top:8px">${completedCount(c)} ${t('completed')}</div>
         </div>
       </div>
     </div>
@@ -1162,19 +1261,19 @@ function renderBookingClient(){
       <div id="clientStatus">${clientStatusHtml(c)}</div>
       <div>
         <div class="panel">
-          <h3>Request a session</h3>
-          <div class="field"><label class="f">Coach</label>
+          <h3>${t('Request a session')}</h3>
+          <div class="field"><label class="f">${t('Coach')}</label>
             <select id="rqCoach" onchange="pickCoachChange(this.value)">${activeCoaches().map(co=>`<option value="${co.id}" ${pickCoach===co.id?'selected':''}>${co.name}</option>`).join('')||'<option value="">No coaches available</option>'}</select></div>
           ${coachMiniProfile(coachById(pickCoach))}
-          <div class="field"><label class="f">Session type</label>
-            <select id="rqType" onchange="reqSel=null;renderOpenSlots()"><option value="1on1">1:1 Private (${money(coachRate(pickCoach,'1on1'))}/hr)</option><option value="group">Group / 1:N (${money(coachRate(pickCoach,'group'))}/hr per player)</option></select></div>
-          <div class="field"><label class="f">Open times with ${coachName(pickCoach)} — tap one to select</label><div id="openSlots" class="slotlist"></div></div>
-          <div class="field"><label class="f">Comment (optional)</label><textarea id="rqComment" placeholder="e.g. any note for the coach…"></textarea></div>
-          <button class="btn" style="width:100%" onclick="submitRequest()">Request Session</button>
-          <p class="muted small" style="margin-top:10px">Tap one of the coach's open times above, then Request Session. The Owner is notified and will confirm. <b style="color:var(--txt)">All times are Boston (ET).</b></p>
+          <div class="field"><label class="f">${t('Session type')}</label>
+            <select id="rqType" onchange="reqSel=null;renderOpenSlots()"><option value="1on1">1:1 (${money(coachRate(pickCoach,'1on1'))}/hr)</option><option value="group">${t('Group')} (${money(coachRate(pickCoach,'group'))}/hr)</option></select></div>
+          <div class="field"><label class="f">${coachName(pickCoach)} — ${t('tap one to select')}</label><div id="openSlots" class="slotlist"></div></div>
+          <div class="field"><label class="f">${t('Comment (optional)')}</label><textarea id="rqComment" placeholder="…"></textarea></div>
+          <button class="btn" style="width:100%" onclick="submitRequest()">${t('Request Session')}</button>
+          <p class="muted small" style="margin-top:10px"><b style="color:var(--txt)">${t('All times are Boston (ET).')||'All times are Boston (ET).'}</b></p>
         </div>
-        <div class="panel" style="margin-top:16px"><h3>Your packages</h3>${pkgHist}
-          <p class="muted small" style="margin-top:8px">To buy a package, ask the Owner — your used/total balance updates automatically.</p></div>
+        <div class="panel" style="margin-top:16px"><h3>${t('Your packages')}</h3>${pkgHist}
+          <p class="muted small" style="margin-top:8px">${t('To buy a package, ask the Owner — your used/total balance updates automatically.')}</p></div>
       </div>
     </div>`;
   renderOpenSlots();
@@ -1190,15 +1289,15 @@ function clientStatusHtml(c){
   const myEvents=(DB.eventRegs||[]).filter(r=>r.customerId===c.id&&r.status!=='cancelled').map(r=>({r,ev:eventById(r.eventId)})).filter(x=>x.ev&&x.ev.date>=now).sort((a,b)=>((a.ev.date||'')+(a.ev.time||'')).localeCompare((b.ev.date||'')+(b.ev.time||'')));
   const evCard=x=>`<div class="panel" style="margin-bottom:12px">
       <div class="row" style="justify-content:space-between;align-items:center;gap:10px">
-        <div style="flex:1;min-width:180px"><b>🎉 ${x.ev.title}</b> ${x.r.status==='pending'?'<span class="pill yellow">⏳ Pending</span>':'<span class="pill green">Registered</span>'} ${x.r.paid?'<span class="pill green">Paid</span>':(x.ev.price?'<span class="pill orange">'+money(x.ev.price)+'</span>':'<span class="pill green">Free</span>')}
+        <div style="flex:1;min-width:180px"><b>🎉 ${x.ev.title}</b> ${x.r.status==='pending'?'<span class="pill yellow">'+t('⏳ Pending approval')+'</span>':'<span class="pill green">'+t('✓ Registered')+'</span>'} ${x.r.paid?'<span class="pill green">'+t('Paid')+'</span>':(x.ev.price?'<span class="pill orange">'+money(x.ev.price)+'</span>':'<span class="pill green">'+t('Free')+'</span>')}
           <div class="clienttag" style="margin-top:4px">📅 ${eventWhen(x.ev)} · 📍 ${x.ev.location||'TBD'}</div></div>
-        <div class="actions">${x.r.status==='registered'?`<button class="btn ghost sm" onclick="addEventToCalendar('${x.ev.id}')">📅 Calendar</button>`:''}<button class="btn ghost sm" onclick="clientCancelEventReg('${x.r.id}')">Cancel</button></div>
+        <div class="actions">${x.r.status==='registered'?`<button class="btn ghost sm" onclick="addEventToCalendar('${x.ev.id}')">${t('📅 Add to calendar')}</button>`:''}<button class="btn ghost sm" onclick="clientCancelEventReg('${x.r.id}')">${t('Cancel')}</button></div>
       </div></div>`;
-  return `${today.length?`<h3 style="margin:0 0 10px">Today</h3>${today.map(clientCard).join('')}`:''}
-    ${pending.length?`<h3 style="margin:${today.length?'18px':'0'} 0 10px">Pending — awaiting confirmation</h3>${pending.map(clientCard).join('')}`:''}
-    <h3 style="margin:${(today.length||pending.length)?'18px':'0'} 0 10px">Your booked sessions</h3>
-    ${upcoming.length?upcoming.map(clientCard).join(''):'<div class="panel"><div class="empty">No booked sessions yet — request one ←</div></div>'}
-    ${myEvents.length?`<h3 style="margin:18px 0 10px">Your events</h3>${myEvents.map(evCard).join('')}`:''}`;
+  return `${today.length?`<h3 style="margin:0 0 10px">${t('Today')}</h3>${today.map(clientCard).join('')}`:''}
+    ${pending.length?`<h3 style="margin:${today.length?'18px':'0'} 0 10px">${t('Pending — awaiting confirmation')}</h3>${pending.map(clientCard).join('')}`:''}
+    <h3 style="margin:${(today.length||pending.length)?'18px':'0'} 0 10px">${t('Your booked sessions')}</h3>
+    ${upcoming.length?upcoming.map(clientCard).join(''):'<div class="panel"><div class="empty">'+t('No booked sessions yet — request one ←')+'</div></div>'}
+    ${myEvents.length?`<h3 style="margin:18px 0 10px">${t('Your events')}</h3>${myEvents.map(evCard).join('')}`:''}`;
 }
 function refreshClientStatus(){const c=custById(clientAs);const el=$('#clientStatus');if(c&&el)el.innerHTML=clientStatusHtml(c);}
 function renderPast(){
@@ -1207,9 +1306,9 @@ function renderPast(){
   const now=todayISO();
   const past=sortSessions(DB.sessions.filter(s=>s.customerIds.includes(c.id)&&(s.date<now||s.status==='completed')&&s.status!=='cancelled')).reverse();
   $('#view-past').innerHTML=`
-    <h1 class="page">Past Sessions</h1>
-    <div class="sub">Your completed sessions, with any coach feedback and attachments.</div>
-    ${past.length?past.map(clientCard).join(''):'<div class="panel"><div class="empty">No past sessions yet.</div></div>'}`;
+    <h1 class="page">${t('Past Sessions')}</h1>
+    <div class="sub">${t('Your completed sessions, with any coach feedback and attachments.')}</div>
+    ${past.length?past.map(clientCard).join(''):'<div class="panel"><div class="empty">'+t('No past sessions yet.')+'</div></div>'}`;
 }
 
 function submitRequest(){
@@ -1232,7 +1331,9 @@ function submitRequest(){
   renderBooking();
 }
 /* ---- free SMS via carrier email-to-SMS gateways ---- */
-const SMS_GATEWAYS={'Verizon':'vtext.com','AT&T':'txt.att.net','T-Mobile':'tmomail.net','Sprint':'messaging.sprintpcs.com','US Cellular':'email.uscc.net','Google Fi':'msg.fi.google.com','Boost':'sms.myboostmobile.com','Cricket':'sms.cricketwireless.net','Metro':'mymetropcs.com','Xfinity':'vtext.com'};
+/* Free carrier email-to-SMS gateways. NOTE: AT&T shut theirs down (Jun 2025) — removed.
+   These still work for now but carriers are phasing them out; use Twilio for guaranteed delivery. */
+const SMS_GATEWAYS={'Verizon':'vtext.com','T-Mobile':'tmomail.net','US Cellular':'email.uscc.net','Google Fi':'msg.fi.google.com','Boost':'sms.myboostmobile.com','Metro':'mymetropcs.com'};
 function carrierOptions(sel){return '<option value="">— none (no text) —</option>'+Object.keys(SMS_GATEWAYS).map(k=>`<option ${sel===k?'selected':''}>${k}</option>`).join('');}
 function smsAddr(phone,carrier){const d=(phone||'').replace(/\D/g,'').slice(-10);const g=SMS_GATEWAYS[carrier];return (d.length===10&&g)?d+'@'+g:'';}
 /* text the client and/or coach when a session is confirmed (if they have phone+carrier) */
@@ -2143,25 +2244,25 @@ function renderMoney(){
   const total=items.reduce((a,i)=>a+i.amount,0);
   const buckets=bucketPayments(items,payRange);
   const maxB=Math.max(1,...buckets.map(b=>b.total));
-  const title=isCoach?'Earnings':'My Payments';
-  const bucketHtml=buckets.length?buckets.map(b=>`<div class="barrow"><div class="lab" style="width:140px">${b.label}</div><div class="bar"><i style="width:${b.total/maxB*100}%"></i></div><div class="val">${money(b.total)}<div class="clienttag" style="text-align:right">${b.n}</div></div></div>`).join(''):'<div class="empty">No payments in range.</div>';
-  const detail=items.length?items.map(i=>`<tr><td>${fmtDate(i.date)}</td><td>${i.label}</td><td class="right">${money(i.amount)}</td></tr>`).join(''):'<tr><td colspan="3"><div class="empty">No payments recorded yet.</div></td></tr>';
+  const title=isCoach?'Earnings':t('My Payments');
+  const bucketHtml=buckets.length?buckets.map(b=>`<div class="barrow"><div class="lab" style="width:140px">${b.label}</div><div class="bar"><i style="width:${b.total/maxB*100}%"></i></div><div class="val">${money(b.total)}<div class="clienttag" style="text-align:right">${b.n}</div></div></div>`).join(''):'<div class="empty">—</div>';
+  const detail=items.length?items.map(i=>`<tr><td>${fmtDate(i.date)}</td><td>${i.label}</td><td class="right">${money(i.amount)}</td></tr>`).join(''):'<tr><td colspan="3"><div class="empty">—</div></td></tr>';
   $('#view-money').innerHTML=`
     <h1 class="page">${title}</h1>
-    <div class="sub">${isCoach?'Money collected for your sessions & packages, grouped by period.':'All money you\'ve paid, grouped by period.'} <b style="color:var(--txt)">Boston (ET).</b></div>
+    <div class="sub">${isCoach?'Money collected for your sessions & packages, grouped by period.':t('All money you\'ve paid, grouped by period.')} <b style="color:var(--txt)">Boston (ET).</b></div>
     <div class="stats">
-      <div class="stat"><div class="k">Total ${isCoach?'collected':'paid'}</div><div class="v">${money(total)}</div><div class="d muted">${items.length} payment(s) all-time</div></div>
+      <div class="stat"><div class="k">${isCoach?'Total collected':t('Total paid')}</div><div class="v">${money(total)}</div><div class="d muted">${items.length} ${t('payment(s) all-time')}</div></div>
     </div>
     <div class="panel" style="margin-top:16px">
       <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h3 style="margin:0">By period</h3>
-        <div class="seg" style="margin:0">${['week','month','quarter','year'].map(r=>`<button class="${payRange===r?'active':''}" onclick="setPayRange('${r}')">${r[0].toUpperCase()+r.slice(1)}</button>`).join('')}</div>
+        <h3 style="margin:0">${t('By period')}</h3>
+        <div class="seg" style="margin:0">${['week','month','quarter','year'].map(r=>`<button class="${payRange===r?'active':''}" onclick="setPayRange('${r}')">${t(r[0].toUpperCase()+r.slice(1))}</button>`).join('')}</div>
       </div>
       ${bucketHtml}
     </div>
     <div class="panel" style="margin-top:16px;padding:6px 14px;overflow-x:auto">
-      <h3 style="padding:12px 6px 4px">All payments</h3>
-      <table><thead><tr><th>Date</th><th>Detail</th><th class="right">Amount</th></tr></thead><tbody>${detail}</tbody></table>
+      <h3 style="padding:12px 6px 4px">${t('All payments')}</h3>
+      <table><thead><tr><th>${t('Date')}</th><th>${t('Detail')}</th><th class="right">${t('Amount')}</th></tr></thead><tbody>${detail}</tbody></table>
     </div>`;
 }
 
@@ -2296,21 +2397,21 @@ function renderEventsClient(){
     return `<div class="panel" style="margin-bottom:12px">
       <div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px">
         <div style="flex:1;min-width:200px">
-          <b style="font-size:15px">${ev.title}</b> ${ev.coachId?`<span class="pill">🏀 ${coachName(ev.coachId)}</span>`:''} ${ev.price?`<span class="pill orange">${money(ev.price)}</span>`:'<span class="pill green">Free</span>'}
-          <div class="clienttag" style="margin-top:4px">📅 ${eventWhen(ev)} · 📍 ${ev.location||'TBD'}${ev.capacity?` · ${left} spot${left===1?'':'s'} left`:''}</div>
+          <b style="font-size:15px">${ev.title}</b> ${ev.coachId?`<span class="pill">🏀 ${coachName(ev.coachId)}</span>`:''} ${ev.price?`<span class="pill orange">${money(ev.price)}</span>`:'<span class="pill green">'+t('Free')+'</span>'}
+          <div class="clienttag" style="margin-top:4px">📅 ${eventWhen(ev)} · 📍 ${ev.location||'TBD'}${ev.capacity?` · ${left} ${t('left')}`:''}</div>
           ${ev.detail?`<div class="small muted" style="margin-top:8px;line-height:1.6">${ev.detail}</div>`:''}
         </div>
         <div class="actions">
-          ${reg?`${reg.status==='pending'?'<span class="pill yellow">⏳ Pending approval</span>':'<span class="pill green">✓ Registered</span>'}${reg.paid?'<span class="pill green">Paid</span>':''}${reg.status==='registered'?`<button class="btn ghost sm" onclick="addEventToCalendar('${ev.id}')">📅 Add to calendar</button>`:''}<button class="btn ghost sm" onclick="clientCancelEventReg('${reg.id}')">Cancel</button>`
-             :(full?'<span class="pill red">Full</span>':`<button class="btn sm" onclick="registerEvent('${ev.id}')">Register</button>`)}
+          ${reg?`${reg.status==='pending'?'<span class="pill yellow">'+t('⏳ Pending approval')+'</span>':'<span class="pill green">'+t('✓ Registered')+'</span>'}${reg.paid?'<span class="pill green">'+t('Paid')+'</span>':''}${reg.status==='registered'?`<button class="btn ghost sm" onclick="addEventToCalendar('${ev.id}')">${t('📅 Add to calendar')}</button>`:''}<button class="btn ghost sm" onclick="clientCancelEventReg('${reg.id}')">${t('Cancel')}</button>`
+             :(full?'<span class="pill red">'+t('Full')+'</span>':`<button class="btn sm" onclick="registerEvent('${ev.id}')">${t('Register')}</button>`)}
         </div>
       </div>
     </div>`;
   };
   $('#view-events').innerHTML=`
-    <h1 class="page">Events</h1>
-    <div class="sub">Workshops, guest sessions and more. Register for anything that interests you. Times are Boston (ET).</div>
-    ${evs.length?evs.map(card).join(''):'<div class="panel"><div class="empty">No upcoming events right now — check back soon.</div></div>'}`;
+    <h1 class="page">${t('Events')}</h1>
+    <div class="sub">${t('Workshops, guest sessions and more. Register for anything that interests you. Times are Boston (ET).')}</div>
+    ${evs.length?evs.map(card).join(''):'<div class="panel"><div class="empty">'+t('No upcoming events right now — check back soon.')+'</div></div>'}`;
 }
 function registerEvent(eid){
   const ev=eventById(eid);if(!ev||!clientAs)return;
@@ -2349,13 +2450,13 @@ function clientEventBanner(){
   const evs=(DB.events||[]).filter(e=>e.active!==false&&e.date>=now&&!myEventReg(e.id,clientAs)&&eventSpotsLeft(e)>0)
     .sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
   if(!evs.length)return '';
-  const item=ev=>`<span class="mq-item">📣 <b>${ev.title}</b> · ${eventWhen(ev)} · ${ev.price?money(ev.price):'Free'} <button class="btn sm" onclick="event.stopPropagation();registerEvent('${ev.id}')">Register</button></span>`;
+  const item=ev=>`<span class="mq-item">📣 <b>${ev.title}</b> · ${eventWhen(ev)} · ${ev.price?money(ev.price):t('Free')} <button class="btn sm" onclick="event.stopPropagation();registerEvent('${ev.id}')">${t('Register')}</button></span>`;
   const items=evs.map(item).join('');
   const dur=Math.max(14,evs.length*9);
   return `<div class="evbanner" onclick="this.classList.toggle('paused')" title="Tap to pause / resume">
-    <span class="tag">🎉 Events</span>
+    <span class="tag">${t('🎉 Events')}</span>
     <div class="mq"><div class="mq-track" style="animation-duration:${dur}s">${items}${items}</div></div>
-    <button class="btn ghost sm" style="flex:0 0 auto" onclick="event.stopPropagation();TAB='events';switchTab()">See all →</button>
+    <button class="btn ghost sm" style="flex:0 0 auto" onclick="event.stopPropagation();TAB='events';switchTab()">${t('See all →')}</button>
   </div>`;
 }
 
