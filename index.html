@@ -447,12 +447,12 @@ function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.
 function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs){
   const d={};
   d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):''};
-  d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,
+  d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',
     rate1on1:(c.rate_1on1!=null?Number(c.rate_1on1):undefined),rateGroup:(c.rate_group!=null?Number(c.rate_group):undefined),
     pending:(c.pending||null),created:c.created||''}));
   d.locations=(loc||[]).map(l=>({id:l.id,name:l.name,address:l.address||''}));
   d.availability=(avail||[]).map(a=>({id:a.id,coachId:a.coach_id||'',date:a.date,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||'',approved:a.approved!==false}));
-  d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',inGroup:!!c.in_group,creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
+  d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',inGroup:!!c.in_group,creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
     packages:(pkg||[]).filter(p=>p.customer_id===c.id).map(p=>({id:p.id,coachId:p.coach_id||'',type:p.type,qty:p.qty,amount:Number(p.amount),date:p.date}))}));
   d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||''}));
   d.expenses=(exp||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||''}));
@@ -461,8 +461,8 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs){
   d.eventRegs=(regs||[]).map(r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||''}));
   return normalize(d);
 }
-const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),pending:(c.pending||null),created:c.created||null});
-const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
+const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),pending:(c.pending||null),created:c.created||null});
+const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
 const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null});
 const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:e.coachId||null,price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||''});
 const eventRegRow=r=>({id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||''});
@@ -1231,6 +1231,20 @@ function submitRequest(){
   notifyOwner(s,comment);
   renderBooking();
 }
+/* ---- free SMS via carrier email-to-SMS gateways ---- */
+const SMS_GATEWAYS={'Verizon':'vtext.com','AT&T':'txt.att.net','T-Mobile':'tmomail.net','Sprint':'messaging.sprintpcs.com','US Cellular':'email.uscc.net','Google Fi':'msg.fi.google.com','Boost':'sms.myboostmobile.com','Cricket':'sms.cricketwireless.net','Metro':'mymetropcs.com','Xfinity':'vtext.com'};
+function carrierOptions(sel){return '<option value="">— none (no text) —</option>'+Object.keys(SMS_GATEWAYS).map(k=>`<option ${sel===k?'selected':''}>${k}</option>`).join('');}
+function smsAddr(phone,carrier){const d=(phone||'').replace(/\D/g,'').slice(-10);const g=SMS_GATEWAYS[carrier];return (d.length===10&&g)?d+'@'+g:'';}
+/* text the client and/or coach when a session is confirmed (if they have phone+carrier) */
+function textConfirm(s){
+  if(!(supa&&SUPA_OK))return;
+  const to=[];
+  const c=custById(s.customerIds[0]); if(c){const a=smsAddr(c.phone,c.carrier);if(a)to.push(a);}
+  const co=coachById(s.coachId); if(co){const a=smsAddr(co.phone,co.carrier);if(a)to.push(a);}
+  if(!to.length)return;
+  const msg='RX Training: your '+(s.type==='1on1'?'1:1':'group')+' session '+fmtDT(s.date,s.time)+' @ '+(s.location||'TBD')+' with '+coachName(s.coachId)+' is CONFIRMED.';
+  supa.functions.invoke('send-request-email',{body:{to,subject:'RX Training',text:msg,replyTo:'rx@rxtraining.org'}}).then(()=>{},()=>{});
+}
 /* email a single client via the Edge Function (replies route to rx@rxtraining.org) */
 function emailClient(to,subject,text){
   if(!to)return flash('Client has no email on file',true);
@@ -1265,6 +1279,7 @@ function confirmSession(id){
   const c=custById(s.customerIds[0]);
   if(c&&c.email){emailClient(c.email,'RX Training — your session is confirmed',
     'Hi '+firstName(c.name)+',\n\nYour '+(s.type==='1on1'?'1:1 Private':'group')+' session is confirmed:\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location+'\n\nReply to this email if you need to change anything.\n\n— RX Training');}
+  textConfirm(s);
   flash('Confirmed'+(c&&c.email?' & client emailed ✅':' ✅'));refreshOwner();
 }
 async function notifyOwner(s,comment){
@@ -1662,9 +1677,10 @@ function openCustomer(id){
   openModal(id?'Edit Customer':'Add Customer',`
     <div class="field"><label class="f">Full name *</label><input id="cName" value="${c.name}"></div>
     <div class="row">
-      <div class="field"><label class="f">Phone</label><input id="cPhone" value="${c.phone||''}"></div>
+      <div class="field"><label class="f">Phone (mobile)</label><input id="cPhone" value="${c.phone||''}"></div>
       <div class="field"><label class="f">Email</label><input id="cEmail" value="${c.email||''}"></div>
     </div>
+    <div class="field" style="max-width:260px"><label class="f">Mobile carrier (for text on confirm)</label><select id="cCarrier">${carrierOptions(c.carrier)}</select><div class="clienttag" style="margin-top:4px">Pick a carrier to text this client when a session is confirmed (free).</div></div>
     <div class="row">
       <div class="field"><label class="f">Level / Age group</label><input id="cLevel" value="${c.level||''}" placeholder="e.g. AAU U14"></div>
       <div class="field"><label class="f">Parent / Guardian</label><input id="cParent" value="${c.parent||''}"></div>
@@ -1698,7 +1714,7 @@ function openCustomer(id){
 }
 function saveCustomer(id){
   const name=$('#cName').value.trim();if(!name)return flash('Name is required',true);
-  const obj={name,phone:$('#cPhone').value,email:$('#cEmail').value,level:$('#cLevel').value,parent:$('#cParent').value,town:($('#cTown')?$('#cTown').value:'').trim(),notes:$('#cNotes').value,wechat:($('#cWechat')?$('#cWechat').value:'').trim(),inGroup:!!($('#cInGroup')&&$('#cInGroup').checked)};
+  const obj={name,phone:$('#cPhone').value,carrier:($('#cCarrier')?$('#cCarrier').value:''),email:$('#cEmail').value,level:$('#cLevel').value,parent:$('#cParent').value,town:($('#cTown')?$('#cTown').value:'').trim(),notes:$('#cNotes').value,wechat:($('#cWechat')?$('#cWechat').value:'').trim(),inGroup:!!($('#cInGroup')&&$('#cInGroup').checked)};
   const tot1=Math.max(0,Math.round(+$('#cTot1').value||0)), totG=Math.max(0,Math.round(+$('#cTotG').value||0));
   const pwd=($('#cPwd').value||'').trim()||DB.settings.defaultClientPwd;
   const created=($('#cCreated')&&$('#cCreated').value)||todayISO();
@@ -1819,6 +1835,7 @@ function doApproveSession(id){
   const s=DB.sessions.find(x=>x.id===id);if(s){s.status='scheduled';clearCancel(s);save();
     const c=custById(s.customerIds[0]);
     if(c&&c.email)emailClient(c.email,'RX Training — your session is confirmed','Hi '+firstName(c.name)+',\n\nYour '+(s.type==='1on1'?'1:1 Private':'group')+' session with '+coachName(s.coachId)+' is confirmed:\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location+'\n\n— RX Training');
+    textConfirm(s);
     flash('Session confirmed ✅');}
   refreshApprovals();
 }
@@ -1864,6 +1881,10 @@ function openCoach(id){
       <div class="field"><label class="f">Sign-in password</label><input id="coPwd" value="${g('pwd')||'coach'}"></div>
       <div class="field" style="display:flex;align-items:flex-end"><label class="f" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="coActive" ${c.active!==false?'checked':''} style="width:auto"> Active (can sign in & be booked)</label></div>
     </div>
+    <div class="row">
+      <div class="field"><label class="f">Phone (mobile)</label><input id="coPhone" value="${g('phone')}"></div>
+      <div class="field"><label class="f">Mobile carrier (text on confirm)</label><select id="coCarrier">${carrierOptions(c.carrier)}</select></div>
+    </div>
     <div class="field" style="max-width:220px"><label class="f">Joined date</label><input type="date" id="coCreated" value="${(c.created||todayISO())}"><div class="clienttag" style="margin-top:4px">Used for recruiting stats.</div></div>`}
     <p class="muted small">${isCoach?'Your profile & rate changes are sent to the owner for approval — they go live only once approved.':'You edit coaches directly; changes take effect immediately. Coach proposals appear above to Approve or Reject.'}</p>
   `,`
@@ -1881,7 +1902,7 @@ function saveCoach(id){
   const name=($('#coName').value||'').trim();if(!name)return flash('Name is required',true);
   const dup=(DB.coaches||[]).find(x=>x.id!==id&&(x.name||'').trim().toLowerCase()===name.toLowerCase());
   if(dup)return flash('Another coach already uses that name',true);
-  const obj={name,tagline:$('#coTag').value,bio:$('#coBio').value,affiliation:$('#coAff').value,affiliationSub:$('#coAffSub').value,photo:$('#coPhoto').value,pwd:($('#coPwd').value||'coach').trim(),active:$('#coActive').checked,rate1on1:r1,rateGroup:rG,created:(($('#coCreated')&&$('#coCreated').value)||todayISO())};
+  const obj={name,tagline:$('#coTag').value,bio:$('#coBio').value,affiliation:$('#coAff').value,affiliationSub:$('#coAffSub').value,photo:$('#coPhoto').value,pwd:($('#coPwd').value||'coach').trim(),active:$('#coActive').checked,phone:($('#coPhone')?$('#coPhone').value:''),carrier:($('#coCarrier')?$('#coCarrier').value:''),rate1on1:r1,rateGroup:rG,created:(($('#coCreated')&&$('#coCreated').value)||todayISO())};
   if(id){Object.assign(coachById(id),obj);}
   else{obj.id=uid();obj.pending=null;DB.coaches.push(obj);}
   save();closeModal();flash('Coach saved 🏀');renderCoaches();
