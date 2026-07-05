@@ -411,9 +411,44 @@ const KO={
   '🎉 Events':'🎉 이벤트',
   'Session cancelled':'수업이 취소되었습니다','Registration cancelled':'등록이 취소되었습니다'
 };
-const LANGDICT={zh:ZH,ko:KO};
-const LANG_NAMES={en:'EN',zh:'中文',ko:'한국어'};
-function nextLang(){const o=['en','zh','ko'];return o[(o.indexOf(LANG)+1)%o.length];}
+const JA={
+  'My Sessions':'マイセッション','Past Sessions':'過去のセッション','Payments':'支払い','Events':'イベント',
+  'Player':'会員','Coach':'コーチ',
+  'Players: enter your name and password (or open your personal link).':'会員：名前とパスワードを入力してください（または個人リンクを開いてください）。',
+  'Your full name':'お名前','Your password':'パスワード','Your name':'お名前',
+  'Sign in as player':'会員としてログイン','Sign in as coach':'コーチとしてログイン',
+  'Coaches: sign in with your name and the password set by the owner.':'コーチ：名前と管理者が設定したパスワードでログインしてください。',
+  '🔑 Change password':'🔑 パスワード変更','Sign out':'ログアウト',
+  'Welcome,':'ようこそ、',
+  'Request a session and manage your upcoming sessions. Past sessions are in the Past Sessions tab.':'セッションを予約し、今後のセッションを管理できます。過去のセッションは「過去のセッション」タブにあります。',
+  'Your prepaid sessions':'プリペイドセッション',
+  'No package yet — ask the Owner about prepaid packs.':'パッケージがありません — 管理者にプリペイドパックについてお問い合わせください。',
+  'Request a session':'セッション予約','Session type':'セッション種別','Date':'日付','Comment (optional)':'コメント（任意）',
+  'Request Session':'予約する','Your packages':'マイパッケージ',
+  'To buy a package, ask the Owner — your used/total balance updates automatically.':'パッケージ購入は管理者へ — 使用/合計残高は自動更新されます。',
+  'Today':'今日','Pending — awaiting confirmation':'確認待ち','Your booked sessions':'予約済みセッション',
+  'No booked sessions yet — request one ←':'予約済みセッションはありません — 予約してください ←','Your events':'マイイベント',
+  'left':'残り','used':'使用','completed':'完了','Prepaid':'前払い','Pending':'保留','Booked':'予約済み',
+  'Completed':'完了','Cancelled':'キャンセル','Check In':'チェックイン','✓ Checked in':'✓ チェックイン済み','Cancel':'キャンセル',
+  '📅 Add to calendar':'📅 カレンダーに追加','Coach feedback:':'コーチからのフィードバック：',
+  'tap one to select':'タップして選択',
+  'Your completed sessions, with any coach feedback and attachments.':'完了したセッション（コーチのフィードバックと添付ファイルを含む）。',
+  'No past sessions yet.':'過去のセッションはまだありません。',
+  'Workshops, guest sessions and more. Register for anything that interests you. Times are Boston (ET).':'ワークショップやゲストセッションなど。気になるものに登録してください。時間はボストン時間（ET）です。',
+  'No upcoming events right now — check back soon.':'現在予定されているイベントはありません — またご確認ください。',
+  'Register':'登録','Full':'満員','✓ Registered':'✓ 登録済み','⏳ Pending approval':'⏳ 承認待ち','Paid':'支払い済み','Free':'無料',
+  'See all →':'すべて見る →',
+  'My Payments':'マイ支払い',"All money you've paid, grouped by period.":'期間別の支払い履歴です。',
+  'Total paid':'支払い合計','By period':'期間別','All payments':'すべての支払い','Detail':'詳細','Amount':'金額',
+  'Week':'週','Month':'月','Quarter':'四半期','Year':'年',
+  'payment(s) all-time':'件（累計）',
+  'All times are Boston (ET).':'すべての時間はボストン時間（ET）です。',
+  '🎉 Events':'🎉 イベント',
+  'Session cancelled':'セッションをキャンセルしました','Registration cancelled':'登録をキャンセルしました'
+};
+const LANGDICT={zh:ZH,ko:KO,ja:JA};
+const LANG_NAMES={en:'EN',zh:'中文',ko:'한국어',ja:'日本語'};
+function nextLang(){const o=['en','zh','ko','ja'];return o[(o.indexOf(LANG)+1)%o.length];}
 function t(s){const d=LANGDICT[LANG];return (d&&d[s])?d[s]:s;}
 function setLang(l){LANG=l;try{localStorage.setItem('rx_lang',l);}catch(e){}try{if(!AUTH&&$('#login')&&$('#login').classList.contains('show')){showLogin();}else{renderWhoami();renderTabs();refreshOwner();}}catch(e){}}
 function langToggleHtml(){return '<select class="coachsel" title="Language" onchange="setLang(this.value)">'+Object.keys(LANG_NAMES).map(k=>'<option value="'+k+'" '+(LANG===k?'selected':'')+'>'+LANG_NAMES[k]+'</option>').join('')+'</select>';}
@@ -818,7 +853,7 @@ function approvalsCount(){
 function renderWhoami(){
   if(AUTH==='owner'){const n=approvalsCount();const appr=n?`<button class="btn sm" style="background:var(--yellow);color:#211c00;font-weight:800;border:0" onclick="openApprovals()">⏳ ${n} to approve</button>`:'';
     $('#whoami').innerHTML=liveHtml()+appr+coachPicker()+'<button class="btn ghost sm" onclick="exportExcel()">⬇ Export</button><span class="pill orange">Owner</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';}
-  else if(AUTH==='coach'){const co=coachById(coachAs);$('#whoami').innerHTML=liveHtml()+langToggleHtml()+'<span class="pill green">🏀 Coach '+(co?firstName(co.name):'')+'</span><button class="btn ghost sm" onclick="signOut()">'+t('Sign out')+'</button>';}
+  else if(AUTH==='coach'){const co=coachById(coachAs);$('#whoami').innerHTML=liveHtml()+'<span class="pill green">🏀 Coach '+(co?firstName(co.name):'')+'</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';}
   else if(AUTH==='client'){const c=custById(clientAs);$('#whoami').innerHTML=liveHtml()+langToggleHtml()+'<span class="pill blue">'+(c?c.name:'Client')+'</span><button class="btn ghost sm" onclick="openChangePwd()">'+t('🔑 Change password')+'</button><button class="btn ghost sm" onclick="signOut()">'+t('Sign out')+'</button>';}
   else $('#whoami').innerHTML='';
 }
