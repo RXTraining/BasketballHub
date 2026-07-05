@@ -52,7 +52,7 @@
   .wrap{max-width:1720px;margin:0 auto;padding:0 28px 80px}
 
   header.top{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
-    background:rgba(10,10,12,.82);border-bottom:1px solid var(--line)}
+    background:rgba(10,10,12,.82);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
   .topin{max-width:1720px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:12px 28px;flex-wrap:nowrap}
   .logo{font-weight:900;letter-spacing:.5px;font-size:20px;flex:0 0 auto}
   .logo .dot{color:var(--accent)}
@@ -200,7 +200,8 @@
   .cchip.done{opacity:.55}
   @media(max-width:640px){.calcell{min-height:70px}.cchip{font-size:9px}}
 
-  .login{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;padding:18px;
+  .login{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;
+    padding:calc(env(safe-area-inset-top,0px) + 64px) 18px 24px;
     background:radial-gradient(900px 500px at 70% -10%,rgba(255,106,0,.18),transparent 60%),var(--bg)}
   .login.show{display:flex}
   .login .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:30px;max-width:680px;width:100%;box-shadow:var(--shadow)}
@@ -209,7 +210,7 @@
   .lbox{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:20px}
   .lbox .lh{font-weight:800;font-size:16px;margin-bottom:8px}
   .lbox p{margin-bottom:12px}
-  .ownerbtn{position:absolute;top:18px;right:18px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);
+  .ownerbtn{position:absolute;top:calc(env(safe-area-inset-top,0px) + 14px);right:18px;z-index:10;background:var(--panel2);border:1px solid var(--line);color:var(--muted);
     font-weight:700;font-size:12.5px;padding:8px 14px;border-radius:999px;cursor:pointer}
   .ownerbtn:hover{color:var(--txt);border-color:var(--accent)}
 
