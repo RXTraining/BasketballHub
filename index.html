@@ -288,6 +288,7 @@
         <input id="loginClient" placeholder="Your full name" autocomplete="off" onkeydown="if(event.key==='Enter')clientLoginPick()">
         <input type="password" id="loginClientPwd" placeholder="Your password" style="margin-top:10px" onkeydown="if(event.key==='Enter')clientLoginPick()">
         <button class="btn" id="playerSignInBtn" style="width:100%;margin-top:14px" onclick="clientLoginPick()">Sign in as player</button>
+        <button class="btn ghost" id="signupOpenBtn" style="width:100%;margin-top:10px" onclick="openSignup()">New here? Create an account</button>
       </div>
       <div id="coachLogin" class="hidden">
         <p class="muted small" id="coachHint">Coaches: sign in with your name and the password set by the owner.</p>
@@ -296,6 +297,7 @@
         <button class="btn" id="coachSignInBtn" style="width:100%;margin-top:14px" onclick="coachLoginPick()">Sign in as coach</button>
       </div>
     </div>
+    <div id="signupPanel" class="hidden"></div>
     <div id="ownerPanel" class="hidden">
       <div class="muted small" style="margin-bottom:18px">🔑 Owner sign in</div>
       <p class="muted small" id="ownerHint">Enter your owner password.</p>
@@ -373,6 +375,16 @@ const ZH={
   'payment(s) all-time':'笔付款（累计）',
   'All times are Boston (ET).':'所有时间为波士顿时间（ET）。',
   '🎉 Events':'🎉 活动',
+  // signup
+  'New here? Create an account':'新用户？创建账号','Create your account':'创建账号','Apply':'提交申请','Back':'返回',
+  'Tell us about the player so the coach can prepare.':'请填写学员信息，方便教练准备。',
+  'Full name':'姓名','Phone':'电话','Email':'邮箱','Town / City':'城镇/城市','Parent / Guardian':'家长/监护人','Level / Age group':'级别/年龄组','Choose a password':'设置密码',
+  'Application submitted — you can sign in once the owner approves.':'申请已提交 — 管理员审核通过后即可登录。',
+  'Your account is awaiting owner approval.':'您的账号正在等待管理员审核。',
+  'A default password will be assigned — you can change it after your first sign-in.':'系统将分配默认密码，登录后可自行修改。',
+  'Account request submitted':'申请已提交','Your account is pending owner approval.':'您的账号正在等待管理员审核。',
+  'Once approved, sign in with:':'审核通过后，请使用以下信息登录：','Name':'姓名','Password':'密码',
+  'Please change your password after your first sign-in.':'首次登录后请修改密码。','Back to sign in':'返回登录',
   // flashes
   'Session cancelled':'课程已取消','Registration cancelled':'报名已取消'
 };
@@ -409,6 +421,15 @@ const KO={
   'payment(s) all-time':'건 (누적)',
   'All times are Boston (ET).':'모든 시간은 보스턴 시간(ET)입니다.',
   '🎉 Events':'🎉 이벤트',
+  'New here? Create an account':'신규 회원? 계정 만들기','Create your account':'계정 만들기','Apply':'신청','Back':'뒤로',
+  'Tell us about the player so the coach can prepare.':'코치가 준비할 수 있도록 회원 정보를 입력해 주세요.',
+  'Full name':'이름','Phone':'전화','Email':'이메일','Town / City':'도시','Parent / Guardian':'보호자','Level / Age group':'레벨/연령','Choose a password':'비밀번호 설정',
+  'Application submitted — you can sign in once the owner approves.':'신청이 접수되었습니다 — 관리자 승인 후 로그인할 수 있습니다.',
+  'Your account is awaiting owner approval.':'계정이 관리자 승인 대기 중입니다.',
+  'A default password will be assigned — you can change it after your first sign-in.':'기본 비밀번호가 부여됩니다 — 로그인 후 변경할 수 있습니다.',
+  'Account request submitted':'신청이 접수되었습니다','Your account is pending owner approval.':'계정이 관리자 승인 대기 중입니다.',
+  'Once approved, sign in with:':'승인 후 다음 정보로 로그인하세요:','Name':'이름','Password':'비밀번호',
+  'Please change your password after your first sign-in.':'첫 로그인 후 비밀번호를 변경하세요.','Back to sign in':'로그인으로 돌아가기',
   'Session cancelled':'수업이 취소되었습니다','Registration cancelled':'등록이 취소되었습니다'
 };
 const JA={
@@ -444,13 +465,22 @@ const JA={
   'payment(s) all-time':'件（累計）',
   'All times are Boston (ET).':'すべての時間はボストン時間（ET）です。',
   '🎉 Events':'🎉 イベント',
+  'New here? Create an account':'新規の方？アカウント作成','Create your account':'アカウント作成','Apply':'申請する','Back':'戻る',
+  'Tell us about the player so the coach can prepare.':'コーチが準備できるよう会員情報を入力してください。',
+  'Full name':'お名前','Phone':'電話','Email':'メール','Town / City':'市区町村','Parent / Guardian':'保護者','Level / Age group':'レベル/年齢','Choose a password':'パスワードを設定',
+  'Application submitted — you can sign in once the owner approves.':'申請を送信しました — 管理者の承認後にログインできます。',
+  'Your account is awaiting owner approval.':'アカウントは管理者の承認待ちです。',
+  'A default password will be assigned — you can change it after your first sign-in.':'デフォルトのパスワードが割り当てられます — ログイン後に変更できます。',
+  'Account request submitted':'申請を送信しました','Your account is pending owner approval.':'アカウントは管理者の承認待ちです。',
+  'Once approved, sign in with:':'承認後、以下でログインしてください:','Name':'お名前','Password':'パスワード',
+  'Please change your password after your first sign-in.':'初回ログイン後にパスワードを変更してください。','Back to sign in':'ログインに戻る',
   'Session cancelled':'セッションをキャンセルしました','Registration cancelled':'登録をキャンセルしました'
 };
 const LANGDICT={zh:ZH,ko:KO,ja:JA};
 const LANG_NAMES={en:'EN',zh:'中文',ko:'한국어',ja:'日本語'};
 function nextLang(){const o=['en','zh','ko','ja'];return o[(o.indexOf(LANG)+1)%o.length];}
 function t(s){const d=LANGDICT[LANG];return (d&&d[s])?d[s]:s;}
-function setLang(l){LANG=l;try{localStorage.setItem('rx_lang',l);}catch(e){}try{if(!AUTH&&$('#login')&&$('#login').classList.contains('show')){showLogin();}else{renderWhoami();renderTabs();refreshOwner();}}catch(e){}}
+function setLang(l){LANG=l;try{localStorage.setItem('rx_lang',l);}catch(e){}try{if(!AUTH&&$('#login')&&$('#login').classList.contains('show')){const su=$('#signupPanel');if(su&&!su.classList.contains('hidden')){applyLoginLang();renderSignup();}else showLogin();}else{renderWhoami();renderTabs();refreshOwner();}}catch(e){}}
 function langToggleHtml(){return '<select class="coachsel" title="Language" onchange="setLang(this.value)">'+Object.keys(LANG_NAMES).map(k=>'<option value="'+k+'" '+(LANG===k?'selected':'')+'>'+LANG_NAMES[k]+'</option>').join('')+'</select>';}
 const $ = (s,el=document)=>el.querySelector(s);
 const $$ = (s,el=document)=>[...el.querySelectorAll(s)];
@@ -542,6 +572,7 @@ function normalize(d){
     }
     if(c.credits)delete c.credits;
     if(!c.pwd)c.pwd=d.settings.defaultClientPwd;
+    if(c.approved===undefined)c.approved=true;
   });
   (d.sessions||[]).forEach(s=>{if(s.paidVia===undefined)s.paidVia=s.paid?'cash':'';});
   // ----- multi-coach: seed a coach + stamp coach_id on every record -----
@@ -574,7 +605,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs){
     pending:(c.pending||null),created:c.created||''}));
   d.locations=(loc||[]).map(l=>({id:l.id,name:l.name,address:l.address||''}));
   d.availability=(avail||[]).map(a=>({id:a.id,coachId:a.coach_id||'',date:a.date,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||'',approved:a.approved!==false}));
-  d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',inGroup:!!c.in_group,creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
+  d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',inGroup:!!c.in_group,approved:c.approved!==false,creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
     packages:(pkg||[]).filter(p=>p.customer_id===c.id).map(p=>({id:p.id,coachId:p.coach_id||'',type:p.type,qty:p.qty,amount:Number(p.amount),date:p.date}))}));
   d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||''}));
   d.expenses=(exp||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||''}));
@@ -584,7 +615,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs){
   return normalize(d);
 }
 const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),pending:(c.pending||null),created:c.created||null});
-const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
+const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,approved:c.approved!==false,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
 const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null});
 const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:e.coachId||null,price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||''});
 const eventRegRow=r=>({id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||''});
@@ -698,6 +729,8 @@ async function cloudPush(){
   try{
     // Clients only write their OWN sessions (no deletes, never settings/customers/etc.)
     // so a client action can never overwrite the owner's data.
+    // Not signed in (e.g. self sign-up) — never bulk push; the action uses a targeted pushRows.
+    if(!AUTH){return;}
     // Clients write ONLY the single record they just changed, via pushRows() at each action —
     // never a bulk upsert — so a client can never revert an owner's approval/edit.
     if(AUTH==='client'){return;}
@@ -848,7 +881,8 @@ function approvalsCount(){
   const ap=(DB.availability||[]).filter(a=>a.approved===false && a.date>=todayISO()).length;
   const er=(DB.eventRegs||[]).filter(r=>r.status==='pending'&&eventById(r.eventId)).length;
   const se=(DB.sessions||[]).filter(s=>s.status==='pending').length;
-  return cp+ap+er+se;
+  const nc=(DB.customers||[]).filter(c=>c.approved===false).length;
+  return cp+ap+er+se+nc;
 }
 function renderWhoami(){
   if(AUTH==='owner'){const n=approvalsCount();const appr=n?`<button class="btn sm" style="background:var(--yellow);color:#211c00;font-weight:800;border:0" onclick="openApprovals()">⏳ ${n} to approve</button>`:'';
@@ -872,6 +906,7 @@ function applyLoginLang(){
   set('langLbl',LANG_NAMES[LANG]||'EN');
   set('roleTabPlayerLbl',t('Player'));set('roleTabCoachLbl',t('Coach'));
   set('playerSignInBtn',t('Sign in as player'));
+  set('signupOpenBtn',t('New here? Create an account'));
   const cs=$('#coachSignInBtn');if(cs)cs.textContent=t('Sign in as coach');
   const lc=$('#loginClient');if(lc)lc.placeholder=t('Your full name');
   const lp=$('#loginClientPwd');if(lp)lp.placeholder=t('Your password');
@@ -886,10 +921,60 @@ function showLogin(){
   $('#ownerHint').textContent=DB.settings.ownerPwd?'Enter your owner password.':'First time here — create an owner password (4+ characters).';
   $('#loginPwd').value='';if($('#loginClientPwd'))$('#loginClientPwd').value='';
   if($('#loginCoach'))$('#loginCoach').value='';if($('#loginCoachPwd'))$('#loginCoachPwd').value='';
+  if($('#signupPanel'))$('#signupPanel').classList.add('hidden');
   applyLoginLang();
   showLoginTab('client');
   toggleOwnerLogin(false);
   $('#login').classList.add('show');
+}
+function openSignup(){
+  if($('#clientPanel'))$('#clientPanel').classList.add('hidden');
+  if($('#ownerPanel'))$('#ownerPanel').classList.add('hidden');
+  if($('#signupPanel'))$('#signupPanel').classList.remove('hidden');
+  renderSignup();
+}
+function renderSignup(){
+  const p=$('#signupPanel');if(!p)return;
+  p.innerHTML=`
+    <div class="muted small" style="margin-bottom:6px">${t('Create your account')}</div>
+    <p class="muted small" style="margin-bottom:12px">${t('Tell us about the player so the coach can prepare.')}</p>
+    <input id="suName" placeholder="${t('Full name')} *" autocomplete="off">
+    <input id="suPhone" placeholder="${t('Phone')}" style="margin-top:10px">
+    <input id="suEmail" placeholder="${t('Email')}" style="margin-top:10px">
+    <input id="suTown" placeholder="${t('Town / City')}" style="margin-top:10px">
+    <input id="suParent" placeholder="${t('Parent / Guardian')}" style="margin-top:10px">
+    <input id="suLevel" placeholder="${t('Level / Age group')}" style="margin-top:10px">
+    <p class="muted small" style="margin-top:10px">${t('A default password will be assigned — you can change it after your first sign-in.')}</p>
+    <button class="btn" style="width:100%;margin-top:8px" onclick="saveSignup()">${t('Apply')}</button>
+    <button class="btn ghost" style="width:100%;margin-top:10px" onclick="showLogin()">← ${t('Back')}</button>`;
+}
+function saveSignup(){
+  const name=($('#suName').value||'').trim();if(!name)return flash(t('Full name'),true);
+  const c={id:uid(),name,phone:($('#suPhone').value||'').trim(),email:($('#suEmail').value||'').trim(),town:($('#suTown').value||'').trim(),parent:($('#suParent').value||'').trim(),level:($('#suLevel').value||'').trim(),notes:'Self sign-up',created:todayISO(),wechat:'',carrier:'',inGroup:false,approved:false,creditsTotal:{'1on1':0,'group':0},packages:[],token:uid()+uid(),pwd:DB.settings.defaultClientPwd};
+  DB.customers.push(c);save();pushRows('customers',[custRow(c)]);
+  notifySignup(c);
+  renderSignupDone(c);
+}
+function renderSignupDone(c){
+  const p=$('#signupPanel');if(!p)return;
+  p.innerHTML=`
+    <div style="text-align:center;margin-bottom:6px"><div style="font-size:40px">✅</div>
+      <div style="font-weight:800;font-size:16px;margin-top:6px">${t('Account request submitted')}</div></div>
+    <p class="muted small" style="text-align:center">${t('Your account is pending owner approval.')}</p>
+    <div class="panel" style="background:var(--panel2);margin:12px 0">
+      <div class="small">${t('Once approved, sign in with:')}</div>
+      <div style="margin-top:8px"><b>${t('Name')}:</b> ${c.name}</div>
+      <div style="margin-top:4px"><b>${t('Password')}:</b> <span style="font-family:monospace">${c.pwd}</span></div>
+      <div class="clienttag" style="margin-top:8px">${t('Please change your password after your first sign-in.')}</div>
+    </div>
+    <button class="btn" style="width:100%" onclick="showLogin()">← ${t('Back to sign in')}</button>`;
+}
+function notifySignup(c){
+  const emails=(DB.settings.notifyEmails||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(!emails.length||!(supa&&SUPA_OK))return;
+  supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:'rx@rxtraining.org',
+    subject:'RX Training — new account request: '+c.name,
+    text:'New client signup awaiting approval:\n\nName: '+c.name+'\nPhone: '+(c.phone||'-')+'\nEmail: '+(c.email||'-')+'\nTown: '+(c.town||'-')+'\n\nApprove in RX.TRAINING (⏳ approvals).'}}).then(()=>{},()=>{});
 }
 function showLoginTab(which){
   const coach=which==='coach';
@@ -918,6 +1003,7 @@ function clientLoginPick(){
   // if several players share a name, the password picks the right one
   const c=matches.find(x=>(x.pwd||'')===pwd);
   if(!c)return flash('Incorrect password',true);
+  if(c.approved===false)return flash(t('Your account is awaiting owner approval.'),true);
   loginAsClient(c.id);
   if(pwd===DB.settings.defaultClientPwd)flash('Tip: set your own password via “Change password”.');
 }
@@ -1656,7 +1742,7 @@ function renderCustomers(){
   const rows=list.map(c=>{
     const next=sortSessions(DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.date>=todayISO()&&s.status==='scheduled'))[0];
     return `<tr>
-      <td><div class="nameceil"><span class="av">${initials(c.name)}</span><div><b>${c.name}</b><div class="clienttag">${c.level||'—'}${c.parent?' · '+c.parent:''}</div></div></div></td>
+      <td><div class="nameceil"><span class="av">${initials(c.name)}</span><div><b>${c.name}</b> ${c.approved===false?'<span class="pill yellow">⏳ pending</span>':''}<div class="clienttag">${c.level||'—'}${c.parent?' · '+c.parent:''}</div></div></div></td>
       <td>${c.phone||''}<div class="clienttag">${c.email||''}</div></td>
       <td>${c.town||'<span class="muted">—</span>'}</td>
       <td>${c.wechat||'<span class="muted">—</span>'}<div class="clienttag">${c.inGroup?'<span style="color:var(--green)">✓ in group</span>':'not in group'}</div></td>
@@ -1937,9 +2023,14 @@ function openApprovals(){
   const avail=(DB.availability||[]).filter(a=>a.approved===false&&a.date>=todayISO()).sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
   const evregs=eventPendingRegs();
   const psess=(DB.sessions||[]).filter(s=>s.status==='pending').sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
+  const newcust=(DB.customers||[]).filter(c=>c.approved===false);
   let body='';
-  if(!coaches.length&&!avail.length&&!evregs.length&&!psess.length){body='<div class="empty">Nothing pending — all caught up! 🎉</div>';}
+  if(!coaches.length&&!avail.length&&!evregs.length&&!psess.length&&!newcust.length){body='<div class="empty">Nothing pending — all caught up! 🎉</div>';}
   else{
+    if(newcust.length){
+      body+=`<h3 style="margin:4px 0 8px">New account requests (${newcust.length})</h3>`;
+      body+='<div style="overflow-x:auto"><table><thead><tr><th>Name</th><th>Contact</th><th>Town</th><th></th></tr></thead><tbody>'+newcust.map(c=>`<tr><td><b>${c.name}</b>${c.level?('<div class="clienttag">'+c.level+'</div>'):''}</td><td>${c.phone||''}${c.email?('<div class="clienttag">'+c.email+'</div>'):''}</td><td>${c.town||'—'}</td><td class="right"><div class="actions"><button class="btn sm" onclick="doApproveCustomer('${c.id}')">Approve</button><button class="iconbtn" title="Reject" onclick="doRejectCustomer('${c.id}')">✕</button></div></td></tr>`).join('')+'</tbody></table></div>';
+    }
     if(psess.length){
       body+=`<h3 style="margin:4px 0 8px">Session requests (${psess.length})</h3>`;
       body+='<div style="overflow-x:auto"><table><thead><tr><th>Client</th><th>Coach</th><th>When</th><th>Type</th><th></th></tr></thead><tbody>'+psess.map(s=>`<tr><td>${custNames(s.customerIds)}</td><td>${coachName(s.coachId)}</td><td>${fmtDT(s.date,s.time)}</td><td>${s.type==='1on1'?'1:1':'Group'}</td><td class="right"><div class="actions"><button class="btn sm" onclick="doApproveSession('${s.id}')">Approve</button><button class="iconbtn" title="Decline" onclick="doRejectSession('${s.id}')">✕</button></div></td></tr>`).join('')+'</tbody></table></div>';
@@ -1968,6 +2059,10 @@ function doRejectAvail(id){DB.availability=(DB.availability||[]).filter(x=>x.id!
 function doApproveAllAvail(){let n=0;(DB.availability||[]).forEach(a=>{if(a.approved===false&&a.date>=todayISO()){a.approved=true;n++;}});if(n){save();flash(n+' window(s) approved ✅');}refreshApprovals();}
 function doApproveEventReg(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(r){r.status='registered';save();flash('Registration approved ✅');}refreshApprovals();}
 function doRejectEventReg(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(r){r.status='cancelled';save();flash('Registration rejected');}refreshApprovals();}
+function doApproveCustomer(id){const c=custById(id);if(c){c.approved=true;if(!c.token)c.token=uid()+uid();save();
+  if(c.email&&supa&&SUPA_OK)supa.functions.invoke('send-request-email',{body:{to:[c.email],replyTo:'rx@rxtraining.org',subject:'RX Training — your account is approved',text:'Hi '+firstName(c.name)+',\n\nYour RX Training account is approved! Sign in with:\n\nName: '+c.name+'\nPassword: '+(c.pwd||DB.settings.defaultClientPwd)+'\n\nPlease change your password after your first sign-in.\n\n— RX Training'}}).then(()=>{},()=>{});
+  flash('Account approved ✅ — '+c.name+' can now sign in');}refreshApprovals();}
+function doRejectCustomer(id){const c=custById(id);if(!c)return;if(!confirm('Reject and remove this account request for '+c.name+'?'))return;DB.customers=DB.customers.filter(x=>x.id!==id);save();flash('Request removed');refreshApprovals();}
 function doApproveSession(id){
   const s=DB.sessions.find(x=>x.id===id);if(s){s.status='scheduled';clearCancel(s);save();
     const c=custById(s.customerIds[0]);
