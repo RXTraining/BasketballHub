@@ -1259,7 +1259,7 @@ function renderBookingTable(){
       (s.date<=now && s.status!=='cancelled'?`<button class="iconbtn" onclick="ownerCheckIn('${s.id}')">Check in</button>`:'<span class="pill">—</span>');
     let payCell;
     if(s.paid){payCell='<span class="pill green">Paid</span><div class="clienttag">'+(s.paidVia==='package'?'package':'cash')+'</div>';}
-    else if(AUTH==='coach'){payCell='<span class="pill red">Unpaid</span>';}
+    else if(AUTH==='coach'){payCell='<div class="actions" style="justify-content:flex-start"><span class="pill red">Unpaid</span><button class="iconbtn" title="Mark paid (cash)" onclick="coachSetPaid(\''+s.id+'\',true)">Cash</button></div>';}
     else{payCell=`<div class="actions" style="justify-content:flex-start">
         ${sessionHasCredit(s)?`<button class="iconbtn" title="Use prepaid credit" onclick="payCredit('${s.id}')">Credit</button>`:''}
         <button class="iconbtn" onclick="payCash('${s.id}')">Cash</button></div>`;}
@@ -1354,13 +1354,34 @@ function coachSetStatus(id,val){
   }
   flash('Status updated → '+val);refreshOwner();
 }
+function coachSetPaid(id,val){
+  const s=DB.sessions.find(x=>x.id===id);if(!s)return;
+  if(s.paidVia==='package')return flash('Paid with a prepaid package — managed by the owner.',true);
+  if(val){s.paid=true;s.paidVia='cash';}else{s.paid=false;s.paidVia='';}
+  save();flash(val?'Marked paid (cash) 💵':'Marked unpaid');refreshOwner();
+}
 function openCoachStatus(id){
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
-  openModal('Update session status',`
+  const pkg=s.paidVia==='package';
+  openModal('Update session',`
     <div class="clienttag" style="margin-bottom:12px"><b>${fmtDT(s.date,s.time)}</b> · ${s.type==='1on1'?'1:1':'Group'} · ${custNames(s.customerIds)}<br>📍 ${s.location||''}</div>
     <div class="field"><label class="f">Status</label><select id="csStatus">${['pending','scheduled','completed','cancelled'].map(o=>`<option ${s.status===o?'selected':''}>${o}</option>`).join('')}</select></div>
-    <p class="muted small">Only the status can be changed here — session details are managed by the owner. Changes sync to the owner and the client.</p>
-  `,`<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="coachSetStatus('${id}',document.getElementById('csStatus').value);closeModal()">Save</button>`);
+    <div class="field"><label class="f">Payment</label>
+      ${pkg
+        ? '<div class="clienttag">Paid with a prepaid package — managed by the owner.</div>'
+        : `<label style="display:flex;align-items:center;gap:8px;font-size:14px"><input type="checkbox" id="csPaid" ${s.paid?'checked':''} style="width:auto"> Paid (cash) — ${money(s.price)}</label>`}
+    </div>
+    <p class="muted small">Status and cash payment can be changed here — other session details are managed by the owner. Changes sync to the owner and the client.</p>
+  `,`<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="coachSaveSession('${id}')">Save</button>`);
+}
+function coachSaveSession(id){
+  const s=DB.sessions.find(x=>x.id===id);if(!s){closeModal();return;}
+  const pv=document.getElementById('csPaid');
+  if(pv && s.paidVia!=='package'){ if(pv.checked){s.paid=true;s.paidVia='cash';}else{s.paid=false;s.paidVia='';} }
+  const st=document.getElementById('csStatus').value;
+  if(st!==s.status){ coachSetStatus(id,st); }
+  else { save();flash('Session updated');refreshOwner(); }
+  closeModal();
 }
 function calStep(n){calM+=n;if(calM<0){calM=11;calY--;}if(calM>11){calM=0;calY++;}renderBooking();}
 function calToday(){const n=nowBoston();calY=n.getFullYear();calM=n.getMonth();renderBooking();}
