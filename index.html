@@ -2346,6 +2346,20 @@ function availableSlots(dateStr,type,cid){
       const t=String(Math.floor(cur/60)).padStart(2,'0')+':'+String(cur%60).padStart(2,'0');
       if(seen[t])continue;
       if(dateStr===todayISO() && new Date(dateStr+'T'+t)<now)continue;
+      // Hide slots that overlap an existing booked session for this coach by >15 min.
+      // (Sessions starting at the exact same time are handled by the capacity logic below,
+      //  so group joins still work; this catches partial overlaps like 9:00 slot vs 9:30 session.)
+      const slotS=cur, slotE=cur+step;
+      const conflict=DB.sessions.some(s=>{
+        if(s.status==='cancelled'||s.status==='deleted')return false;
+        if(cid&&s.coachId!==cid)return false;
+        if(s.date!==dateStr||!s.time)return false;
+        const [sh2,sm2]=s.time.split(':').map(Number);
+        const ss=sh2*60+sm2, se=ss+(s.dur||60);
+        if(ss===slotS)return false; // same start = capacity logic handles it
+        return Math.min(slotE,se)-Math.max(slotS,ss) > 15;
+      });
+      if(conflict)continue;
       const at=sessAt(t); let open;
       if(type==='group'){
         const has1on1=at.some(s=>s.type==='1on1');
