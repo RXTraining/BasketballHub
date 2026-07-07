@@ -617,7 +617,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs){
   d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',inGroup:!!c.in_group,approved:c.approved!==false,suspended:c.suspended===true,creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
     packages:(pkg||[]).filter(p=>p.customer_id===c.id).map(p=>({id:p.id,coachId:p.coach_id||'',type:p.type,qty:p.qty,amount:Number(p.amount),date:p.date}))}));
   d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||''}));
-  d.expenses=(exp||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||''}));
+  d.expenses=(exp||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||'',freq:e.freq||'once'}));
   d.cashEntries=(cash||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,amount:Number(e.amount),note:e.note||'',customerId:e.customer_id||'',type:e.type||'1on1',qty:e.qty||1}));
   d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||''}));
   d.eventRegs=(regs||[]).map(r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||''}));
@@ -771,7 +771,7 @@ async function cloudPush(){
     await push('customers',()=>syncTable('customers',DB.customers.map(custRow)));
     await push('packages',()=>syncTable('packages',DB.customers.flatMap(c=>c.packages.map(p=>({id:p.id,customer_id:c.id,coach_id:p.coachId||null,type:p.type,qty:p.qty,amount:p.amount,date:p.date})))));
     await push('sessions',()=>syncTable('sessions',DB.sessions.map(sessRow)));
-    await push('expenses',()=>syncTable('expenses',DB.expenses.map(e=>({id:e.id,coach_id:e.coachId||null,date:e.date,cat:e.cat,amount:e.amount,note:e.note||''}))));
+    await push('expenses',()=>syncTable('expenses',DB.expenses.map(e=>({id:e.id,coach_id:e.coachId||null,date:e.date,cat:e.cat,amount:e.amount,note:e.note||'',freq:e.freq||'once'}))));
     await push('cash_entries',()=>syncTable('cash_entries',DB.cashEntries.map(e=>({id:e.id,coach_id:e.coachId||null,date:e.date,amount:e.amount,note:e.note||'',customer_id:e.customerId||null,type:e.type||null,qty:e.qty||null}))));
     await push('availability',()=>syncTable('availability',(DB.availability||[]).map(a=>({id:a.id,coach_id:a.coachId||null,date:a.date,start_t:a.start,end_t:a.end,slot_min:a.slotMin,location:a.location||'',approved:a.approved!==false}))));
     await push('events',()=>syncTable('events',(DB.events||[]).map(eventRow)));
@@ -1113,7 +1113,7 @@ function exportExcel(){
   const pkgRev=DB.customers.flatMap(c=>c.packages).reduce((a,p)=>a+p.amount,0);
   const otherCash=DB.cashEntries.reduce((a,e)=>a+e.amount,0);
   const eventInc=(DB.eventRegs||[]).filter(r=>r.paid&&r.status!=='cancelled').reduce((a,r)=>{const ev=eventById(r.eventId);return ev?a+(ev.price||0):a;},0);
-  const expenses=DB.expenses.reduce((a,e)=>a+e.amount,0);
+  const expenses=expenseOccurrences(DB.expenses).reduce((a,e)=>a+e.amount,0);
   const outstanding=DB.sessions.filter(s=>!s.paid&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
   const revenue=cashSess+pkgRev+otherCash+eventInc;
   add('Finance',[
@@ -1139,7 +1139,7 @@ function exportExcel(){
     Type:s.type==='1on1'?'1:1':'Group',Players:s.customerIds.length,Duration:s.dur,Location:s.location,Status:s.status,
     'Checked in':s.checkedIn?'Yes':'No',Payment:s.paid?(s.paidVia||'paid'):'unpaid',Price:s.price,Notes:s.notes,Feedback:s.feedback||'',Attachments:(s.media||[]).length})));
   add('Packages',DB.customers.flatMap(c=>c.packages.map(p=>({Client:c.name,Coach:coachName(p.coachId),Date:p.date,Type:p.type==='1on1'?'1:1':'Group',Sessions:p.qty,Amount:p.amount}))));
-  add('Expenses',DB.expenses.map(e=>({Date:e.date,Category:e.cat,Note:e.note,Amount:e.amount})));
+  add('Expenses',DB.expenses.map(e=>({Date:e.date,Category:e.cat,Note:e.note,Amount:e.amount,Frequency:e.freq||'once'})));
   add('Cash income',[
     ...DB.sessions.filter(s=>s.paid&&s.paidVia==='cash'&&s.status!=='cancelled').map(s=>({Date:s.date,Source:custNames(s.customerIds)+' ('+(s.type==='1on1'?'1:1':'Group')+' session)',Note:s.notes||'',Amount:s.price})),
     ...DB.cashEntries.map(e=>({Date:e.date,Source:(e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in')+' ('+(e.qty||1)+'× '+(e.type==='group'?'Group':'1:1')+' cash)',Note:e.note||'',Amount:e.amount}))
@@ -2747,12 +2747,34 @@ function clientEventBanner(){
    ============================================================ */
 let finRange='6m';
 function monthKey(d){return d.slice(0,7);}
+/* Expand recurring (monthly/yearly) expenses into individual occurrences from their start date
+   up to the current month, so ongoing charges are counted in every period. One-time expenses
+   pass through unchanged. Yearly recurs on its anniversary month; monthly every month. */
+function expenseOccurrences(list){
+  const todayYM=todayISO().slice(0,7);
+  const out=[];
+  (list||[]).forEach(e=>{
+    const freq=e.freq||'once';
+    if(freq!=='monthly'&&freq!=='yearly'){out.push(e);return;}
+    let [y,m]=e.date.split('-').map(Number); const day=e.date.slice(8,10)||'01';
+    let guard=0;
+    while(guard++<1200){
+      const ym=y+'-'+String(m).padStart(2,'0');
+      if(ym>todayYM)break;
+      out.push({...e,date:ym+'-'+day});
+      if(freq==='monthly'){m++;if(m>12){m=1;y++;}}else{y++;}
+    }
+  });
+  return out;
+}
+const FREQ_LABEL={once:'',monthly:'monthly',yearly:'yearly'};
 function monthLabel(k){const[y,m]=k.split('-');return new Date(y,m-1,1).toLocaleDateString('en-US',{month:'short'});}
 function renderFinance(){
   // ----- everything on this page is scoped to the coach selected top-right -----
   const S=DB.sessions.filter(s=>inScope(s.coachId));
   const CE=DB.cashEntries.filter(e=>inScope(e.coachId));
   const EX=DB.expenses.filter(e=>inScope(e.coachId));
+  const EXo=expenseOccurrences(EX);   // recurring expanded to per-period occurrences
   const scopeLbl = scopeCoach()==='all' ? 'All coaches' : 'Coach: '+coachName(scopeCoach());
   const cashSess=S.filter(s=>s.paid&&s.paidVia==='cash'&&s.status!=='cancelled');
   const allPkgs=DB.customers.flatMap(c=>c.packages.filter(p=>inScope(p.coachId)).map(p=>({...p,cust:c.name,custId:c.id})));
@@ -2763,7 +2785,7 @@ function renderFinance(){
   const cashRev=sessCash+otherCash+eventInc;
   const revenue=pkgRev+cashRev;
   const outstanding=S.filter(s=>!s.paid&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
-  const expenses=EX.reduce((a,e)=>a+e.amount,0);
+  const expenses=EXo.reduce((a,e)=>a+e.amount,0);
   const profit=revenue-expenses;
   // Liability = money received for sessions not yet delivered (prepaid packages + cash sessions),
   // reduced by every completed (delivered) session, whether cash or prepaid.
@@ -2783,7 +2805,7 @@ function renderFinance(){
   cashSess.forEach(s=>{const k=monthKey(s.date);revByM[k]=(revByM[k]||0)+s.price;});
   CE.forEach(e=>{const k=monthKey(e.date);revByM[k]=(revByM[k]||0)+e.amount;});
   allPkgs.forEach(p=>{const k=monthKey(p.date);revByM[k]=(revByM[k]||0)+p.amount;});
-  EX.forEach(e=>{const k=monthKey(e.date);expByM[k]=(expByM[k]||0)+e.amount;});
+  EXo.forEach(e=>{const k=monthKey(e.date);expByM[k]=(expByM[k]||0)+e.amount;});
   const rev=months.map(m=>revByM[m]||0), exp=months.map(m=>expByM[m]||0), prof=months.map((m,i)=>rev[i]-exp[i]);
 
   const byType={'1on1':0,'group':0};
@@ -2792,8 +2814,8 @@ function renderFinance(){
   const maxType=Math.max(byType['1on1'],byType['group'],1);
 
   const expRows=EX.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>`<tr>
-    <td>${fmtDate(e.date)}</td><td>🏀 ${coachName(e.coachId)}</td><td>${e.cat}</td><td class="muted">${e.note||''}</td>
-    <td class="right">${money(e.amount)}</td>
+    <td>${fmtDate(e.date)}${(e.freq&&e.freq!=='once')?` <span class="pill blue">↻ ${FREQ_LABEL[e.freq]}</span>`:''}</td><td>🏀 ${coachName(e.coachId)}</td><td>${e.cat}</td><td class="muted">${e.note||''}</td>
+    <td class="right">${money(e.amount)}${(e.freq&&e.freq!=='once')?`<div class="clienttag">/${e.freq==='monthly'?'mo':'yr'}</div>`:''}</td>
     <td class="right"><div class="actions"><button class="iconbtn" onclick="openExpense('${e.id}')">Edit</button><button class="iconbtn" onclick="delExpense('${e.id}')">✕</button></div></td></tr>`).join('')
     ||'<tr><td colspan="6"><div class="empty">No expenses logged.</div></td></tr>';
 
@@ -2823,7 +2845,7 @@ function renderFinance(){
       const pk=DB.customers.flatMap(c=>c.packages).filter(p=>p.coachId===co.id).reduce((a,p)=>a+p.amount,0);
       const other=DB.cashEntries.filter(e=>e.coachId===co.id).reduce((a,e)=>a+e.amount,0);
       const rev=cash+pk+other;
-      const exp=DB.expenses.filter(e=>e.coachId===co.id).reduce((a,e)=>a+e.amount,0);
+      const exp=expenseOccurrences(DB.expenses.filter(e=>e.coachId===co.id)).reduce((a,e)=>a+e.amount,0);
       const done=cs.filter(s=>s.status==='completed').length;
       const upc=cs.filter(s=>s.status!=='cancelled'&&s.date>=todayISO()&&s.status!=='completed').length;
       return {co,rev,exp,profit:rev-exp,done,upc};
@@ -2947,22 +2969,33 @@ function saveNotify(){
   save();flash('Notification settings saved');
 }
 function openExpense(id){
-  const e=id?DB.expenses.find(x=>x.id===id):{date:todayISO(),cat:'Gym Rental',amount:0,note:''};
+  const e=id?DB.expenses.find(x=>x.id===id):{date:todayISO(),cat:'Gym Rental',amount:0,note:'',freq:'once'};
   const cats=['Gym Rental','Equipment','Travel','Marketing','Insurance','Other'];
+  const freqs=[['once','One-time'],['monthly','Monthly (recurring)'],['yearly','Yearly (recurring)']];
+  const ef=e.freq||'once';
   openModal(id?'Edit Expense':'Add Expense',`
     <div class="field"><label class="f">Coach (whose expense)</label><select id="eCoach">${coachSelectOptions(e.coachId||targetCoach(),false)}</select></div>
     <div class="row">
-      <div class="field"><label class="f">Date</label><input type="date" id="eDate" value="${e.date}"></div>
-      <div class="field"><label class="f">Amount ($)</label><input type="number" id="eAmt" value="${e.amount}"></div>
+      <div class="field"><label class="f">${ef==='once'?'Date':'Start date'}</label><input type="date" id="eDate" value="${e.date}"></div>
+      <div class="field"><label class="f">Amount ($)${ef==='monthly'?' / month':ef==='yearly'?' / year':''}</label><input type="number" id="eAmt" value="${e.amount}"></div>
     </div>
-    <div class="field"><label class="f">Category</label>
-      <select id="eCat">${cats.map(c=>`<option ${e.cat===c?'selected':''}>${c}</option>`).join('')}</select></div>
+    <div class="row">
+      <div class="field"><label class="f">Category</label>
+        <select id="eCat">${cats.map(c=>`<option ${e.cat===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="field"><label class="f">Frequency</label>
+        <select id="eFreq" onchange="openExpenseFreqHint()">${freqs.map(f=>`<option value="${f[0]}" ${ef===f[0]?'selected':''}>${f[1]}</option>`).join('')}</select></div>
+    </div>
+    <div id="eFreqHint" class="clienttag" style="margin-bottom:8px">${ef==='once'?'':'Counts automatically in every '+(ef==='monthly'?'month':'year')+' from the start date onward — no need to re-enter it.'}</div>
     <div class="field"><label class="f">Note</label><input id="eNote" value="${e.note||''}"></div>
   `,`${id?`<button class="btn danger" onclick="delExpense('${id}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveExpense('${id||''}')">Save</button>`);
 }
+function openExpenseFreqHint(){
+  const f=$('#eFreq')?$('#eFreq').value:'once', h=$('#eFreqHint');
+  if(h)h.textContent = f==='once'?'':'Counts automatically in every '+(f==='monthly'?'month':'year')+' from the start date onward — no need to re-enter it.';
+}
 function saveExpense(id){
   const amt=+$('#eAmt').value;if(!amt)return flash('Enter an amount',true);
-  const obj={coachId:($('#eCoach')?$('#eCoach').value:targetCoach()),date:$('#eDate').value,cat:$('#eCat').value,amount:amt,note:$('#eNote').value};
+  const obj={coachId:($('#eCoach')?$('#eCoach').value:targetCoach()),date:$('#eDate').value,cat:$('#eCat').value,amount:amt,note:$('#eNote').value,freq:($('#eFreq')?$('#eFreq').value:'once')};
   if(id){Object.assign(DB.expenses.find(x=>x.id===id),obj);}else{obj.id=uid();DB.expenses.push(obj);}
   save();closeModal();flash('Expense saved');renderFinance();
 }
