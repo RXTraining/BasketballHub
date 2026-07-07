@@ -838,7 +838,7 @@ function coachSelectOptions(sel,includeAll){
 }
 
 let AUTH=null, ROLE='owner', TAB='about';
-let clientAs=null, coachAs=null, mgCoach=null, pickCoach=null, pendingClient=null, sessionReturnCust=null, editMedia=[];
+let clientAs=null, coachAs=null, mgCoach=null, pickCoach=null, pendingClient=null, sessionReturnCust=null, editMedia=[], mediaCust=null;
 let calY, calM; {const n=nowBoston();calY=n.getFullYear();calM=n.getMonth();}
 const TABS=[
   {id:'about',label:'About'},
@@ -1376,6 +1376,8 @@ function coachSetPaid(id,val){
 function openCoachStatus(id){
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
   const pkg=s.paidVia==='package';
+  editMedia=(s.media||[]).slice();
+  mediaCust=(s.customerIds&&s.customerIds[0]&&custById(s.customerIds[0])&&custById(s.customerIds[0]).name)||null;
   openModal('Update session',`
     <div class="clienttag" style="margin-bottom:12px"><b>${fmtDT(s.date,s.time)}</b> · ${s.type==='1on1'?'1:1':'Group'} · ${custNames(s.customerIds)}<br>📍 ${s.location||''}</div>
     <div class="field"><label class="f">Status</label><select id="csStatus">${['pending','scheduled','completed','cancelled'].map(o=>`<option ${s.status===o?'selected':''}>${o}</option>`).join('')}</select></div>
@@ -1384,16 +1386,25 @@ function openCoachStatus(id){
         ? '<div class="clienttag">Paid with a prepaid package — managed by the owner.</div>'
         : `<label style="display:flex;align-items:center;gap:8px;font-size:14px"><input type="checkbox" id="csPaid" ${s.paid?'checked':''} style="width:auto"> Paid (cash) — ${money(s.price)}</label>`}
     </div>
-    <p class="muted small">Status and cash payment can be changed here — other session details are managed by the owner. Changes sync to the owner and the client.</p>
+    <div class="field"><label class="f">📣 Feedback to client — shown on their My Sessions</label><textarea id="csFeedback" placeholder="How did it go? Progress, tips, next focus...">${s.feedback||''}</textarea></div>
+    <div class="field"><label class="f">📎 Photos / videos for client</label>
+      <input type="file" accept="image/*,video/*" multiple onchange="addMediaFiles(this)">
+      <div id="sMediaPrev" style="margin-top:8px"></div>
+      <div class="clienttag" style="margin-top:4px">Shown to the client with this session. Photos are compressed automatically; keep videos under 25MB.</div></div>
+    <p class="muted small">Status, cash payment, feedback and media can be updated here — other session details are managed by the owner. Changes sync to the owner and the client.</p>
   `,`<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="coachSaveSession('${id}')">Save</button>`);
+  renderMediaPrev();
 }
 function coachSaveSession(id){
   const s=DB.sessions.find(x=>x.id===id);if(!s){closeModal();return;}
   const pv=document.getElementById('csPaid');
   if(pv && s.paidVia!=='package'){ if(pv.checked){s.paid=true;s.paidVia='cash';}else{s.paid=false;s.paidVia='';} }
+  const fb=document.getElementById('csFeedback'); if(fb)s.feedback=fb.value;
+  s.media=editMedia.slice();
   const st=document.getElementById('csStatus').value;
   if(st!==s.status){ coachSetStatus(id,st); }
   else { save();flash('Session updated');refreshOwner(); }
+  mediaCust=null;
   closeModal();
 }
 function calStep(n){calM+=n;if(calM<0){calM=11;calY--;}if(calM>11){calM=0;calY++;}renderBooking();}
@@ -1641,11 +1652,14 @@ async function addMediaFiles(input){
     // compress photos; leave videos as-is (can't transcode in-browser)
     let upFile=f, upType=f.type, upName=f.name||'file';
     if(type==='image'){const c=await compressImage(f);if(c){upFile=c;upType='image/jpeg';upName=(f.name||'photo').replace(/\.[^.]+$/,'')+'.jpg';}}
-    const cid=($$('.sCustCb').filter(cb=>cb.checked).map(cb=>cb.value)[0])||'unassigned';
+    // folder = client NAME (clear structure in R2/Storage), resolved from the selected/session client
+    const cbId=$$('.sCustCb').filter(cb=>cb.checked).map(cb=>cb.value)[0];
+    const cObj=cbId?custById(cbId):null;
+    const folder=((cObj&&cObj.name)||mediaCust||'unassigned').trim()||'unassigned';
     if(useR2()){
       flash('Uploading '+(f.name||'file')+'…');
       try{
-        const r=await fetch(R2_ENDPOINT,{method:'POST',headers:{'content-type':upType,'x-upload-token':R2_TOKEN,'x-file-name':upName,'x-customer-id':cid},body:upFile});
+        const r=await fetch(R2_ENDPOINT,{method:'POST',headers:{'content-type':upType,'x-upload-token':R2_TOKEN,'x-file-name':upName,'x-customer-id':folder},body:upFile});
         const j=await r.json();
         if(!r.ok||!j.url){flash('Upload failed: '+(j&&j.error||r.status),true);continue;}
         editMedia.push({type,name:upName,url:j.url,key:j.key});
@@ -1654,7 +1668,7 @@ async function addMediaFiles(input){
       continue;
     }
     if(supa&&SUPA_OK){
-      const path='media/'+cid+'/'+uid()+'-'+upName.replace(/[^a-zA-Z0-9._-]/g,'_');
+      const path='media/'+folder.replace(/[^a-zA-Z0-9._-]/g,'_')+'/'+uid()+'-'+upName.replace(/[^a-zA-Z0-9._-]/g,'_');
       flash('Uploading '+(f.name||'file')+'…');
       const up=await supa.storage.from(MEDIA_BUCKET).upload(path,upFile,{upsert:true,contentType:upType});
       if(up.error){flash('Upload failed: '+up.error.message,true);continue;}
