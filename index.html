@@ -1342,7 +1342,7 @@ function statusSelect(s){
 function coachSetStatus(id,val){
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
   const prev=s.status; if(prev===val)return;
-  if(val==='cancelled'){markCancelled(s,'coach');}else{s.status=val;clearCancel(s);}
+  if(val==='cancelled'){ if(!confirm('Cancel this session? The owner and client will be notified.')){refreshOwner();return;} markCancelled(s,'coach');}else{s.status=val;clearCancel(s);}
   save();
   const c=custById(s.customerIds[0]);
   if(val==='scheduled'&&c&&c.email){emailClient(c.email,'RX Training — your session is confirmed',
@@ -1709,6 +1709,7 @@ function saveSession(id,emailAfter){
     paid:pay!=='',paidVia:pay,checkedIn:$('#sCheck').checked,notes:$('#sNotes').value,
     feedback:$('#sFeedback').value,media:editMedia.slice()};
   const exSess=id?DB.sessions.find(x=>x.id===id):null;
+  if(obj.status==='cancelled' && (!exSess||exSess.status!=='cancelled')){ if(!confirm('Cancel this session? It will show as cancelled and the client will see the change.'))return; }
   if(obj.status==='cancelled'){obj.cancelledBy=(exSess&&exSess.cancelledBy)||'owner';obj.cancelledAt=(exSess&&exSess.cancelledAt)||new Date().toISOString();}
   else{obj.cancelledBy='';obj.cancelledAt='';}
   if(id){Object.assign(DB.sessions.find(x=>x.id===id),obj);}
@@ -2127,7 +2128,7 @@ function doApproveAvail(id){const a=(DB.availability||[]).find(x=>x.id===id);if(
 function doRejectAvail(id){DB.availability=(DB.availability||[]).filter(x=>x.id!==id);save();flash('Removed');refreshApprovals();}
 function doApproveAllAvail(){let n=0;(DB.availability||[]).forEach(a=>{if(a.approved===false&&a.date>=todayISO()){a.approved=true;n++;}});if(n){save();flash(n+' window(s) approved ✅');}refreshApprovals();}
 function doApproveEventReg(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(r){r.status='registered';save();flash('Registration approved ✅');}refreshApprovals();}
-function doRejectEventReg(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(r){r.status='cancelled';save();flash('Registration rejected');}refreshApprovals();}
+function doRejectEventReg(id){if(!confirm('Reject this event registration? It will be cancelled.'))return;const r=(DB.eventRegs||[]).find(x=>x.id===id);if(r){r.status='cancelled';save();flash('Registration rejected');}refreshApprovals();}
 function doApproveCustomer(id){const c=custById(id);if(c){c.approved=true;if(!c.token)c.token=uid()+uid();save();
   if(c.email&&supa&&SUPA_OK)supa.functions.invoke('send-request-email',{body:{to:[c.email],replyTo:'rx@rxtraining.org',subject:'RX Training — your account is approved',text:'Hi '+firstName(c.name)+',\n\nYour RX Training account is approved! Sign in with:\n\nName: '+c.name+'\nPassword: '+(c.pwd||DB.settings.defaultClientPwd)+'\n\nPlease change your password after your first sign-in.\n\n— RX Training'}}).then(()=>{},()=>{});
   flash('Account approved ✅ — '+c.name+' can now sign in');}refreshApprovals();}
@@ -2141,6 +2142,7 @@ function doApproveSession(id){
   refreshApprovals();
 }
 function doRejectSession(id){
+  if(!confirm('Decline this request? The session will be cancelled and the client notified.'))return;
   const s=DB.sessions.find(x=>x.id===id);if(s){markCancelled(s,'owner');save();
     const c=custById(s.customerIds[0]);
     if(c&&c.email)emailClient(c.email,'RX Training — your request was declined','Hi '+firstName(c.name)+',\n\nUnfortunately your requested session ('+fmtDT(s.date,s.time)+') could not be confirmed. Please request another time in the app.\n\n— RX Training');
