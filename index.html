@@ -819,7 +819,7 @@ function locOptions(selected){
 }
 /* ---------- multi-coach helpers ---------- */
 const coachById = id => (DB.coaches||[]).find(c=>c.id===id);
-const coachName = id => {const c=coachById(id);return c?c.name:'—';};
+const coachName = id => {if(id==='owner')return 'Owner / Business';const c=coachById(id);return c?c.name:'—';};
 function activeCoaches(){return (DB.coaches||[]).filter(c=>c.active!==false);}
 function defaultCoachId(){const a=activeCoaches();return (a[0]||(DB.coaches&&DB.coaches[0])||{}).id||'rx1';}
 /* which coach is in scope for the current view */
@@ -831,8 +831,9 @@ function scopeCoach(){
 /* new records default to a concrete coach even when the owner is viewing "all" */
 function targetCoach(){const s=scopeCoach();return (!s||s==='all')?defaultCoachId():s;}
 function inScope(coachId){const s=scopeCoach();if(!s||s==='all')return true;return (coachId||defaultCoachId())===s;}
-function coachSelectOptions(sel,includeAll){
+function coachSelectOptions(sel,includeAll,includeOwner){
   let out=includeAll?`<option value="all" ${sel==='all'?'selected':''}>All coaches</option>`:'';
+  if(includeOwner)out+=`<option value="owner" ${sel==='owner'?'selected':''}>Owner / Business (overhead)</option>`;
   out+=(DB.coaches||[]).map(c=>`<option value="${c.id}" ${sel===c.id?'selected':''}>${c.name}${c.active===false?' (inactive)':''}</option>`).join('');
   return out;
 }
@@ -1139,7 +1140,7 @@ function exportExcel(){
     Type:s.type==='1on1'?'1:1':'Group',Players:s.customerIds.length,Duration:s.dur,Location:s.location,Status:s.status,
     'Checked in':s.checkedIn?'Yes':'No',Payment:s.paid?(s.paidVia||'paid'):'unpaid',Price:s.price,Notes:s.notes,Feedback:s.feedback||'',Attachments:(s.media||[]).length})));
   add('Packages',DB.customers.flatMap(c=>c.packages.map(p=>({Client:c.name,Coach:coachName(p.coachId),Date:p.date,Type:p.type==='1on1'?'1:1':'Group',Sessions:p.qty,Amount:p.amount}))));
-  add('Expenses',DB.expenses.map(e=>({Date:e.date,Category:e.cat,Note:e.note,Amount:e.amount,Frequency:e.freq||'once'})));
+  add('Expenses',DB.expenses.map(e=>({Date:e.date,'Attributed to':coachName(e.coachId),Category:e.cat,Note:e.note,Amount:e.amount,Frequency:e.freq||'once'})));
   add('Cash income',[
     ...DB.sessions.filter(s=>s.paid&&s.paidVia==='cash'&&s.status!=='cancelled').map(s=>({Date:s.date,Source:custNames(s.customerIds)+' ('+(s.type==='1on1'?'1:1':'Group')+' session)',Note:s.notes||'',Amount:s.price})),
     ...DB.cashEntries.map(e=>({Date:e.date,Source:(e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in')+' ('+(e.qty||1)+'× '+(e.type==='group'?'Group':'1:1')+' cash)',Note:e.note||'',Amount:e.amount}))
@@ -2814,7 +2815,7 @@ function renderFinance(){
   const maxType=Math.max(byType['1on1'],byType['group'],1);
 
   const expRows=EX.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>`<tr>
-    <td>${fmtDate(e.date)}${(e.freq&&e.freq!=='once')?` <span class="pill blue">↻ ${FREQ_LABEL[e.freq]}</span>`:''}</td><td>🏀 ${coachName(e.coachId)}</td><td>${e.cat}</td><td class="muted">${e.note||''}</td>
+    <td>${fmtDate(e.date)}${(e.freq&&e.freq!=='once')?` <span class="pill blue">↻ ${FREQ_LABEL[e.freq]}</span>`:''}</td><td>${e.coachId==='owner'?'🏢':'🏀'} ${coachName(e.coachId)}</td><td>${e.cat}</td><td class="muted">${e.note||''}</td>
     <td class="right">${money(e.amount)}${(e.freq&&e.freq!=='once')?`<div class="clienttag">/${e.freq==='monthly'?'mo':'yr'}</div>`:''}</td>
     <td class="right"><div class="actions"><button class="iconbtn" onclick="openExpense('${e.id}')">Edit</button><button class="iconbtn" onclick="delExpense('${e.id}')">✕</button></div></td></tr>`).join('')
     ||'<tr><td colspan="6"><div class="empty">No expenses logged.</div></td></tr>';
@@ -2974,7 +2975,7 @@ function openExpense(id){
   const freqs=[['once','One-time'],['monthly','Monthly (recurring)'],['yearly','Yearly (recurring)']];
   const ef=e.freq||'once';
   openModal(id?'Edit Expense':'Add Expense',`
-    <div class="field"><label class="f">Coach (whose expense)</label><select id="eCoach">${coachSelectOptions(e.coachId||targetCoach(),false)}</select></div>
+    <div class="field"><label class="f">Attributed to</label><select id="eCoach">${coachSelectOptions(e.coachId||targetCoach(),false,true)}</select></div>
     <div class="row">
       <div class="field"><label class="f">${ef==='once'?'Date':'Start date'}</label><input type="date" id="eDate" value="${e.date}"></div>
       <div class="field"><label class="f">Amount ($)${ef==='monthly'?' / month':ef==='yearly'?' / year':''}</label><input type="number" id="eAmt" value="${e.amount}"></div>
