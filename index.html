@@ -1352,7 +1352,7 @@ function statusSelect(s){
   const opts=['pending','scheduled','completed','cancelled'];
   return '<select class="coachsel" title="Update status" onchange="coachSetStatus(\''+s.id+'\',this.value)">'+opts.map(o=>'<option '+(s.status===o?'selected':'')+'>'+o+'</option>').join('')+'</select>';
 }
-function coachSetStatus(id,val){
+function coachSetStatus(id,val,fromModal){
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
   const prev=s.status; if(prev===val)return;
   if(val==='cancelled'){ if(!confirm('Cancel this session? The owner and client will be notified.')){refreshOwner();return;} markCancelled(s,'coach');}else{s.status=val;clearCancel(s);}
@@ -1366,6 +1366,9 @@ function coachSetStatus(id,val){
     notifyCancel(s);
   }
   flash('Status updated → '+val);refreshOwner();
+  // When a coach marks a session completed from the quick dropdown, open the popup so they can
+  // add feedback + photos/videos for the client.
+  if(val==='completed' && !fromModal){ openCoachStatus(id); }
 }
 function coachSetPaid(id,val){
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
@@ -1402,7 +1405,7 @@ function coachSaveSession(id){
   const fb=document.getElementById('csFeedback'); if(fb)s.feedback=fb.value;
   s.media=editMedia.slice();
   const st=document.getElementById('csStatus').value;
-  if(st!==s.status){ coachSetStatus(id,st); }
+  if(st!==s.status){ coachSetStatus(id,st,true); }
   else { save();flash('Session updated');refreshOwner(); }
   mediaCust=null;
   closeModal();
