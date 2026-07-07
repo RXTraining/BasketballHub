@@ -697,7 +697,12 @@ function subscribeRealtime(){
 }
 function unsubscribeRealtime(){if(rtChannel){try{supa.removeChannel(rtChannel);}catch(e){}rtChannel=null;}}
 function startPolling(){
-  lastSig=dataSig(DB);clearInterval(pollTimer);pollTimer=setInterval(pollSync,8000);
+  lastSig=dataSig(DB);clearInterval(pollTimer);
+  // Realtime is the primary live channel (it pushes changes instantly). The interval is only a
+  // fallback for when Realtime isn't connected — this avoids re-downloading every table every few
+  // seconds, which was the main source of Supabase egress. When Realtime is healthy the interval
+  // does nothing; a change still refreshes instantly via subscribeRealtime() → pollSync().
+  pollTimer=setInterval(()=>{ if(rtState!=='SUBSCRIBED') pollSync(); }, 45000);
   subscribeRealtime();
   if(!pollHooked){
     pollHooked=true;
@@ -1606,24 +1611,41 @@ function ownerCheckIn(id){const s=DB.sessions.find(x=>x.id===id);s.checkedIn=tru
 /* session editor (owner) */
 /* session feedback media (photos/videos stored with the session) */
 const mUrl=m=>m.url||m.data||'';
+// Downscale + re-encode a photo before upload to cut storage & (repeated) view egress.
+async function compressImage(file,maxDim=1600,quality=0.8){
+  try{
+    const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(file);});
+    let w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+    if(Math.max(w,h)>maxDim){const s=maxDim/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);}
+    const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+    cv.getContext('2d').drawImage(img,0,0,w,h);
+    URL.revokeObjectURL(img.src);
+    const blob=await new Promise(res=>cv.toBlob(res,'image/jpeg',quality));
+    return (blob && blob.size<file.size)?blob:null;
+  }catch(e){return null;}
+}
 async function addMediaFiles(input){
   const files=[...input.files];input.value='';
   for(const f of files){
-    if(f.size>50*1024*1024){flash(f.name+' is too large (max 50MB)',true);continue;}
     const type=f.type.indexOf('video')===0?'video':'image';
+    if(type==='video' && f.size>25*1024*1024){flash(f.name+' is too large — please keep videos under 25MB (trim or lower the resolution).',true);continue;}
+    if(f.size>50*1024*1024){flash(f.name+' is too large (max 50MB)',true);continue;}
+    // compress photos; leave videos as-is (can't transcode in-browser)
+    let upFile=f, upType=f.type, upName=f.name||'file';
+    if(type==='image'){const c=await compressImage(f);if(c){upFile=c;upType='image/jpeg';upName=(f.name||'photo').replace(/\.[^.]+$/,'')+'.jpg';}}
     if(supa&&SUPA_OK){
-      const path='media/'+uid()+'-'+(f.name||'file').replace(/[^a-zA-Z0-9._-]/g,'_');
-      flash('Uploading '+f.name+'…');
-      const up=await supa.storage.from(MEDIA_BUCKET).upload(path,f,{upsert:true,contentType:f.type});
+      const path='media/'+uid()+'-'+upName.replace(/[^a-zA-Z0-9._-]/g,'_');
+      flash('Uploading '+(f.name||'file')+'…');
+      const up=await supa.storage.from(MEDIA_BUCKET).upload(path,upFile,{upsert:true,contentType:upType});
       if(up.error){flash('Upload failed: '+up.error.message,true);continue;}
       const pub=supa.storage.from(MEDIA_BUCKET).getPublicUrl(path);
-      editMedia.push({type,name:f.name,url:pub.data.publicUrl,path});
+      editMedia.push({type,name:upName,url:pub.data.publicUrl,path});
       renderMediaPrev();
     }else{
-      if(f.size>8*1024*1024){flash('Connect Supabase to upload large files',true);continue;}
+      if(upFile.size>8*1024*1024){flash('Connect Supabase to upload large files',true);continue;}
       const r=new FileReader();
-      r.onload=()=>{editMedia.push({type,name:f.name,data:r.result});renderMediaPrev();};
-      r.readAsDataURL(f);
+      r.onload=()=>{editMedia.push({type,name:upName,data:r.result});renderMediaPrev();};
+      r.readAsDataURL(upFile);
     }
   }
 }
