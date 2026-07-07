@@ -1277,7 +1277,7 @@ function renderBookingTable(){
         ${sessionHasCredit(s)?`<button class="iconbtn" title="Use prepaid credit" onclick="payCredit('${s.id}')">Credit</button>`:''}
         <button class="iconbtn" onclick="payCash('${s.id}')">Cash</button></div>`;}
     const actionCell = AUTH==='coach'
-      ? statusSelect(s)+`<button class="iconbtn" title="Calendar" onclick="addToCalendar('${s.id}')">📅</button>`
+      ? statusSelect(s)+`<button class="iconbtn" title="Feedback, photos & payment" onclick="openCoachStatus('${s.id}')">📝</button><button class="iconbtn" title="Calendar" onclick="addToCalendar('${s.id}')">📅</button>`
       : `${s.status==='pending'?`<button class="btn sm" onclick="confirmSession('${s.id}')">Confirm</button>`:''}
         <button class="iconbtn" title="Calendar" onclick="addToCalendar('${s.id}')">📅</button>
         <button class="iconbtn" onclick="openSession('${s.id}')">Edit</button>`;
