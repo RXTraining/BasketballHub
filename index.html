@@ -537,6 +537,14 @@ function seed(){
 const SUPABASE_URL = "https://hlqesgnemuquwxetyhaw.supabase.co";        // e.g. https://abcd1234.supabase.co
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhscWVzZ25lbXVxdXd4ZXR5aGF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2MTM1NDcsImV4cCI6MjA5ODE4OTU0N30.n8xYCIg7eSq-V2dyRPkUDQ8Vdwtgn65LINwZKcV2UjU";   // your anon public key
 const MEDIA_BUCKET = "rx-media";
+/* ---- Cloudflare R2 media storage (optional; cheaper egress) ----
+   When R2_ENDPOINT is set, session photos/videos are stored on Cloudflare R2 via the
+   Pages Function at /api/media instead of Supabase Storage. Leave blank to keep using
+   Supabase. R2_TOKEN must match the UPLOAD_TOKEN set in the Pages project settings.
+   See functions/api/media.js and R2-SETUP.md. */
+const R2_ENDPOINT = "https://rxtraining.org/api/media";                 // e.g. "https://rxtraining.org/api/media"
+const R2_TOKEN    = "a6f754a6270d96c7aa9b237f8abf444f13aa2559819cd86a";                 // must equal the UPLOAD_TOKEN env var in Cloudflare Pages
+const useR2 = () => !!(R2_ENDPOINT && R2_TOKEN);
 const STATE_TABLE = "rx_state";
 /* =========================================================================== */
 let DB = {}, supa = null, SUPA_OK = false, cloudTimer = null, localOnly = false;
@@ -1633,8 +1641,20 @@ async function addMediaFiles(input){
     // compress photos; leave videos as-is (can't transcode in-browser)
     let upFile=f, upType=f.type, upName=f.name||'file';
     if(type==='image'){const c=await compressImage(f);if(c){upFile=c;upType='image/jpeg';upName=(f.name||'photo').replace(/\.[^.]+$/,'')+'.jpg';}}
+    const cid=($$('.sCustCb').filter(cb=>cb.checked).map(cb=>cb.value)[0])||'unassigned';
+    if(useR2()){
+      flash('Uploading '+(f.name||'file')+'…');
+      try{
+        const r=await fetch(R2_ENDPOINT,{method:'POST',headers:{'content-type':upType,'x-upload-token':R2_TOKEN,'x-file-name':upName,'x-customer-id':cid},body:upFile});
+        const j=await r.json();
+        if(!r.ok||!j.url){flash('Upload failed: '+(j&&j.error||r.status),true);continue;}
+        editMedia.push({type,name:upName,url:j.url,key:j.key});
+        renderMediaPrev();
+      }catch(e){flash('Upload failed: '+e.message,true);}
+      continue;
+    }
     if(supa&&SUPA_OK){
-      const path='media/'+uid()+'-'+upName.replace(/[^a-zA-Z0-9._-]/g,'_');
+      const path='media/'+cid+'/'+uid()+'-'+upName.replace(/[^a-zA-Z0-9._-]/g,'_');
       flash('Uploading '+(f.name||'file')+'…');
       const up=await supa.storage.from(MEDIA_BUCKET).upload(path,upFile,{upsert:true,contentType:upType});
       if(up.error){flash('Upload failed: '+up.error.message,true);continue;}
@@ -1655,7 +1675,10 @@ function renderMediaPrev(){
     ${m.type==='image'?`<img src="${mUrl(m)}" style="width:84px;height:84px;object-fit:cover;border-radius:8px">`:`<video src="${mUrl(m)}" style="width:84px;height:84px;object-fit:cover;border-radius:8px"></video>`}
     <button class="iconbtn" style="position:absolute;top:-8px;right:-8px;padding:2px 7px" onclick="rmMedia(${i})">✕</button></div>`).join(''):'<span class="clienttag">No attachments yet.</span>';
 }
-function rmMedia(i){const m=editMedia[i];if(m&&m.path&&supa&&SUPA_OK){supa.storage.from(MEDIA_BUCKET).remove([m.path]).catch(()=>{});}editMedia.splice(i,1);renderMediaPrev();}
+function rmMedia(i){const m=editMedia[i];
+  if(m&&m.key&&useR2()){fetch(R2_ENDPOINT+'?key='+encodeURIComponent(m.key)+'&token='+encodeURIComponent(R2_TOKEN),{method:'DELETE'}).catch(()=>{});}
+  else if(m&&m.path&&supa&&SUPA_OK){supa.storage.from(MEDIA_BUCKET).remove([m.path]).catch(()=>{});}
+  editMedia.splice(i,1);renderMediaPrev();}
 function viewMedia(sid,i){const s=DB.sessions.find(x=>x.id===sid);const m=s&&s.media&&s.media[i];if(!m)return;
   openModal(m.name||'Attachment',m.type==='image'?`<img src="${mUrl(m)}" style="max-width:100%;border-radius:10px">`:`<video src="${mUrl(m)}" controls autoplay style="max-width:100%;border-radius:10px"></video>`,`<button class="btn" onclick="closeModal()">Close</button>`);}
 function mediaThumbs(s,owner){
