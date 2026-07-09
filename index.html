@@ -3130,10 +3130,16 @@ function custAnalyticsHtml(){
   const active=custs.filter(c=>bookedCount(c)>0).length;
   const totalPaid=custs.reduce((a,c)=>a+custValue(c),0);
   // all customers who have at least one completed session, ranked by lifetime value
-  const ranked=custs.map(c=>({c,val:custValue(c),done:completedCount(c),booked:bookedCount(c)})).filter(r=>r.done>0).sort((a,b)=>b.val-a.val);
-  const maxV=Math.max(1,...ranked.map(r=>r.val));
   const chip=(k,v,col)=>`<div class="stat"><div class="k">${k}</div><div class="v"${col?` style="color:${col}"`:''}>${v}</div></div>`;
-  const topRows=ranked.length?ranked.map(r=>`<div class="barrow" style="cursor:pointer" title="Filter table to ${r.c.name}" onclick="custSearch='${(r.c.name||'').replace(/'/g,"\\'")}';renderCustomers()"><div class="lab" style="width:130px">${r.c.name}</div><div class="bar"><i style="width:${r.val/maxV*100}%"></i></div><div class="val">${money(r.val)}<div class="clienttag" style="text-align:right">${r.done+r.booked} sessions</div><div class="clienttag" style="text-align:right">${r.done} done · ${r.booked} booked</div></div></div>`).join(''):'<div class="empty">No completed sessions yet.</div>';
+  const clickRow=c=>`onclick="custSearch='${(c.name||'').replace(/'/g,"\\'")}';renderCustomers()"`;
+  // ranked by lifetime money paid (customers with a completed session)
+  const rankedV=custs.map(c=>({c,val:custValue(c),done:completedCount(c),booked:bookedCount(c)})).filter(r=>r.done>0).sort((a,b)=>b.val-a.val);
+  const maxV=Math.max(1,...rankedV.map(r=>r.val));
+  const topRows=rankedV.length?rankedV.map(r=>`<div class="barrow" style="cursor:pointer" title="Filter table to ${r.c.name}" ${clickRow(r.c)}><div class="lab" style="width:120px">${r.c.name}</div><div class="bar"><i style="width:${r.val/maxV*100}%"></i></div><div class="val">${money(r.val)}<div class="clienttag" style="text-align:right">${r.done+r.booked} sessions</div></div></div>`).join(''):'<div class="empty">No completed sessions yet.</div>';
+  // ranked by session volume (completed + booked)
+  const rankedS=custs.map(c=>({c,done:completedCount(c),booked:bookedCount(c)})).map(r=>({...r,sess:r.done+r.booked})).filter(r=>r.sess>0).sort((a,b)=>b.sess-a.sess);
+  const maxS=Math.max(1,...rankedS.map(r=>r.sess));
+  const sessRows=rankedS.length?rankedS.map(r=>`<div class="barrow" style="cursor:pointer" title="Filter table to ${r.c.name}" ${clickRow(r.c)}><div class="lab" style="width:120px">${r.c.name}</div><div class="bar"><i style="width:${r.sess/maxS*100}%"></i></div><div class="val">${r.sess} sessions<div class="clienttag" style="text-align:right">${r.done} done · ${r.booked} booked</div></div></div>`).join(''):'<div class="empty">No sessions yet.</div>';
   // customers by town
   const townMap={};custs.forEach(c=>{const t=(c.town||'').trim()||'(no town)';townMap[t]=(townMap[t]||0)+1;});
   const towns=Object.entries(townMap).sort((a,b)=>b[1]-a[1]);
@@ -3145,14 +3151,15 @@ function custAnalyticsHtml(){
       ${chip('Active (booked)',active,'var(--blue)')}
       ${chip('Lifetime revenue',money(totalPaid),'var(--accent2)')}
     </div>
-    <div class="twocol" style="margin-bottom:16px">
-      <div class="panel">
-        <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="margin:0">New customers added</h3>${growthSeg()}</div>
-        <div class="chart-wrap"><canvas id="custGrowth"></canvas></div>
-      </div>
-      <div class="panel"><h3>Most valuable customers</h3><div style="max-height:240px;overflow-y:auto;padding-right:12px">${topRows}</div><div class="clienttag" style="margin-top:8px">All customers with a completed session, ranked by lifetime money paid.</div></div>
+    <div class="panel" style="margin-bottom:16px">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="margin:0">New customers added</h3>${growthSeg()}</div>
+      <div class="chart-wrap"><canvas id="custGrowth"></canvas></div>
     </div>
-    <div class="panel" style="margin-bottom:16px"><h3>Customers by town</h3><div style="max-height:240px;overflow-y:auto;padding-right:12px">${townRows}</div><div class="clienttag" style="margin-top:8px">Where your players come from. Click a town to filter the table.</div></div>`;
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px">
+      <div class="panel"><h3>Most valuable — by money</h3><div style="max-height:240px;overflow-y:auto;padding-right:12px">${topRows}</div><div class="clienttag" style="margin-top:8px">Ranked by lifetime money paid. Click a bar to filter the table.</div></div>
+      <div class="panel"><h3>Most active — by sessions</h3><div style="max-height:240px;overflow-y:auto;padding-right:12px">${sessRows}</div><div class="clienttag" style="margin-top:8px">Ranked by sessions (completed + booked). Click a bar to filter the table.</div></div>
+      <div class="panel"><h3>Customers by town</h3><div style="max-height:240px;overflow-y:auto;padding-right:12px">${townRows}</div><div class="clienttag" style="margin-top:8px">Where your players come from. Click a town to filter the table.</div></div>
+    </div>`;
 }
 function mountCustGrowth(){drawBars('custGrowth',bucketByPeriodCount(DB.customers.map(c=>c.created).filter(Boolean),growthRange,12),'#4aa8ff',(it)=>{custDateFilter=(custDateFilter&&custDateFilter.key===it.key)?null:{period:growthRange,key:it.key,label:it.label};renderCustomers();},custDateFilter&&custDateFilter.key);}
 function coachValue(id){return coachEarnings(id).reduce((x,i)=>x+i.amount,0);}
