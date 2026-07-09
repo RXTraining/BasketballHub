@@ -3130,10 +3130,10 @@ function custAnalyticsHtml(){
   const active=custs.filter(c=>bookedCount(c)>0).length;
   const totalPaid=custs.reduce((a,c)=>a+custValue(c),0);
   // all customers who have at least one completed session, ranked by lifetime value
-  const ranked=custs.map(c=>({c,val:custValue(c),done:completedCount(c)})).filter(r=>r.done>0).sort((a,b)=>b.val-a.val);
+  const ranked=custs.map(c=>({c,val:custValue(c),done:completedCount(c),booked:bookedCount(c)})).filter(r=>r.done>0).sort((a,b)=>b.val-a.val);
   const maxV=Math.max(1,...ranked.map(r=>r.val));
   const chip=(k,v,col)=>`<div class="stat"><div class="k">${k}</div><div class="v"${col?` style="color:${col}"`:''}>${v}</div></div>`;
-  const topRows=ranked.length?ranked.map(r=>`<div class="barrow" style="cursor:pointer" title="Filter table to ${r.c.name}" onclick="custSearch='${(r.c.name||'').replace(/'/g,"\\'")}';renderCustomers()"><div class="lab" style="width:130px">${r.c.name}</div><div class="bar"><i style="width:${r.val/maxV*100}%"></i></div><div class="val">${money(r.val)}<div class="clienttag" style="text-align:right">${r.done} done</div></div></div>`).join(''):'<div class="empty">No completed sessions yet.</div>';
+  const topRows=ranked.length?ranked.map(r=>`<div class="barrow" style="cursor:pointer" title="Filter table to ${r.c.name}" onclick="custSearch='${(r.c.name||'').replace(/'/g,"\\'")}';renderCustomers()"><div class="lab" style="width:130px">${r.c.name}</div><div class="bar"><i style="width:${r.val/maxV*100}%"></i></div><div class="val">${money(r.val)}<div class="clienttag" style="text-align:right">${r.done+r.booked} sessions</div><div class="clienttag" style="text-align:right">${r.done} done · ${r.booked} booked</div></div></div>`).join(''):'<div class="empty">No completed sessions yet.</div>';
   // customers by town
   const townMap={};custs.forEach(c=>{const t=(c.town||'').trim()||'(no town)';townMap[t]=(townMap[t]||0)+1;});
   const towns=Object.entries(townMap).sort((a,b)=>b[1]-a[1]);
