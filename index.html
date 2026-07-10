@@ -269,6 +269,7 @@
   <section class="view" id="view-coaches"></section>
   <section class="view" id="view-locations"></section>
   <section class="view" id="view-availability"></section>
+  <section class="view" id="view-messages"></section>
   <section class="view" id="view-finance"></section>
   <section class="view" id="view-admin"></section>
 </div>
@@ -599,6 +600,7 @@ function normalize(d){
   (d.customers||[]).forEach(c=>{(c.packages||[]).forEach(p=>{if(!p.coachId)p.coachId=dcid;});});
   if(!d.events)d.events=[];
   if(!d.eventRegs)d.eventRegs=[];
+  if(!d.messages)d.messages=[];
   d.events.forEach(e=>{if(e.active===undefined)e.active=true;if(e.price==null)e.price=0;if(e.capacity==null)e.capacity=0;if(!e.created)e.created=todayISO();if(e.coachId===undefined)e.coachId='';if(!e.detail)e.detail=e.detail||'';});
   d.eventRegs.forEach(r=>{if(!r.status)r.status='registered';if(r.paid===undefined)r.paid=false;if(r.paidVia===undefined)r.paidVia='';if(r.checkedIn===undefined)r.checkedIn=false;});
   return d;
@@ -606,7 +608,7 @@ function normalize(d){
 function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.parse(r);}catch(e){}return normalize(d);}
 
 /* ----- relational mapping (separate tables in Supabase) ----- */
-function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs){
+function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs){
   const d={};
   d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):''};
   d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',
@@ -621,6 +623,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs){
   d.cashEntries=(cash||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,amount:Number(e.amount),note:e.note||'',customerId:e.customer_id||'',type:e.type||'1on1',qty:e.qty||1}));
   d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||''}));
   d.eventRegs=(regs||[]).map(r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||''}));
+  d.messages=(msgs||[]).map(m=>({id:m.id,peerType:m.peer_type||'client',clientId:m.client_id||'',coachId:m.coach_id||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',readOwner:m.read_owner===true,readClient:m.read_client===true,readCoach:m.read_coach===true}));
   return normalize(d);
 }
 const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),pending:(c.pending||null),created:c.created||null});
@@ -628,6 +631,7 @@ const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',e
 const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null});
 const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:e.coachId||null,price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||''});
 const eventRegRow=r=>({id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||''});
+const messageRow=m=>({id:m.id,peer_type:m.peerType||'client',client_id:m.clientId||'',coach_id:m.coachId||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',read_owner:m.readOwner===true,read_client:m.readClient===true,read_coach:m.readCoach===true});
 async function migrateSource(){
   try{const {data}=await supa.from(STATE_TABLE).select('data').eq('id','main').maybeSingle();if(data&&data.data)return normalize(data.data);}catch(e){}
   return localData();
@@ -641,10 +645,11 @@ async function fetchCloud(){
     supa.from('availability').select('*'), supa.from('coaches').select('*')]);
   const err=[st,loc,cus,pkg,ses,exp,cash,avail,coa].find(r=>r.error); if(err) throw err.error;
   // events tables are newer/optional — never let a missing table break the whole sync
-  let evs={data:[]},regs={data:[]};
+  let evs={data:[]},regs={data:[]},msgs={data:[]};
   try{const [e1,e2]=await Promise.all([supa.from('events').select('*'),supa.from('event_regs').select('*')]);
     if(e1&&!e1.error)evs=e1; if(e2&&!e2.error)regs=e2;}catch(e){}
-  return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data,avail.data,coa.data,evs.data,regs.data);
+  try{const m1=await supa.from('messages').select('*'); if(m1&&!m1.error)msgs=m1;}catch(e){}
+  return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data,avail.data,coa.data,evs.data,regs.data,msgs.data);
 }
 async function bootLoad(){
   const cfg=getSupaCfg();
@@ -670,6 +675,7 @@ function dataSig(d){return JSON.stringify({
   e:(d.expenses||[]).length, k:(d.cashEntries||[]).length,
   ev:(d.events||[]).map(x=>[x.id,x.title,x.date,x.time,x.price,x.capacity,x.active,x.location]),
   er:(d.eventRegs||[]).map(x=>[x.id,x.eventId,x.customerId,x.status,x.paid,x.checkedIn]),
+  msg:(d.messages||[]).map(x=>[x.id,x.readOwner,x.readClient,x.readCoach]),
   n:d.settings&&d.settings.notifyEmails});}
 /* only protect real text entry — a focused dropdown (e.g. the header coach selector)
    must NOT block live refreshes, or the owner's view goes stale */
@@ -776,6 +782,7 @@ async function cloudPush(){
     await push('availability',()=>syncTable('availability',(DB.availability||[]).map(a=>({id:a.id,coach_id:a.coachId||null,date:a.date,start_t:a.start,end_t:a.end,slot_min:a.slotMin,location:a.location||'',approved:a.approved!==false}))));
     await push('events',()=>syncTable('events',(DB.events||[]).map(eventRow)));
     await push('event_regs',()=>syncTable('event_regs',(DB.eventRegs||[]).map(eventRegRow)));
+    await push('messages',()=>syncTable('messages',(DB.messages||[]).map(messageRow)));
     if(fails.length)flash('⚠ These tables need setup — run supabase-setup.sql: '+fails.join(', '),true);
   }catch(e){flash('Cloud save failed — saved on this device',true);}
   finally{pushing=false;}
@@ -847,6 +854,7 @@ const TABS=[
   {id:'past',label:'Past Sessions'},
   {id:'money',label:'Payments'},
   {id:'events',label:'Events'},
+  {id:'messages',label:'Messages'},
   {id:'customers',label:'Customers'},
   {id:'coaches',label:'Coaches'},
   {id:'locations',label:'Locations'},
@@ -857,16 +865,19 @@ const TABS=[
 
 function renderTabs(){
   let allowed;
-  if(AUTH==='client') allowed=['booking','past','money','events'];
-  else if(AUTH==='coach') allowed=['about','booking','availability','money'];
+  if(AUTH==='client') allowed=['booking','past','money','events','messages'];
+  else if(AUTH==='coach') allowed=['about','booking','availability','money','messages'];   // coach chats with owner only
   else allowed = TABS.map(tb=>tb.id).filter(x=>x!=='past'&&x!=='money');   // owner uses the full Finance tab instead
   if(!allowed.includes(TAB)) TAB = 'booking';
+  const unread=unreadCount();
   $('#tabs').innerHTML = TABS.filter(tb=>allowed.includes(tb.id)).map(tb=>{
     let label=tb.label;
     if(tb.id==='booking'&&AUTH==='client')label='My Sessions';
     if(tb.id==='about'&&AUTH==='coach')label='My Profile';
     if(tb.id==='money')label=AUTH==='coach'?'Earnings':'Payments';
-    return `<button data-tab="${tb.id}" class="${TAB===tb.id?'active':''}">${t(label)}</button>`;
+    let lab=t(label);
+    if(tb.id==='messages'&&unread>0)lab+=` <span class="pill red" style="padding:1px 7px">${unread}</span>`;
+    return `<button data-tab="${tb.id}" class="${TAB===tb.id?'active':''}">${lab}</button>`;
   }).join('');
   $$('#tabs button').forEach(b=>b.onclick=()=>{TAB=b.dataset.tab;switchTab();});
 }
@@ -878,7 +889,7 @@ function switchTab(){
   saveSess();
 }
 function saveSess(){try{sessionStorage.setItem('rx_sess',JSON.stringify({auth:AUTH,clientAs,coachAs,mgCoach,pickCoach,tab:TAB}));}catch(e){}}
-function refreshOwner(){const f={about:renderAbout,booking:renderBooking,past:renderPast,money:renderMoney,events:renderEvents,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,admin:renderAdmin}[TAB];if(f)f();if(AUTH==='owner')renderWhoami();}
+function refreshOwner(){const f={about:renderAbout,booking:renderBooking,past:renderPast,money:renderMoney,events:renderEvents,messages:renderMessages,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,admin:renderAdmin}[TAB];if(f)f();if(TAB!=='messages'&&(AUTH==='owner'||AUTH==='client'))renderTabs();if(AUTH==='owner')renderWhoami();}
 
 /* ---------- Auth ---------- */
 function ensureTokens(){let ch=false;DB.customers.forEach(c=>{if(!c.token){c.token=uid()+uid();ch=true;}});if(ch)save();}
@@ -1148,6 +1159,7 @@ function exportExcel(){
   add('Availability',(DB.availability||[]).map(a=>({Coach:coachName(a.coachId),Date:a.date,From:a.start,To:a.end,'Slot (min)':a.slotMin,Location:a.location,Approved:a.approved!==false?'Yes':'No'})));
   add('Events',(DB.events||[]).map(e=>({Title:e.title,Date:e.date,Time:e.time,Location:e.location,Coach:e.coachId?coachName(e.coachId):'General',Price:e.price,Capacity:e.capacity,Published:e.active!==false?'Yes':'No',Registered:eventRegsFor(e.id).length,Collected:eventRevenue(e),Details:e.detail||''})));
   add('Event registrations',(DB.eventRegs||[]).map(r=>{const ev=eventById(r.eventId);const c=custById(r.customerId);return {Event:ev?ev.title:'(deleted)',Client:c?c.name:'?',Status:r.status,Paid:r.paid?'Yes':'No','Checked in':r.checkedIn?'Yes':'No','Event date':ev?ev.date:'',Registered:r.created||''};}));
+  add('Messages',(DB.messages||[]).slice().sort((a,b)=>(a.created||'').localeCompare(b.created||'')).map(m=>{const pt=m.peerType||'client';return {'Thread with':(pt==='coach'?'Coach '+coachName(m.coachId):peerName('client',m.clientId)),Type:pt,From:m.sender,Message:m.text||'',Photos:(m.media||[]).length,When:m.created||'','Read by owner':m.readOwner?'Yes':'No','Read by peer':(pt==='coach'?m.readCoach:m.readClient)?'Yes':'No'};}));
   XLSX.writeFile(wb,'RXTraining-export-'+todayISO()+'.xlsx');
   flash('Excel exported ⬇');
 }
@@ -2741,6 +2753,114 @@ function clientEventBanner(){
     <div class="mq"><div class="mq-track" style="animation-duration:${dur}s">${items}${items}</div></div>
     <button class="btn ghost sm" style="flex:0 0 auto" onclick="event.stopPropagation();TAB='events';switchTab()">${t('See all →')}</button>
   </div>`;
+}
+
+/* ============================================================
+   MESSAGES (owner <-> client chat)
+   ============================================================ */
+let ownerThread=null, chatThreadKey=null;   // ownerThread = {type:'client'|'coach', id} or null
+function escapeHtml(s){return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function fmtChatTime(iso){try{return new Date(iso).toLocaleString('en-US',{timeZone:TZ,month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
+function peerName(type,id){return type==='coach'?coachName(id):(custById(id)?custById(id).name:'client');}
+function threadMsgs(type,id){return (DB.messages||[]).filter(m=>(m.peerType||'client')===type && (type==='coach'?m.coachId===id:m.clientId===id)).sort((a,b)=>(a.created||'').localeCompare(b.created||''));}
+function unreadCount(){
+  const M=DB.messages||[];
+  if(AUTH==='owner')return M.filter(m=>m.sender!=='owner'&&!m.readOwner).length;
+  if(AUTH==='client')return M.filter(m=>(m.peerType||'client')==='client'&&m.clientId===clientAs&&m.sender==='owner'&&!m.readClient).length;
+  if(AUTH==='coach')return M.filter(m=>m.peerType==='coach'&&m.coachId===coachAs&&m.sender==='owner'&&!m.readCoach).length;
+  return 0;
+}
+function markThreadRead(type,id){
+  const rows=[];
+  (DB.messages||[]).forEach(m=>{const pt=m.peerType||'client';
+    if(pt!==type)return;
+    if(type==='coach'?m.coachId!==id:m.clientId!==id)return;
+    if(AUTH==='owner'&&m.sender!=='owner'&&!m.readOwner){m.readOwner=true;rows.push(m);}
+    if(AUTH==='client'&&m.sender==='owner'&&!m.readClient){m.readClient=true;rows.push(m);}
+    if(AUTH==='coach'&&m.sender==='owner'&&!m.readCoach){m.readCoach=true;rows.push(m);}
+  });
+  if(rows.length){save();pushRows('messages',rows.map(messageRow));}
+}
+function scrollChat(){setTimeout(()=>{const l=document.getElementById('chatList');if(l)l.scrollTop=l.scrollHeight;},30);}
+function chatBubble(m,mine){
+  const media=(m.media||[]).map(x=>`<img src="${mUrl(x)}" style="max-width:200px;border-radius:8px;display:block;margin-top:6px">`).join('');
+  return `<div style="display:flex;justify-content:${mine?'flex-end':'flex-start'};margin:6px 0">
+    <div style="max-width:78%;background:${mine?'var(--accent)':'var(--panel2)'};color:${mine?'#151515':'var(--txt)'};padding:8px 12px;border-radius:14px;word-break:break-word">
+      ${m.text?`<div>${escapeHtml(m.text)}</div>`:''}${media}
+      <div style="font-size:10px;opacity:.65;margin-top:3px;text-align:right">${fmtChatTime(m.created)}</div>
+    </div></div>`;
+}
+function chatThreadHtml(type,id){
+  const msgs=threadMsgs(type,id);
+  const list=msgs.length?msgs.map(m=>chatBubble(m,m.sender===AUTH)).join(''):'<div class="empty">No messages yet — say hello! 👋</div>';
+  const who=AUTH==='owner'?('Chat with '+(type==='coach'?'🏀 ':'')+peerName(type,id)):t('Messages');
+  const sub=AUTH==='owner'?'Messages sync live. Boston (ET).':t('Chat directly with the RX.TRAINING owner. Boston (ET).');
+  return `<h1 class="page">${who}</h1><div class="sub">${sub}</div>
+    <div id="chatList" style="max-height:54vh;overflow-y:auto;padding:8px;background:var(--panel);border-radius:12px;margin-bottom:10px">${list}</div>
+    <div id="sMediaPrev" style="margin-bottom:6px"></div>
+    <div class="row" style="gap:8px;align-items:flex-end">
+      <textarea id="chatInput" placeholder="${t('Type a message…')}" style="flex:1;min-height:46px;resize:vertical"></textarea>
+      <label class="btn ghost" title="Attach photo" style="cursor:pointer">📎<input type="file" accept="image/*" style="display:none" onchange="addMediaFiles(this)"></label>
+      <button class="btn" onclick="sendMessage()">${t('Send')}</button>
+    </div>`;
+}
+function ownerInboxHtml(){
+  const lastMap={},unreadMap={};
+  (DB.messages||[]).forEach(m=>{const pt=m.peerType||'client';const k=pt+':'+(pt==='coach'?m.coachId:m.clientId);
+    if(!lastMap[k]||(m.created||'')>(lastMap[k].created||''))lastMap[k]=m;
+    if(m.sender!=='owner'&&!m.readOwner)unreadMap[k]=(unreadMap[k]||0)+1;});
+  const entries=[];
+  (DB.coaches||[]).forEach(co=>entries.push({type:'coach',id:co.id,name:'🏀 '+co.name}));
+  DB.customers.forEach(c=>entries.push({type:'client',id:c.id,name:c.name}));
+  entries.forEach(e=>{e.key=e.type+':'+e.id;e.lm=lastMap[e.key];e.u=unreadMap[e.key]||0;});
+  const withM=entries.filter(e=>e.lm).sort((a,b)=>(b.lm.created||'').localeCompare(a.lm.created||''));
+  const noM=entries.filter(e=>!e.lm).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const row=e=>{const lm=e.lm;const prev=lm?((lm.sender==='owner'?'You: ':'')+(lm.text||(lm.media&&lm.media.length?'📷 Photo':''))):'Start a conversation';
+    return `<div onclick="openThread('${e.type}','${e.id}')" style="display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;padding:11px 12px;border-bottom:1px solid var(--line)">
+      <div style="min-width:0;flex:1"><b>${e.name}</b> ${e.u>0?`<span class="pill red">${e.u}</span>`:''}
+        <div class="clienttag" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(prev)}</div></div>
+      <div class="clienttag" style="flex-shrink:0">${lm?fmtChatTime(lm.created):''}</div></div>`;};
+  return `<h1 class="page">Messages</h1><div class="sub">Chat with coaches and clients. (Coaches and clients can't message each other — everything routes through you.)</div>
+    <div class="panel" style="padding:0;overflow:hidden;margin-top:10px">
+      ${withM.map(row).join('')}
+      ${noM.length?`<div class="clienttag" style="padding:10px 12px;background:var(--panel2)">Start a new chat</div>`+noM.map(row).join(''):''}
+      ${!entries.length?'<div class="empty">No coaches or customers yet.</div>':''}
+    </div>`;
+}
+function renderMessages(){
+  const el=$('#view-messages');if(!el)return;
+  if(AUTH==='owner'){
+    if(!ownerThread){el.innerHTML=ownerInboxHtml();chatThreadKey=null;renderTabs();return;}
+    const {type,id}=ownerThread;
+    const key='o:'+type+':'+id; if(key!==chatThreadKey){editMedia=[];chatThreadKey=key;}
+    mediaCust=peerName(type,id)||'chat'; markThreadRead(type,id);
+    el.innerHTML=`<button class="btn ghost sm" style="margin-bottom:8px" onclick="backToInbox()">← ${t('All conversations')}</button>`+chatThreadHtml(type,id);
+    renderMediaPrev();scrollChat();renderTabs();return;
+  }
+  const type=AUTH==='coach'?'coach':'client';
+  const id=AUTH==='coach'?coachAs:clientAs;
+  if(!id){el.innerHTML='<div class="empty">No conversation.</div>';return;}
+  const key=type+':'+id; if(key!==chatThreadKey){editMedia=[];chatThreadKey=key;}
+  mediaCust=peerName(type,id)||'chat'; markThreadRead(type,id);
+  el.innerHTML=chatThreadHtml(type,id);
+  renderMediaPrev();scrollChat();renderTabs();
+}
+function openThread(type,id){ownerThread={type,id};editMedia=[];chatThreadKey=null;renderMessages();}
+function backToInbox(){ownerThread=null;editMedia=[];renderMessages();}
+function sendMessage(){
+  const inp=$('#chatInput');const text=(inp?inp.value:'').trim();
+  if(!text&&!editMedia.length)return;
+  let type,id;
+  if(AUTH==='owner'){if(!ownerThread)return;type=ownerThread.type;id=ownerThread.id;}
+  else if(AUTH==='coach'){type='coach';id=coachAs;}
+  else{type='client';id=clientAs;}
+  if(!id)return;
+  const m={id:uid(),peerType:type,clientId:type==='client'?id:'',coachId:type==='coach'?id:'',sender:AUTH,
+    text,media:editMedia.slice(),created:new Date().toISOString(),
+    readOwner:(AUTH==='owner'),readClient:(AUTH==='client'&&type==='client'),readCoach:(AUTH==='coach'&&type==='coach')};
+  DB.messages.push(m);save();pushRows('messages',[messageRow(m)]);
+  editMedia=[];if(inp)inp.value='';
+  renderMessages();
 }
 
 /* ============================================================
