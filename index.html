@@ -880,11 +880,26 @@ function renderTabs(){
     return `<button data-tab="${tb.id}" class="${TAB===tb.id?'active':''}">${lab}</button>`;
   }).join('');
   $$('#tabs button').forEach(b=>b.onclick=()=>{TAB=b.dataset.tab;switchTab();});
+  updateAppBadge(unread);
+}
+/* Home-screen / installed-app icon badge for unread messages (owner, coach, client).
+   Works on installed PWAs incl. iOS 16.4+ home-screen web apps once notification
+   permission is granted; no-ops where unsupported. Also mirrors the count in the tab title. */
+function updateAppBadge(n){
+  if(n===undefined){try{n=unreadCount();}catch(e){n=0;}}
+  try{ if('setAppBadge' in navigator){ n>0?navigator.setAppBadge(n):navigator.clearAppBadge(); } }catch(e){}
+  try{ document.title = (n>0?('('+n+') '):'')+'RX.TRAINING'; }catch(e){}
+}
+function askNotifyPermission(){
+  try{ if(window.Notification && Notification.permission==='default'){ Notification.requestPermission().then(()=>updateAppBadge()); } }catch(e){}
 }
 function switchTab(){
   renderTabs();
   $$('.view').forEach(v=>v.classList.remove('active'));
   $('#view-'+TAB).classList.add('active');
+  // opening Messages is a user gesture — a good moment to request notification permission
+  // so the home-screen icon badge can show (required on iOS).
+  if(TAB==='messages')askNotifyPermission();
   refreshOwner();
   saveSess();
 }
@@ -1087,6 +1102,7 @@ function loginAsCoach(id){
 function signOut(){
   AUTH=null;ROLE='owner';pendingClient=null;coachAs=null;pickCoach=null;stopPolling();
   try{sessionStorage.removeItem('rx_sess');}catch(e){}
+  try{ if('clearAppBadge' in navigator)navigator.clearAppBadge(); document.title='RX.TRAINING'; }catch(e){}
   if(location.hash) history.replaceState(null,'',location.pathname+location.search);
   showLogin();
 }
@@ -2827,14 +2843,29 @@ function ownerInboxHtml(){
       ${!entries.length?'<div class="empty">No coaches or customers yet.</div>':''}
     </div>`;
 }
+// "Turn on alerts" banner so people can enable the icon badge after dismissing the prompt
+function enableAlerts(){
+  try{ if(window.Notification && Notification.permission==='default'){
+    Notification.requestPermission().then(()=>{updateAppBadge();if(TAB==='messages')renderMessages();});
+  } }catch(e){}
+}
+function notifyBannerHtml(){
+  if(!window.Notification || Notification.permission==='granted') return '';
+  if(Notification.permission==='denied')
+    return `<div class="clienttag" style="background:var(--panel2);padding:9px 12px;border-radius:10px;margin-bottom:10px">🔔 ${t('Alerts are blocked. To get a new-message badge on your app icon, allow notifications for this site in your device settings.')}</div>`;
+  return `<div style="background:var(--panel2);padding:10px 12px;border-radius:10px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <span class="small">🔔 ${t('Turn on alerts to get a badge on your app icon for new messages.')}</span>
+    <button class="btn sm" onclick="enableAlerts()">${t('Turn on alerts')}</button></div>`;
+}
 function renderMessages(){
   const el=$('#view-messages');if(!el)return;
+  const banner=notifyBannerHtml();
   if(AUTH==='owner'){
-    if(!ownerThread){el.innerHTML=ownerInboxHtml();chatThreadKey=null;renderTabs();return;}
+    if(!ownerThread){el.innerHTML=banner+ownerInboxHtml();chatThreadKey=null;renderTabs();return;}
     const {type,id}=ownerThread;
     const key='o:'+type+':'+id; if(key!==chatThreadKey){editMedia=[];chatThreadKey=key;}
     mediaCust=peerName(type,id)||'chat'; markThreadRead(type,id);
-    el.innerHTML=`<button class="btn ghost sm" style="margin-bottom:8px" onclick="backToInbox()">← ${t('All conversations')}</button>`+chatThreadHtml(type,id);
+    el.innerHTML=banner+`<button class="btn ghost sm" style="margin-bottom:8px" onclick="backToInbox()">← ${t('All conversations')}</button>`+chatThreadHtml(type,id);
     renderMediaPrev();scrollChat();renderTabs();return;
   }
   const type=AUTH==='coach'?'coach':'client';
@@ -2842,7 +2873,7 @@ function renderMessages(){
   if(!id){el.innerHTML='<div class="empty">No conversation.</div>';return;}
   const key=type+':'+id; if(key!==chatThreadKey){editMedia=[];chatThreadKey=key;}
   mediaCust=peerName(type,id)||'chat'; markThreadRead(type,id);
-  el.innerHTML=chatThreadHtml(type,id);
+  el.innerHTML=banner+chatThreadHtml(type,id);
   renderMediaPrev();scrollChat();renderTabs();
 }
 function openThread(type,id){ownerThread={type,id};editMedia=[];chatThreadKey=null;renderMessages();}
