@@ -723,8 +723,8 @@ function startPolling(){
   initPush();   // register for background push if permission already granted
   if(!pollHooked){
     pollHooked=true;
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden)pollSync();}); // refresh the moment you return to the tab
-    window.addEventListener('focus',pollSync);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden){pollSync();if(TAB==='messages')renderMessages();}}); // refresh + mark read on return
+    window.addEventListener('focus',()=>{pollSync();if(TAB==='messages')renderMessages();});
   }
 }
 function stopPolling(){clearInterval(pollTimer);pollTimer=null;unsubscribeRealtime();}
@@ -2814,6 +2814,11 @@ function unreadCount(){
   return 0;
 }
 function markThreadRead(type,id){
+  // Only mark as read when the user is actually looking at the thread. A live refresh can
+  // re-render the Messages view while the app is backgrounded / screen off / on another tab —
+  // don't silently clear unread in that case.
+  if(TAB!=='messages')return;
+  if(typeof document!=='undefined' && document.hidden)return;
   const rows=[];
   (DB.messages||[]).forEach(m=>{const pt=m.peerType||'client';
     if(pt!==type)return;
