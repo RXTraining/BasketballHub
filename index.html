@@ -8,6 +8,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="RX.TRAINING">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <link id="appleIcon" rel="apple-touch-icon">
 <link id="favIcon" rel="icon" type="image/png">
 <script>
@@ -718,6 +720,7 @@ function startPolling(){
   // does nothing; a change still refreshes instantly via subscribeRealtime() → pollSync().
   pollTimer=setInterval(()=>{ if(rtState!=='SUBSCRIBED') pollSync(); }, 45000);
   subscribeRealtime();
+  initPush();   // register for background push if permission already granted
   if(!pollHooked){
     pollHooked=true;
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)pollSync();}); // refresh the moment you return to the tab
@@ -891,7 +894,31 @@ function updateAppBadge(n){
   try{ document.title = (n>0?('('+n+') '):'')+'RX.TRAINING'; }catch(e){}
 }
 function askNotifyPermission(){
-  try{ if(window.Notification && Notification.permission==='default'){ Notification.requestPermission().then(()=>updateAppBadge()); } }catch(e){}
+  try{ if(window.Notification && Notification.permission==='default'){ Notification.requestPermission().then(()=>{updateAppBadge();initPush();}); } }catch(e){}
+}
+/* ---- Web Push: register the service worker and store this device's subscription ---- */
+const VAPID_PUBLIC="BBzEXfAxrGvu2MYgNkkM_MXcH0P1u3tGXBX3pUvCkOPKSDQIJJvoDmytAGWph2M5ulsSz8RkFMiA9yrf5fgIoMI";
+let pushInited=false;
+function urlB64ToUint8(b64){const pad='='.repeat((4-b64.length%4)%4);const s=(b64+pad).replace(/-/g,'+').replace(/_/g,'/');const raw=atob(s);return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));}
+async function initPush(){
+  try{
+    if(pushInited)return;
+    if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
+    if(!window.Notification||Notification.permission!=='granted')return;   // retry after permission granted
+    if(!AUTH)return;
+    const reg=await navigator.serviceWorker.register('/sw.js');
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToUint8(VAPID_PUBLIC)});
+    const j=sub.toJSON();
+    const ref=AUTH==='coach'?coachAs:(AUTH==='client'?clientAs:'owner');
+    if(!ref)return;
+    if(supa&&SUPA_OK){
+      await supa.from('push_subscriptions').upsert({
+        id:sub.endpoint, role:AUTH, ref_id:ref, endpoint:sub.endpoint,
+        p256dh:j.keys.p256dh, auth:j.keys.auth, created:new Date().toISOString()});
+    }
+    pushInited=true;
+  }catch(e){console.warn('push init failed',e&&e.message);}
 }
 function switchTab(){
   renderTabs();
@@ -2846,7 +2873,7 @@ function ownerInboxHtml(){
 // "Turn on alerts" banner so people can enable the icon badge after dismissing the prompt
 function enableAlerts(){
   try{ if(window.Notification && Notification.permission==='default'){
-    Notification.requestPermission().then(()=>{updateAppBadge();if(TAB==='messages')renderMessages();});
+    Notification.requestPermission().then(()=>{updateAppBadge();initPush();if(TAB==='messages')renderMessages();});
   } }catch(e){}
 }
 function notifyBannerHtml(){
