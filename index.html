@@ -569,7 +569,7 @@ function normalize(d){
   if(!d)d=seed();
   d.settings=d.settings||{rate1on1:30,rateGroup:20};
   if(d.settings.defaultClientPwd===undefined)d.settings.defaultClientPwd='rxtraining';
-  ['notifyEmails','ejService','ejTemplate','ejKey'].forEach(k=>{if(d.settings[k]===undefined)d.settings[k]='';});
+  ['notifyEmails','ejService','ejTemplate','ejKey','zellePhone'].forEach(k=>{if(d.settings[k]===undefined)d.settings[k]='';});
   if(!d.cashEntries)d.cashEntries=[];
   if(!d.locations){const names=[...new Set((d.sessions||[]).map(s=>s.location).filter(Boolean))];if(!names.length)names.push('Lexington Gym');d.locations=names.map(n=>({id:uid(),name:n,address:''}));}
   if(!d.availability)d.availability=[];
@@ -586,7 +586,7 @@ function normalize(d){
     if(c.approved===undefined)c.approved=true;
     if(c.suspended===undefined)c.suspended=false;
   });
-  (d.sessions||[]).forEach(s=>{if(s.paidVia===undefined)s.paidVia=s.paid?'cash':'';});
+  (d.sessions||[]).forEach(s=>{if(s.paidVia===undefined)s.paidVia=s.paid?'cash':'';if(s.paymentRequested===undefined)s.paymentRequested=false;});
   // ----- multi-coach: seed a coach + stamp coach_id on every record -----
   if(!d.coaches||!d.coaches.length)d.coaches=[{id:'rx1',name:'Raymond Xu',tagline:'Lexington, MA · AAU Level Training',bio:"Training isn't just about drills. It's about teaching you the love of the game — the dedication, the grind, the mindset that you never give up. That's what every session is built on.",affiliation:'AAU',affiliationSub:'Middlesex Magic',photo:'',pwd:'coach',active:true}];
   const gR1=(d.settings&&d.settings.rate1on1)||30, gRG=(d.settings&&d.settings.rateGroup)||20;
@@ -612,7 +612,7 @@ function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.
 /* ----- relational mapping (separate tables in Supabase) ----- */
 function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs){
   const d={};
-  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):''};
+  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):''};
   d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',
     rate1on1:(c.rate_1on1!=null?Number(c.rate_1on1):undefined),rateGroup:(c.rate_group!=null?Number(c.rate_group):undefined),
     pending:(c.pending||null),created:c.created||''}));
@@ -620,7 +620,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs){
   d.availability=(avail||[]).map(a=>({id:a.id,coachId:a.coach_id||'',date:a.date,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||'',approved:a.approved!==false}));
   d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',inGroup:!!c.in_group,approved:c.approved!==false,suspended:c.suspended===true,creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
     packages:(pkg||[]).filter(p=>p.customer_id===c.id).map(p=>({id:p.id,coachId:p.coach_id||'',type:p.type,qty:p.qty,amount:Number(p.amount),date:p.date}))}));
-  d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||''}));
+  d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||'',paymentRequested:!!s.payment_requested}));
   d.expenses=(exp||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||'',freq:e.freq||'once'}));
   d.cashEntries=(cash||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,amount:Number(e.amount),note:e.note||'',customerId:e.customer_id||'',type:e.type||'1on1',qty:e.qty||1}));
   d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||''}));
@@ -630,7 +630,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs){
 }
 const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),pending:(c.pending||null),created:c.created||null});
 const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,approved:c.approved!==false,suspended:c.suspended===true,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
-const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null});
+const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,payment_requested:!!s.paymentRequested});
 const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:e.coachId||null,price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||''});
 const eventRegRow=r=>({id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||''});
 const messageRow=m=>({id:m.id,peer_type:m.peerType||'client',client_id:m.clientId||'',coach_id:m.coachId||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',read_owner:m.readOwner===true,read_client:m.readClient===true,read_coach:m.readCoach===true});
@@ -774,7 +774,7 @@ async function cloudPush(){
     // added yet) can't block everything else — the critical stuff still saves.
     const fails=[];
     const push=async(name,fn)=>{try{await fn();}catch(e){fails.push(name);console.warn('sync failed:',name,e&&e.message);}};
-    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null});if(error)throw error;});
+    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null,zelle_phone:DB.settings.zellePhone||null});if(error)throw error;});
     await push('coaches',()=>syncTable('coaches',(DB.coaches||[]).map(coachRow)));
     await push('locations',()=>syncTable('locations',DB.locations.map(l=>({id:l.id,name:l.name,address:l.address||''}))));
     await push('customers',()=>syncTable('customers',DB.customers.map(custRow)));
@@ -1421,6 +1421,7 @@ function coachSetStatus(id,val,fromModal){
       'Hi '+firstName(c.name)+',\n\nYour session has been cancelled:\n'+fmtDT(s.date,s.time)+' · '+s.location+'\n\nNeed another time? Request one in the app.\n\n— RX Training');
     notifyCancel(s);
   }
+  if(val==='completed'){ requestPaymentZelle(s); }
   flash('Status updated → '+val);refreshOwner();
   // When a coach marks a session completed from the quick dropdown, open the popup so they can
   // add feedback + photos/videos for the client.
@@ -1625,6 +1626,28 @@ function emailClient(to,subject,text){
   supa.functions.invoke('send-request-email',{body:{to:[to],subject,text,replyTo:'rx@rxtraining.org'}})
     .then(({error})=>{if(error)throw error;flash('Email sent to client 📧');},()=>flash('Email failed — check the function',true));
 }
+/* Auto-notify the client to pay once a session is marked completed and it's still unpaid
+   (cash or package credit already covers it, so those are skipped). Posts a chat message from
+   the owner in the client's Messages thread — same channel used for chat push notifications.
+   Fires once per session (guarded by s.paymentRequested) so re-saving an already-completed
+   session, or flipping status back and forth, doesn't spam the client. The Zelle phone number
+   is an owner-only setting (Admin tab); only the owner ever writes DB.settings to the cloud. */
+function requestPaymentZelle(s){
+  if(!s||s.paid||s.paidVia==='package'||s.paymentRequested)return;
+  const zelle=(DB.settings.zellePhone||'').trim();
+  const c=custById(s.customerIds[0]);
+  const label=(s.type==='1on1'?'1:1':'Group')+' session on '+fmtDT(s.date,s.time);
+  const text=zelle
+    ? 'Hi'+(c?' '+firstName(c.name):'')+'! Your '+label+' with '+coachName(s.coachId)+' is complete. Amount due: '+money(s.price)+'. Please Zelle payment to Raymond at '+zelle+'. Thanks! 🏀'
+    : 'Hi'+(c?' '+firstName(c.name):'')+'! Your '+label+' with '+coachName(s.coachId)+' is complete. Amount due: '+money(s.price)+'. Please arrange payment with Raymond — thanks! 🏀';
+  const m={id:uid(),peerType:'client',clientId:s.customerIds[0]||'',coachId:'',sender:'owner',
+    text,media:[],created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false};
+  DB.messages.push(m);
+  s.paymentRequested=true;
+  save();
+  pushRows('messages',[messageRow(m)]);
+  pushRows('sessions',[sessRow(s)]);
+}
 /* record who cancelled (client / coach / owner) + when, for the integrity tally */
 function markCancelled(s,who){s.status='cancelled';s.cancelledBy=who;s.cancelledAt=new Date().toISOString();}
 function clearCancel(s){s.cancelledBy='';s.cancelledAt='';}
@@ -1827,12 +1850,16 @@ function saveSession(id,emailAfter){
     paid:pay!=='',paidVia:pay,checkedIn:$('#sCheck').checked,notes:$('#sNotes').value,
     feedback:$('#sFeedback').value,media:editMedia.slice()};
   const exSess=id?DB.sessions.find(x=>x.id===id):null;
+  const prevStatus=exSess?exSess.status:null; // captured before Object.assign mutates exSess in place
   if(obj.status==='cancelled' && (!exSess||exSess.status!=='cancelled')){ if(!confirm('Cancel this session? It will show as cancelled and the client will see the change.'))return; }
   if(obj.status==='cancelled'){obj.cancelledBy=(exSess&&exSess.cancelledBy)||'owner';obj.cancelledAt=(exSess&&exSess.cancelledAt)||new Date().toISOString();}
   else{obj.cancelledBy='';obj.cancelledAt='';}
   if(id){Object.assign(DB.sessions.find(x=>x.id===id),obj);}
   else{obj.id=uid();DB.sessions.push(obj);}
   if(!save())return;flash('Session saved');
+  if(obj.status==='completed' && prevStatus!=='completed'){
+    requestPaymentZelle(id?DB.sessions.find(x=>x.id===id):obj);
+  }
   if(emailAfter){
     const c=custById(ids[0]);
     if(!c||!c.email){flash('Client has no email on file',true);}
@@ -3175,11 +3202,22 @@ function renderAdmin(){
       <div class="clienttag" style="margin:-6px 0 12px">Tip: add your carrier's email-to-SMS address (e.g. <b style="color:var(--txt)">number@vtext.com</b> Verizon, <b style="color:var(--txt)">@txt.att.net</b> AT&amp;T, <b style="color:var(--txt)">@tmomail.net</b> T-Mobile) to get a text message.</div>
       <button class="btn sm" onclick="saveNotify()">Save notifications</button>
       <div class="clienttag" style="margin-top:10px">Auto-send uses your secure Supabase Edge Function (<b style="color:var(--txt)">send-request-email</b>) with the Resend key kept server-side. If it isn't set up, the app opens a pre-filled email instead. Setup steps are in <b style="color:var(--txt)">supabase-edge-function.md</b>.</div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h3>Payment — Zelle</h3>
+      <div class="field"><label class="f">Zelle phone number (owner-only — this is what clients are told to pay)</label>
+        <input id="zellePhone" value="${DB.settings.zellePhone||''}" placeholder="e.g. (555) 123-4567"></div>
+      <div class="clienttag" style="margin:-6px 0 12px">When a coach marks a session <b style="color:var(--txt)">completed</b> and it isn't already paid (cash or package), the client automatically gets a chat message asking them to Zelle this number for the session amount. Only the owner can view or change this number.</div>
+      <button class="btn sm" onclick="saveZelle()">Save Zelle number</button>
     </div>`;
 }
 function saveNotify(){
   DB.settings.notifyEmails=($('#ntfEmails').value||'').trim();
   save();flash('Notification settings saved');
+}
+function saveZelle(){
+  DB.settings.zellePhone=($('#zellePhone').value||'').trim();
+  save();flash('Zelle number saved');
 }
 function openExpense(id){
   const e=id?DB.expenses.find(x=>x.id===id):{date:todayISO(),cat:'Gym Rental',amount:0,note:'',freq:'once'};
