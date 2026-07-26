@@ -359,7 +359,7 @@ const ZH={
   'To buy a package, ask the Owner — your used/total balance updates automatically.':'购买套餐请联系管理员 — 已用/总数会自动更新。',
   'Today':'今天','Pending — awaiting confirmation':'待确认','Your booked sessions':'已预约课程',
   'No booked sessions yet — request one ←':'暂无已预约课程 — 去预约 ←','Your events':'我的活动',
-  'left':'剩余','used':'已用','completed':'已完成','Prepaid':'已预付','Pending':'待确认','Booked':'已预约',
+  'left':'剩余','used':'已用','completed':'已完成','Prepaid':'已预付','Unpaid':'未付款','Pending':'待确认','Booked':'已预约',
   'Completed':'已完成','Cancelled':'已取消','Check In':'签到','✓ Checked in':'✓ 已签到','Cancel':'取消',
   '📅 Add to calendar':'📅 加入日历','Coach feedback:':'教练反馈：',
   'tap one to select':'点击选择','Register a session and manage your upcoming sessions.':'预约并管理您的课程。',
@@ -408,7 +408,7 @@ const KO={
   'To buy a package, ask the Owner — your used/total balance updates automatically.':'패키지 구매는 관리자에게 문의하세요 — 사용/총 잔액은 자동으로 업데이트됩니다.',
   'Today':'오늘','Pending — awaiting confirmation':'확인 대기 중','Your booked sessions':'예약된 수업',
   'No booked sessions yet — request one ←':'아직 예약된 수업이 없습니다 — 예약하세요 ←','Your events':'내 이벤트',
-  'left':'남음','used':'사용','completed':'완료','Prepaid':'선불','Pending':'대기','Booked':'예약됨',
+  'left':'남음','used':'사용','completed':'완료','Prepaid':'선불','Unpaid':'미결제','Pending':'대기','Booked':'예약됨',
   'Completed':'완료','Cancelled':'취소됨','Check In':'체크인','✓ Checked in':'✓ 체크인 완료','Cancel':'취소',
   '📅 Add to calendar':'📅 캘린더에 추가','Coach feedback:':'코치 피드백:',
   'tap one to select':'선택하려면 탭하세요',
@@ -452,7 +452,7 @@ const JA={
   'To buy a package, ask the Owner — your used/total balance updates automatically.':'パッケージ購入は管理者へ — 使用/合計残高は自動更新されます。',
   'Today':'今日','Pending — awaiting confirmation':'確認待ち','Your booked sessions':'予約済みセッション',
   'No booked sessions yet — request one ←':'予約済みセッションはありません — 予約してください ←','Your events':'マイイベント',
-  'left':'残り','used':'使用','completed':'完了','Prepaid':'前払い','Pending':'保留','Booked':'予約済み',
+  'left':'残り','used':'使用','completed':'完了','Prepaid':'前払い','Unpaid':'未払い','Pending':'保留','Booked':'予約済み',
   'Completed':'完了','Cancelled':'キャンセル','Check In':'チェックイン','✓ Checked in':'✓ チェックイン済み','Cancel':'キャンセル',
   '📅 Add to calendar':'📅 カレンダーに追加','Coach feedback:':'コーチからのフィードバック：',
   'tap one to select':'タップして選択',
@@ -1428,8 +1428,11 @@ function coachSetStatus(id,val,fromModal){
 function coachSetPaid(id,val){
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
   if(s.paidVia==='package')return flash('Paid with a prepaid package — managed by the owner.',true);
+  const wasPaid=s.paid;
   if(val){s.paid=true;s.paidVia='cash';}else{s.paid=false;s.paidVia='';}
-  save();flash(val?'Marked paid (cash) 💵':'Marked unpaid');refreshOwner();
+  save();flash(val?'Marked paid (cash) 💵':'Marked unpaid');
+  if(val&&!wasPaid)notifyPaymentReceived(s);
+  refreshOwner();
 }
 function openCoachStatus(id){
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
@@ -1455,6 +1458,7 @@ function openCoachStatus(id){
 }
 function coachSaveSession(id){
   const s=DB.sessions.find(x=>x.id===id);if(!s){closeModal();return;}
+  const wasPaid=s.paid;
   const pv=document.getElementById('csPaid');
   if(pv && s.paidVia!=='package'){ if(pv.checked){s.paid=true;s.paidVia='cash';}else{s.paid=false;s.paidVia='';} }
   const fb=document.getElementById('csFeedback'); if(fb)s.feedback=fb.value;
@@ -1462,6 +1466,7 @@ function coachSaveSession(id){
   const st=document.getElementById('csStatus').value;
   if(st!==s.status){ coachSetStatus(id,st,true); }
   else { save();flash('Session updated');refreshOwner(); }
+  if(s.paid&&!wasPaid)notifyPaymentReceived(s);
   mediaCust=null;
   closeModal();
 }
@@ -1474,7 +1479,7 @@ function clientCard(s){
   return `<div class="panel" style="margin-bottom:12px">
     <div class="row" style="justify-content:space-between;align-items:center">
       <div>
-        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} <span class="pill">🏀 ${coachName(s.coachId)}</span> ${s.paid?'<span class="pill green">'+t('Prepaid')+'</span>':''} ${s.status==='pending'?'<span class="pill yellow">'+t('Pending')+'</span>':s.status==='scheduled'?'<span class="pill blue">'+t('Booked')+'</span>':s.status==='completed'?'<span class="pill green">'+t('Completed')+'</span>':s.status==='cancelled'?cancelledByLabel(s):''}
+        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} <span class="pill">🏀 ${coachName(s.coachId)}</span> ${s.paid?'<span class="pill green">'+(s.paidVia==='package'?t('Prepaid'):t('Paid'))+'</span>':'<span class="pill red">'+t('Unpaid')+'</span>'} ${s.status==='pending'?'<span class="pill yellow">'+t('Pending')+'</span>':s.status==='scheduled'?'<span class="pill blue">'+t('Booked')+'</span>':s.status==='completed'?'<span class="pill green">'+t('Completed')+'</span>':s.status==='cancelled'?cancelledByLabel(s):''}
         <div class="clienttag" style="margin-top:4px">${s.dur} min · 📍 ${s.location||'TBD'}${others>0?' · with '+others+' other player'+(others>1?'s':''):''}</div>
       </div>
       <div class="actions">
@@ -1668,6 +1673,23 @@ function requestPaymentZelle(s){
   save();
   pushRows('messages',[messageRow(m)]);
   pushRows('sessions',[sessRow(s)]);
+}
+/* Closes the loop on requestPaymentZelle(): once a session that we'd asked the client to Zelle
+   for gets marked paid (any method — cash, package credit, whatever), post a short "payment
+   received" confirmation in their chat thread. Without this, the original "Amount due: $X"
+   message just sits in Messages looking unresolved forever, even after the owner has actually
+   collected payment — which is exactly what made it look like sessions were still unpaid.
+   Only fires if we'd actually sent a request (s.paymentRequested) — no request, no confirmation. */
+function notifyPaymentReceived(s){
+  if(!s||!s.paymentRequested)return;
+  const c=custById(s.customerIds[0]);
+  const label=(s.type==='1on1'?'1:1':'Group')+' session on '+fmtDT(s.date,s.time);
+  const text='Hi'+(c?' '+firstName(c.name):'')+'! ✅ Payment received for your '+label+' — thank you!';
+  const m={id:uid(),peerType:'client',clientId:s.customerIds[0]||'',coachId:'',sender:'owner',
+    text,media:[],created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false};
+  DB.messages.push(m);
+  save();
+  pushRows('messages',[messageRow(m)]);
 }
 /* record who cancelled (client / coach / owner) + when, for the integrity tally */
 function markCancelled(s,who){s.status='cancelled';s.cancelledBy=who;s.cancelledAt=new Date().toISOString();}
@@ -1893,6 +1915,7 @@ function saveSession(id,emailAfter){
     feedback:$('#sFeedback').value,media:editMedia.slice()};
   const exSess=id?DB.sessions.find(x=>x.id===id):null;
   const prevStatus=exSess?exSess.status:null; // captured before Object.assign mutates exSess in place
+  const prevPaid=exSess?exSess.paid:false;
   if(obj.status==='cancelled' && (!exSess||exSess.status!=='cancelled')){ if(!confirm('Cancel this session? It will show as cancelled and the client will see the change.'))return; }
   if(obj.status==='cancelled'){obj.cancelledBy=(exSess&&exSess.cancelledBy)||'owner';obj.cancelledAt=(exSess&&exSess.cancelledAt)||new Date().toISOString();}
   else{obj.cancelledBy='';obj.cancelledAt='';}
@@ -1905,6 +1928,9 @@ function saveSession(id,emailAfter){
   if(obj.status==='cancelled' && prevStatus!=='cancelled'){
     notifyCancellation(id?DB.sessions.find(x=>x.id===id):obj,'owner');
   }
+  if(obj.paid && !prevPaid){
+    notifyPaymentReceived(id?DB.sessions.find(x=>x.id===id):obj);
+  }
   if(emailAfter){
     const c=custById(ids[0]);
     if(!c||!c.email){flash('Client has no email on file',true);}
@@ -1915,8 +1941,8 @@ function saveSession(id,emailAfter){
 }
 function delSession(id){if(!confirm('Delete this session?'))return;DB.sessions=DB.sessions.filter(x=>x.id!==id);save();flash('Session deleted');afterSessionSave();}
 
-function payCash(id){const s=DB.sessions.find(x=>x.id===id);s.paid=true;s.paidVia='cash';save();flash('Marked paid (cash) 💵');refreshOwner();}
-function payCredit(id){const s=DB.sessions.find(x=>x.id===id);if(!sessionHasCredit(s))return flash('No prepaid credit available',true);s.paid=true;s.paidVia='package';save();flash('Credit applied 🎟️');refreshOwner();}
+function payCash(id){const s=DB.sessions.find(x=>x.id===id);const wasPaid=s.paid;s.paid=true;s.paidVia='cash';save();flash('Marked paid (cash) 💵');if(!wasPaid)notifyPaymentReceived(s);refreshOwner();}
+function payCredit(id){const s=DB.sessions.find(x=>x.id===id);if(!sessionHasCredit(s))return flash('No prepaid credit available',true);const wasPaid=s.paid;s.paid=true;s.paidVia='package';save();flash('Credit applied 🎟️');if(!wasPaid)notifyPaymentReceived(s);refreshOwner();}
 
 /* ---------- Calendar export (.ics + Google) ---------- */
 function pad(n){return String(n).padStart(2,'0');}
@@ -2685,6 +2711,13 @@ function coachEarnings(id){
   return out;
 }
 function setPayRange(r){payRange=r;renderMoney();}
+/* every one of this client's non-cancelled sessions with its live paid/unpaid status + method —
+   distinct from clientPayments() (which is just a log of money actually collected). This is
+   what surfaces "still unpaid" sessions directly in the Payments tab. */
+function clientSessionStatus(id){
+  return DB.sessions.filter(s=>s.customerIds.includes(id)&&s.status!=='cancelled')
+    .slice().sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));
+}
 function renderMoney(){
   const isCoach=AUTH==='coach';
   const targetId=isCoach?coachAs:clientAs;
@@ -2695,6 +2728,15 @@ function renderMoney(){
   const title=isCoach?'Earnings':t('My Payments');
   const bucketHtml=buckets.length?buckets.map(b=>`<div class="barrow"><div class="lab" style="width:140px">${b.label}</div><div class="bar"><i style="width:${b.total/maxB*100}%"></i></div><div class="val">${money(b.total)}<div class="clienttag" style="text-align:right">${b.n}</div></div></div>`).join(''):'<div class="empty">—</div>';
   const detail=items.length?items.map(i=>`<tr><td>${fmtDate(i.date)}</td><td>${i.label}</td><td class="right">${money(i.amount)}</td></tr>`).join(''):'<tr><td colspan="3"><div class="empty">—</div></td></tr>';
+  const sessStatusRows=isCoach?'':(()=>{
+    const ss=clientSessionStatus(targetId);
+    return ss.length?ss.map(s=>{
+      const statusCell=s.paid
+        ?'<span class="pill green">'+(s.paidVia==='package'?t('Prepaid'):(t('Paid')+(s.paidVia?' · '+s.paidVia:'')))+'</span>'
+        :'<span class="pill red">'+t('Unpaid')+'</span>';
+      return `<tr><td>${fmtDT(s.date,s.time)}</td><td>${s.type==='1on1'?'1:1':'Group'} · ${coachName(s.coachId)}</td><td>${statusCell}</td><td class="right">${money(s.price/s.customerIds.length)}</td></tr>`;
+    }).join(''):'<tr><td colspan="4"><div class="empty">—</div></td></tr>';
+  })();
   $('#view-money').innerHTML=`
     <h1 class="page">${title}</h1>
     <div class="sub">${isCoach?'Money collected for your sessions & packages, grouped by period.':t('All money you\'ve paid, grouped by period.')} <b style="color:var(--txt)">Boston (ET).</b></div>
@@ -2708,6 +2750,10 @@ function renderMoney(){
       </div>
       ${bucketHtml}
     </div>
+    ${isCoach?'':`<div class="panel" style="margin-top:16px;padding:6px 14px;overflow-x:auto">
+      <h3 style="padding:12px 6px 4px">Your sessions & payment status</h3>
+      <table><thead><tr><th>${t('Date')}</th><th>${t('Detail')}</th><th>Status</th><th class="right">${t('Amount')}</th></tr></thead><tbody>${sessStatusRows}</tbody></table>
+    </div>`}
     <div class="panel" style="margin-top:16px;padding:6px 14px;overflow-x:auto">
       <h3 style="padding:12px 6px 4px">${t('All payments')}</h3>
       <table><thead><tr><th>${t('Date')}</th><th>${t('Detail')}</th><th class="right">${t('Amount')}</th></tr></thead><tbody>${detail}</tbody></table>
