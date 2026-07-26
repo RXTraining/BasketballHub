@@ -2290,7 +2290,13 @@ function openCoach(id){
       <div class="field"><label class="f">Affiliation detail</label><input id="coAffSub" value="${g('affiliationSub')}" placeholder="e.g. Middlesex Magic"></div>
     </div>
     <div class="field"><label class="f">About / bio (shown to clients)</label><textarea id="coBio">${gArea('bio')}</textarea></div>
-    <div class="field"><label class="f">Photo URL (optional)</label><input id="coPhoto" value="${g('photo')}" placeholder="https://..."></div>
+    <div class="field"><label class="f">Photo</label>
+      <div class="row" style="gap:10px;align-items:center">
+        <img id="coPhotoPrev" src="${g('photo')||''}" alt="" style="width:56px;height:56px;border-radius:10px;object-fit:cover;background:var(--panel2);${g('photo')?'':'display:none'}" onerror="this.style.display='none'">
+        <label class="btn ghost sm" style="cursor:pointer">⬆ Upload photo<input type="file" accept="image/*" style="display:none" onchange="uploadCoachPhoto(this)"></label>
+      </div>
+      <input id="coPhoto" value="${g('photo')}" placeholder="…or paste a direct image link (ends in .jpg/.png)" style="margin-top:8px">
+      <div class="clienttag" style="margin-top:4px">Upload a photo, or paste a <b>direct image link</b>. iCloud/Google Photos <i>share</i> links won't work — they're web pages, not image files.</div></div>
     <div class="panel" style="background:var(--panel2);padding:14px;margin-bottom:14px">
       <b class="small">Hourly rates</b>
       <div class="row" style="margin-top:10px">
@@ -2313,6 +2319,29 @@ function openCoach(id){
     ${(!isCoach&&id)?`<button class="btn ghost" onclick="toggleCoachSuspend('${id}')">${c.active!==false?'⏸ Suspend':'▶ Resume'}</button>`:''}
     <button class="btn ghost" onclick="closeModal()">Cancel</button>
     <button class="btn" onclick="saveCoach('${id||''}')">${isCoach?'Submit for approval':'Save'}</button>`);
+}
+async function uploadCoachPhoto(input){
+  const f=input.files&&input.files[0];input.value='';
+  if(!f)return;
+  if(f.type.indexOf('image')!==0)return flash('Please choose an image file',true);
+  let up=f,type=f.type,name='coach.jpg';
+  const c=await compressImage(f,600,0.85);if(c){up=c;}
+  flash('Uploading photo…');
+  try{
+    let url='';
+    if(useR2()){
+      const r=await fetch(R2_ENDPOINT,{method:'POST',headers:{'content-type':'image/jpeg','x-upload-token':R2_TOKEN,'x-file-name':name,'x-customer-id':'coaches'},body:up});
+      const j=await r.json();if(!r.ok||!j.url)return flash('Upload failed: '+((j&&j.error)||r.status),true);url=j.url;
+    }else if(supa&&SUPA_OK){
+      const path='media/coaches/'+uid()+'-coach.jpg';
+      const upr=await supa.storage.from(MEDIA_BUCKET).upload(path,up,{upsert:true,contentType:'image/jpeg'});
+      if(upr.error)return flash('Upload failed: '+upr.error.message,true);
+      url=supa.storage.from(MEDIA_BUCKET).getPublicUrl(path).data.publicUrl;
+    }else{return flash('Connect Supabase or R2 to upload photos',true);}
+    const inp=$('#coPhoto');if(inp)inp.value=url;
+    const pv=$('#coPhotoPrev');if(pv){pv.src=url;pv.style.display='';}
+    flash('Photo uploaded ✅ — remember to Save');
+  }catch(e){flash('Upload failed: '+e.message,true);}
 }
 function saveCoach(id){
   const r1=+$('#coR1').value, rG=+$('#coRG').value;
