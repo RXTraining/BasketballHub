@@ -1680,16 +1680,33 @@ function requestPaymentZelle(s){
    message just sits in Messages looking unresolved forever, even after the owner has actually
    collected payment — which is exactly what made it look like sessions were still unpaid.
    Only fires if we'd actually sent a request (s.paymentRequested) — no request, no confirmation. */
-function notifyPaymentReceived(s){
-  if(!s||!s.paymentRequested)return;
+function sendPaymentReceivedMsg(s){
   const c=custById(s.customerIds[0]);
   const label=(s.type==='1on1'?'1:1':'Group')+' session on '+fmtDT(s.date,s.time);
   const text='Hi'+(c?' '+firstName(c.name):'')+'! ✅ Payment received for your '+label+' — thank you!';
   const m={id:uid(),peerType:'client',clientId:s.customerIds[0]||'',coachId:'',sender:'owner',
     text,media:[],created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false};
   DB.messages.push(m);
-  save();
   pushRows('messages',[messageRow(m)]);
+}
+function notifyPaymentReceived(s){
+  if(!s||!s.paymentRequested)return;
+  sendPaymentReceivedMsg(s);
+  save();
+}
+/* Manual escape hatch: some sessions got their Zelle request sent before the payment_requested
+   column existed in the database (a one-time historical gap from mid-rollout), so that flag is
+   stuck false for them even though a request really was sent — notifyPaymentReceived() silently
+   skips those. This lets the owner force the confirmation through from the session editor, and
+   sets the flag afterward so everything stays consistent going forward. */
+function manualPaymentConfirm(id){
+  const s=DB.sessions.find(x=>x.id===id);if(!s)return;
+  if(!s.paid)return flash('Mark this session paid first',true);
+  sendPaymentReceivedMsg(s);
+  s.paymentRequested=true;
+  save();
+  pushRows('sessions',[sessRow(s)]);
+  flash('Payment confirmation sent to client ✅');
 }
 /* record who cancelled (client / coach / owner) + when, for the integrity tally */
 function markCancelled(s,who){s.status='cancelled';s.cancelledBy=who;s.cancelledAt=new Date().toISOString();}
@@ -1889,6 +1906,7 @@ function openSession(id,returnCust){
     <p class="muted small">Marking payment as "package credit" counts one used session against the client's prepaid total. Manage venues in the Locations tab.</p>
   `,`
     ${id?`<button class="btn danger" onclick="delSession('${id}')">Delete</button>`:''}
+    ${(id&&s.paid)?`<button class="btn ghost" title="Manually post a payment-received message to the client's chat, even if one wasn't auto-sent" onclick="manualPaymentConfirm('${id}')">✅ Confirm payment to client</button>`:''}
     ${id?`<button class="btn ghost" onclick="saveSession('${id}',true)">📧 Save & email client</button>`:''}
     <button class="btn ghost" onclick="closeSessionEditor()">Cancel</button>
     <button class="btn" onclick="saveSession('${id||''}')">Save</button>`);
@@ -2610,9 +2628,10 @@ function addAvailability(){
 function approveAvailability(id){const a=(DB.availability||[]).find(x=>x.id===id);if(!a)return;a.approved=true;save();flash('Availability approved ✅');renderAvailability();}
 function delAvailability(id){DB.availability=DB.availability.filter(a=>a.id!==id);save();flash('Removed');renderAvailability();}
 
-/* open slots for a given date + session type.
-   1:1 needs an empty slot; group stays open until it holds 4 clients total. */
-function availableSlots(dateStr,type,cid){
+/* every candidate slot for a date + session type — both open AND already-booked-by-someone-else.
+   Booked ones carry open:false so the UI can show them greyed out ("Booked by others") instead of
+   just showing nothing when a coach's posted window is full. */
+function allCandidateSlots(dateStr,type,cid){
   if(!dateStr)return [];
   const now=nowBoston(); const seen={}; const out=[];
   const sessAt=t=>DB.sessions.filter(s=>s.date===dateStr&&s.time===t&&s.status!=='cancelled'&&(!cid||s.coachId===cid));
@@ -2623,7 +2642,7 @@ function availableSlots(dateStr,type,cid){
       const t=String(Math.floor(cur/60)).padStart(2,'0')+':'+String(cur%60).padStart(2,'0');
       if(seen[t])continue;
       if(dateStr===todayISO() && new Date(dateStr+'T'+t)<now)continue;
-      // Hide slots that overlap an existing booked session for this coach by >15 min.
+      // Slots that overlap an existing booked session for this coach by >15 min count as taken.
       // (Sessions starting at the exact same time are handled by the capacity logic below,
       //  so group joins still work; this catches partial overlaps like 9:00 slot vs 9:30 session.)
       const slotS=cur, slotE=cur+step;
@@ -2636,7 +2655,7 @@ function availableSlots(dateStr,type,cid){
         if(ss===slotS)return false; // same start = capacity logic handles it
         return Math.min(slotE,se)-Math.max(slotS,ss) > 15;
       });
-      if(conflict)continue;
+      if(conflict){ seen[t]=1; out.push({time:t,location:r.location,slotMin:step,open:false}); continue; }
       const at=sessAt(t); let open;
       if(type==='group'){
         const has1on1=at.some(s=>s.type==='1on1');
@@ -2645,11 +2664,14 @@ function availableSlots(dateStr,type,cid){
       }else{
         open = at.length===0;                         // 1:1 needs the slot to itself
       }
-      if(!open)continue;
-      seen[t]=1; out.push({time:t,location:r.location,slotMin:step});
+      seen[t]=1; out.push({time:t,location:r.location,slotMin:step,open});
     }
   });
   return out.sort((a,b)=>a.time.localeCompare(b.time));
+}
+/* open slots only — same signature/behavior as before, now built on allCandidateSlots(). */
+function availableSlots(dateStr,type,cid){
+  return allCandidateSlots(dateStr,type,cid).filter(s=>s.open);
 }
 /* all upcoming open slots for a coach + type (respects capacity from other clients' bookings
    and drops past times — availableSlots already enforces both) */
@@ -2660,15 +2682,29 @@ function clientOpenSlots(cid,type){
   dates.forEach(dt=>availableSlots(dt,type,cid).forEach(s=>out.push({date:dt,time:s.time,location:s.location,slotMin:s.slotMin})));
   return out;
 }
+/* same as clientOpenSlots but includes booked-by-others slots too (open:false), for display */
+function clientAllSlots(cid,type){
+  const now=todayISO();
+  const dates=[...new Set((DB.availability||[]).filter(a=>a.coachId===cid&&a.approved!==false&&a.date>=now).map(a=>a.date))].sort();
+  const out=[];
+  dates.forEach(dt=>allCandidateSlots(dt,type,cid).forEach(s=>out.push({date:dt,time:s.time,location:s.location,slotMin:s.slotMin,open:s.open})));
+  return out;
+}
 function renderSlots(){renderOpenSlots();}   // alias kept for any older callers
 function renderOpenSlots(){
   const list=$('#openSlots'); if(!list)return;
   const type=$('#rqType')?$('#rqType').value:'1on1';
   const cid=pickCoach||defaultCoachId();
-  const open=clientOpenSlots(cid,type);
-  if(!open.length){list.innerHTML='<div class="clienttag">No open times posted yet — check back soon.</div>';return;}
-  const byd={};open.forEach(s=>{(byd[s.date]=byd[s.date]||[]).push(s);});
-  list.innerHTML=Object.keys(byd).sort().map(dt=>`<div style="margin-bottom:8px"><div class="clienttag" style="margin-bottom:5px"><b style="color:var(--txt)">${fmtDate(dt)}</b></div><div class="row" style="gap:6px">${byd[dt].map(s=>{const on=(reqSel&&reqSel.date===dt&&reqSel.time===s.time&&reqSel.loc===s.location);return `<button type="button" class="slotchip${on?' sel':''}" onclick="setReqSlot('${dt}','${s.time}','${(s.location||'').replace(/'/g,"\\'")}')">${fmtT(s.time)} · ${s.location}</button>`;}).join('')}</div></div>`).join('');
+  const all=clientAllSlots(cid,type);
+  if(!all.length){list.innerHTML='<div class="clienttag">No open times posted yet — check back soon.</div>';return;}
+  const byd={};all.forEach(s=>{(byd[s.date]=byd[s.date]||[]).push(s);});
+  const anyOpen=all.some(s=>s.open);
+  list.innerHTML=Object.keys(byd).sort().map(dt=>`<div style="margin-bottom:8px"><div class="clienttag" style="margin-bottom:5px"><b style="color:var(--txt)">${fmtDate(dt)}</b></div><div class="row" style="gap:6px;flex-wrap:wrap">${byd[dt].map(s=>{
+      if(!s.open)return `<span class="slotchip" style="opacity:.45;cursor:not-allowed;text-decoration:line-through" title="Booked by another player">${fmtT(s.time)} · ${s.location} · Booked by others</span>`;
+      const on=(reqSel&&reqSel.date===dt&&reqSel.time===s.time&&reqSel.loc===s.location);
+      return `<button type="button" class="slotchip${on?' sel':''}" onclick="setReqSlot('${dt}','${s.time}','${(s.location||'').replace(/'/g,"\\'")}')">${fmtT(s.time)} · ${s.location}</button>`;
+    }).join('')}</div></div>`).join('')
+    +(anyOpen?'':'<div class="clienttag" style="margin-top:6px">No open times right now — all posted windows are booked by other players. Check back soon or pick another coach.</div>');
 }
 function setReqSlot(date,time,loc){
   reqSel={date,time,loc};
