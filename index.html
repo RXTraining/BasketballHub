@@ -590,7 +590,7 @@ function normalize(d){
   // ----- multi-coach: seed a coach + stamp coach_id on every record -----
   if(!d.coaches||!d.coaches.length)d.coaches=[{id:'rx1',name:'Raymond Xu',tagline:'Lexington, MA · AAU Level Training',bio:"Training isn't just about drills. It's about teaching you the love of the game — the dedication, the grind, the mindset that you never give up. That's what every session is built on.",affiliation:'AAU',affiliationSub:'Middlesex Magic',photo:'',pwd:'coach',active:true}];
   const gR1=(d.settings&&d.settings.rate1on1)||30, gRG=(d.settings&&d.settings.rateGroup)||20;
-  d.coaches.forEach(c=>{if(c.active===undefined)c.active=true;if(!c.pwd)c.pwd='coach';if(c.tagline===undefined)c.tagline='';if(c.bio===undefined)c.bio='';if(c.affiliation===undefined)c.affiliation='';if(c.affiliationSub===undefined)c.affiliationSub='';if(c.photo===undefined)c.photo='';
+  d.coaches.forEach(c=>{if(c.active===undefined)c.active=true;if(!c.pwd)c.pwd='coach';if(c.tagline===undefined)c.tagline='';if(c.bio===undefined)c.bio='';if(c.affiliation===undefined)c.affiliation='';if(c.affiliationSub===undefined)c.affiliationSub='';if(c.photo===undefined)c.photo='';if(c.email===undefined)c.email='';
     if(c.rate1on1===undefined||c.rate1on1===null||c.rate1on1==='')c.rate1on1=gR1;
     if(c.rateGroup===undefined||c.rateGroup===null||c.rateGroup==='')c.rateGroup=gRG;
     if(c.pending===undefined)c.pending=null;if(!c.created)c.created=todayISO();});
@@ -613,7 +613,7 @@ function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.
 function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs){
   const d={};
   d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):''};
-  d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',
+  d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',
     rate1on1:(c.rate_1on1!=null?Number(c.rate_1on1):undefined),rateGroup:(c.rate_group!=null?Number(c.rate_group):undefined),
     pending:(c.pending||null),created:c.created||''}));
   d.locations=(loc||[]).map(l=>({id:l.id,name:l.name,address:l.address||''}));
@@ -628,7 +628,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs){
   d.messages=(msgs||[]).map(m=>({id:m.id,peerType:m.peer_type||'client',clientId:m.client_id||'',coachId:m.coach_id||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',readOwner:m.read_owner===true,readClient:m.read_client===true,readCoach:m.read_coach===true}));
   return normalize(d);
 }
-const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),pending:(c.pending||null),created:c.created||null});
+const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),pending:(c.pending||null),created:c.created||null});
 const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,approved:c.approved!==false,suspended:c.suspended===true,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
 const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,payment_requested:!!s.paymentRequested});
 const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:e.coachId||null,price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||''});
@@ -1417,9 +1417,7 @@ function coachSetStatus(id,val,fromModal){
   if(val==='scheduled'&&c&&c.email){emailClient(c.email,'RX Training — your session is confirmed',
     'Hi '+firstName(c.name)+',\n\nYour '+(s.type==='1on1'?'1:1 Private':'group')+' session with '+coachName(s.coachId)+' is confirmed:\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location+'\n\n— RX Training');}
   if(val==='cancelled'){
-    if(c&&c.email)emailClient(c.email,'RX Training — your session was cancelled',
-      'Hi '+firstName(c.name)+',\n\nYour session has been cancelled:\n'+fmtDT(s.date,s.time)+' · '+s.location+'\n\nNeed another time? Request one in the app.\n\n— RX Training');
-    notifyCancel(s);
+    notifyCancellation(s,'coach');
   }
   if(val==='completed'){ requestPaymentZelle(s); }
   flash('Status updated → '+val);refreshOwner();
@@ -1520,6 +1518,7 @@ function renderBookingClient(){
   $('#view-booking').innerHTML=`
     <h1 class="page">${t('Welcome,')} ${firstName(c.name)} 👋</h1>
     <div class="sub">${t('Request a session and manage your upcoming sessions. Past sessions are in the Past Sessions tab.')}</div>
+    <div class="row" style="margin:-6px 0 14px"><button class="btn ghost sm" onclick="openClientProfile()">✎ ${t('Edit my contact info')}</button></div>
     ${clientEventBanner()}
     <div class="panel" style="margin-bottom:16px">
       <div class="row" style="justify-content:space-between;align-items:flex-start">
@@ -1550,6 +1549,28 @@ function renderBookingClient(){
       </div>
     </div>`;
   renderOpenSlots();
+}
+/* client self-service: update their own phone/carrier/email — applies immediately (no owner
+   approval needed, unlike coach bio/rate proposals) and syncs via a targeted pushRows, same
+   pattern as every other client write, so it can never clobber owner-side data. */
+function openClientProfile(){
+  const c=custById(clientAs); if(!c)return;
+  openModal(t('Edit my info'),`
+    <div class="row">
+      <div class="field"><label class="f">${t('Phone (mobile)')}</label><input id="cpPhone" value="${(c.phone||'').replace(/"/g,'&quot;')}"></div>
+      <div class="field"><label class="f">${t('Mobile carrier (for text on confirm)')}</label><select id="cpCarrier">${carrierOptions(c.carrier)}</select></div>
+    </div>
+    <div class="field"><label class="f">${t('Email')}</label><input id="cpEmail" type="email" value="${(c.email||'').replace(/"/g,'&quot;')}" placeholder="you@example.com"></div>
+    <p class="muted small">${t('Used for booking confirmations and receipts.')}</p>
+  `,`<button class="btn ghost" onclick="closeModal()">${t('Cancel')}</button><button class="btn" onclick="saveClientProfile()">${t('Save')}</button>`);
+}
+function saveClientProfile(){
+  const c=custById(clientAs); if(!c)return closeModal();
+  c.phone=($('#cpPhone').value||'').trim();
+  c.carrier=$('#cpCarrier').value||'';
+  c.email=($('#cpEmail').value||'').trim();
+  save();pushRows('customers',[custRow(c)]);
+  closeModal();flash(t('Info updated ✅'));renderBooking();
 }
 /* just the Today / Pending / Booked panels — can refresh on its own so live updates
    don't wipe out what the client is typing in the request form */
@@ -1651,23 +1672,44 @@ function requestPaymentZelle(s){
 /* record who cancelled (client / coach / owner) + when, for the integrity tally */
 function markCancelled(s,who){s.status='cancelled';s.cancelledBy=who;s.cancelledAt=new Date().toISOString();}
 function clearCancel(s){s.cancelledBy='';s.cancelledAt='';}
+/* email the assigned coach (if they have an email on file) that one of their sessions was
+   cancelled by someone else. Silent — no flash — since this is a background side notification,
+   same pattern as notifyCancel() which alerts the owner. */
+function emailCoachCancelled(s,who){
+  const co=coachById(s.coachId); if(!co||!co.email)return;
+  if(!(supa&&SUPA_OK))return;
+  const cn=custNames(s.customerIds);
+  const subject='RX Training — session cancelled by '+who;
+  const text='Hi '+firstName(co.name)+',\n\n'+cn+"'s session has been cancelled:\n"+fmtDT(s.date,s.time)+' · '+(s.location||'')+'\n\n— RX Training';
+  supa.functions.invoke('send-request-email',{body:{to:[co.email],subject,text,replyTo:'rx@rxtraining.org'}}).then(()=>{},()=>{});
+}
+/* Unified cancellation fan-out: whoever cancels a session (client / coach / owner), everyone
+   ELSE with a stake in it gets an email — the client, the assigned coach, and the owner's
+   notification address(es). The actor themselves isn't re-notified (they already know). */
+function notifyCancellation(s,actor){
+  if(actor!=='client'){
+    const c=custById(s.customerIds[0]);
+    if(c&&c.email)emailClient(c.email,'RX Training — your session was cancelled',
+      'Hi '+firstName(c.name)+',\n\nYour session has been cancelled'+(actor==='coach'?' by your coach':'')+':\n'+fmtDT(s.date,s.time)+' · '+(s.location||'')+'\n\nNeed another time? Request one in the app.\n\n— RX Training');
+  }
+  if(actor!=='coach'){ emailCoachCancelled(s,actor==='client'?'the client':'the owner'); }
+  if(actor!=='owner'){ notifyCancel(s,actor); }
+}
 function clientCancel(id){
   if(!confirm('Cancel this session?'))return;
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
   markCancelled(s,'client');save();pushRows('sessions',[sessRow(s)]);flash('Session cancelled');
-  const c=custById(s.customerIds[0]);
-  if(c&&c.email)emailClient(c.email,'RX Training — your session was cancelled',
-    'Hi '+firstName(c.name)+',\n\nYour session has been cancelled:\n'+fmtDT(s.date,s.time)+' · '+s.location+'\n\nNeed another time? Just request one in the app.\n\n— RX Training');
-  notifyCancel(s);
+  notifyCancellation(s,'client');
   renderBooking();
 }
-function notifyCancel(s){
+function notifyCancel(s,actor){
   const emails=(DB.settings.notifyEmails||'').split(',').map(x=>x.trim()).filter(Boolean);
   if(!emails.length||!(supa&&SUPA_OK))return;
   const cn=custNames(s.customerIds);
+  const who=actor==='coach'?coachName(s.coachId):cn;
   supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:'rx@rxtraining.org',
-    subject:'RX Training — session CANCELLED by '+cn,
-    text:cn+' cancelled a session:\n'+(s.type==='1on1'?'1:1 Private':'Group')+'\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location}}).then(()=>{},()=>{});
+    subject:'RX Training — session CANCELLED by '+who,
+    text:who+' cancelled a session:\n'+(s.type==='1on1'?'1:1 Private':'Group')+'\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location}}).then(()=>{},()=>{});
 }
 function confirmSession(id){
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
@@ -1859,6 +1901,9 @@ function saveSession(id,emailAfter){
   if(!save())return;flash('Session saved');
   if(obj.status==='completed' && prevStatus!=='completed'){
     requestPaymentZelle(id?DB.sessions.find(x=>x.id===id):obj);
+  }
+  if(obj.status==='cancelled' && prevStatus!=='cancelled'){
+    notifyCancellation(id?DB.sessions.find(x=>x.id===id):obj,'owner');
   }
   if(emailAfter){
     const c=custById(ids[0]);
@@ -2291,6 +2336,7 @@ function doRejectSession(id){
   const s=DB.sessions.find(x=>x.id===id);if(s){markCancelled(s,'owner');save();
     const c=custById(s.customerIds[0]);
     if(c&&c.email)emailClient(c.email,'RX Training — your request was declined','Hi '+firstName(c.name)+',\n\nUnfortunately your requested session ('+fmtDT(s.date,s.time)+') could not be confirmed. Please request another time in the app.\n\n— RX Training');
+    emailCoachCancelled(s,'the owner');
     flash('Request declined');}
   refreshApprovals();
 }
@@ -2331,21 +2377,23 @@ function openCoach(id){
         <div class="field" style="margin-bottom:0"><label class="f">Group rate ($/hr/player)</label><input type="number" id="coRG" value="${rG}"></div>
       </div>
     </div>
-    ${isCoach?'':`<div class="row">
-      <div class="field"><label class="f">Sign-in password</label><input id="coPwd" value="${g('pwd')||'coach'}"></div>
-      <div class="field" style="display:flex;align-items:flex-end"><label class="f" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="coActive" ${c.active!==false?'checked':''} style="width:auto"> Active (can sign in & be booked)</label></div>
-    </div>
     <div class="row">
       <div class="field"><label class="f">Phone (mobile)</label><input id="coPhone" value="${g('phone')}"></div>
       <div class="field"><label class="f">Mobile carrier (text on confirm)</label><select id="coCarrier">${carrierOptions(c.carrier)}</select></div>
     </div>
+    <div class="field"><label class="f">Email${isCoach?'':' (gets notified when a client cancels a session)'}</label><input id="coEmail" type="email" value="${g('email')}" placeholder="coach@example.com"></div>
+    ${isCoach?'<div class="clienttag" style="margin:-6px 0 12px">Contact info updates immediately — no approval needed.</div>':''}
+    ${isCoach?'':`<div class="row">
+      <div class="field"><label class="f">Sign-in password</label><input id="coPwd" value="${g('pwd')||'coach'}"></div>
+      <div class="field" style="display:flex;align-items:flex-end"><label class="f" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="coActive" ${c.active!==false?'checked':''} style="width:auto"> Active (can sign in & be booked)</label></div>
+    </div>
     <div class="field" style="max-width:220px"><label class="f">Joined date</label><input type="date" id="coCreated" value="${(c.created||todayISO())}"><div class="clienttag" style="margin-top:4px">Used for recruiting stats.</div></div>`}
-    <p class="muted small">${isCoach?'Your profile & rate changes are sent to the owner for approval — they go live only once approved.':'You edit coaches directly; changes take effect immediately. Coach proposals appear above to Approve or Reject.'}</p>
+    <p class="muted small">${isCoach?'Profile & rate changes are sent to the owner for approval — they go live only once approved. Contact info above updates right away.':'You edit coaches directly; changes take effect immediately. Coach proposals appear above to Approve or Reject.'}</p>
   `,`
     ${(!isCoach&&id)?`<button class="btn danger" onclick="delCoach('${id}')">Delete</button>`:''}
     ${(!isCoach&&id)?`<button class="btn ghost" onclick="toggleCoachSuspend('${id}')">${c.active!==false?'⏸ Suspend':'▶ Resume'}</button>`:''}
     <button class="btn ghost" onclick="closeModal()">Cancel</button>
-    <button class="btn" onclick="saveCoach('${id||''}')">${isCoach?'Submit for approval':'Save'}</button>`);
+    <button class="btn" onclick="saveCoach('${id||''}')">${isCoach?'Save changes':'Save'}</button>`);
 }
 async function uploadCoachPhoto(input){
   const f=input.files&&input.files[0];input.value='';
@@ -2374,13 +2422,19 @@ function saveCoach(id){
   const r1=+$('#coR1').value, rG=+$('#coRG').value;
   if(AUTH==='coach'){
     const c=coachById(coachAs);if(!c)return;
+    // Contact info applies immediately (no review needed) — syncs to the owner + DB via the
+    // coach's normal own-profile upsert in cloudPush(). Bio/tagline/affiliation/photo/rates
+    // still go through the pending-approval queue since those are client-facing.
+    c.phone=($('#coPhone')?$('#coPhone').value:'').trim();
+    c.carrier=$('#coCarrier')?$('#coCarrier').value:'';
+    c.email=($('#coEmail')?$('#coEmail').value:'').trim();
     c.pending={tagline:$('#coTag').value,bio:$('#coBio').value,affiliation:$('#coAff').value,affiliationSub:$('#coAffSub').value,photo:$('#coPhoto').value,rate1on1:r1,rateGroup:rG};
-    save();closeModal();flash('Sent to owner for approval ⏳');refreshOwner();return;
+    save();closeModal();flash('Contact info updated · other changes sent to owner for approval ⏳');refreshOwner();return;
   }
   const name=($('#coName').value||'').trim();if(!name)return flash('Name is required',true);
   const dup=(DB.coaches||[]).find(x=>x.id!==id&&(x.name||'').trim().toLowerCase()===name.toLowerCase());
   if(dup)return flash('Another coach already uses that name',true);
-  const obj={name,tagline:$('#coTag').value,bio:$('#coBio').value,affiliation:$('#coAff').value,affiliationSub:$('#coAffSub').value,photo:$('#coPhoto').value,pwd:($('#coPwd').value||'coach').trim(),active:$('#coActive').checked,phone:($('#coPhone')?$('#coPhone').value:''),carrier:($('#coCarrier')?$('#coCarrier').value:''),rate1on1:r1,rateGroup:rG,created:(($('#coCreated')&&$('#coCreated').value)||todayISO())};
+  const obj={name,tagline:$('#coTag').value,bio:$('#coBio').value,affiliation:$('#coAff').value,affiliationSub:$('#coAffSub').value,photo:$('#coPhoto').value,pwd:($('#coPwd').value||'coach').trim(),active:$('#coActive').checked,phone:($('#coPhone')?$('#coPhone').value:''),carrier:($('#coCarrier')?$('#coCarrier').value:''),email:($('#coEmail')?$('#coEmail').value.trim():''),rate1on1:r1,rateGroup:rG,created:(($('#coCreated')&&$('#coCreated').value)||todayISO())};
   if(id){Object.assign(coachById(id),obj);}
   else{obj.id=uid();obj.pending=null;DB.coaches.push(obj);}
   save();closeModal();flash('Coach saved 🏀');renderCoaches();
