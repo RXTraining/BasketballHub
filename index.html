@@ -2607,9 +2607,9 @@ function openApprovals(){
 }
 function refreshApprovals(){renderWhoami();if($('#modal').classList.contains('show'))openApprovals();if(AUTH==='owner')refreshOwner();}
 function doApproveCoach(id){const c=coachById(id);if(c&&c.pending){const p=c.pending;['tagline','bio','affiliation','affiliationSub','photo'].forEach(k=>{if(p[k]!=null)c[k]=p[k];});if(p.rate1on1!=null&&!isNaN(p.rate1on1))c.rate1on1=+p.rate1on1;if(p.rateGroup!=null&&!isNaN(p.rateGroup))c.rateGroup=+p.rateGroup;c.pending=null;save();flash('Approved ✅');}refreshApprovals();}
-function doRejectCoach(id){const c=coachById(id);if(c){c.pending=null;save();flash('Rejected');}refreshApprovals();}
+function doRejectCoach(id){if(!confirm('Reject this coach\'s pending profile changes? Their edits will be discarded.'))return;const c=coachById(id);if(c){c.pending=null;save();flash('Rejected');}refreshApprovals();}
 function doApproveAvail(id){const a=(DB.availability||[]).find(x=>x.id===id);if(a){a.approved=true;save();flash('Availability approved ✅');}refreshApprovals();}
-function doRejectAvail(id){DB.availability=(DB.availability||[]).filter(x=>x.id!==id);save();flash('Removed');refreshApprovals();}
+function doRejectAvail(id){if(!confirm('Reject and remove this availability window?'))return;DB.availability=(DB.availability||[]).filter(x=>x.id!==id);save();flash('Removed');refreshApprovals();}
 function doApproveAllAvail(){let n=0;(DB.availability||[]).forEach(a=>{if(a.approved===false&&a.date>=todayISO()){a.approved=true;n++;}});if(n){save();flash(n+' window(s) approved ✅');}refreshApprovals();}
 function doApproveEventReg(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(r){r.status='registered';save();flash('Registration approved ✅');}refreshApprovals();}
 function doRejectEventReg(id){if(!confirm('Reject this event registration? It will be cancelled.'))return;const r=(DB.eventRegs||[]).find(x=>x.id===id);if(r){r.status='cancelled';save();flash('Registration rejected');}refreshApprovals();}
@@ -2944,7 +2944,7 @@ function addAvailability(){
   save();flash(isCoach?'Added — awaiting owner approval ⏳':'Availability added 📅');renderAvailability();
 }
 function approveAvailability(id){const a=(DB.availability||[]).find(x=>x.id===id);if(!a)return;a.approved=true;save();flash('Availability approved ✅');renderAvailability();}
-function delAvailability(id){DB.availability=DB.availability.filter(a=>a.id!==id);save();flash('Removed');renderAvailability();}
+function delAvailability(id){if(!confirm('Remove this availability window? Any open slots in it will no longer be bookable.'))return;DB.availability=DB.availability.filter(a=>a.id!==id);save();flash('Removed');renderAvailability();}
 
 /* every candidate slot for a date + session type — both open AND already-booked-by-someone-else.
    Booked ones carry open:false so the UI can show them greyed out ("Booked by others") instead of
