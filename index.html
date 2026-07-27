@@ -586,7 +586,7 @@ function normalize(d){
     if(c.approved===undefined)c.approved=true;
     if(c.suspended===undefined)c.suspended=false;
   });
-  (d.sessions||[]).forEach(s=>{if(s.paidVia===undefined)s.paidVia=s.paid?'cash':'';if(s.paymentRequested===undefined)s.paymentRequested=false;});
+  (d.sessions||[]).forEach(s=>{if(s.paidVia===undefined)s.paidVia=s.paid?'cash':'';if(s.paymentRequested===undefined)s.paymentRequested=false;if(!s.pay||typeof s.pay!=='object')s.pay={};});
   // ----- multi-coach: seed a coach + stamp coach_id on every record -----
   if(!d.coaches||!d.coaches.length)d.coaches=[{id:'rx1',name:'Raymond Xu',tagline:'Lexington, MA · AAU Level Training',bio:"Training isn't just about drills. It's about teaching you the love of the game — the dedication, the grind, the mindset that you never give up. That's what every session is built on.",affiliation:'AAU',affiliationSub:'Middlesex Magic',photo:'',pwd:'coach',active:true}];
   const gR1=(d.settings&&d.settings.rate1on1)||30, gRG=(d.settings&&d.settings.rateGroup)||20;
@@ -620,7 +620,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs){
   d.availability=(avail||[]).map(a=>({id:a.id,coachId:a.coach_id||'',date:a.date,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||'',approved:a.approved!==false}));
   d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',inGroup:!!c.in_group,approved:c.approved!==false,suspended:c.suspended===true,creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
     packages:(pkg||[]).filter(p=>p.customer_id===c.id).map(p=>({id:p.id,coachId:p.coach_id||'',type:p.type,qty:p.qty,amount:Number(p.amount),date:p.date}))}));
-  d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||'',paymentRequested:!!s.payment_requested}));
+  d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||'',paymentRequested:!!s.payment_requested,pay:(s.pay&&typeof s.pay==='object')?s.pay:{}}));
   d.expenses=(exp||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||'',freq:e.freq||'once'}));
   d.cashEntries=(cash||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,amount:Number(e.amount),note:e.note||'',customerId:e.customer_id||'',type:e.type||'1on1',qty:e.qty||1}));
   d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||''}));
@@ -630,7 +630,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs){
 }
 const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),pending:(c.pending||null),created:c.created||null});
 const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,approved:c.approved!==false,suspended:c.suspended===true,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
-const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,payment_requested:!!s.paymentRequested});
+const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,payment_requested:!!s.paymentRequested,pay:s.pay||{}});
 const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:e.coachId||null,price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||''});
 const eventRegRow=r=>({id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||''});
 const messageRow=m=>({id:m.id,peer_type:m.peerType||'client',client_id:m.clientId||'',coach_id:m.coachId||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',read_owner:m.readOwner===true,read_client:m.readClient===true,read_coach:m.readCoach===true});
@@ -805,7 +805,16 @@ function coachRate(coachId,type){
 }
 function computePrice(type,dur,n,coachId){const h=(dur||60)/60;const rate=coachRate(coachId,type);return Math.round(type==='1on1'?rate*h:rate*h*(n||1));}
 function totalFor(c,type){return (c&&c.creditsTotal&&c.creditsTotal[type])||0;}
-function usedFor(c,type){if(!c)return 0;const done=DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.type===type&&s.paidVia==='package'&&s.status==='completed').length;return Math.min(totalFor(c,type),done);}
+/* Per-customer payment status within a session. Group sessions can have a mixed s.pay map
+   (one player on a credit, another paying cash, another not yet paid); 1:1 sessions and any
+   group session nobody has split yet just fall back to the session-level paid/paidVia, which
+   is exactly today's behavior — so nothing existing changes until someone actually uses the
+   per-player controls. */
+function custPay(s,custId){
+  if(s.type==='group' && s.pay && s.pay[custId]) return s.pay[custId];
+  return {paid:!!s.paid, paidVia:s.paidVia||'', requested:!!s.paymentRequested};
+}
+function usedFor(c,type){if(!c)return 0;const done=DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.type===type&&s.status==='completed'&&custPay(s,c.id).paidVia==='package').length;return Math.min(totalFor(c,type),done);}
 function completedCount(c){return DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status==='completed').length;}
 function bookedCount(c){return DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status==='scheduled'&&s.date>=todayISO()).length;}
 /* integrity tally: how many sessions each side cancelled */
@@ -820,6 +829,34 @@ function creditBadge(c){
   return parts.length?parts.map(p=>'<span class="credit">'+p+'</span>').join(' '):'<span class="muted small">—</span>';
 }
 function sessionHasCredit(s){return s.customerIds.some(id=>creditsFor(custById(id),s.type)>0);}
+/* Set one player's payment status inside a group session, without touching the others.
+   Also mirrors an aggregate onto the legacy s.paid/s.paidVia fields (true only once EVERY
+   player is paid) so any code that hasn't been updated to read s.pay still degrades sensibly. */
+function setCustPay(s,custId,paid,paidVia){
+  if(!s.pay)s.pay={};
+  const prev=s.pay[custId]||{};
+  s.pay[custId]=paid?{paid:true,paidVia:paidVia||'cash',requested:!!prev.requested}:{paid:false,paidVia:'',requested:!!prev.requested};
+  const all=s.customerIds.map(id=>custPay(s,id));
+  s.paid=all.every(p=>p.paid);
+  s.paidVia=s.paid?(all.every(p=>p.paidVia==='package')?'package':'cash'):'';
+}
+/* true only once every player in the session has their own paid status = true (group), or the
+   plain paid flag for 1:1 */
+function sessionFullyPaid(s){ return s.type!=='group' ? !!s.paid : s.customerIds.every(id=>custPay(s,id).paid); }
+/* cash actually collected for this session — for a group, only the paid-cash players' shares */
+function sessionCashAmt(s){
+  if(s.status==='cancelled')return 0;
+  if(s.type!=='group') return (s.paid&&s.paidVia==='cash')?s.price:0;
+  const n=s.customerIds.length||1;
+  return s.customerIds.reduce((a,id)=>{const p=custPay(s,id);return a+((p.paid&&p.paidVia==='cash')?s.price/n:0);},0);
+}
+/* amount still owed for this session — for a group, only the unpaid players' shares */
+function sessionOutstandingAmt(s){
+  if(s.status==='cancelled')return 0;
+  if(s.type!=='group') return s.paid?0:s.price;
+  const n=s.customerIds.length||1;
+  return s.customerIds.reduce((a,id)=>a+(custPay(s,id).paid?0:s.price/n),0);
+}
 function locOptions(selected){
   const names=DB.locations.map(l=>l.name);
   let out=DB.locations.map(l=>`<option ${l.name===selected?'selected':''}>${l.name}</option>`).join('');
@@ -1164,12 +1201,12 @@ function exportExcel(){
   const wb=XLSX.utils.book_new();
   const add=(name,rows)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{}]),name);
 
-  const cashSess=DB.sessions.filter(s=>s.paid&&s.paidVia==='cash'&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
+  const cashSess=DB.sessions.reduce((a,s)=>a+sessionCashAmt(s),0);
   const pkgRev=DB.customers.flatMap(c=>c.packages).reduce((a,p)=>a+p.amount,0);
   const otherCash=DB.cashEntries.reduce((a,e)=>a+e.amount,0);
   const eventInc=(DB.eventRegs||[]).filter(r=>r.paid&&r.status!=='cancelled').reduce((a,r)=>{const ev=eventById(r.eventId);return ev?a+(ev.price||0):a;},0);
   const expenses=expenseOccurrences(DB.expenses).reduce((a,e)=>a+e.amount,0);
-  const outstanding=DB.sessions.filter(s=>!s.paid&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
+  const outstanding=DB.sessions.reduce((a,s)=>a+sessionOutstandingAmt(s),0);
   const revenue=cashSess+pkgRev+otherCash+eventInc;
   add('Finance',[
     {Metric:'Revenue (collected)',Amount:revenue},
@@ -1192,11 +1229,11 @@ function exportExcel(){
   add('Locations',DB.locations.map(l=>({Name:l.name,Address:l.address,Sessions:DB.sessions.filter(s=>s.location===l.name).length})));
   add('Booking & Schedule',sortSessions(DB.sessions).map(s=>({Date:s.date,Time:s.time,Coach:coachName(s.coachId),Clients:custNames(s.customerIds),
     Type:s.type==='1on1'?'1:1':'Group',Players:s.customerIds.length,Duration:s.dur,Location:s.location,Status:s.status,
-    'Checked in':s.checkedIn?'Yes':'No',Payment:s.paid?(s.paidVia||'paid'):'unpaid',Price:s.price,Notes:s.notes,Feedback:s.feedback||'',Attachments:(s.media||[]).length})));
+    'Checked in':s.checkedIn?'Yes':'No',Payment:sessionFullyPaid(s)?(s.type==='group'?'paid (all players)':(s.paidVia||'paid')):(s.type==='group'&&s.customerIds.some(cid=>custPay(s,cid).paid)?'partially paid':'unpaid'),Price:s.price,Notes:s.notes,Feedback:s.feedback||'',Attachments:(s.media||[]).length})));
   add('Packages',DB.customers.flatMap(c=>c.packages.map(p=>({Client:c.name,Coach:coachName(p.coachId),Date:p.date,Type:p.type==='1on1'?'1:1':'Group',Sessions:p.qty,Amount:p.amount}))));
   add('Expenses',DB.expenses.map(e=>({Date:e.date,'Attributed to':coachName(e.coachId),Category:e.cat,Note:e.note,Amount:e.amount,Frequency:e.freq||'once'})));
   add('Cash income',[
-    ...DB.sessions.filter(s=>s.paid&&s.paidVia==='cash'&&s.status!=='cancelled').map(s=>({Date:s.date,Source:custNames(s.customerIds)+' ('+(s.type==='1on1'?'1:1':'Group')+' session)',Note:s.notes||'',Amount:s.price})),
+    ...DB.sessions.filter(s=>s.status!=='cancelled'&&sessionCashAmt(s)>0).map(s=>({Date:s.date,Source:custNames(s.customerIds)+' ('+(s.type==='1on1'?'1:1':'Group')+' session)',Note:s.notes||'',Amount:sessionCashAmt(s)})),
     ...DB.cashEntries.map(e=>({Date:e.date,Source:(e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in')+' ('+(e.qty||1)+'× '+(e.type==='group'?'Group':'1:1')+' cash)',Note:e.note||'',Amount:e.amount}))
   ]);
   add('Availability',(DB.availability||[]).map(a=>({Coach:coachName(a.coachId),Date:a.date,From:a.start,To:a.end,'Slot (min)':a.slotMin,Location:a.location,Approved:a.approved!==false?'Yes':'No'})));
@@ -1327,7 +1364,14 @@ function renderBookingTable(){
     const checkCell = s.checkedIn?'<span class="pill green">✓ In</span>':
       (s.date<=now && s.status!=='cancelled'?`<button class="iconbtn" onclick="ownerCheckIn('${s.id}')">Check in</button>`:'<span class="pill">—</span>');
     let payCell;
-    if(s.paid){payCell='<span class="pill green">Paid</span><div class="clienttag">'+(s.paidVia==='package'?'package':'cash')+'</div>';}
+    if(s.type==='group' && s.customerIds.length>1){
+      const paidN=s.customerIds.filter(cid=>custPay(s,cid).paid).length;
+      const allPaid=paidN===s.customerIds.length;
+      payCell=`<div class="actions" style="justify-content:flex-start">
+        <span class="pill ${allPaid?'green':(paidN>0?'yellow':'red')}">${paidN}/${s.customerIds.length} paid</span>
+        <button class="iconbtn" title="Manage each player's payment" onclick="openGroupPay('${s.id}')">Manage</button></div>`;
+    }
+    else if(s.paid){payCell='<span class="pill green">Paid</span><div class="clienttag">'+(s.paidVia==='package'?'package':'cash')+'</div>';}
     else if(AUTH==='coach'){payCell='<div class="actions" style="justify-content:flex-start"><span class="pill red">Unpaid</span><button class="iconbtn" title="Mark paid (cash)" onclick="coachSetPaid(\''+s.id+'\',true)">Cash</button></div>';}
     else{payCell=`<div class="actions" style="justify-content:flex-start">
         ${sessionHasCredit(s)?`<button class="iconbtn" title="Use prepaid credit" onclick="payCredit('${s.id}')">Credit</button>`:''}
@@ -1427,6 +1471,7 @@ function coachSetStatus(id,val,fromModal){
 }
 function coachSetPaid(id,val){
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
+  if(s.type==='group'&&s.customerIds.length>1)return openGroupPay(id);
   if(s.paidVia==='package')return flash('Paid with a prepaid package — managed by the owner.',true);
   const wasPaid=s.paid;
   if(val){s.paid=true;s.paidVia='cash';}else{s.paid=false;s.paidVia='';}
@@ -1437,16 +1482,26 @@ function coachSetPaid(id,val){
 function openCoachStatus(id){
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
   const pkg=s.paidVia==='package';
+  const isGroup=s.type==='group'&&s.customerIds.length>1;
   editMedia=(s.media||[]).slice();
   mediaCust=(s.customerIds&&s.customerIds[0]&&custById(s.customerIds[0])&&custById(s.customerIds[0]).name)||null;
-  openModal('Update session',`
-    <div class="clienttag" style="margin-bottom:12px"><b>${fmtDT(s.date,s.time)}</b> · ${s.type==='1on1'?'1:1':'Group'} · ${custNames(s.customerIds)}<br>📍 ${s.location||''}</div>
-    <div class="field"><label class="f">Status</label><select id="csStatus">${['pending','scheduled','completed','cancelled'].map(o=>`<option ${s.status===o?'selected':''}>${o}</option>`).join('')}</select></div>
-    <div class="field"><label class="f">Payment</label>
+  const paySection=isGroup
+    ? `<div class="field"><label class="f">Payment — per player</label>
+        ${s.customerIds.map(cid=>{
+          const c=custById(cid); const p=custPay(s,cid);
+          if(p.paidVia==='package')return `<div class="clienttag" style="margin:4px 0">${c?c.name:'—'}: paid with a prepaid package (owner-managed)</div>`;
+          return `<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin:4px 0"><input type="checkbox" class="csPaidMember" data-cid="${cid}" ${p.paid?'checked':''} style="width:auto"> ${c?c.name:'—'} — paid (cash), ${money(s.price/s.customerIds.length)}</label>`;
+        }).join('')}
+      </div>`
+    : `<div class="field"><label class="f">Payment</label>
       ${pkg
         ? '<div class="clienttag">Paid with a prepaid package — managed by the owner.</div>'
         : `<label style="display:flex;align-items:center;gap:8px;font-size:14px"><input type="checkbox" id="csPaid" ${s.paid?'checked':''} style="width:auto"> Paid (cash) — ${money(s.price)}</label>`}
-    </div>
+    </div>`;
+  openModal('Update session',`
+    <div class="clienttag" style="margin-bottom:12px"><b>${fmtDT(s.date,s.time)}</b> · ${s.type==='1on1'?'1:1':'Group'} · ${custNames(s.customerIds)}<br>📍 ${s.location||''}</div>
+    <div class="field"><label class="f">Status</label><select id="csStatus">${['pending','scheduled','completed','cancelled'].map(o=>`<option ${s.status===o?'selected':''}>${o}</option>`).join('')}</select></div>
+    ${paySection}
     <div class="field"><label class="f">📣 Feedback to client — shown on their My Sessions</label><textarea id="csFeedback" placeholder="How did it go? Progress, tips, next focus...">${s.feedback||''}</textarea></div>
     <div class="field"><label class="f">📎 Photos / videos for client</label>
       <input type="file" accept="image/*,video/*" multiple onchange="addMediaFiles(this)">
@@ -1459,14 +1514,25 @@ function openCoachStatus(id){
 function coachSaveSession(id){
   const s=DB.sessions.find(x=>x.id===id);if(!s){closeModal();return;}
   const wasPaid=s.paid;
-  const pv=document.getElementById('csPaid');
-  if(pv && s.paidVia!=='package'){ if(pv.checked){s.paid=true;s.paidVia='cash';}else{s.paid=false;s.paidVia='';} }
+  const isGroup=s.type==='group'&&s.customerIds.length>1;
+  if(isGroup){
+    $$('.csPaidMember').forEach(cb=>{
+      const cid=cb.getAttribute('data-cid');
+      const already=custPay(s,cid);
+      if(already.paidVia==='package')return; // owner-managed, coach can't touch
+      const nowPaid=cb.checked;
+      if(nowPaid!==already.paid){ setCustPay(s,cid,nowPaid,'cash'); if(nowPaid)notifyMemberPaymentReceived(s,cid); }
+    });
+  } else {
+    const pv=document.getElementById('csPaid');
+    if(pv && s.paidVia!=='package'){ if(pv.checked){s.paid=true;s.paidVia='cash';}else{s.paid=false;s.paidVia='';} }
+  }
   const fb=document.getElementById('csFeedback'); if(fb)s.feedback=fb.value;
   s.media=editMedia.slice();
   const st=document.getElementById('csStatus').value;
   if(st!==s.status){ coachSetStatus(id,st,true); }
   else { save();flash('Session updated');refreshOwner(); }
-  if(s.paid&&!wasPaid)notifyPaymentReceived(s);
+  if(!isGroup && s.paid&&!wasPaid)notifyPaymentReceived(s);
   mediaCust=null;
   closeModal();
 }
@@ -1476,10 +1542,11 @@ function calToday(){const n=nowBoston();calY=n.getFullYear();calM=n.getMonth();r
 /* ---- client view (locked to the logged-in client only) ---- */
 function clientCard(s){
   const now=todayISO(); const others=s.customerIds.length-1;
+  const my=custPay(s,clientAs); // this client's own paid status — separate from any other player in a group session
   return `<div class="panel" style="margin-bottom:12px">
     <div class="row" style="justify-content:space-between;align-items:center">
       <div>
-        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} <span class="pill">🏀 ${coachName(s.coachId)}</span> ${s.paid?'<span class="pill green">'+(s.paidVia==='package'?t('Prepaid'):t('Paid'))+'</span>':'<span class="pill red">'+t('Unpaid')+'</span>'} ${s.status==='pending'?'<span class="pill yellow">'+t('Pending')+'</span>':s.status==='scheduled'?'<span class="pill blue">'+t('Booked')+'</span>':s.status==='completed'?'<span class="pill green">'+t('Completed')+'</span>':s.status==='cancelled'?cancelledByLabel(s):''}
+        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} <span class="pill">🏀 ${coachName(s.coachId)}</span> ${my.paid?'<span class="pill green">'+(my.paidVia==='package'?t('Prepaid'):t('Paid'))+'</span>':'<span class="pill red">'+t('Unpaid')+'</span>'} ${s.status==='pending'?'<span class="pill yellow">'+t('Pending')+'</span>':s.status==='scheduled'?'<span class="pill blue">'+t('Booked')+'</span>':s.status==='completed'?'<span class="pill green">'+t('Completed')+'</span>':s.status==='cancelled'?cancelledByLabel(s):''}
         <div class="clienttag" style="margin-top:4px">${s.dur} min · 📍 ${s.location||'TBD'}${others>0?' · with '+others+' other player'+(others>1?'s':''):''}</div>
       </div>
       <div class="actions">
@@ -1659,10 +1726,34 @@ function emailClient(to,subject,text){
    session, or flipping status back and forth, doesn't spam the client. The Zelle phone number
    is an owner-only setting (Admin tab); only the owner ever writes DB.settings to the cloud. */
 function requestPaymentZelle(s){
-  if(!s||s.paid||s.paidVia==='package'||s.paymentRequested)return;
+  if(!s)return;
   const zelle=(DB.settings.zellePhone||'').trim();
+  if(s.type==='group' && s.customerIds.length>1){
+    // Group sessions message each unpaid player individually with THEIR share — a player who
+    // already paid (e.g. used a package credit) is skipped entirely, so paying members never
+    // get a stray "amount due" ask meant for someone else in the same session.
+    if(!s.pay)s.pay={};
+    const share=money(s.price/s.customerIds.length);
+    const newMsgs=[];
+    s.customerIds.forEach(cid=>{
+      const p=custPay(s,cid);
+      if(p.paid||p.requested)return;
+      const c=custById(cid);
+      const text=zelle
+        ? 'Hi'+(c?' '+firstName(c.name):'')+'! Your group session on '+fmtDT(s.date,s.time)+' with '+coachName(s.coachId)+' is complete. Your share: '+share+'. Please Zelle payment to Raymond at '+zelle+'. Thanks! 🏀'
+        : 'Hi'+(c?' '+firstName(c.name):'')+'! Your group session on '+fmtDT(s.date,s.time)+' with '+coachName(s.coachId)+' is complete. Your share: '+share+'. Please arrange payment with Raymond — thanks! 🏀';
+      const m={id:uid(),peerType:'client',clientId:cid,coachId:'',sender:'owner',
+        text,media:[],created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false};
+      DB.messages.push(m); newMsgs.push(m);
+      s.pay[cid]={...(s.pay[cid]||{paid:false,paidVia:''}),requested:true};
+    });
+    if(newMsgs.length){ save(); pushRows('messages',newMsgs.map(messageRow)); pushRows('sessions',[sessRow(s)]); }
+    return;
+  }
+  // ---- 1:1 (unchanged) ----
+  if(s.paid||s.paidVia==='package'||s.paymentRequested)return;
   const c=custById(s.customerIds[0]);
-  const label=(s.type==='1on1'?'1:1':'Group')+' session on '+fmtDT(s.date,s.time);
+  const label='1:1 session on '+fmtDT(s.date,s.time);
   const text=zelle
     ? 'Hi'+(c?' '+firstName(c.name):'')+'! Your '+label+' with '+coachName(s.coachId)+' is complete. Amount due: '+money(s.price)+'. Please Zelle payment to Raymond at '+zelle+'. Thanks! 🏀'
     : 'Hi'+(c?' '+firstName(c.name):'')+'! Your '+label+' with '+coachName(s.coachId)+' is complete. Amount due: '+money(s.price)+'. Please arrange payment with Raymond — thanks! 🏀';
@@ -1674,39 +1765,62 @@ function requestPaymentZelle(s){
   pushRows('messages',[messageRow(m)]);
   pushRows('sessions',[sessRow(s)]);
 }
-/* Closes the loop on requestPaymentZelle(): once a session that we'd asked the client to Zelle
-   for gets marked paid (any method — cash, package credit, whatever), post a short "payment
-   received" confirmation in their chat thread. Without this, the original "Amount due: $X"
-   message just sits in Messages looking unresolved forever, even after the owner has actually
-   collected payment — which is exactly what made it look like sessions were still unpaid.
-   Only fires if we'd actually sent a request (s.paymentRequested) — no request, no confirmation. */
-function sendPaymentReceivedMsg(s){
-  const c=custById(s.customerIds[0]);
-  const label=(s.type==='1on1'?'1:1':'Group')+' session on '+fmtDT(s.date,s.time);
+/* Closes the loop on requestPaymentZelle(): once a session (or, for a group, one specific
+   player) that we'd asked to Zelle gets marked paid, post a short "payment received"
+   confirmation in their chat thread. Without this, the original "Amount due: $X" message just
+   sits in Messages looking unresolved forever, even after payment was actually collected.
+   custId is optional — defaults to the session's first customer (the 1:1 case). */
+function sendPaymentReceivedMsg(s,custId){
+  const cid=custId||s.customerIds[0];
+  const c=custById(cid);
+  const label=(s.type==='group'?'group':'1:1')+' session on '+fmtDT(s.date,s.time);
   const text='Hi'+(c?' '+firstName(c.name):'')+'! ✅ Payment received for your '+label+' — thank you!';
-  const m={id:uid(),peerType:'client',clientId:s.customerIds[0]||'',coachId:'',sender:'owner',
+  const m={id:uid(),peerType:'client',clientId:cid,coachId:'',sender:'owner',
     text,media:[],created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false};
   DB.messages.push(m);
   pushRows('messages',[messageRow(m)]);
 }
+/* 1:1 only — group sessions use notifyMemberPaymentReceived() below since each player's
+   request/confirmation is tracked separately. */
 function notifyPaymentReceived(s){
-  if(!s||!s.paymentRequested)return;
+  if(!s||s.type==='group'||!s.paymentRequested)return;
   sendPaymentReceivedMsg(s);
+  save();
+}
+/* Group equivalent of notifyPaymentReceived — fires only for the specific player who just got
+   marked paid, and only if we'd actually sent THAT player a Zelle ask. */
+function notifyMemberPaymentReceived(s,custId){
+  const p=s.pay&&s.pay[custId];
+  if(!p||!p.requested)return;
+  sendPaymentReceivedMsg(s,custId);
   save();
 }
 /* Manual escape hatch: some sessions got their Zelle request sent before the payment_requested
    column existed in the database (a one-time historical gap from mid-rollout), so that flag is
    stuck false for them even though a request really was sent — notifyPaymentReceived() silently
    skips those. This lets the owner force the confirmation through from the session editor, and
-   sets the flag afterward so everything stays consistent going forward. */
+   sets the flag afterward so everything stays consistent going forward. 1:1 sessions only —
+   group sessions have the equivalent control inside the per-player payments modal. */
 function manualPaymentConfirm(id){
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
+  if(s.type==='group')return flash('Use "Manage payments" for group sessions',true);
   if(!s.paid)return flash('Mark this session paid first',true);
   sendPaymentReceivedMsg(s);
   s.paymentRequested=true;
   save();
   pushRows('sessions',[sessRow(s)]);
   flash('Payment confirmation sent to client ✅');
+}
+/* Same manual override as manualPaymentConfirm(), scoped to one player in a group session. */
+function manualMemberPaymentConfirm(id,custId){
+  const s=DB.sessions.find(x=>x.id===id);if(!s)return;
+  const p=custPay(s,custId); if(!p.paid)return flash('Mark this player paid first',true);
+  sendPaymentReceivedMsg(s,custId);
+  if(!s.pay)s.pay={};
+  s.pay[custId]={...(s.pay[custId]||p),requested:true};
+  save();
+  pushRows('sessions',[sessRow(s)]);
+  flash('Payment confirmation sent ✅');
 }
 /* record who cancelled (client / coach / owner) + when, for the integrity tally */
 function markCancelled(s,who){s.status='cancelled';s.cancelledBy=who;s.cancelledAt=new Date().toISOString();}
@@ -1779,10 +1893,15 @@ function mailtoOwner(emails,subject,body){
 }
 
 function clientCheckIn(id){
-  const s=DB.sessions.find(x=>x.id===id);s.checkedIn=true;
+  const s=DB.sessions.find(x=>x.id===id);if(!s)return;
+  s.checkedIn=true;
   const c=custById(clientAs);
-  if(!s.paid && creditsFor(c,s.type)>0){
-    s.paid=true;s.paidVia='package';
+  const my=custPay(s,clientAs);
+  // For a group session, using a credit only settles THIS client's own share — it must not
+  // mark the whole session (and everyone else in it) as paid off the back of one player's credit.
+  if(!my.paid && creditsFor(c,s.type)>0){
+    if(s.type==='group'&&s.customerIds.length>1){ setCustPay(s,clientAs,true,'package'); }
+    else{ s.paid=true; s.paidVia='package'; }
     save();flash("Checked in — 1 credit used. Let's work! 🔥");
   }else{save();flash("Checked in — let's work! 🔥");}
   pushRows('sessions',[sessRow(s)]);
@@ -1889,11 +2008,13 @@ function openSession(id,returnCust){
         ${['pending','scheduled','completed','cancelled'].map(v=>`<option ${s.status===v?'selected':''}>${v}</option>`).join('')}</select></div>
     </div>
     <div class="row">
-      <div class="field"><label class="f">Payment</label><select id="sPay">
+      <div class="field"><label class="f">Payment${s.type==='group'?' (default for anyone not set individually)':''}</label><select id="sPay">
         <option value="" ${payVal===''?'selected':''}>Unpaid</option>
         <option value="cash" ${payVal==='cash'?'selected':''}>Paid — cash</option>
         <option value="package" ${payVal==='package'?'selected':''}>Paid — use package credit</option>
-      </select></div>
+      </select>
+      ${(id&&s.type==='group'&&s.customerIds.length>1)?`<button type="button" class="btn ghost sm" style="margin-top:6px" onclick="openGroupPay('${id}')">👥 Manage payments per player</button>`:''}
+      </div>
       <div class="field"><label class="f">Location — clients see this</label><select id="sLoc">${locOptions(s.location)}</select></div>
     </div>
     <label class="f" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="sCheck" ${s.checkedIn?'checked':''} style="width:auto"> Checked in</label>
@@ -1934,20 +2055,29 @@ function saveSession(id,emailAfter){
   const exSess=id?DB.sessions.find(x=>x.id===id):null;
   const prevStatus=exSess?exSess.status:null; // captured before Object.assign mutates exSess in place
   const prevPaid=exSess?exSess.paid:false;
+  // per-member snapshot (for groups) — also captured before the mutation below
+  const prevMemberPaid={}; if(exSess)exSess.customerIds.forEach(cid=>{prevMemberPaid[cid]=custPay(exSess,cid).paid;});
   if(obj.status==='cancelled' && (!exSess||exSess.status!=='cancelled')){ if(!confirm('Cancel this session? It will show as cancelled and the client will see the change.'))return; }
   if(obj.status==='cancelled'){obj.cancelledBy=(exSess&&exSess.cancelledBy)||'owner';obj.cancelledAt=(exSess&&exSess.cancelledAt)||new Date().toISOString();}
   else{obj.cancelledBy='';obj.cancelledAt='';}
   if(id){Object.assign(DB.sessions.find(x=>x.id===id),obj);}
   else{obj.id=uid();DB.sessions.push(obj);}
   if(!save())return;flash('Session saved');
+  const savedSess=id?DB.sessions.find(x=>x.id===id):obj;
   if(obj.status==='completed' && prevStatus!=='completed'){
-    requestPaymentZelle(id?DB.sessions.find(x=>x.id===id):obj);
+    requestPaymentZelle(savedSess);
   }
   if(obj.status==='cancelled' && prevStatus!=='cancelled'){
-    notifyCancellation(id?DB.sessions.find(x=>x.id===id):obj,'owner');
+    notifyCancellation(savedSess,'owner');
   }
-  if(obj.paid && !prevPaid){
-    notifyPaymentReceived(id?DB.sessions.find(x=>x.id===id):obj);
+  if(obj.type==='group' && obj.customerIds.length>1){
+    // the bulk Payment dropdown can mark everyone paid at once (via the legacy fallback) —
+    // still confirm to each individual player who'd previously been sent a Zelle request.
+    obj.customerIds.forEach(cid=>{
+      if(custPay(savedSess,cid).paid && !prevMemberPaid[cid]) notifyMemberPaymentReceived(savedSess,cid);
+    });
+  } else if(obj.paid && !prevPaid){
+    notifyPaymentReceived(savedSess);
   }
   if(emailAfter){
     const c=custById(ids[0]);
@@ -1959,8 +2089,61 @@ function saveSession(id,emailAfter){
 }
 function delSession(id){if(!confirm('Delete this session?'))return;DB.sessions=DB.sessions.filter(x=>x.id!==id);save();flash('Session deleted');afterSessionSave();}
 
-function payCash(id){const s=DB.sessions.find(x=>x.id===id);const wasPaid=s.paid;s.paid=true;s.paidVia='cash';save();flash('Marked paid (cash) 💵');if(!wasPaid)notifyPaymentReceived(s);refreshOwner();}
-function payCredit(id){const s=DB.sessions.find(x=>x.id===id);if(!sessionHasCredit(s))return flash('No prepaid credit available',true);const wasPaid=s.paid;s.paid=true;s.paidVia='package';save();flash('Credit applied 🎟️');if(!wasPaid)notifyPaymentReceived(s);refreshOwner();}
+function payCash(id){const s=DB.sessions.find(x=>x.id===id);if(!s)return;if(s.type==='group'&&s.customerIds.length>1)return openGroupPay(id);const wasPaid=s.paid;s.paid=true;s.paidVia='cash';save();flash('Marked paid (cash) 💵');if(!wasPaid)notifyPaymentReceived(s);refreshOwner();}
+function payCredit(id){const s=DB.sessions.find(x=>x.id===id);if(!s)return;if(s.type==='group'&&s.customerIds.length>1)return openGroupPay(id);if(!sessionHasCredit(s))return flash('No prepaid credit available',true);const wasPaid=s.paid;s.paid=true;s.paidVia='package';save();flash('Credit applied 🎟️');if(!wasPaid)notifyPaymentReceived(s);refreshOwner();}
+/* Per-player payment editor for group sessions — one player might use a prepaid credit while
+   another pays cash and a third hasn't paid at all. Shared by owner and coach (role-gated
+   inline): owner can apply credits, coach can only mark/unmark cash and sees credit-paid
+   players as read-only ("managed by the owner"), matching the existing 1:1 permission model. */
+function openGroupPay(id){
+  const s=DB.sessions.find(x=>x.id===id);if(!s)return;
+  const n=s.customerIds.length||1;
+  const rows=s.customerIds.map(cid=>{
+    const c=custById(cid); const p=custPay(s,cid);
+    const hasCredit=c?creditsFor(c,s.type)>0:false;
+    let actionHtml;
+    if(AUTH==='coach'){
+      if(p.paidVia==='package'){ actionHtml='<span class="pill green">Credit</span><div class="clienttag">owner-managed</div>'; }
+      else{ actionHtml = p.paid
+        ? `<span class="pill green">Cash</span><button class="iconbtn" onclick="setGroupPay('${id}','${cid}',false)">Undo</button>`
+        : `<button class="btn sm" onclick="setGroupPay('${id}','${cid}',true,'cash')">Mark cash paid</button>`;
+      }
+    } else {
+      actionHtml = p.paid
+        ? `<span class="pill green">${p.paidVia==='package'?'Credit':'Cash'}</span>
+           <button class="iconbtn" title="Undo" onclick="setGroupPay('${id}','${cid}',false)">Undo</button>
+           <button class="iconbtn" title="Resend payment-received confirmation" onclick="manualMemberPaymentConfirm('${id}','${cid}')">✅</button>`
+        : `${hasCredit?`<button class="iconbtn" title="Use prepaid credit" onclick="setGroupPay('${id}','${cid}',true,'package')">Credit</button>`:''}
+           <button class="iconbtn" onclick="setGroupPay('${id}','${cid}',true,'cash')">Cash</button>`;
+    }
+    return `<div class="row" style="justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)">
+      <div><b>${c?c.name:'—'}</b><div class="clienttag">${money(s.price/n)} share${(hasCredit&&!p.paid)?' · has a credit available':''}</div></div>
+      <div class="actions">${actionHtml}</div>
+    </div>`;
+  }).join('');
+  openModal('Payments — '+custNames(s.customerIds),`
+    <div class="clienttag" style="margin-bottom:8px">${fmtDT(s.date,s.time)} · Group · Total ${money(s.price)}</div>
+    ${rows}
+    <p class="muted small" style="margin-top:10px">Each player's payment is tracked separately — one can use a prepaid credit while another pays cash, or hasn't paid yet.</p>
+  `,`<button class="btn ghost" onclick="closeModal()">Close</button>`);
+}
+function setGroupPay(id,custId,paid,method){
+  const s=DB.sessions.find(x=>x.id===id);if(!s)return;
+  const cur=custPay(s,custId);
+  if(AUTH==='coach' && cur.paidVia==='package')return flash('Paid with a prepaid package — managed by the owner.',true);
+  if(paid && method==='package'){
+    if(AUTH==='coach')return flash('Only the owner can apply a prepaid credit.',true);
+    if(creditsFor(custById(custId),s.type)<=0)return flash('No prepaid credit available for this player',true);
+  }
+  const wasPaid=cur.paid;
+  setCustPay(s,custId,paid,method);
+  save();
+  pushRows('sessions',[sessRow(s)]);
+  if(paid&&!wasPaid)notifyMemberPaymentReceived(s,custId);
+  flash(paid?'Marked paid':'Marked unpaid');
+  openGroupPay(id);
+  refreshOwner();
+}
 
 /* ---------- Calendar export (.ics + Google) ---------- */
 function pad(n){return String(n).padStart(2,'0');}
@@ -2084,11 +2267,11 @@ function renderCustomers(){
 function viewCustomer(id){
   const c=custById(id);
   const sess=sortSessions(DB.sessions.filter(s=>s.customerIds.includes(c.id))).reverse();
-  const hist=sess.map(s=>`<tr><td>${fmtDT(s.date,s.time)}<div class="clienttag">📍 ${s.location||''}</div></td><td>${s.type==='1on1'?'1:1':'Group'}</td>
+  const hist=sess.map(s=>{const p=custPay(s,c.id);return `<tr><td>${fmtDT(s.date,s.time)}<div class="clienttag">📍 ${s.location||''}</div></td><td>${s.type==='1on1'?'1:1':'Group'}</td>
     <td><span class="pill ${s.status==='completed'?'green':s.status==='cancelled'?'red':'yellow'}">${s.status}</span>${s.status==='cancelled'&&s.cancelledBy?`<div class="clienttag">by ${s.cancelledBy}</div>`:''}</td>
-    <td>${s.paid?'<span class="pill green">'+(s.paidVia==='package'?'pkg':'paid')+'</span>':'<span class="pill red">unpaid</span>'}</td>
+    <td>${p.paid?'<span class="pill green">'+(p.paidVia==='package'?'pkg':'paid')+'</span>':'<span class="pill red">unpaid</span>'}${s.type==='group'&&s.customerIds.length>1?`<button class="iconbtn" title="Manage each player's payment" onclick="openGroupPay('${s.id}')">⋯</button>`:''}</td>
     <td class="right">${money(s.price/s.customerIds.length)}</td>
-    <td class="right"><button class="iconbtn" onclick="openSession('${s.id}','${id}')">Edit</button></td></tr>`).join('')||'<tr><td colspan="6"><div class="empty">No sessions yet.</div></td></tr>';
+    <td class="right"><button class="iconbtn" onclick="openSession('${s.id}','${id}')">Edit</button></td></tr>`;}).join('')||'<tr><td colspan="6"><div class="empty">No sessions yet.</div></td></tr>';
   const pkgs=c.packages.length?c.packages.slice().reverse().map(p=>`<tr><td>${fmtDate(p.date)}</td><td>${p.qty}× ${p.type==='1on1'?'1:1':'Group'}</td><td class="right">${money(p.amount)}</td><td class="right"><button class="iconbtn" onclick="openPackage('${id}','${p.id}')">Edit</button></td></tr>`).join(''):'<tr><td colspan="4"><div class="empty">No packages.</div></td></tr>';
   const credLine=(lab,t)=>totalFor(c,t)>0?`<div class="small" style="margin-top:4px">${lab}: <b>${usedFor(c,t)}/${totalFor(c,t)} used</b> · <span style="color:var(--accent2)">${creditsFor(c,t)} left</span></div>`:'';
   openModal(c.name,`
@@ -2768,14 +2951,24 @@ function clientPayments(id){
   const out=[];
   (c.packages||[]).forEach(p=>out.push({date:p.date,amount:p.amount,label:p.qty+'× '+(p.type==='1on1'?'1:1':'Group')+' package · '+coachName(p.coachId)}));
   DB.cashEntries.filter(e=>e.customerId===id).forEach(e=>out.push({date:e.date,amount:e.amount,label:(e.qty||1)+'× '+(e.type==='group'?'Group':'1:1')+' (cash) · '+coachName(e.coachId)}));
-  DB.sessions.filter(s=>s.customerIds.includes(id)&&s.paid&&s.paidVia==='cash'&&s.status!=='cancelled').forEach(s=>out.push({date:s.date,amount:s.price/s.customerIds.length,label:(s.type==='1on1'?'1:1':'Group')+' session (cash) · '+coachName(s.coachId)}));
+  // Check THIS client's own share, not the session aggregate — in a mixed group, one player's
+  // cash payment must never show up in another player's payment log.
+  DB.sessions.filter(s=>s.customerIds.includes(id)&&s.status!=='cancelled').forEach(s=>{
+    const p=custPay(s,id);
+    if(p.paid&&p.paidVia==='cash')out.push({date:s.date,amount:s.price/s.customerIds.length,label:(s.type==='1on1'?'1:1':'Group')+' session (cash) · '+coachName(s.coachId)});
+  });
   return out;
 }
 function coachEarnings(id){
   const out=[];
   DB.customers.forEach(c=>(c.packages||[]).filter(p=>p.coachId===id).forEach(p=>out.push({date:p.date,amount:p.amount,label:c.name+' — '+p.qty+'× '+(p.type==='1on1'?'1:1':'Group')+' package'})));
   DB.cashEntries.filter(e=>e.coachId===id).forEach(e=>{const cn=e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in';out.push({date:e.date,amount:e.amount,label:cn+' — '+(e.qty||1)+'× '+(e.type==='group'?'Group':'1:1')+' (cash)'});});
-  DB.sessions.filter(s=>s.coachId===id&&s.paid&&s.paidVia==='cash'&&s.status!=='cancelled').forEach(s=>out.push({date:s.date,amount:s.price,label:custNames(s.customerIds)+' — '+(s.type==='1on1'?'1:1':'Group')+' session (cash)'}));
+  // sessionCashAmt() only counts what was actually collected in cash — for a mixed group that's
+  // just the paying members' shares, not the full session price.
+  DB.sessions.filter(s=>s.coachId===id&&s.status!=='cancelled').forEach(s=>{
+    const amt=sessionCashAmt(s);
+    if(amt>0)out.push({date:s.date,amount:amt,label:custNames(s.customerIds)+' — '+(s.type==='1on1'?'1:1':'Group')+' session (cash)'});
+  });
   return out;
 }
 function setPayRange(r){payRange=r;renderMoney();}
@@ -2799,8 +2992,9 @@ function renderMoney(){
   const sessStatusRows=isCoach?'':(()=>{
     const ss=clientSessionStatus(targetId);
     return ss.length?ss.map(s=>{
-      const statusCell=s.paid
-        ?'<span class="pill green">'+(s.paidVia==='package'?t('Prepaid'):(t('Paid')+(s.paidVia?' · '+s.paidVia:'')))+'</span>'
+      const p=custPay(s,targetId);
+      const statusCell=p.paid
+        ?'<span class="pill green">'+(p.paidVia==='package'?t('Prepaid'):(t('Paid')+(p.paidVia?' · '+p.paidVia:'')))+'</span>'
         :'<span class="pill red">'+t('Unpaid')+'</span>';
       return `<tr><td>${fmtDT(s.date,s.time)}</td><td>${s.type==='1on1'?'1:1':'Group'} · ${coachName(s.coachId)}</td><td>${statusCell}</td><td class="right">${money(s.price/s.customerIds.length)}</td></tr>`;
     }).join(''):'<tr><td colspan="4"><div class="empty">—</div></td></tr>';
@@ -3184,24 +3378,24 @@ function renderFinance(){
   const EX=DB.expenses.filter(e=>inScope(e.coachId));
   const EXo=expenseOccurrences(EX);   // recurring expanded to per-period occurrences
   const scopeLbl = scopeCoach()==='all' ? 'All coaches' : 'Coach: '+coachName(scopeCoach());
-  const cashSess=S.filter(s=>s.paid&&s.paidVia==='cash'&&s.status!=='cancelled');
+  // Sessions where SOME cash was actually collected — for a mixed group that's only the paying
+  // members' shares (sessionCashAmt), not the full session price.
+  const cashSess=S.filter(s=>s.status!=='cancelled'&&sessionCashAmt(s)>0);
   const allPkgs=DB.customers.flatMap(c=>c.packages.filter(p=>inScope(p.coachId)).map(p=>({...p,cust:c.name,custId:c.id})));
   const pkgRev=allPkgs.reduce((a,p)=>a+p.amount,0);
-  const sessCash=cashSess.reduce((a,s)=>a+s.price,0);
+  const sessCash=cashSess.reduce((a,s)=>a+sessionCashAmt(s),0);
   const otherCash=CE.reduce((a,e)=>a+e.amount,0);
   const eventInc=(DB.eventRegs||[]).filter(r=>r.paid&&r.status!=='cancelled').reduce((a,r)=>{const ev=eventById(r.eventId);return (ev&&inScope(ev.coachId))?a+(ev.price||0):a;},0);
   const cashRev=sessCash+otherCash+eventInc;
   const revenue=pkgRev+cashRev;
-  const outstanding=S.filter(s=>!s.paid&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
+  const outstanding=S.reduce((a,s)=>a+sessionOutstandingAmt(s),0);
   const expenses=EXo.reduce((a,e)=>a+e.amount,0);
   const profit=revenue-expenses;
   // Liability = money received for sessions not yet delivered (prepaid packages + cash sessions),
   // reduced by every completed (delivered) session, whether cash or prepaid.
-  const soldVal=allPkgs.reduce((x,p)=>x+p.amount,0)
-              + S.filter(s=>s.paidVia==='cash'&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
-  const soldCnt=allPkgs.reduce((x,p)=>x+p.qty,0)
-              + S.filter(s=>s.paidVia==='cash'&&s.status!=='cancelled').length;
-  const delivered=S.filter(s=>s.status==='completed'&&(s.paidVia==='package'||s.paidVia==='cash'));
+  const soldVal=allPkgs.reduce((x,p)=>x+p.amount,0) + cashSess.reduce((a,s)=>a+sessionCashAmt(s),0);
+  const soldCnt=allPkgs.reduce((x,p)=>x+p.qty,0) + cashSess.length;
+  const delivered=S.filter(s=>s.status==='completed'&&sessionFullyPaid(s));
   const remCredits=Math.max(0, soldCnt - delivered.length);
   const creditValue=Math.max(0, soldVal - delivered.reduce((a,s)=>a+s.price,0));
 
@@ -3210,14 +3404,14 @@ function renderFinance(){
   const base=new Date(by,bm-1,1);
   for(let i=n-1;i>=0;i--){const d=new Date(base);d.setMonth(d.getMonth()-i);months.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));}
   const revByM={},expByM={};
-  cashSess.forEach(s=>{const k=monthKey(s.date);revByM[k]=(revByM[k]||0)+s.price;});
+  cashSess.forEach(s=>{const k=monthKey(s.date);revByM[k]=(revByM[k]||0)+sessionCashAmt(s);});
   CE.forEach(e=>{const k=monthKey(e.date);revByM[k]=(revByM[k]||0)+e.amount;});
   allPkgs.forEach(p=>{const k=monthKey(p.date);revByM[k]=(revByM[k]||0)+p.amount;});
   EXo.forEach(e=>{const k=monthKey(e.date);expByM[k]=(expByM[k]||0)+e.amount;});
   const rev=months.map(m=>revByM[m]||0), exp=months.map(m=>expByM[m]||0), prof=months.map((m,i)=>rev[i]-exp[i]);
 
   const byType={'1on1':0,'group':0};
-  cashSess.forEach(s=>byType[s.type]+=s.price);
+  cashSess.forEach(s=>byType[s.type]+=sessionCashAmt(s));
   allPkgs.forEach(p=>byType[p.type]+=p.amount);
   const maxType=Math.max(byType['1on1'],byType['group'],1);
 
@@ -3227,18 +3421,38 @@ function renderFinance(){
     <td class="right"><div class="actions"><button class="iconbtn" onclick="openExpense('${e.id}')">Edit</button><button class="iconbtn" onclick="delExpense('${e.id}')">✕</button></div></td></tr>`).join('')
     ||'<tr><td colspan="6"><div class="empty">No expenses logged.</div></td></tr>';
 
-  const unpaidRows=S.filter(s=>!s.paid&&s.status!=='cancelled').sort((a,b)=>a.date.localeCompare(b.date)).map(s=>`<tr>
-    <td>${fmtDate(s.date)}</td><td>🏀 ${coachName(s.coachId)}</td><td>${custNames(s.customerIds)}</td>
-    <td>${s.type==='1on1'?'1:1':'Group'}</td><td class="right">${money(s.price)}</td>
-    <td class="right"><div class="actions">${sessionHasCredit(s)?`<button class="btn sm ghost" onclick="payCredit('${s.id}')">Credit</button>`:''}<button class="btn sm" onclick="payCash('${s.id}')">Cash</button></div></td></tr>`).join('')
-    ||'<tr><td colspan="6"><div class="empty">All caught up — nothing outstanding! 🎉</div></td></tr>';
+  // One row per session for 1:1 (unchanged), but one row PER UNPAID PLAYER for groups — so a
+  // group where Yanyan already paid and Rick hasn't shows only Rick here, with his own share
+  // and his own Cash/Credit action, not the whole session.
+  const unpaidRows=(()=>{
+    const out=[];
+    S.filter(s=>s.status!=='cancelled').forEach(s=>{
+      if(s.type==='group'&&s.customerIds.length>1){
+        s.customerIds.forEach(cid=>{
+          const p=custPay(s,cid); if(p.paid)return;
+          const c=custById(cid);
+          out.push({date:s.date,html:`<tr>
+            <td>${fmtDate(s.date)}</td><td>🏀 ${coachName(s.coachId)}</td><td>${c?c.name:'—'}<div class="clienttag">Group w/ ${custNames(s.customerIds.filter(x=>x!==cid))}</div></td>
+            <td>Group</td><td class="right">${money(s.price/s.customerIds.length)}</td>
+            <td class="right"><div class="actions">${c&&creditsFor(c,s.type)>0?`<button class="btn sm ghost" onclick="setGroupPay('${s.id}','${cid}',true,'package')">Credit</button>`:''}<button class="btn sm" onclick="setGroupPay('${s.id}','${cid}',true,'cash')">Cash</button></div></td></tr>`});
+        });
+      } else if(!s.paid){
+        out.push({date:s.date,html:`<tr>
+          <td>${fmtDate(s.date)}</td><td>🏀 ${coachName(s.coachId)}</td><td>${custNames(s.customerIds)}</td>
+          <td>${s.type==='1on1'?'1:1':'Group'}</td><td class="right">${money(s.price)}</td>
+          <td class="right"><div class="actions">${sessionHasCredit(s)?`<button class="btn sm ghost" onclick="payCredit('${s.id}')">Credit</button>`:''}<button class="btn sm" onclick="payCash('${s.id}')">Cash</button></div></td></tr>`});
+      }
+    });
+    out.sort((a,b)=>a.date.localeCompare(b.date));
+    return out.length?out.map(r=>r.html).join(''):'<tr><td colspan="6"><div class="empty">All caught up — nothing outstanding! 🎉</div></td></tr>';
+  })();
 
   const manualRows=CE.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>{const cn=e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in';return `<tr>
     <td>${fmtDate(e.date)}</td><td>🏀 ${coachName(e.coachId)}</td><td>${cn}</td><td class="muted">${e.qty||1}× ${e.type==='group'?'Group':'1:1'} (cash)${e.note?' · '+e.note:''}</td><td class="right">${money(e.amount)}</td>
     <td class="right"><div class="actions"><button class="iconbtn" onclick="openCashEntry('${e.id}')">Edit</button><button class="iconbtn" onclick="delCashEntry('${e.id}')">✕</button></div></td></tr>`}).join('');
   const cashSessRows=cashSess.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(s=>`<tr>
-    <td>${fmtDate(s.date)}</td><td>🏀 ${coachName(s.coachId)}</td><td>${custNames(s.customerIds)}</td><td class="muted">${s.type==='1on1'?'1:1':'Group'} session</td><td class="right">${money(s.price)}</td>
-    <td class="right"><button class="iconbtn" onclick="openSession('${s.id}')">Edit</button></td></tr>`).join('');
+    <td>${fmtDate(s.date)}</td><td>🏀 ${coachName(s.coachId)}</td><td>${custNames(s.customerIds)}</td><td class="muted">${s.type==='1on1'?'1:1':'Group'} session${s.type==='group'&&!sessionFullyPaid(s)?' · partial':''}</td><td class="right">${money(sessionCashAmt(s))}</td>
+    <td class="right"><button class="iconbtn" onclick="${s.type==='group'&&s.customerIds.length>1?`openGroupPay('${s.id}')`:`openSession('${s.id}')`}">Edit</button></td></tr>`).join('');
   const cashRows=(manualRows+cashSessRows)||'<tr><td colspan="6"><div class="empty">No cash income yet.</div></td></tr>';
 
   const pkgRows=allPkgs.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>`<tr><td>${fmtDate(p.date)}</td><td>🏀 ${coachName(p.coachId)}</td><td>${p.cust}</td><td class="muted">${p.qty}× ${p.type==='1on1'?'1:1':'Group'}</td><td class="right">${money(p.amount)}</td>
@@ -3249,7 +3463,7 @@ function renderFinance(){
   if(scopeCoach()==='all' && (DB.coaches||[]).length){
     const rows=DB.coaches.map(co=>{
       const cs=DB.sessions.filter(s=>s.coachId===co.id);
-      const cash=cs.filter(s=>s.paid&&s.paidVia==='cash'&&s.status!=='cancelled').reduce((a,s)=>a+s.price,0);
+      const cash=cs.filter(s=>s.status!=='cancelled').reduce((a,s)=>a+sessionCashAmt(s),0);
       const pk=DB.customers.flatMap(c=>c.packages).filter(p=>p.coachId===co.id).reduce((a,p)=>a+p.amount,0);
       const other=DB.cashEntries.filter(e=>e.coachId===co.id).reduce((a,e)=>a+e.amount,0);
       const rev=cash+pk+other;
