@@ -2006,9 +2006,10 @@ function mediaThumbs(s,owner){
     ?`<img src="${mUrl(m)}" onclick="viewMedia('${s.id}',${i})" style="width:90px;height:90px;object-fit:cover;border-radius:8px;margin:6px 6px 0 0;cursor:pointer">`
     :`<video src="${mUrl(m)}" controls style="width:150px;border-radius:8px;margin:6px 6px 0 0"></video>`).join('');
 }
-function openSession(id,returnCust){
+function openSession(id,returnCust,preset){
   sessionReturnCust=returnCust||null;
-  const blank={id:'',coachId:targetCoach(),customerIds:returnCust?[returnCust]:[],type:'1on1',date:todayISO(),time:'16:00',dur:60,price:computePrice('1on1',60,1,targetCoach()),status:'scheduled',paid:false,paidVia:'',checkedIn:false,location:(DB.locations[0]?DB.locations[0].name:''),notes:''};
+  const pcoach=(preset&&preset.coachId)||targetCoach();
+  const blank={id:'',coachId:pcoach,customerIds:returnCust?[returnCust]:[],type:'1on1',date:(preset&&preset.date)||todayISO(),time:(preset&&preset.time)||'16:00',dur:60,price:computePrice('1on1',60,1,pcoach),status:'scheduled',paid:false,paidVia:'',checkedIn:false,location:(preset&&preset.location)||(DB.locations[0]?DB.locations[0].name:''),notes:''};
   const s = id?DB.sessions.find(x=>x.id===id):blank;
   const opts = DB.customers.map(c=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 4px;cursor:pointer"><input type="checkbox" class="sCustCb" value="${c.id}" ${s.customerIds.includes(c.id)?'checked':''} style="width:auto" onchange="recalcPrice()"><span>${c.name}${totalFor(c,'1on1')||totalFor(c,'group')?' · 1:1 '+creditsFor(c,'1on1')+' left':''}</span></label>`).join('')||'<div class="clienttag">No customers yet — add one in the Customers tab first.</div>';
   const payVal = s.paid?(s.paidVia||'cash'):'';
@@ -2791,6 +2792,41 @@ let availDraft=[];
 // reset to hardcoded defaults every time you add one to the list — makes adding several
 // different dates back-to-back much less tedious. Same panel is used by owner and coach.
 let avLast={date:'',start:'16:00',end:'19:00',slotMin:60,location:'',dow:[],until:''};
+/* Expand one availability rule into its individual time slots, each flagged with whichever
+   session (if any) is actually booked there — connects the Availability page to real booking
+   state instead of just showing the raw open/close window. Shared by owner and coach views. */
+function slotsForRule(a){
+  const step=a.slotMin||60; let [sh,sm]=a.start.split(':').map(Number); let [eh,em]=a.end.split(':').map(Number);
+  let cur=sh*60+sm; const lim=eh*60+em; const out=[];
+  for(;cur+step<=lim;cur+=step){
+    const t=String(Math.floor(cur/60)).padStart(2,'0')+':'+String(cur%60).padStart(2,'0');
+    const sess=DB.sessions.filter(s=>s.date===a.date&&s.time===t&&s.coachId===a.coachId&&s.status!=='cancelled');
+    out.push({time:t,sessions:sess});
+  }
+  return out;
+}
+function slotChipsHtml(a){
+  const chips=slotsForRule(a).map(sl=>{
+    if(sl.sessions.length){
+      const names=sl.sessions.map(s=>s.customerIds.map(cid=>custById(cid)?custById(cid).name:'?').join(' + ')).join(', ');
+      const typ=sl.sessions[0].type==='group'?'Group':'1:1';
+      const extra=sl.sessions[0].status==='completed'?' · done':sl.sessions[0].status==='pending'?' · pending':'';
+      return `<span class="pill red" title="${names} · ${typ}${extra}" style="margin:2px 4px 2px 0">${fmtT(sl.time)} · booked</span>`;
+    }
+    // owner can tap an open slot to book it directly — pre-fills the session editor with this
+    // coach/date/time/location so Booking picks up the new session immediately
+    return AUTH==='owner'
+      ? `<button type="button" class="slotchip" style="padding:3px 8px;font-size:12px;margin:2px 4px 2px 0" title="Book this open slot" onclick="quickBookSlot('${a.coachId}','${a.date}','${sl.time}','${(a.location||'').replace(/'/g,"\\'")}')">${fmtT(sl.time)} · open</button>`
+      : `<span class="pill green" style="margin:2px 4px 2px 0">${fmtT(sl.time)} · open</span>`;
+  }).join('');
+  return chips||'<span class="clienttag">No slots fit this window/slot length.</span>';
+}
+/* Opens the full session editor pre-filled from a tapped Availability slot — same editor,
+   same save path (saveSession → DB.sessions), so the new booking shows up in Booking & Schedule
+   and back here in Availability (as "booked") right away. */
+function quickBookSlot(coachId,date,time,loc){
+  openSession(null,null,{coachId,date,time,location:loc});
+}
 function renderAvailability(){
   const now=todayISO();
   const scopeLbl = AUTH==='coach' ? 'Your availability' : (scopeCoach()==='all' ? 'All coaches' : 'Coach: '+coachName(scopeCoach()));
@@ -2799,7 +2835,7 @@ function renderAvailability(){
   const upcoming=rules.filter(a=>a.date>=now);
   const pending=upcoming.filter(a=>a.approved===false);
   const rows=upcoming.map(a=>`<tr>
-    <td><b>${fmtDate(a.date)}</b><div class="clienttag">${DOW[new Date(a.date+'T00:00').getDay()]}</div></td>${showCoach?`<td>🏀 ${coachName(a.coachId)}</td>`:''}<td>${fmtT(a.start)} – ${fmtT(a.end)}</td><td>${a.slotMin} min</td><td>${a.location||'—'}</td>
+    <td><b>${fmtDate(a.date)}</b><div class="clienttag">${DOW[new Date(a.date+'T00:00').getDay()]}</div></td>${showCoach?`<td>🏀 ${coachName(a.coachId)}</td>`:''}<td>${fmtT(a.start)} – ${fmtT(a.end)}<div style="margin-top:6px;display:flex;flex-wrap:wrap">${slotChipsHtml(a)}</div></td><td>${a.slotMin} min</td><td>${a.location||'—'}</td>
     <td>${a.approved!==false?'<span class="pill green">Open</span>':'<span class="pill yellow">⏳ Pending</span>'}</td>
     <td class="right"><div class="actions">${(AUTH==='owner'&&a.approved===false)?`<button class="btn sm" onclick="approveAvailability('${a.id}')">Approve</button>`:''}<button class="iconbtn" onclick="delAvailability('${a.id}')">✕</button></div></td></tr>`).join('')
     ||`<tr><td colspan="${showCoach?7:6}"><div class="empty">No upcoming availability — add a date below.</div></td></tr>`;
@@ -2821,6 +2857,7 @@ function renderAvailability(){
     <div class="sub">Open specific dates and times (Boston / ET). Clients can only request sessions inside these slots, at the location you choose. Add several windows to the list, then submit once. <span class="pill ${scopeCoach()==='all'?'orange':'green'}" style="margin-left:6px">${scopeLbl}</span></div>
     ${AUTH==='owner'&&scopeCoach()==='all'&&!pending.length?'<div class="clienttag" style="margin:-6px 0 12px">Pick a specific coach in the top-right selector to add availability for them. Coach-submitted slots awaiting approval appear at the top.</div>':''}
     ${isCoach?'<div class="clienttag" style="margin:-6px 0 12px">⏳ Windows you submit are sent to the owner for approval before clients can book them.</div>':''}
+    <div class="clienttag" style="margin:-6px 0 12px">Each window below is broken into its individual time slots — red "booked" chips show who's already in that slot${AUTH==='owner'?', green "open" chips are tappable to book that slot straight into Booking & Schedule':''}.</div>
     ${pendingPanel}
     <div class="panel" style="margin-bottom:16px">
       <h3>Open a date</h3>
