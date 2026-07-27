@@ -2538,6 +2538,10 @@ function delLocation(id){
 const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 function fmtT(t){const[h,m]=t.split(':').map(Number);const ap=h<12?'AM':'PM';const hh=((h+11)%12)+1;return hh+':'+String(m).padStart(2,'0')+' '+ap;}
 let availDraft=[];
+// Remembers the last-used window settings (+ repeat picks) so the "Open a date" form doesn't
+// reset to hardcoded defaults every time you add one to the list — makes adding several
+// different dates back-to-back much less tedious. Same panel is used by owner and coach.
+let avLast={date:'',start:'16:00',end:'19:00',slotMin:60,location:'',dow:[],until:''};
 function renderAvailability(){
   const now=todayISO();
   const scopeLbl = AUTH==='coach' ? 'Your availability' : (scopeCoach()==='all' ? 'All coaches' : 'Coach: '+coachName(scopeCoach()));
@@ -2572,15 +2576,22 @@ function renderAvailability(){
     <div class="panel" style="margin-bottom:16px">
       <h3>Open a date</h3>
       <div class="row">
-        <div class="field"><label class="f">Date</label><input type="date" id="avDate" min="${now}" value="${now}"></div>
-        <div class="field"><label class="f">From</label><input type="time" id="avStart" value="16:00"></div>
-        <div class="field"><label class="f">To</label><input type="time" id="avEnd" value="19:00"></div>
-        <div class="field"><label class="f">Slot length</label><select id="avSlot"><option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>60 min</option><option value="90">90 min</option></select></div>
-        <div class="field"><label class="f">Location</label><select id="avLoc">${locOpt}</select></div>
+        <div class="field"><label class="f">Date</label><input type="date" id="avDate" min="${now}" value="${(avLast.date&&avLast.date>=now)?avLast.date:now}"></div>
+        <div class="field"><label class="f">From</label><input type="time" id="avStart" value="${avLast.start}"></div>
+        <div class="field"><label class="f">To</label><input type="time" id="avEnd" value="${avLast.end}"></div>
+        <div class="field"><label class="f">Slot length</label><select id="avSlot">${[30,45,60,90].map(m=>`<option value="${m}" ${avLast.slotMin===m?'selected':''}>${m} min</option>`).join('')}</select></div>
+        <div class="field"><label class="f">Location</label><select id="avLoc">${DB.locations.map(l=>`<option ${avLast.location===l.name?'selected':''}>${l.name}</option>`).join('')||'<option value="">Add a location first</option>'}</select></div>
+      </div>
+      <div class="field" style="margin-top:2px">
+        <label class="f">Repeat on other days (optional)</label>
+        <div class="row" style="gap:12px;flex-wrap:wrap">${DOW.map((d,i)=>`<label style="display:flex;align-items:center;gap:4px;font-size:13px;margin-bottom:0"><input type="checkbox" class="avDow" value="${i}" style="width:auto" ${avLast.dow.includes(i)?'checked':''}>${d}</label>`).join('')}</div>
+      </div>
+      <div class="row">
+        <div class="field" style="max-width:220px"><label class="f">Repeat until</label><input type="date" id="avUntil" min="${now}" value="${avLast.until||''}"></div>
       </div>
       <button class="btn ghost" onclick="addAvailDraft()">+ Add to list</button>
       ${draftHtml}
-      <p class="muted small" style="margin-top:10px">Add each date/time window to the list (e.g. Jul 7, 4:00–7:00 PM, 60-min slots → 4:00, 5:00, 6:00), then ${isCoach?'submit them all for the owner to approve':'add them all at once'}. Booked times drop out automatically.</p>
+      <p class="muted small" style="margin-top:10px">Add one date/time window (e.g. Jul 7, 4:00–7:00 PM, 60-min slots), or tick day(s) of the week + a "Repeat until" date to add the same window across every matching day in that range in one click — ${isCoach?'submit them all for the owner to approve':'add them all at once'}. Booked times drop out automatically.</p>
     </div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
       <table><thead><tr><th>Date</th>${showCoach?'<th>Coach</th>':''}<th>Window</th><th>Slot</th><th>Location</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table>
@@ -2591,8 +2602,29 @@ function addAvailDraft(){
   const start=$('#avStart').value, end=$('#avEnd').value;
   if(!start||!end||end<=start)return flash('Set a valid time range',true);
   const loc=$('#avLoc').value; if(!loc)return flash('Add a location first (Locations tab)',true);
-  availDraft.push({date,start,end,slotMin:+$('#avSlot').value,location:loc});
+  const slotMin=+$('#avSlot').value;
+  const dows=$$('.avDow').filter(cb=>cb.checked).map(cb=>+cb.value);
+  const until=$('#avUntil')?$('#avUntil').value:'';
+  avLast={date,start,end,slotMin,location:loc,dow:dows,until}; // remember for next time this panel renders
+  // build the list of dates to add: the picked date itself, plus — if day(s)-of-week are
+  // ticked and a "Repeat until" date is set — every matching weekday through that date.
+  const dates=[date];
+  if(dows.length && until && until>date){
+    let d=new Date(date+'T00:00'); const last=new Date(until+'T00:00');
+    d.setDate(d.getDate()+1);
+    while(d<=last){
+      const iso=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      if(dows.includes(d.getDay())&&!dates.includes(iso))dates.push(iso);
+      d.setDate(d.getDate()+1);
+    }
+  }
+  let added=0;
+  dates.forEach(dt=>{
+    if(availDraft.some(w=>w.date===dt&&w.start===start&&w.location===loc))return; // skip exact dupes
+    availDraft.push({date:dt,start,end,slotMin,location:loc}); added++;
+  });
   renderAvailability();
+  flash(added>1?(added+' windows added to the list 📅'):'Added to the list');
 }
 function rmAvailDraft(i){availDraft.splice(i,1);renderAvailability();}
 function submitAvailDraft(){
