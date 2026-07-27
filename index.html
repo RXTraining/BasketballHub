@@ -1572,8 +1572,8 @@ function coachMiniProfile(co){
     ${co.bio?`<div class="small muted" style="margin-top:8px;line-height:1.6">${co.bio}</div>`:''}
   </div>`;
 }
-let reqSel=null;   // {date,time,loc} chosen from the open-times list
-function pickCoachChange(v){pickCoach=v;reqSel=null;saveSess();renderBookingClient();}
+let reqSel=[];   // array of {date,time,loc} — clients can tap several open times to request them all at once
+function pickCoachChange(v){pickCoach=v;reqSel=[];saveSess();renderBookingClient();}
 function renderBookingClient(){
   const now=todayISO();
   const c=custById(clientAs);
@@ -1610,10 +1610,10 @@ function renderBookingClient(){
             <select id="rqCoach" onchange="pickCoachChange(this.value)">${activeCoaches().map(co=>`<option value="${co.id}" ${pickCoach===co.id?'selected':''}>${co.name}</option>`).join('')||'<option value="">No coaches available</option>'}</select></div>
           ${coachMiniProfile(coachById(pickCoach))}
           <div class="field"><label class="f">${t('Session type')}</label>
-            <select id="rqType" onchange="reqSel=null;renderOpenSlots()"><option value="1on1">1:1 (${money(coachRate(pickCoach,'1on1'))}/hr)</option><option value="group">${t('Group')} (${money(coachRate(pickCoach,'group'))}/hr)</option></select></div>
-          <div class="field"><label class="f">${coachName(pickCoach)} — ${t('tap one to select')}</label><div id="openSlots" class="slotlist"></div></div>
+            <select id="rqType" onchange="reqSel=[];renderOpenSlots()"><option value="1on1">1:1 (${money(coachRate(pickCoach,'1on1'))}/hr)</option><option value="group">${t('Group')} (${money(coachRate(pickCoach,'group'))}/hr)</option></select></div>
+          <div class="field"><label class="f">${coachName(pickCoach)} — tap as many times as you'd like to request</label><div id="openSlots" class="slotlist"></div></div>
           <div class="field"><label class="f">${t('Comment (optional)')}</label><textarea id="rqComment" placeholder="…"></textarea></div>
-          <button class="btn" style="width:100%" onclick="submitRequest()">${t('Request Session')}</button>
+          <button class="btn" id="rqSubmitBtn" style="width:100%" onclick="submitRequest()">${t('Request Session')}</button>
           <p class="muted small" style="margin-top:10px"><b style="color:var(--txt)">${t('All times are Boston (ET).')||'All times are Boston (ET).'}</b></p>
         </div>
         <div class="panel" style="margin-top:16px"><h3>${t('Your packages')}</h3>${pkgHist}
@@ -1679,21 +1679,27 @@ function renderPast(){
 
 function submitRequest(){
   const cid=clientAs;if(!cid)return flash('Please sign in again',true);
-  if(!reqSel)return flash('Tap one of the coach’s open times above to select it',true);
+  if(!reqSel.length)return flash('Tap one or more of the coach’s open times above to select them',true);
   const type=$('#rqType')?$('#rqType').value:'1on1';
   const dur=type==='1on1'?60:90;
   const coachId=($('#rqCoach')?$('#rqCoach').value:'')||pickCoach||defaultCoachId();
-  // re-check the slot is still open (another client may have just taken it)
-  const stillOpen=availableSlots(reqSel.date,type,coachId).some(s=>s.time===reqSel.time&&s.location===reqSel.loc);
-  if(!stillOpen){reqSel=null;renderOpenSlots();return flash('That time was just taken — please pick another',true);}
   const comment=($('#rqComment')?$('#rqComment').value:'').trim();
-  const s={id:uid(),coachId,customerIds:[cid],type,date:reqSel.date,time:reqSel.time,
-    dur,price:computePrice(type,dur,1,coachId),status:'pending',paid:false,paidVia:'',checkedIn:false,location:reqSel.loc||'TBD',
-    notes:'Client request'+(comment?(' — '+comment):'')};
-  DB.sessions.push(s);
-  reqSel=null;
-  save();pushRows('sessions',[sessRow(s)]);flash('Request sent to '+coachName(coachId)+' — awaiting confirmation 🏀');
-  notifyOwner(s,comment);
+  const created=[], taken=[];
+  reqSel.forEach(sel=>{
+    // re-check each slot is still open (another client may have just taken it)
+    const stillOpen=availableSlots(sel.date,type,coachId).some(s=>s.time===sel.time&&s.location===sel.loc);
+    if(!stillOpen){ taken.push(sel); return; }
+    created.push({id:uid(),coachId,customerIds:[cid],type,date:sel.date,time:sel.time,
+      dur,price:computePrice(type,dur,1,coachId),status:'pending',paid:false,paidVia:'',checkedIn:false,location:sel.loc||'TBD',
+      notes:'Client request'+(comment?(' — '+comment):'')});
+  });
+  if(!created.length){reqSel=[];renderOpenSlots();return flash('Those times were just taken — please pick another',true);}
+  created.forEach(s=>DB.sessions.push(s));
+  reqSel=[];
+  save();pushRows('sessions',created.map(sessRow));
+  flash((created.length>1?created.length+' requests':'Request')+' sent to '+coachName(coachId)+' — awaiting confirmation 🏀'
+    +(taken.length?(' ('+taken.length+' time'+(taken.length>1?'s':'')+' had just been taken and were skipped)'):''));
+  if(created.length>1)notifyOwnerBatch(created,comment); else notifyOwner(created[0],comment);
   renderBooking();
 }
 /* ---- free SMS via carrier email-to-SMS gateways ---- */
@@ -1888,6 +1894,23 @@ async function notifyOwner(s,comment){
   }
   mailtoOwner(emails,subject,body);
 }
+/* one email covering several requests submitted together, instead of one email per slot */
+async function notifyOwnerBatch(sessions,comment){
+  const emails=(DB.settings.notifyEmails||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(!emails.length)return;
+  const cn=custNames(sessions[0].customerIds);
+  const subject='RX Training — '+sessions.length+' new requests from '+cn;
+  const lines=sessions.map(s=>'• '+(s.type==='1on1'?'1:1':'Group')+' — '+fmtDT(s.date,s.time)+' · '+s.location).join('\n');
+  const body='New session requests from '+cn+' (coach: '+coachName(sessions[0].coachId)+'):\n\n'+lines+(comment?('\n\nComment: '+comment):'')+'\n\nOpen RX.TRAINING to confirm.';
+  if(supa && SUPA_OK){
+    try{
+      const {data,error}=await supa.functions.invoke('send-request-email',{body:{to:emails,subject,text:body}});
+      if(error||(data&&data.error))throw(error||data.error);
+      flash('Owner notified 📧');return;
+    }catch(e){console.warn('email function failed',e);}
+  }
+  mailtoOwner(emails,subject,body);
+}
 function mailtoOwner(emails,subject,body){
   try{window.location.href='mailto:'+encodeURIComponent(emails.join(','))+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);}catch(e){}
 }
@@ -2002,6 +2025,14 @@ function openSession(id,returnCust){
       <div class="field"><label class="f">Date</label><input type="date" id="sDate" value="${s.date}"></div>
       <div class="field"><label class="f">Time</label><input type="time" id="sTime" value="${s.time}"></div>
     </div>
+    ${!id?`<div class="field" style="margin-top:2px">
+      <label class="f">Repeat on other days (optional)</label>
+      <div class="row" style="gap:12px;flex-wrap:wrap">${DOW.map((d,i)=>`<label style="display:flex;align-items:center;gap:4px;font-size:13px;margin-bottom:0"><input type="checkbox" class="sDow" value="${i}" style="width:auto">${d}</label>`).join('')}</div>
+    </div>
+    <div class="row">
+      <div class="field" style="max-width:220px"><label class="f">Repeat until</label><input type="date" id="sUntil" min="${todayISO()}"></div>
+      <div class="field" style="display:flex;align-items:flex-end"><div class="clienttag">Tick day(s) of the week + an end date to create this same session on every matching day in one Save.</div></div>
+    </div>`:''}
     <div class="row">
       <div class="field"><label class="f">Price ($) — auto, editable</label><input type="number" id="sPrice" value="${s.price}"></div>
       <div class="field"><label class="f">Status — syncs to client</label><select id="sStatus">
@@ -2048,22 +2079,57 @@ function saveSession(id,emailAfter){
   if(type==='group' && ids.length>MAX_GROUP) return flash('Groups are capped at '+MAX_GROUP+' players',true);
   const pay=$('#sPay').value;
   const coachId=(AUTH==='coach')?coachAs:($('#sCoach')?$('#sCoach').value:targetCoach());
-  const obj={coachId,customerIds:ids,type,dur:+$('#sDur').value,date:$('#sDate').value,time:$('#sTime').value,
+  const baseDate=$('#sDate').value;
+  const obj={coachId,customerIds:ids,type,dur:+$('#sDur').value,date:baseDate,time:$('#sTime').value,
     price:+$('#sPrice').value,status:$('#sStatus').value,location:$('#sLoc').value,
     paid:pay!=='',paidVia:pay,checkedIn:$('#sCheck').checked,notes:$('#sNotes').value,
     feedback:$('#sFeedback').value,media:editMedia.slice()};
   const exSess=id?DB.sessions.find(x=>x.id===id):null;
-  const prevStatus=exSess?exSess.status:null; // captured before Object.assign mutates exSess in place
-  const prevPaid=exSess?exSess.paid:false;
-  // per-member snapshot (for groups) — also captured before the mutation below
-  const prevMemberPaid={}; if(exSess)exSess.customerIds.forEach(cid=>{prevMemberPaid[cid]=custPay(exSess,cid).paid;});
   if(obj.status==='cancelled' && (!exSess||exSess.status!=='cancelled')){ if(!confirm('Cancel this session? It will show as cancelled and the client will see the change.'))return; }
   if(obj.status==='cancelled'){obj.cancelledBy=(exSess&&exSess.cancelledBy)||'owner';obj.cancelledAt=(exSess&&exSess.cancelledAt)||new Date().toISOString();}
   else{obj.cancelledBy='';obj.cancelledAt='';}
-  if(id){Object.assign(DB.sessions.find(x=>x.id===id),obj);}
-  else{obj.id=uid();DB.sessions.push(obj);}
+
+  // ---- brand-new session: optionally repeat the same window across other weekdays through
+  //      an end date, in one Save — same "pick a window, repeat it" pattern as Availability.
+  //      Not offered when editing an existing session (that's a single record). ----
+  if(!id){
+    const dows=$$('.sDow').filter(cb=>cb.checked).map(cb=>+cb.value);
+    const until=$('#sUntil')?$('#sUntil').value:'';
+    const dates=[baseDate];
+    if(dows.length && until && until>baseDate){
+      let d=new Date(baseDate+'T00:00'); const last=new Date(until+'T00:00');
+      d.setDate(d.getDate()+1);
+      while(d<=last){
+        const iso=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+        if(dows.includes(d.getDay())&&!dates.includes(iso))dates.push(iso);
+        d.setDate(d.getDate()+1);
+      }
+    }
+    const created=dates.map(dt=>({...obj,id:uid(),date:dt}));
+    created.forEach(s=>DB.sessions.push(s));
+    if(!save())return;
+    flash(created.length>1?(created.length+' sessions created 📅'):'Session saved');
+    created.forEach(s=>{
+      if(s.status==='completed')requestPaymentZelle(s);
+      if(s.status==='cancelled')notifyCancellation(s,'owner');
+    });
+    if(emailAfter){
+      const c=custById(ids[0]);
+      if(!c||!c.email){flash('Client has no email on file',true);}
+      else{emailClient(c.email,'RX Training — note about your '+fmtDate(obj.date)+' session',
+        'Hi '+firstName(c.name)+',\n\n'+(obj.feedback||'(no note)')+'\n\nSession: '+fmtDT(obj.date,obj.time)+' · '+obj.location+'\nReply to this email with any questions.\n\n— RX Training');}
+    }
+    afterSessionSave();
+    return;
+  }
+
+  // ---- existing session: edit in place (unchanged behavior) ----
+  const prevStatus=exSess.status; // captured before Object.assign mutates exSess in place
+  const prevPaid=exSess.paid;
+  const prevMemberPaid={}; exSess.customerIds.forEach(cid=>{prevMemberPaid[cid]=custPay(exSess,cid).paid;});
+  Object.assign(DB.sessions.find(x=>x.id===id),obj);
   if(!save())return;flash('Session saved');
-  const savedSess=id?DB.sessions.find(x=>x.id===id):obj;
+  const savedSess=DB.sessions.find(x=>x.id===id);
   if(obj.status==='completed' && prevStatus!=='completed'){
     requestPaymentZelle(savedSess);
   }
@@ -2911,20 +2977,27 @@ function renderOpenSlots(){
   const type=$('#rqType')?$('#rqType').value:'1on1';
   const cid=pickCoach||defaultCoachId();
   const all=clientAllSlots(cid,type);
+  const btn=$('#rqSubmitBtn'); if(btn)btn.textContent=reqSel.length>1?('Request '+reqSel.length+' Sessions'):t('Request Session');
   if(!all.length){list.innerHTML='<div class="clienttag">No open times posted yet — check back soon.</div>';return;}
   const byd={};all.forEach(s=>{(byd[s.date]=byd[s.date]||[]).push(s);});
   const anyOpen=all.some(s=>s.open);
+  const isSel=(dt,s)=>reqSel.some(r=>r.date===dt&&r.time===s.time&&r.loc===s.location);
   list.innerHTML=Object.keys(byd).sort().map(dt=>`<div style="margin-bottom:8px"><div class="clienttag" style="margin-bottom:5px"><b style="color:var(--txt)">${fmtDate(dt)}</b></div><div class="row" style="gap:6px;flex-wrap:wrap">${byd[dt].map(s=>{
       if(!s.open)return `<span class="slotchip" style="opacity:.45;cursor:not-allowed;text-decoration:line-through" title="Booked by another player">${fmtT(s.time)} · ${s.location} · Booked by others</span>`;
-      const on=(reqSel&&reqSel.date===dt&&reqSel.time===s.time&&reqSel.loc===s.location);
-      return `<button type="button" class="slotchip${on?' sel':''}" onclick="setReqSlot('${dt}','${s.time}','${(s.location||'').replace(/'/g,"\\'")}')">${fmtT(s.time)} · ${s.location}</button>`;
+      const on=isSel(dt,s);
+      return `<button type="button" class="slotchip${on?' sel':''}" onclick="setReqSlot('${dt}','${s.time}','${(s.location||'').replace(/'/g,"\\'")}')">${on?'✓ ':''}${fmtT(s.time)} · ${s.location}</button>`;
     }).join('')}</div></div>`).join('')
-    +(anyOpen?'':'<div class="clienttag" style="margin-top:6px">No open times right now — all posted windows are booked by other players. Check back soon or pick another coach.</div>');
+    +(anyOpen?'':'<div class="clienttag" style="margin-top:6px">No open times right now — all posted windows are booked by other players. Check back soon or pick another coach.</div>')
+    +(reqSel.length?`<div class="clienttag" style="margin-top:8px">${reqSel.length} time${reqSel.length>1?'s':''} selected — tap a time again to remove it, or <a href="#" onclick="reqSel=[];renderOpenSlots();return false;">clear all</a>.</div>`:'');
 }
+/* tapping a slot TOGGLES it in/out of the selection, so a client can queue up several times
+   (e.g. every Tue + Thu this month) and request them all in one submit — same "pick several,
+   then submit together" pattern as the owner/coach availability panel. */
 function setReqSlot(date,time,loc){
-  reqSel={date,time,loc};
-  renderOpenSlots();   // refresh highlight
-  flash('Selected '+fmtDate(date)+' · '+fmtT(time)+' — tap Request Session');
+  const idx=reqSel.findIndex(r=>r.date===date&&r.time===time&&r.loc===loc);
+  if(idx>=0){ reqSel.splice(idx,1); }
+  else{ reqSel.push({date,time,loc}); }
+  renderOpenSlots();
 }
 
 /* ============================================================
