@@ -570,8 +570,11 @@ function normalize(d){
   d.settings=d.settings||{rate1on1:30,rateGroup:20};
   if(d.settings.defaultClientPwd===undefined)d.settings.defaultClientPwd='rxtraining';
   ['notifyEmails','ejService','ejTemplate','ejKey','zellePhone'].forEach(k=>{if(d.settings[k]===undefined)d.settings[k]='';});
+  if(!d.settings.homeAddress)d.settings.homeAddress='1 Granger Pond Way';
+  if(d.settings.mileageRate===undefined||d.settings.mileageRate===null||d.settings.mileageRate==='')d.settings.mileageRate=0.70;
   if(!d.cashEntries)d.cashEntries=[];
-  if(!d.locations){const names=[...new Set((d.sessions||[]).map(s=>s.location).filter(Boolean))];if(!names.length)names.push('Lexington Gym');d.locations=names.map(n=>({id:uid(),name:n,address:''}));}
+  if(!d.locations){const names=[...new Set((d.sessions||[]).map(s=>s.location).filter(Boolean))];if(!names.length)names.push('Lexington Gym');d.locations=names.map(n=>({id:uid(),name:n,address:'',miles:0}));}
+  (d.locations||[]).forEach(l=>{if(l.miles===undefined||l.miles===null||l.miles==='')l.miles=0;});
   if(!d.availability)d.availability=[];
   (d.customers||[]).forEach(c=>{
     if(!c.packages)c.packages=[];
@@ -612,11 +615,11 @@ function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.
 /* ----- relational mapping (separate tables in Supabase) ----- */
 function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs){
   const d={};
-  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):''};
+  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
   d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',
     rate1on1:(c.rate_1on1!=null?Number(c.rate_1on1):undefined),rateGroup:(c.rate_group!=null?Number(c.rate_group):undefined),
     pending:(c.pending||null),created:c.created||''}));
-  d.locations=(loc||[]).map(l=>({id:l.id,name:l.name,address:l.address||''}));
+  d.locations=(loc||[]).map(l=>({id:l.id,name:l.name,address:l.address||'',miles:Number(l.miles)||0}));
   d.availability=(avail||[]).map(a=>({id:a.id,coachId:a.coach_id||'',date:a.date,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||'',approved:a.approved!==false}));
   d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',inGroup:!!c.in_group,approved:c.approved!==false,suspended:c.suspended===true,creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
     packages:(pkg||[]).filter(p=>p.customer_id===c.id).map(p=>({id:p.id,coachId:p.coach_id||'',type:p.type,qty:p.qty,amount:Number(p.amount),date:p.date}))}));
@@ -631,6 +634,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs){
 const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),pending:(c.pending||null),created:c.created||null});
 const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,approved:c.approved!==false,suspended:c.suspended===true,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
 const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,payment_requested:!!s.paymentRequested,pay:s.pay||{}});
+const expRow=e=>({id:e.id,coach_id:e.coachId||null,date:e.date,cat:e.cat,amount:e.amount,note:e.note||'',freq:e.freq||'once'});
 const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:e.coachId||null,price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||''});
 const eventRegRow=r=>({id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||''});
 const messageRow=m=>({id:m.id,peer_type:m.peerType||'client',client_id:m.clientId||'',coach_id:m.coachId||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',read_owner:m.readOwner===true,read_client:m.readClient===true,read_coach:m.readCoach===true});
@@ -774,13 +778,13 @@ async function cloudPush(){
     // added yet) can't block everything else — the critical stuff still saves.
     const fails=[];
     const push=async(name,fn)=>{try{await fn();}catch(e){fails.push(name);console.warn('sync failed:',name,e&&e.message);}};
-    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null,zelle_phone:DB.settings.zellePhone||null});if(error)throw error;});
+    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null,zelle_phone:DB.settings.zellePhone||null,home_address:DB.settings.homeAddress||null,mileage_rate:DB.settings.mileageRate!=null?DB.settings.mileageRate:null});if(error)throw error;});
     await push('coaches',()=>syncTable('coaches',(DB.coaches||[]).map(coachRow)));
-    await push('locations',()=>syncTable('locations',DB.locations.map(l=>({id:l.id,name:l.name,address:l.address||''}))));
+    await push('locations',()=>syncTable('locations',DB.locations.map(l=>({id:l.id,name:l.name,address:l.address||'',miles:l.miles||0}))));
     await push('customers',()=>syncTable('customers',DB.customers.map(custRow)));
     await push('packages',()=>syncTable('packages',DB.customers.flatMap(c=>c.packages.map(p=>({id:p.id,customer_id:c.id,coach_id:p.coachId||null,type:p.type,qty:p.qty,amount:p.amount,date:p.date})))));
     await push('sessions',()=>syncTable('sessions',DB.sessions.map(sessRow)));
-    await push('expenses',()=>syncTable('expenses',DB.expenses.map(e=>({id:e.id,coach_id:e.coachId||null,date:e.date,cat:e.cat,amount:e.amount,note:e.note||'',freq:e.freq||'once'}))));
+    await push('expenses',()=>syncTable('expenses',DB.expenses.map(expRow)));
     await push('cash_entries',()=>syncTable('cash_entries',DB.cashEntries.map(e=>({id:e.id,coach_id:e.coachId||null,date:e.date,amount:e.amount,note:e.note||'',customer_id:e.customerId||null,type:e.type||null,qty:e.qty||null}))));
     await push('availability',()=>syncTable('availability',(DB.availability||[]).map(a=>({id:a.id,coach_id:a.coachId||null,date:a.date,start_t:a.start,end_t:a.end,slot_min:a.slotMin,location:a.location||'',approved:a.approved!==false}))));
     await push('events',()=>syncTable('events',(DB.events||[]).map(eventRow)));
@@ -867,7 +871,17 @@ function locOptions(selected){
 /* ---------- multi-coach helpers ---------- */
 const coachById = id => (DB.coaches||[]).find(c=>c.id===id);
 const coachName = id => {if(id==='owner')return 'Owner / Business';const c=coachById(id);return c?c.name:'—';};
-function activeCoaches(){return (DB.coaches||[]).filter(c=>c.active!==false);}
+/* Display order used everywhere a coach picker/list appears: Raymond Xu is the primary coach
+   and should always be the first choice; everyone else sorts alphabetically by name. */
+function sortedCoaches(list){
+  return (list||DB.coaches||[]).slice().sort((a,b)=>{
+    const ar=(a.name||'').trim().toLowerCase()==='raymond xu'?0:1;
+    const br=(b.name||'').trim().toLowerCase()==='raymond xu'?0:1;
+    if(ar!==br)return ar-br;
+    return (a.name||'').localeCompare(b.name||'');
+  });
+}
+function activeCoaches(){return sortedCoaches(DB.coaches).filter(c=>c.active!==false);}
 function defaultCoachId(){const a=activeCoaches();return (a[0]||(DB.coaches&&DB.coaches[0])||{}).id||'rx1';}
 /* which coach is in scope for the current view */
 function scopeCoach(){
@@ -881,7 +895,7 @@ function inScope(coachId){const s=scopeCoach();if(!s||s==='all')return true;retu
 function coachSelectOptions(sel,includeAll,includeOwner){
   let out=includeAll?`<option value="all" ${sel==='all'?'selected':''}>All coaches</option>`:'';
   if(includeOwner)out+=`<option value="owner" ${sel==='owner'?'selected':''}>Owner / Business (overhead)</option>`;
-  out+=(DB.coaches||[]).map(c=>`<option value="${c.id}" ${sel===c.id?'selected':''}>${c.name}${c.active===false?' (inactive)':''}</option>`).join('');
+  out+=sortedCoaches(DB.coaches).map(c=>`<option value="${c.id}" ${sel===c.id?'selected':''}>${c.name}${c.active===false?' (inactive)':''}</option>`).join('');
   return out;
 }
 
@@ -1456,7 +1470,11 @@ function coachSetStatus(id,val,fromModal){
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
   const prev=s.status; if(prev===val)return;
   if(val==='cancelled'){ if(!confirm('Cancel this session? The owner and client will be notified.')){refreshOwner();return;} markCancelled(s,'coach');}else{s.status=val;clearCancel(s);}
+  const gasRow=syncGasExpense(s);
   save();
+  // Coaches only push their own sessions/coach profile/availability in the normal sync — target
+  // the gas expense row explicitly so it reaches Supabase without needing a full owner sync.
+  if(gasRow)pushRows('expenses',[expRow(gasRow)]);
   const c=custById(s.customerIds[0]);
   if(val==='scheduled'&&c&&c.email){emailClient(c.email,'RX Training — your session is confirmed',
     'Hi '+firstName(c.name)+',\n\nYour '+(s.type==='1on1'?'1:1 Private':'group')+' session with '+coachName(s.coachId)+' is confirmed:\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location+'\n\n— RX Training');}
@@ -2108,6 +2126,7 @@ function saveSession(id,emailAfter){
     }
     const created=dates.map(dt=>({...obj,id:uid(),date:dt}));
     created.forEach(s=>DB.sessions.push(s));
+    created.forEach(s=>syncGasExpense(s));
     if(!save())return;
     flash(created.length>1?(created.length+' sessions created 📅'):'Session saved');
     created.forEach(s=>{
@@ -2129,8 +2148,9 @@ function saveSession(id,emailAfter){
   const prevPaid=exSess.paid;
   const prevMemberPaid={}; exSess.customerIds.forEach(cid=>{prevMemberPaid[cid]=custPay(exSess,cid).paid;});
   Object.assign(DB.sessions.find(x=>x.id===id),obj);
-  if(!save())return;flash('Session saved');
   const savedSess=DB.sessions.find(x=>x.id===id);
+  syncGasExpense(savedSess); // keeps the auto gas expense in sync with status/location/date changes
+  if(!save())return;flash('Session saved');
   if(obj.status==='completed' && prevStatus!=='completed'){
     requestPaymentZelle(savedSess);
   }
@@ -2154,7 +2174,7 @@ function saveSession(id,emailAfter){
   }
   afterSessionSave();
 }
-function delSession(id){if(!confirm('Delete this session?'))return;DB.sessions=DB.sessions.filter(x=>x.id!==id);save();flash('Session deleted');afterSessionSave();}
+function delSession(id){if(!confirm('Delete this session?'))return;DB.sessions=DB.sessions.filter(x=>x.id!==id);DB.expenses=DB.expenses.filter(e=>e.id!==gasExpenseId(id));save();flash('Session deleted');afterSessionSave();}
 
 function payCash(id){const s=DB.sessions.find(x=>x.id===id);if(!s)return;if(s.type==='group'&&s.customerIds.length>1)return openGroupPay(id);const wasPaid=s.paid;s.paid=true;s.paidVia='cash';save();flash('Marked paid (cash) 💵');if(!wasPaid)notifyPaymentReceived(s);refreshOwner();}
 function payCredit(id){const s=DB.sessions.find(x=>x.id===id);if(!s)return;if(s.type==='group'&&s.customerIds.length>1)return openGroupPay(id);if(!sessionHasCredit(s))return flash('No prepaid credit available',true);const wasPaid=s.paid;s.paid=true;s.paidVia='package';save();flash('Credit applied 🎟️');if(!wasPaid)notifyPaymentReceived(s);refreshOwner();}
@@ -2749,32 +2769,40 @@ function toggleCoachSuspend(id){const co=coachById(id);if(!co)return;const to=co
    LOCATIONS
    ============================================================ */
 function renderLocations(){
+  const rate=+DB.settings.mileageRate||0;
   const rows=DB.locations.map(l=>{
     const cnt=DB.sessions.filter(s=>s.location===l.name).length;
-    return `<tr><td><b>${l.name}</b></td><td class="muted">${l.address||'—'}</td><td>${cnt} sessions</td>
+    const mi=+l.miles||0;
+    const gasTxt=mi?(mi*2)+' mi round trip · '+money(mi*2*rate)+'/session':'<span class="muted">not set</span>';
+    return `<tr><td><b>${l.name}</b></td><td class="muted">${l.address||'—'}</td><td>${gasTxt}</td><td>${cnt} sessions</td>
       <td class="right"><div class="actions"><button class="iconbtn" onclick="openLocation('${l.id}')">Edit</button><button class="iconbtn" onclick="delLocation('${l.id}')">✕</button></div></td></tr>`;
-  }).join('')||'<tr><td colspan="4"><div class="empty">No locations yet — add one.</div></td></tr>';
+  }).join('')||'<tr><td colspan="5"><div class="empty">No locations yet — add one.</div></td></tr>';
   $('#view-locations').innerHTML=`
     <h1 class="page">Locations</h1>
-    <div class="sub">Manage your training venues. These appear as choices when scheduling, and clients see the chosen location on their sessions.</div>
+    <div class="sub">Manage your training venues. These appear as choices when scheduling, and clients see the chosen location on their sessions. Set each venue's one-way mileage from home (${DB.settings.homeAddress||'1 Granger Pond Way'}) so completed sessions there auto-log a gas expense in Finance.</div>
     <div class="row" style="margin-bottom:16px"><button class="btn" onclick="openLocation()">+ Add Location</button></div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto"><table>
-      <thead><tr><th>Name</th><th>Address / notes</th><th>Used</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      <thead><tr><th>Name</th><th>Address / notes</th><th>Gas (round trip)</th><th>Used</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function openLocation(id){
-  const l=id?DB.locations.find(x=>x.id===id):{name:'',address:''};
+  const l=id?DB.locations.find(x=>x.id===id):{name:'',address:'',miles:0};
   openModal(id?'Edit Location':'Add Location',`
     <div class="field"><label class="f">Name *</label><input id="lName" value="${l.name}" placeholder="e.g. Lexington Gym"></div>
     <div class="field"><label class="f">Address / notes</label><input id="lAddr" value="${l.address||''}" placeholder="Street, city, or court info"></div>
+    <div class="field"><label class="f">One-way miles from home (${DB.settings.homeAddress||'1 Granger Pond Way'})</label>
+      <input type="number" step="0.1" min="0" id="lMiles" value="${l.miles||''}" placeholder="e.g. 8.4"></div>
+    <div class="clienttag" style="margin-top:-4px">Look this up once (e.g. in Google Maps) — the app doubles it for round trip and multiplies by your $/mile rate to auto-log a gas expense whenever a session here is marked completed.</div>
   `,`${id?`<button class="btn danger" onclick="delLocation('${id}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveLocation('${id||''}')">Save</button>`);
 }
 function saveLocation(id){
   const name=$('#lName').value.trim();if(!name)return flash('Name is required',true);
   const addr=$('#lAddr').value.trim();
-  if(id){const ex=DB.locations.find(x=>x.id===id);const old=ex.name;ex.name=name;ex.address=addr;
+  const miles=+$('#lMiles').value||0;
+  if(id){const ex=DB.locations.find(x=>x.id===id);const old=ex.name;ex.name=name;ex.address=addr;ex.miles=miles;
     if(old!==name)DB.sessions.forEach(s=>{if(s.location===old)s.location=name;});}
-  else{DB.locations.push({id:uid(),name,address:addr});}
-  save();closeModal();flash('Location saved 📍');renderLocations();
+  else{DB.locations.push({id:uid(),name,address:addr,miles});}
+  closeModal();flash('Location saved 📍');renderLocations();
+  resyncAllGasExpenses(); // picks up the new/changed mileage for any already-completed sessions there
 }
 function delLocation(id){
   const l=DB.locations.find(x=>x.id===id);const cnt=DB.sessions.filter(s=>s.location===l.name).length;
@@ -3178,7 +3206,7 @@ function renderEventsOwner(){
 }
 function openEvent(id){
   const ev=id?eventById(id):{id:'',title:'',detail:'',date:todayISO(),time:'10:00',location:(DB.locations[0]?DB.locations[0].name:''),coachId:'',price:0,capacity:0,active:true};
-  const coachOpts='<option value="">General (no specific coach)</option>'+(DB.coaches||[]).map(c=>`<option value="${c.id}" ${ev.coachId===c.id?'selected':''}>${c.name}</option>`).join('');
+  const coachOpts='<option value="">General (no specific coach)</option>'+sortedCoaches(DB.coaches).map(c=>`<option value="${c.id}" ${ev.coachId===c.id?'selected':''}>${c.name}</option>`).join('');
   openModal(id?'Edit Event':'New Event',`
     <div class="field"><label class="f">Title *</label><input id="evTitle" value="${(ev.title||'').replace(/"/g,'&quot;')}" placeholder="e.g. Workshop with a D2 Guard"></div>
     <div class="field"><label class="f">Details (shown to clients)</label><textarea id="evDetail">${ev.detail||''}</textarea></div>
@@ -3701,6 +3729,15 @@ function renderAdmin(){
         <input id="zellePhone" value="${DB.settings.zellePhone||''}" placeholder="e.g. (555) 123-4567"></div>
       <div class="clienttag" style="margin:-6px 0 12px">When a coach marks a session <b style="color:var(--txt)">completed</b> and it isn't already paid (cash or package), the client automatically gets a chat message asking them to Zelle this number for the session amount. Only the owner can view or change this number.</div>
       <button class="btn sm" onclick="saveZelle()">Save Zelle number</button>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h3>Gas mileage expense</h3>
+      <div class="row">
+        <div class="field"><label class="f">Home address</label><input id="homeAddr" value="${DB.settings.homeAddress||'1 Granger Pond Way'}" placeholder="1 Granger Pond Way"></div>
+        <div class="field"><label class="f">Cost per mile ($)</label><input type="number" step="0.01" min="0" id="mileRate" value="${DB.settings.mileageRate!=null?DB.settings.mileageRate:0.70}"></div>
+      </div>
+      <div class="clienttag" style="margin:-6px 0 12px">When a session is marked <b style="color:var(--txt)">completed</b>, the app auto-logs a "Gas mileage" expense in Finance: round trip (2 × the location's one-way miles, set per-venue in the <b style="color:var(--txt)">Locations</b> tab) × this rate. No mileage set on a location = no auto expense for it.</div>
+      <button class="btn sm" onclick="saveMileage()">Save mileage settings</button>
     </div>`;
 }
 function saveNotify(){
@@ -3711,9 +3748,44 @@ function saveZelle(){
   DB.settings.zellePhone=($('#zellePhone').value||'').trim();
   save();flash('Zelle number saved');
 }
+function saveMileage(){
+  DB.settings.homeAddress=($('#homeAddr').value||'').trim()||'1 Granger Pond Way';
+  DB.settings.mileageRate=+$('#mileRate').value||0;
+  flash('Mileage settings saved');
+  resyncAllGasExpenses(); // re-prices every already-completed session's gas entry at the new rate
+}
+function gasExpenseId(sessionId){return 'gas-'+sessionId;}
+/* Auto-tracks driving cost as a Finance expense for every completed session: round-trip miles
+   (home <-> the session's location, using that location's one-way mileage set in the Locations
+   tab) x the owner's $/mile rate (Admin settings). Upserts by a deterministic id so
+   re-completing, editing or cancelling a session never leaves duplicate or stale gas entries in
+   Finance — if the session isn't completed, or the location has no mileage set, any existing
+   auto entry for it is removed. Returns the row that was written (or null if none). */
+function syncGasExpense(s){
+  if(!s)return null;
+  const eid=gasExpenseId(s.id);
+  const idx=DB.expenses.findIndex(e=>e.id===eid);
+  if(s.status!=='completed'){ if(idx>-1)DB.expenses.splice(idx,1); return null; }
+  const loc=(DB.locations||[]).find(l=>l.name===s.location);
+  const oneWay=loc?(+loc.miles||0):0;
+  if(!oneWay){ if(idx>-1)DB.expenses.splice(idx,1); return null; }
+  const rate=+DB.settings.mileageRate||0;
+  const rt=Math.round(oneWay*2*10)/10;
+  const amount=Math.round(rt*rate*100)/100;
+  const row={id:eid,coachId:s.coachId||'',date:s.date,cat:'Gas mileage',amount,
+    note:'Round trip to '+(s.location||'session')+' — '+rt+' mi @ $'+rate.toFixed(2)+'/mi (auto)',freq:'once'};
+  if(idx>-1)DB.expenses[idx]=row; else DB.expenses.push(row);
+  return row;
+}
+/* Recomputes every completed session's gas expense — call after changing a location's mileage
+   or the owner's $/mile rate, since previously-logged entries would otherwise go stale. */
+function resyncAllGasExpenses(){
+  DB.sessions.filter(s=>s.status==='completed').forEach(s=>syncGasExpense(s));
+  save();
+}
 function openExpense(id){
   const e=id?DB.expenses.find(x=>x.id===id):{date:todayISO(),cat:'Gym Rental',amount:0,note:'',freq:'once'};
-  const cats=['Gym Rental','Equipment','Travel','Marketing','Insurance','Other'];
+  const cats=['Gym Rental','Equipment','Travel','Marketing','Insurance','Gas mileage','Other'];
   const freqs=[['once','One-time'],['monthly','Monthly (recurring)'],['yearly','Yearly (recurring)']];
   const ef=e.freq||'once';
   openModal(id?'Edit Expense':'Add Expense',`
