@@ -594,6 +594,11 @@ function normalize(d){
   if(!d.coaches||!d.coaches.length)d.coaches=[{id:'rx1',name:'Raymond Xu',tagline:'Lexington, MA · AAU Level Training',bio:"Training isn't just about drills. It's about teaching you the love of the game — the dedication, the grind, the mindset that you never give up. That's what every session is built on.",affiliation:'AAU',affiliationSub:'Middlesex Magic',photo:'',pwd:'coach',active:true}];
   const gR1=(d.settings&&d.settings.rate1on1)||30, gRG=(d.settings&&d.settings.rateGroup)||20;
   d.coaches.forEach(c=>{if(c.active===undefined)c.active=true;if(!c.pwd)c.pwd='coach';if(c.tagline===undefined)c.tagline='';if(c.bio===undefined)c.bio='';if(c.affiliation===undefined)c.affiliation='';if(c.affiliationSub===undefined)c.affiliationSub='';if(c.photo===undefined)c.photo='';if(c.email===undefined)c.email='';
+    // In-house (family) coach: the business keeps 100% of the session and carries its real costs
+    // (gas etc.). Partner coaches: the business takes only a cut and carries no session costs.
+    if(c.family===undefined)c.family=((c.name||'').trim().toLowerCase()==='raymond xu');
+    if(c.shareType!=='flat'&&c.shareType!=='pct')c.shareType='pct';
+    if(c.shareVal===undefined||c.shareVal===null||c.shareVal==='')c.shareVal=0;
     if(c.rate1on1===undefined||c.rate1on1===null||c.rate1on1==='')c.rate1on1=gR1;
     if(c.rateGroup===undefined||c.rateGroup===null||c.rateGroup==='')c.rateGroup=gRG;
     if(c.pending===undefined)c.pending=null;if(!c.created)c.created=todayISO();});
@@ -617,6 +622,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs){
   const d={};
   d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
   d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',
+    family:(c.family==null?undefined:c.family===true),shareType:(c.share_type||'pct'),shareVal:(c.share_val!=null?Number(c.share_val):0),
     rate1on1:(c.rate_1on1!=null?Number(c.rate_1on1):undefined),rateGroup:(c.rate_group!=null?Number(c.rate_group):undefined),
     pending:(c.pending||null),created:c.created||''}));
   d.locations=(loc||[]).map(l=>({id:l.id,name:l.name,address:l.address||'',miles:Number(l.miles)||0}));
@@ -631,7 +637,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs){
   d.messages=(msgs||[]).map(m=>({id:m.id,peerType:m.peer_type||'client',clientId:m.client_id||'',coachId:m.coach_id||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',readOwner:m.read_owner===true,readClient:m.read_client===true,readCoach:m.read_coach===true}));
   return normalize(d);
 }
-const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),pending:(c.pending||null),created:c.created||null});
+const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),family:c.family===true,share_type:c.shareType||'pct',share_val:(c.shareVal!=null?c.shareVal:0),pending:(c.pending||null),created:c.created||null});
 const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,approved:c.approved!==false,suspended:c.suspended===true,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
 const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,payment_requested:!!s.paymentRequested,pay:s.pay||{}});
 const expRow=e=>({id:e.id,coach_id:e.coachId||null,date:e.date,cat:e.cat,amount:e.amount,note:e.note||'',freq:e.freq||'once'});
@@ -733,7 +739,16 @@ function startPolling(){
 }
 function stopPolling(){clearInterval(pollTimer);pollTimer=null;unsubscribeRealtime();}
 
+let _autoExpBusy=false;
 function save(){
+  // Single choke point: recompute the derived gas/coach-payout expenses before persisting, so
+  // every path that changes a session (status, payment, coach, location, deal terms) keeps the
+  // books correct without each call site having to remember to do it.
+  if(!_autoExpBusy&&typeof resyncAutoExpenses==='function'){
+    _autoExpBusy=true;
+    try{resyncAutoExpenses();}catch(e){console.warn('auto-expense resync failed',e);}
+    finally{_autoExpBusy=false;}
+  }
   try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){}
   if(supa&&SUPA_OK){clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{cloudTimer=null;cloudPush();},500);} // reset the flag so polling resumes after the push
   return true;
@@ -767,6 +782,10 @@ async function cloudPush(){
       const mine=DB.sessions.filter(s=>s.coachId===coachAs).map(sessRow);
       if(mine.length){const {error}=await supa.from('sessions').upsert(mine); if(error) throw error;}
       const me=coachById(coachAs); if(me){const {error}=await supa.from('coaches').upsert(coachRow(me)); if(error) throw error;}
+      // Auto gas/payout expenses derived from this coach's own sessions — upsert only (never
+      // delete), so a coach can't remove owner-side expense rows; the owner's full sync prunes.
+      const myExp=DB.expenses.filter(e=>isAutoExpense(e)&&e.coachId===coachAs).map(expRow);
+      if(myExp.length){try{await supa.from('expenses').upsert(myExp);}catch(e){}}
       const av=(DB.availability||[]).filter(a=>a.coachId===coachAs).map(a=>({id:a.id,coach_id:a.coachId,date:a.date,start_t:a.start,end_t:a.end,slot_min:a.slotMin,location:a.location||'',approved:a.approved!==false}));
       if(av.length){await supa.from('availability').upsert(av);}
       const avids=av.map(a=>a.id);
@@ -1470,11 +1489,11 @@ function coachSetStatus(id,val,fromModal){
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
   const prev=s.status; if(prev===val)return;
   if(val==='cancelled'){ if(!confirm('Cancel this session? The owner and client will be notified.')){refreshOwner();return;} markCancelled(s,'coach');}else{s.status=val;clearCancel(s);}
-  const gasRow=syncGasExpense(s);
-  save();
+  save(); // recomputes this session's auto gas/payout expenses
   // Coaches only push their own sessions/coach profile/availability in the normal sync — target
-  // the gas expense row explicitly so it reaches Supabase without needing a full owner sync.
-  if(gasRow)pushRows('expenses',[expRow(gasRow)]);
+  // the auto expense rows explicitly so they reach Supabase without needing a full owner sync.
+  const autoRows=DB.expenses.filter(e=>e.id===gasExpenseId(s.id)||e.id===payoutExpenseId(s.id));
+  if(autoRows.length)pushRows('expenses',autoRows.map(expRow));
   const c=custById(s.customerIds[0]);
   if(val==='scheduled'&&c&&c.email){emailClient(c.email,'RX Training — your session is confirmed',
     'Hi '+firstName(c.name)+',\n\nYour '+(s.type==='1on1'?'1:1 Private':'group')+' session with '+coachName(s.coachId)+' is confirmed:\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location+'\n\n— RX Training');}
@@ -2126,8 +2145,7 @@ function saveSession(id,emailAfter){
     }
     const created=dates.map(dt=>({...obj,id:uid(),date:dt}));
     created.forEach(s=>DB.sessions.push(s));
-    created.forEach(s=>syncGasExpense(s));
-    if(!save())return;
+    if(!save())return; // save() recomputes auto gas/payout expenses for the new sessions
     flash(created.length>1?(created.length+' sessions created 📅'):'Session saved');
     created.forEach(s=>{
       if(s.status==='completed')requestPaymentZelle(s);
@@ -2149,8 +2167,7 @@ function saveSession(id,emailAfter){
   const prevMemberPaid={}; exSess.customerIds.forEach(cid=>{prevMemberPaid[cid]=custPay(exSess,cid).paid;});
   Object.assign(DB.sessions.find(x=>x.id===id),obj);
   const savedSess=DB.sessions.find(x=>x.id===id);
-  syncGasExpense(savedSess); // keeps the auto gas expense in sync with status/location/date changes
-  if(!save())return;flash('Session saved');
+  if(!save())return;flash('Session saved'); // save() re-derives the auto gas/payout expenses
   if(obj.status==='completed' && prevStatus!=='completed'){
     requestPaymentZelle(savedSess);
   }
@@ -2174,7 +2191,7 @@ function saveSession(id,emailAfter){
   }
   afterSessionSave();
 }
-function delSession(id){if(!confirm('Delete this session?'))return;DB.sessions=DB.sessions.filter(x=>x.id!==id);DB.expenses=DB.expenses.filter(e=>e.id!==gasExpenseId(id));save();flash('Session deleted');afterSessionSave();}
+function delSession(id){if(!confirm('Delete this session?'))return;DB.sessions=DB.sessions.filter(x=>x.id!==id);save();flash('Session deleted');afterSessionSave();} // save() drops the orphaned auto expenses
 
 function payCash(id){const s=DB.sessions.find(x=>x.id===id);if(!s)return;if(s.type==='group'&&s.customerIds.length>1)return openGroupPay(id);const wasPaid=s.paid;s.paid=true;s.paidVia='cash';save();flash('Marked paid (cash) 💵');if(!wasPaid)notifyPaymentReceived(s);refreshOwner();}
 function payCredit(id){const s=DB.sessions.find(x=>x.id===id);if(!s)return;if(s.type==='group'&&s.customerIds.length>1)return openGroupPay(id);if(!sessionHasCredit(s))return flash('No prepaid credit available',true);const wasPaid=s.paid;s.paid=true;s.paidVia='package';save();flash('Credit applied 🎟️');if(!wasPaid)notifyPaymentReceived(s);refreshOwner();}
@@ -2697,7 +2714,22 @@ function openCoach(id){
     </div>
     <div class="field"><label class="f">Email${isCoach?'':' (gets notified when a client cancels a session)'}</label><input id="coEmail" type="email" value="${g('email')}" placeholder="coach@example.com"></div>
     ${isCoach?'<div class="clienttag" style="margin:-6px 0 12px">Contact info updates immediately — no approval needed.</div>':''}
-    ${isCoach?'':`<div class="row">
+    ${isCoach?'':`<div class="panel" style="background:var(--panel2);padding:14px;margin-bottom:14px">
+      <b class="small">Business arrangement</b>
+      <label class="f" style="display:flex;align-items:center;gap:8px;margin-top:10px"><input type="checkbox" id="coFamily" ${c.family===true?'checked':''} style="width:auto" onchange="coachShareToggle()"> In-house / family coach — business keeps 100% of the session</label>
+      <div class="clienttag" style="margin:4px 0 10px">In-house: the business books the full session as revenue and carries its real costs (gas mileage to the venue). Partner coach: the business books only its cut — the coach's share is auto-logged as a "Coach payout" expense, and no gas is charged to the business.</div>
+      <div id="coShareBox" class="row" style="${c.family===true?'display:none':''}">
+        <div class="field" style="margin-bottom:0"><label class="f">Business takes</label>
+          <select id="coShareType" onchange="coachShareToggle()">
+            <option value="pct" ${(c.shareType||'pct')==='pct'?'selected':''}>% of each session</option>
+            <option value="flat" ${c.shareType==='flat'?'selected':''}>flat $ per session</option>
+          </select></div>
+        <div class="field" style="margin-bottom:0"><label class="f"><span id="coShareLbl">${c.shareType==='flat'?'Amount ($)':'Percent (%)'}</span></label>
+          <input type="number" step="0.01" min="0" id="coShareVal" value="${c.shareVal||0}"></div>
+      </div>
+      <div class="clienttag" id="coShareHint" style="margin-top:8px;${c.family===true?'display:none':''}">Payout accrues only once the client's money is actually collected, so unpaid sessions never show a payout owed.</div>
+    </div>
+    <div class="row">
       <div class="field"><label class="f">Sign-in password</label><input id="coPwd" value="${g('pwd')||'coach'}"></div>
       <div class="field" style="display:flex;align-items:flex-end"><label class="f" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="coActive" ${c.active!==false?'checked':''} style="width:auto"> Active (can sign in & be booked)</label></div>
     </div>
@@ -2708,6 +2740,13 @@ function openCoach(id){
     ${(!isCoach&&id)?`<button class="btn ghost" onclick="toggleCoachSuspend('${id}')">${c.active!==false?'⏸ Suspend':'▶ Resume'}</button>`:''}
     <button class="btn ghost" onclick="closeModal()">Cancel</button>
     <button class="btn" onclick="saveCoach('${id||''}')">${isCoach?'Save changes':'Save'}</button>`);
+}
+function coachShareToggle(){
+  const fam=$('#coFamily')&&$('#coFamily').checked;
+  const box=$('#coShareBox'), hint=$('#coShareHint'), lbl=$('#coShareLbl'), ty=$('#coShareType');
+  if(box)box.style.display=fam?'none':'';
+  if(hint)hint.style.display=fam?'none':'';
+  if(lbl&&ty)lbl.textContent=(ty.value==='flat')?'Amount ($)':'Percent (%)';
 }
 async function uploadCoachPhoto(input){
   const f=input.files&&input.files[0];input.value='';
@@ -2748,10 +2787,13 @@ function saveCoach(id){
   const name=($('#coName').value||'').trim();if(!name)return flash('Name is required',true);
   const dup=(DB.coaches||[]).find(x=>x.id!==id&&(x.name||'').trim().toLowerCase()===name.toLowerCase());
   if(dup)return flash('Another coach already uses that name',true);
-  const obj={name,tagline:$('#coTag').value,bio:$('#coBio').value,affiliation:$('#coAff').value,affiliationSub:$('#coAffSub').value,photo:$('#coPhoto').value,pwd:($('#coPwd').value||'coach').trim(),active:$('#coActive').checked,phone:($('#coPhone')?$('#coPhone').value:''),carrier:($('#coCarrier')?$('#coCarrier').value:''),email:($('#coEmail')?$('#coEmail').value.trim():''),rate1on1:r1,rateGroup:rG,created:(($('#coCreated')&&$('#coCreated').value)||todayISO())};
+  const fam=$('#coFamily')?$('#coFamily').checked:false;
+  const obj={name,tagline:$('#coTag').value,bio:$('#coBio').value,affiliation:$('#coAff').value,affiliationSub:$('#coAffSub').value,photo:$('#coPhoto').value,pwd:($('#coPwd').value||'coach').trim(),active:$('#coActive').checked,phone:($('#coPhone')?$('#coPhone').value:''),carrier:($('#coCarrier')?$('#coCarrier').value:''),email:($('#coEmail')?$('#coEmail').value.trim():''),rate1on1:r1,rateGroup:rG,
+    family:fam,shareType:($('#coShareType')?$('#coShareType').value:'pct'),shareVal:(fam?0:(+($('#coShareVal')?$('#coShareVal').value:0)||0)),
+    created:(($('#coCreated')&&$('#coCreated').value)||todayISO())};
   if(id){Object.assign(coachById(id),obj);}
   else{obj.id=uid();obj.pending=null;DB.coaches.push(obj);}
-  save();closeModal();flash('Coach saved 🏀');renderCoaches();
+  save();closeModal();flash('Coach saved 🏀');renderCoaches(); // save() re-derives gas/payout expenses under the new deal
 }
 function delCoach(id){
   const co=coachById(id);if(!co)return;
@@ -2801,8 +2843,8 @@ function saveLocation(id){
   if(id){const ex=DB.locations.find(x=>x.id===id);const old=ex.name;ex.name=name;ex.address=addr;ex.miles=miles;
     if(old!==name)DB.sessions.forEach(s=>{if(s.location===old)s.location=name;});}
   else{DB.locations.push({id:uid(),name,address:addr,miles});}
+  save(); // re-prices gas for any already-completed sessions at this venue
   closeModal();flash('Location saved 📍');renderLocations();
-  resyncAllGasExpenses(); // picks up the new/changed mileage for any already-completed sessions there
 }
 function delLocation(id){
   const l=DB.locations.find(x=>x.id===id);const cnt=DB.sessions.filter(s=>s.location===l.name).length;
@@ -3554,10 +3596,15 @@ function renderFinance(){
   const maxType=Math.max(byType['1on1'],byType['group'],1);
 
   const expRows=EX.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>`<tr>
-    <td>${fmtDate(e.date)}${(e.freq&&e.freq!=='once')?` <span class="pill blue">↻ ${FREQ_LABEL[e.freq]}</span>`:''}</td><td>${e.coachId==='owner'?'🏢':'🏀'} ${coachName(e.coachId)}</td><td>${e.cat}</td><td class="muted">${e.note||''}</td>
+    <td>${fmtDate(e.date)}${(e.freq&&e.freq!=='once')?` <span class="pill blue">↻ ${FREQ_LABEL[e.freq]}</span>`:''}</td><td>${e.coachId==='owner'?'🏢':'🏀'} ${coachName(e.coachId)}</td><td>${e.cat}${isAutoExpense(e)?' <span class="pill blue">auto</span>':''}</td><td class="muted">${e.note||''}</td>
     <td class="right">${money(e.amount)}${(e.freq&&e.freq!=='once')?`<div class="clienttag">/${e.freq==='monthly'?'mo':'yr'}</div>`:''}</td>
-    <td class="right"><div class="actions"><button class="iconbtn" onclick="openExpense('${e.id}')">Edit</button><button class="iconbtn" onclick="delExpense('${e.id}')">✕</button></div></td></tr>`).join('')
+    <td class="right">${isAutoExpense(e)
+      ? '<span class="clienttag" title="Calculated from the session — change the session, the venue mileage, or the coach\'s deal to update it">from session</span>'
+      : `<div class="actions"><button class="iconbtn" onclick="openExpense('${e.id}')">Edit</button><button class="iconbtn" onclick="delExpense('${e.id}')">✕</button></div>`}</td></tr>`).join('')
     ||'<tr><td colspan="6"><div class="empty">No expenses logged.</div></td></tr>';
+  // Auto-derived cost split, surfaced so the owner can see what's business overhead vs. coach share
+  const payoutTotal=EXo.filter(e=>/^payout-/.test(e.id||'')).reduce((a,e)=>a+e.amount,0);
+  const gasTotal=EXo.filter(e=>/^gas-/.test(e.id||'')).reduce((a,e)=>a+e.amount,0);
 
   // One row per session for 1:1 (unchanged), but one row PER UNPAID PLAYER for groups — so a
   // group where Yanyan already paid and Rick hasn't shows only Rick here, with his own share
@@ -3599,7 +3646,7 @@ function renderFinance(){
   // per-coach comparison (only in the "All coaches" view)
   let compareHtml='';
   if(scopeCoach()==='all' && (DB.coaches||[]).length){
-    const rows=DB.coaches.map(co=>{
+    const rows=sortedCoaches(DB.coaches).map(co=>{
       const cs=DB.sessions.filter(s=>s.coachId===co.id);
       const cash=cs.filter(s=>s.status!=='cancelled').reduce((a,s)=>a+sessionCashAmt(s),0);
       const pk=DB.customers.flatMap(c=>c.packages).filter(p=>p.coachId===co.id).reduce((a,p)=>a+p.amount,0);
@@ -3612,8 +3659,11 @@ function renderFinance(){
     }).sort((a,b)=>b.rev-a.rev);
     compareHtml=`<div class="panel" style="margin-bottom:16px;overflow-x:auto">
       <h3>Coach comparison</h3>
-      <table><thead><tr><th>Coach</th><th class="right">Revenue</th><th class="right">Expenses</th><th class="right">Profit</th><th class="right">Completed</th><th class="right">Upcoming</th><th></th></tr></thead>
+      <table><thead><tr><th>Coach</th><th>Arrangement</th><th class="right">Revenue</th><th class="right">Expenses</th><th class="right">Business keeps</th><th class="right">Completed</th><th class="right">Upcoming</th><th></th></tr></thead>
       <tbody>${rows.map(r=>`<tr><td><b>${r.co.name}</b><div class="clienttag">1:1 ${money(coachRate(r.co.id,'1on1'))} · Grp ${money(coachRate(r.co.id,'group'))}</div></td>
+        <td>${r.co.family===true
+          ? '<span class="pill green">In-house</span><div class="clienttag">keeps 100% · pays gas</div>'
+          : `<span class="pill orange">Partner</span><div class="clienttag">business takes ${r.co.shareType==='flat'?money(r.co.shareVal||0)+'/session':(r.co.shareVal||0)+'%'}</div>`}</td>
         <td class="right">${money(r.rev)}</td><td class="right">${money(r.exp)}</td>
         <td class="right" style="color:${r.profit>=0?'var(--green)':'var(--red)'}">${money(r.profit)}</td>
         <td class="right">${r.done}</td><td class="right">${r.upc}</td>
@@ -3627,8 +3677,8 @@ function renderFinance(){
     <div class="stats">
       <div class="stat"><div class="k">Revenue (collected)</div><div class="v">${money(revenue)}</div><div class="d" style="color:var(--green)">Cash ${money(cashRev)} + packages ${money(pkgRev)}</div></div>
       <div class="stat"><div class="k">Outstanding</div><div class="v">${money(outstanding)}</div><div class="d" style="color:var(--red)">Awaiting payment</div></div>
-      <div class="stat"><div class="k">Expenses</div><div class="v">${money(expenses)}</div><div class="d muted">Total costs</div></div>
-      <div class="stat"><div class="k">Net Profit</div><div class="v" style="color:${profit>=0?'var(--green)':'var(--red)'}">${money(profit)}</div><div class="d muted">Revenue − expenses</div></div>
+      <div class="stat"><div class="k">Expenses</div><div class="v">${money(expenses)}</div><div class="d muted">${(payoutTotal||gasTotal)?`incl. payouts ${money(payoutTotal)} · gas ${money(gasTotal)}`:'Total costs'}</div></div>
+      <div class="stat"><div class="k">Net Profit</div><div class="v" style="color:${profit>=0?'var(--green)':'var(--red)'}">${money(profit)}</div><div class="d muted">Business keeps, after payouts</div></div>
     </div>
 
     <div class="twocol" style="margin-top:16px">
@@ -3751,41 +3801,97 @@ function saveZelle(){
 function saveMileage(){
   DB.settings.homeAddress=($('#homeAddr').value||'').trim()||'1 Granger Pond Way';
   DB.settings.mileageRate=+$('#mileRate').value||0;
-  flash('Mileage settings saved');
-  resyncAllGasExpenses(); // re-prices every already-completed session's gas entry at the new rate
+  save(); // re-prices every already-completed session's gas entry at the new rate
+  flash('Mileage settings saved');renderFinance();
 }
+/* ============================================================================
+   AUTO EXPENSES — two kinds, both derived from session state, never hand-entered:
+
+   1. Gas mileage — ONLY for in-house/family coaches (Raymond). The business drives to
+      those sessions and eats the cost. Partner coaches get themselves to their own
+      sessions, so no gas is charged to the business for them.
+   2. Coach payout — ONLY for partner (non-family) coaches. The client still pays the full
+      price (recorded as revenue as always); the coach's share of it is booked as an expense,
+      so net profit correctly shows only the business's cut. Accrues only on money actually
+      COLLECTED, so an unpaid session never shows a payout owed against revenue not received.
+
+   Both use deterministic ids (gas-<sid> / payout-<sid>) so they upsert instead of piling up,
+   and self-delete the moment they stop applying (session un-completed, cancelled, refunded,
+   coach switched family<->partner, mileage cleared). This is why they're recomputed from
+   scratch on every save rather than patched at each call site.
+   ============================================================================ */
 function gasExpenseId(sessionId){return 'gas-'+sessionId;}
-/* Auto-tracks driving cost as a Finance expense for every completed session: round-trip miles
-   (home <-> the session's location, using that location's one-way mileage set in the Locations
-   tab) x the owner's $/mile rate (Admin settings). Upserts by a deterministic id so
-   re-completing, editing or cancelling a session never leaves duplicate or stale gas entries in
-   Finance — if the session isn't completed, or the location has no mileage set, any existing
-   auto entry for it is removed. Returns the row that was written (or null if none). */
-function syncGasExpense(s){
-  if(!s)return null;
-  const eid=gasExpenseId(s.id);
+function payoutExpenseId(sessionId){return 'payout-'+sessionId;}
+function isAutoExpense(e){return !!e&&/^(gas|payout)-/.test(e.id||'');}
+function isFamilyCoach(coachId){const c=coachById(coachId);return !!(c&&c.family===true);}
+/* Money actually collected for a session — unlike sessionCashAmt() this counts prepaid package
+   credit too, since that money was received (at package purchase) and the session is delivered. */
+function sessionPaidAmt(s){
+  if(!s)return 0;
+  if(s.type==='group'&&s.customerIds.length>1){
+    const share=s.price/s.customerIds.length;
+    return s.customerIds.reduce((a,cid)=>a+(custPay(s,cid).paid?share:0),0);
+  }
+  return s.paid?s.price:0;
+}
+/* The business's cut of a partner coach's session, prorated to the amount actually collected
+   (so a half-paid group accrues half the cut and half the payout). */
+function ownerCutAmt(s,paidAmt){
+  const c=coachById(s.coachId); if(!c)return paidAmt;
+  const val=+c.shareVal||0;
+  if(c.shareType==='flat'){
+    const frac=s.price>0?Math.min(1,paidAmt/s.price):0;
+    return Math.min(paidAmt,val*frac);
+  }
+  return paidAmt*(val/100);
+}
+function upsertAutoExpense(row,eid){
   const idx=DB.expenses.findIndex(e=>e.id===eid);
-  if(s.status!=='completed'){ if(idx>-1)DB.expenses.splice(idx,1); return null; }
-  const loc=(DB.locations||[]).find(l=>l.name===s.location);
-  const oneWay=loc?(+loc.miles||0):0;
-  if(!oneWay){ if(idx>-1)DB.expenses.splice(idx,1); return null; }
-  const rate=+DB.settings.mileageRate||0;
-  const rt=Math.round(oneWay*2*10)/10;
-  const amount=Math.round(rt*rate*100)/100;
-  const row={id:eid,coachId:s.coachId||'',date:s.date,cat:'Gas mileage',amount,
-    note:'Round trip to '+(s.location||'session')+' — '+rt+' mi @ $'+rate.toFixed(2)+'/mi (auto)',freq:'once'};
+  if(!row){ if(idx>-1)DB.expenses.splice(idx,1); return null; }
   if(idx>-1)DB.expenses[idx]=row; else DB.expenses.push(row);
   return row;
 }
-/* Recomputes every completed session's gas expense — call after changing a location's mileage
-   or the owner's $/mile rate, since previously-logged entries would otherwise go stale. */
-function resyncAllGasExpenses(){
-  DB.sessions.filter(s=>s.status==='completed').forEach(s=>syncGasExpense(s));
-  save();
+function syncGasExpense(s){
+  if(!s)return null;
+  const eid=gasExpenseId(s.id);
+  // Partner coaches drive themselves — the business books no mileage for their sessions.
+  if(s.status!=='completed'||!isFamilyCoach(s.coachId))return upsertAutoExpense(null,eid);
+  const loc=(DB.locations||[]).find(l=>l.name===s.location);
+  const oneWay=loc?(+loc.miles||0):0;
+  if(!oneWay)return upsertAutoExpense(null,eid);
+  const rate=+DB.settings.mileageRate||0;
+  const rt=Math.round(oneWay*2*10)/10;
+  return upsertAutoExpense({id:eid,coachId:s.coachId||'',date:s.date,cat:'Gas mileage',
+    amount:Math.round(rt*rate*100)/100,
+    note:'Round trip to '+(s.location||'session')+' — '+rt+' mi @ $'+rate.toFixed(2)+'/mi (auto)',freq:'once'},eid);
+}
+function syncPayoutExpense(s){
+  if(!s)return null;
+  const eid=payoutExpenseId(s.id);
+  // Family coach = business keeps everything, so there's nothing to pay out.
+  if(s.status!=='completed'||isFamilyCoach(s.coachId))return upsertAutoExpense(null,eid);
+  const paidAmt=sessionPaidAmt(s);
+  if(paidAmt<=0)return upsertAutoExpense(null,eid);   // not collected yet — don't accrue
+  const cut=ownerCutAmt(s,paidAmt);
+  const payout=Math.round((paidAmt-cut)*100)/100;
+  if(payout<=0)return upsertAutoExpense(null,eid);
+  const c=coachById(s.coachId);
+  const deal=c?(c.shareType==='flat'?('$'+(+c.shareVal||0).toFixed(2)+'/session to business'):((+c.shareVal||0)+'% to business')):'';
+  return upsertAutoExpense({id:eid,coachId:s.coachId||'',date:s.date,cat:'Coach payout',amount:payout,
+    note:coachName(s.coachId)+"'s share of "+money(paidAmt)+' collected — '+deal+' (auto)',freq:'once'},eid);
+}
+function syncSessionExpenses(s){return [syncGasExpense(s),syncPayoutExpense(s)].filter(Boolean);}
+/* Recomputes every auto expense from current session/coach/settings state and drops any orphans
+   (e.g. left behind by a deleted session). Called from save() so the books are always correct no
+   matter which action changed things — status, payment, coach deal, mileage or rate. */
+function resyncAutoExpenses(){
+  const live=new Set();
+  DB.sessions.forEach(s=>{syncSessionExpenses(s);live.add(gasExpenseId(s.id));live.add(payoutExpenseId(s.id));});
+  DB.expenses=DB.expenses.filter(e=>!isAutoExpense(e)||live.has(e.id));
 }
 function openExpense(id){
   const e=id?DB.expenses.find(x=>x.id===id):{date:todayISO(),cat:'Gym Rental',amount:0,note:'',freq:'once'};
-  const cats=['Gym Rental','Equipment','Travel','Marketing','Insurance','Gas mileage','Other'];
+  const cats=['Gym Rental','Equipment','Travel','Marketing','Insurance','Gas mileage','Coach payout','Other'];
   const freqs=[['once','One-time'],['monthly','Monthly (recurring)'],['yearly','Yearly (recurring)']];
   const ef=e.freq||'once';
   openModal(id?'Edit Expense':'Add Expense',`
