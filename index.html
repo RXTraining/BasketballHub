@@ -273,6 +273,7 @@
   <section class="view" id="view-availability"></section>
   <section class="view" id="view-messages"></section>
   <section class="view" id="view-finance"></section>
+  <section class="view" id="view-activity"></section>
   <section class="view" id="view-admin"></section>
 </div>
 
@@ -570,6 +571,7 @@ function normalize(d){
   d.settings=d.settings||{rate1on1:30,rateGroup:20};
   if(d.settings.defaultClientPwd===undefined)d.settings.defaultClientPwd='rxtraining';
   ['notifyEmails','ejService','ejTemplate','ejKey','zellePhone'].forEach(k=>{if(d.settings[k]===undefined)d.settings[k]='';});
+  if(!d.settings.activityPush)d.settings.activityPush='important';
   if(!d.settings.homeAddress)d.settings.homeAddress='1 Granger Pond Way';
   if(d.settings.mileageRate===undefined||d.settings.mileageRate===null||d.settings.mileageRate==='')d.settings.mileageRate=0.70;
   if(!d.cashEntries)d.cashEntries=[];
@@ -611,6 +613,9 @@ function normalize(d){
   if(!d.events)d.events=[];
   if(!d.eventRegs)d.eventRegs=[];
   if(!d.messages)d.messages=[];
+  if(!d.activity)d.activity=[];
+  (d.customers||[]).forEach(c=>{if(c.lastLogin===undefined)c.lastLogin='';if(c.loginCount===undefined)c.loginCount=0;});
+  (d.coaches||[]).forEach(c=>{if(c.lastLogin===undefined)c.lastLogin='';if(c.loginCount===undefined)c.loginCount=0;});
   d.events.forEach(e=>{if(e.active===undefined)e.active=true;if(e.price==null)e.price=0;if(e.capacity==null)e.capacity=0;if(!e.created)e.created=todayISO();if(e.coachId===undefined)e.coachId='';if(!e.detail)e.detail=e.detail||'';if(e.video===undefined)e.video='';});
   d.eventRegs.forEach(r=>{if(!r.status)r.status='registered';if(r.paid===undefined)r.paid=false;if(r.paidVia===undefined)r.paidVia='';if(r.checkedIn===undefined)r.checkedIn=false;});
   return d;
@@ -618,9 +623,9 @@ function normalize(d){
 function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.parse(r);}catch(e){}return normalize(d);}
 
 /* ----- relational mapping (separate tables in Supabase) ----- */
-function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs){
+function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts){
   const d={};
-  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
+  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',activityPush:(st&&st.activity_push)||'important',homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
   d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',
     family:(c.family==null?undefined:c.family===true),shareType:(c.share_type||'pct'),shareVal:(c.share_val!=null?Number(c.share_val):0),
     rate1on1:(c.rate_1on1!=null?Number(c.rate_1on1):undefined),rateGroup:(c.rate_group!=null?Number(c.rate_group):undefined),
@@ -635,10 +640,13 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs){
   d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||'',video:e.video||''}));
   d.eventRegs=(regs||[]).map(r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||''}));
   d.messages=(msgs||[]).map(m=>({id:m.id,peerType:m.peer_type||'client',clientId:m.client_id||'',coachId:m.coach_id||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',readOwner:m.read_owner===true,readClient:m.read_client===true,readCoach:m.read_coach===true}));
+  d.activity=(acts||[]).map(a=>({id:a.id,ts:a.ts||'',role:a.role||'',actorId:a.actor_id||'',actorName:a.actor_name||'',action:a.action||'',detail:a.detail||'',refId:a.ref_id||'',notify:a.notify===true}));
   return normalize(d);
 }
-const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),family:c.family===true,share_type:c.shareType||'pct',share_val:(c.shareVal!=null?c.shareVal:0),pending:(c.pending||null),created:c.created||null});
-const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,approved:c.approved!==false,suspended:c.suspended===true,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||''});
+const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),family:c.family===true,share_type:c.shareType||'pct',share_val:(c.shareVal!=null?c.shareVal:0),pending:(c.pending||null),created:c.created||null,last_login:c.lastLogin||null,login_count:c.loginCount||0});
+const actRow=a=>({id:a.id,ts:a.ts,role:a.role||'',actor_id:a.actorId||'',actor_name:a.actorName||'',
+                  action:a.action||'',detail:a.detail||'',ref_id:a.refId||'',notify:a.notify===true});
+const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,approved:c.approved!==false,suspended:c.suspended===true,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',last_login:c.lastLogin||null,login_count:c.loginCount||0});
 const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,payment_requested:!!s.paymentRequested,pay:s.pay||{}});
 const expRow=e=>({id:e.id,coach_id:e.coachId||null,date:e.date,cat:e.cat,amount:e.amount,note:e.note||'',freq:e.freq||'once'});
 const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:e.coachId||null,price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||'',video:e.video||''});
@@ -661,7 +669,12 @@ async function fetchCloud(){
   try{const [e1,e2]=await Promise.all([supa.from('events').select('*'),supa.from('event_regs').select('*')]);
     if(e1&&!e1.error)evs=e1; if(e2&&!e2.error)regs=e2;}catch(e){}
   try{const m1=await supa.from('messages').select('*'); if(m1&&!m1.error)msgs=m1;}catch(e){}
-  return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data,avail.data,coa.data,evs.data,regs.data,msgs.data);
+  // Activity log: newest first, capped — a long history is never needed on screen and pulling
+  // it all would grow egress for no benefit.
+  let acts={data:[]};
+  try{const a1=await supa.from('activity').select('*').order('ts',{ascending:false}).limit(ACT_FETCH_LIMIT);
+    if(a1&&!a1.error)acts=a1;}catch(e){}
+  return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data,avail.data,coa.data,evs.data,regs.data,msgs.data,acts.data);
 }
 async function bootLoad(){
   const cfg=getSupaCfg();
@@ -731,6 +744,7 @@ function startPolling(){
   pollTimer=setInterval(()=>{ if(rtState!=='SUBSCRIBED') pollSync(); }, 45000);
   subscribeRealtime();
   initPush();   // register for background push if permission already granted
+  pruneActivity();  // owner-only: drop activity rows past the retention window
   if(!pollHooked){
     pollHooked=true;
     document.addEventListener('visibilitychange',()=>{if(!document.hidden){pollSync();if(TAB==='messages')renderMessages();}}); // refresh + mark read on return
@@ -752,6 +766,77 @@ function save(){
   try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){}
   if(supa&&SUPA_OK){clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{cloudTimer=null;cloudPush();},500);} // reset the flag so polling resumes after the push
   return true;
+}
+/* ============================================================================
+   ACTIVITY LOG — who did what, when.
+
+   Deliberately APPEND-ONLY and excluded from the owner's bulk table sync. The owner's normal
+   sync deletes any row it doesn't hold locally, which would race with a client writing a log
+   entry and silently erase it. Instead every role inserts its own rows via pushRows(), and the
+   owner prunes old ones explicitly by date (pruneActivity).
+
+   `notify` marks the rows worth waking the owner's phone for. A Database Webhook on this table
+   points at the same push-on-message Edge Function, which pushes to the owner only when
+   notify is true — so logins and page views never buzz, but a booking or cancellation does.
+   ============================================================================ */
+const ACT_FETCH_LIMIT=400;      // newest N rows pulled on load — keeps egress small
+const ACT_KEEP_DAYS=120;        // owner prunes anything older than this
+/* Which actions are worth a push to the owner. Logins/profile edits/feedback views are
+   intentionally absent — they'd be constant noise. Owner can widen this in Admin. */
+const ACT_NOTIFY_DEFAULT=['booking_request','cancel','event_register','event_cancel','checkin'];
+const ACT_LABEL={
+  login:'signed in', booking_request:'requested a session', cancel:'cancelled a session',
+  checkin:'checked in', payment:'payment recorded', credit_used:'used a package credit',
+  profile_edit:'updated contact info', event_register:'registered for an event',
+  event_cancel:'cancelled an event registration', feedback_viewed:'read coach feedback',
+  signup:'created an account'
+};
+function actShouldNotify(action){
+  const mode=DB.settings.activityPush||'important';
+  if(mode==='off')return false;
+  if(mode==='all')return true;
+  return ACT_NOTIFY_DEFAULT.includes(action);
+}
+/* Records one activity row. Writes straight to localStorage + a targeted upsert rather than
+   going through save(), so logging never triggers a full owner sync or an auto-expense resync. */
+function logAct(action,detail,refId,who){
+  try{
+    if(!AUTH&&!who)return;
+    const role=who?who.role:AUTH;
+    const actorId=who?who.id:(AUTH==='client'?clientAs:AUTH==='coach'?coachAs:'owner');
+    let actorName=who?who.name:'Owner';
+    if(!who){
+      if(AUTH==='client'){const c=custById(clientAs);actorName=c?c.name:'Client';}
+      else if(AUTH==='coach')actorName=coachName(coachAs);
+    }
+    const a={id:uid(),ts:new Date().toISOString(),role:role||'',actorId:actorId||'',
+             actorName:actorName||'',action,detail:detail||'',refId:refId||'',
+             // only client/coach activity should ping the owner — the owner's own clicks shouldn't
+             notify:(role!=='owner')&&actShouldNotify(action)};
+    if(!DB.activity)DB.activity=[];
+    DB.activity.push(a);
+    if(DB.activity.length>ACT_FETCH_LIMIT*2)DB.activity=DB.activity.slice(-ACT_FETCH_LIMIT*2);
+    try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){}
+    pushRows('activity',[actRow(a)]);
+  }catch(e){console.warn('logAct failed',e&&e.message);}
+}
+/* Owner-only housekeeping so the table can't grow forever. Runs once per session on load. */
+function pruneActivity(){
+  if(AUTH!=='owner'||!(supa&&SUPA_OK))return;
+  const cut=new Date(Date.now()-ACT_KEEP_DAYS*864e5).toISOString();
+  supa.from('activity').delete().lt('ts',cut).then(()=>{},()=>{});
+  DB.activity=(DB.activity||[]).filter(a=>(a.ts||'')>=cut);
+}
+/* Stamps last-seen on the person's own record. Separate from the log so the Customers/Coaches
+   tables can show "last seen" without scanning the whole activity history. */
+function stampLogin(role,id){
+  const rec=role==='client'?custById(id):role==='coach'?coachById(id):null;
+  if(!rec)return;
+  rec.lastLogin=new Date().toISOString();
+  rec.loginCount=(rec.loginCount||0)+1;
+  try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){}
+  pushRows(role==='client'?'customers':'coaches',[role==='client'?custRow(rec):coachRow(rec)]);
+  logAct('login','',id,{role,id,name:rec.name});
 }
 /* targeted single-record upsert for client actions (never bulk) */
 function pushRows(table,rows){
@@ -797,7 +882,7 @@ async function cloudPush(){
     // added yet) can't block everything else — the critical stuff still saves.
     const fails=[];
     const push=async(name,fn)=>{try{await fn();}catch(e){fails.push(name);console.warn('sync failed:',name,e&&e.message);}};
-    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null,zelle_phone:DB.settings.zellePhone||null,home_address:DB.settings.homeAddress||null,mileage_rate:DB.settings.mileageRate!=null?DB.settings.mileageRate:null});if(error)throw error;});
+    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null,zelle_phone:DB.settings.zellePhone||null,activity_push:DB.settings.activityPush||'important',home_address:DB.settings.homeAddress||null,mileage_rate:DB.settings.mileageRate!=null?DB.settings.mileageRate:null});if(error)throw error;});
     await push('coaches',()=>syncTable('coaches',(DB.coaches||[]).map(coachRow)));
     await push('locations',()=>syncTable('locations',DB.locations.map(l=>({id:l.id,name:l.name,address:l.address||'',miles:l.miles||0}))));
     await push('customers',()=>syncTable('customers',DB.customers.map(custRow)));
@@ -933,6 +1018,7 @@ const TABS=[
   {id:'locations',label:'Locations'},
   {id:'availability',label:'Availability'},
   {id:'finance',label:'Finance'},
+  {id:'activity',label:'Activity'},
   {id:'admin',label:'Admin'}
 ];
 
@@ -1018,7 +1104,7 @@ function switchTab(){
   saveSess();
 }
 function saveSess(){try{sessionStorage.setItem('rx_sess',JSON.stringify({auth:AUTH,clientAs,coachAs,mgCoach,pickCoach,tab:TAB}));}catch(e){}}
-function refreshOwner(){const f={about:renderAbout,booking:renderBooking,past:renderPast,money:renderMoney,events:renderEvents,messages:renderMessages,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,admin:renderAdmin}[TAB];if(f)f();if(TAB!=='messages'&&(AUTH==='owner'||AUTH==='client'))renderTabs();if(AUTH==='owner')renderWhoami();}
+function refreshOwner(){const f={about:renderAbout,booking:renderBooking,past:renderPast,money:renderMoney,events:renderEvents,messages:renderMessages,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,activity:renderActivity,admin:renderAdmin}[TAB];if(f)f();if(TAB!=='messages'&&(AUTH==='owner'||AUTH==='client'))renderTabs();if(AUTH==='owner')renderWhoami();}
 
 /* ---------- Auth ---------- */
 function ensureTokens(){let ch=false;DB.customers.forEach(c=>{if(!c.token){c.token=uid()+uid();ch=true;}});if(ch)save();}
@@ -1207,10 +1293,12 @@ function loginAsClient(id){
   if(signupTimer){clearInterval(signupTimer);signupTimer=null;}
   AUTH='client';ROLE='client';clientAs=id;pickCoach=defaultCoachId();TAB='booking';
   $('#login').classList.remove('show');renderWhoami();switchTab();startPolling();
+  stampLogin('client',id);
 }
 function loginAsCoach(id){
   AUTH='coach';ROLE='coach';coachAs=id;TAB='booking';
   $('#login').classList.remove('show');renderWhoami();switchTab();startPolling();
+  stampLogin('coach',id);
   flash('Signed in as coach 🏀');
 }
 function signOut(){
@@ -1518,6 +1606,7 @@ function coachSetStatus(id,val,fromModal){
     notifyCancellation(s,'coach');
   }
   if(val==='completed'){ requestPaymentZelle(s); }
+  logAct(val==='cancelled'?'cancel':'status',fmtDT(s.date,s.time)+' → '+val,s.id);
   flash('Status updated → '+val);refreshOwner();
   // When a coach marks a session completed from the quick dropdown, open the popup so they can
   // add feedback + photos/videos for the client.
@@ -1579,7 +1668,7 @@ function coachSaveSession(id){
     });
   } else {
     const pv=document.getElementById('csPaid');
-    if(pv && s.paidVia!=='package'){ if(pv.checked){s.paid=true;s.paidVia='cash';}else{s.paid=false;s.paidVia='';} }
+    if(pv && s.paidVia!=='package'){ if(pv.checked){s.paid=true;s.paidVia='cash';if(!wasPaid)logAct('payment',money(s.price)+' cash · '+custNames(s.customerIds),s.id);}else{s.paid=false;s.paidVia='';} }
   }
   const fb=document.getElementById('csFeedback'); if(fb)s.feedback=fb.value;
   s.media=editMedia.slice();
@@ -1696,6 +1785,7 @@ function saveClientProfile(){
   c.carrier=$('#cpCarrier').value||'';
   c.email=($('#cpEmail').value||'').trim();
   save();pushRows('customers',[custRow(c)]);
+  logAct('profile_edit','phone / email',c.id);
   closeModal();flash(t('Info updated ✅'));renderBooking();
 }
 /* just the Today / Pending / Booked panels — can refresh on its own so live updates
@@ -1729,6 +1819,18 @@ function renderPast(){
     <h1 class="page">${t('Past Sessions')}</h1>
     <div class="sub">${t('Your completed sessions, with any coach feedback and attachments.')}</div>
     ${past.length?past.map(clientCard).join(''):'<div class="panel"><div class="empty">'+t('No past sessions yet.')+'</div></div>'}`;
+  logFeedbackViews(past);
+}
+/* Records that the client actually opened Past Sessions and saw a session that has coach
+   feedback or media waiting — so the owner can tell whether coaching notes are landing.
+   Logged once per session ever, not once per visit, or the log would fill up with repeats. */
+function logFeedbackViews(list){
+  if(AUTH!=='client')return;
+  const seen=new Set((DB.activity||[]).filter(a=>a.action==='feedback_viewed'&&a.actorId===clientAs).map(a=>a.refId));
+  list.filter(s=>(s.feedback&&s.feedback.trim())||(s.media&&s.media.length))
+      .filter(s=>!seen.has(s.id))
+      .slice(0,5)   // cap per visit; the rest get logged on the next open
+      .forEach(s=>logAct('feedback_viewed',fmtDT(s.date,s.time),s.id));
 }
 
 function submitRequest(){
@@ -1753,6 +1855,7 @@ function submitRequest(){
   save();pushRows('sessions',created.map(sessRow));
   flash((created.length>1?created.length+' requests':'Request')+' sent to '+coachName(coachId)+' — awaiting confirmation 🏀'
     +(taken.length?(' ('+taken.length+' time'+(taken.length>1?'s':'')+' had just been taken and were skipped)'):''));
+  logAct('booking_request',created.length+'× '+(created[0].type==='1on1'?'1:1':'Group')+' with '+coachName(coachId)+' · '+created.map(x=>fmtDT(x.date,x.time)).join(', '),created[0].id);
   if(created.length>1)notifyOwnerBatch(created,comment); else notifyOwner(created[0],comment);
   renderBooking();
 }
@@ -1912,6 +2015,7 @@ function clientCancel(id){
   if(!confirm('Cancel this session?'))return;
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
   markCancelled(s,'client');save();pushRows('sessions',[sessRow(s)]);flash('Session cancelled');
+  logAct('cancel',fmtDT(s.date,s.time)+' · '+(s.type==='1on1'?'1:1':'Group'),s.id);
   notifyCancellation(s,'client');
   renderBooking();
 }
@@ -1969,7 +2073,7 @@ function mailtoOwner(emails,subject,body){
   try{window.location.href='mailto:'+encodeURIComponent(emails.join(','))+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);}catch(e){}
 }
 
-function clientCheckIn(id){
+function clientCheckIn(id){ /* logs a checkin activity at the end */
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
   s.checkedIn=true;
   const c=custById(clientAs);
@@ -1982,6 +2086,8 @@ function clientCheckIn(id){
     save();flash("Checked in — 1 credit used. Let's work! 🔥");
   }else{save();flash("Checked in — let's work! 🔥");}
   pushRows('sessions',[sessRow(s)]);
+  logAct('checkin',fmtDT(s.date,s.time),s.id);
+  if(custPay(s,clientAs).paidVia==='package')logAct('credit_used',(s.type==='1on1'?'1:1':'Group')+' credit',s.id);
   renderBooking();
 }
 function ownerCheckIn(id){const s=DB.sessions.find(x=>x.id===id);s.checkedIn=true;save();flash('Checked in');refreshOwner();}
@@ -2232,8 +2338,8 @@ function saveSession(id,emailAfter){
 }
 function delSession(id){if(!confirm('Delete this session?'))return;DB.sessions=DB.sessions.filter(x=>x.id!==id);save();flash('Session deleted');afterSessionSave();} // save() drops the orphaned auto expenses
 
-function payCash(id){const s=DB.sessions.find(x=>x.id===id);if(!s)return;if(s.type==='group'&&s.customerIds.length>1)return openGroupPay(id);const wasPaid=s.paid;s.paid=true;s.paidVia='cash';save();flash('Marked paid (cash) 💵');if(!wasPaid)notifyPaymentReceived(s);refreshOwner();}
-function payCredit(id){const s=DB.sessions.find(x=>x.id===id);if(!s)return;if(s.type==='group'&&s.customerIds.length>1)return openGroupPay(id);if(!sessionHasCredit(s))return flash('No prepaid credit available',true);const wasPaid=s.paid;s.paid=true;s.paidVia='package';save();flash('Credit applied 🎟️');if(!wasPaid)notifyPaymentReceived(s);refreshOwner();}
+function payCash(id){const s=DB.sessions.find(x=>x.id===id);if(!s)return;if(s.type==='group'&&s.customerIds.length>1)return openGroupPay(id);const wasPaid=s.paid;s.paid=true;s.paidVia='cash';save();flash('Marked paid (cash) 💵');if(!wasPaid){logAct('payment',money(s.price)+' cash · '+custNames(s.customerIds),s.id);notifyPaymentReceived(s);}refreshOwner();}
+function payCredit(id){const s=DB.sessions.find(x=>x.id===id);if(!s)return;if(s.type==='group'&&s.customerIds.length>1)return openGroupPay(id);if(!sessionHasCredit(s))return flash('No prepaid credit available',true);const wasPaid=s.paid;s.paid=true;s.paidVia='package';save();flash('Credit applied 🎟️');if(!wasPaid){logAct('credit_used',custNames(s.customerIds)+' · '+(s.type==='1on1'?'1:1':'Group'),s.id);notifyPaymentReceived(s);}refreshOwner();}
 /* Per-player payment editor for group sessions — one player might use a prepaid credit while
    another pays cash and a third hasn't paid at all. Shared by owner and coach (role-gated
    inline): owner can apply credits, coach can only mark/unmark cash and sees credit-paid
@@ -2346,6 +2452,7 @@ const CUST_COLS=[
   {id:'cancels',label:'Cancels',num:true,get:c=>clientCancelCount(c)},
   {id:'credits',label:'Credits (used/total)',num:true,get:c=>totalFor(c,'1on1')+totalFor(c,'group')},
   {id:'joined',label:'Joined',get:c=>c.created||''},
+  {id:'seen',label:'Last seen',get:c=>c.lastLogin||''},
   {id:'next',label:'Next session',get:c=>{const n=sortSessions(DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.date>=todayISO()&&s.status==='scheduled'))[0];return n?(n.date+n.time):'';}}
 ];
 const COACH_COLS=[
@@ -2380,6 +2487,7 @@ function renderCustomers(){
       <td>${cancelBadge(clientCancelCount(c))}<div class="clienttag">cancels</div></td>
       <td>${creditBadge(c)}</td>
       <td>${c.created?fmtDate(c.created):'<span class="muted">—</span>'}</td>
+      <td>${lastSeenHtml(c)}</td>
       <td>${next?fmtDT(next.date,next.time):'<span class="muted">—</span>'}</td>
       <td class="right"><div class="actions">
         <button class="iconbtn" title="Copy personal login link" onclick="copyClientLink('${c.id}')">🔗 Link</button>
@@ -2849,6 +2957,89 @@ function toggleCoachSuspend(id){const co=coachById(id);if(!co)return;const to=co
 /* ============================================================
    LOCATIONS
    ============================================================ */
+/* ---------- Activity feed (owner only) ---------- */
+let actFilterWho='all', actFilterKind='all', actLimit=120;
+function setActFilter(k,v){ if(k==='who')actFilterWho=v; else actFilterKind=v; actLimit=120; renderActivity(); }
+function actMoreRows(){ actLimit+=120; renderActivity(); }
+function actAgo(ts){
+  if(!ts)return '';
+  const d=Math.floor((Date.now()-new Date(ts).getTime())/1000);
+  if(d<60)return 'just now';
+  if(d<3600)return Math.floor(d/60)+'m ago';
+  if(d<86400)return Math.floor(d/3600)+'h ago';
+  if(d<604800)return Math.floor(d/86400)+'d ago';
+  return fmtDate(ts.slice(0,10));
+}
+function lastSeenHtml(rec){
+  if(!rec||!rec.lastLogin)return '<span class="muted small">never</span>';
+  const days=(Date.now()-new Date(rec.lastLogin).getTime())/864e5;
+  const cls=days<=7?'green':days<=30?'yellow':'red';
+  return `<span class="pill ${cls}">${actAgo(rec.lastLogin)}</span><div class="clienttag">${rec.loginCount||0} sign-in${(rec.loginCount||0)===1?'':'s'}</div>`;
+}
+function renderActivity(){
+  const el=$('#view-activity'); if(!el)return;
+  let rows=(DB.activity||[]).slice().sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
+  if(actFilterWho!=='all')rows=rows.filter(a=>a.actorId===actFilterWho);
+  if(actFilterKind!=='all')rows=rows.filter(a=>a.action===actFilterKind);
+  const total=rows.length; const shown=rows.slice(0,actLimit);
+  const kinds=[...new Set((DB.activity||[]).map(a=>a.action))].sort();
+  const people=[...new Map((DB.activity||[]).filter(a=>a.actorId).map(a=>[a.actorId,a.actorName||a.actorId])).entries()]
+    .sort((a,b)=>String(a[1]).localeCompare(String(b[1])));
+  const icon=a=>a.role==='client'?'👤':a.role==='coach'?'🏀':'🏢';
+  const body=shown.map(a=>`<tr>
+      <td style="white-space:nowrap">${actAgo(a.ts)}<div class="clienttag">${a.ts?fmtChatTime(a.ts):''}</div></td>
+      <td>${icon(a)} <b>${a.actorName||'—'}</b><div class="clienttag">${a.role||''}</div></td>
+      <td>${ACT_LABEL[a.action]||a.action}${a.notify?' <span class="pill blue" title="Pushed to your phone">bell</span>':''}</td>
+      <td class="muted">${a.detail||''}</td></tr>`).join('')
+    ||'<tr><td colspan="4"><div class="empty">Nothing logged yet — activity appears here as clients and coaches use the app.</div></td></tr>';
+  // dormant accounts are usually the most actionable thing on this page
+  const stale=DB.customers.filter(c=>c.approved!==false&&!c.suspended)
+    .filter(c=>!c.lastLogin||(Date.now()-new Date(c.lastLogin).getTime())/864e5>30)
+    .sort((a,b)=>(a.lastLogin||'').localeCompare(b.lastLogin||''));
+  el.innerHTML=`
+    <h1 class="page">Activity</h1>
+    <div class="sub">Everything clients and coaches do in the app — sign-ins, bookings, cancellations, payments and more. Kept for ${ACT_KEEP_DAYS} days.</div>
+    <div class="stats" style="margin-bottom:14px">
+      <div class="stat"><div class="k">Logged events</div><div class="v">${(DB.activity||[]).length}</div><div class="d muted">last ${ACT_KEEP_DAYS} days</div></div>
+      <div class="stat"><div class="k">Active this week</div><div class="v">${DB.customers.filter(c=>c.lastLogin&&(Date.now()-new Date(c.lastLogin).getTime())/864e5<=7).length}</div><div class="d" style="color:var(--green)">clients signed in</div></div>
+      <div class="stat"><div class="k">Dormant</div><div class="v">${stale.length}</div><div class="d" style="color:${stale.length?'var(--red)':'var(--green)'}">30+ days / never</div></div>
+      <div class="stat"><div class="k">Push alerts</div><div class="v" style="font-size:20px">${{off:'Off',important:'Key events',all:'Everything'}[DB.settings.activityPush||'important']}</div><div class="d muted">change in Admin</div></div>
+    </div>
+    ${stale.length?`<div class="panel" style="border-color:var(--yellow);margin-bottom:14px">
+      <h3 style="margin:0 0 8px">Haven't signed in recently (${stale.length})</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${stale.slice(0,24).map(c=>`<button class="btn ghost sm" onclick="viewCustomer('${c.id}')">${c.name} · ${c.lastLogin?actAgo(c.lastLogin):'never'}</button>`).join('')}</div>
+    </div>`:''}
+    <div class="row" style="margin-bottom:12px;gap:10px;flex-wrap:wrap">
+      <div class="field" style="max-width:230px;margin-bottom:0"><label class="f">Who</label>
+        <select onchange="setActFilter('who',this.value)">
+          <option value="all">Everyone</option>
+          ${people.map(([id,nm])=>`<option value="${id}" ${actFilterWho===id?'selected':''}>${nm}</option>`).join('')}
+        </select></div>
+      <div class="field" style="max-width:230px;margin-bottom:0"><label class="f">Type</label>
+        <select onchange="setActFilter('kind',this.value)">
+          <option value="all">All activity</option>
+          ${kinds.map(k=>`<option value="${k}" ${actFilterKind===k?'selected':''}>${ACT_LABEL[k]||k}</option>`).join('')}
+        </select></div>
+      <div class="field" style="display:flex;align-items:flex-end;margin-bottom:0">
+        <button class="btn ghost" onclick="exportActivity()">Export CSV</button></div>
+    </div>
+    <div class="panel" style="padding:6px 14px;overflow-x:auto"><table>
+      <thead><tr><th>When</th><th>Who</th><th>Did what</th><th>Detail</th></tr></thead>
+      <tbody>${body}</tbody></table></div>
+    ${total>shown.length?`<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="actMoreRows()">Show more (${total-shown.length} older)</button></div>`:''}`;
+}
+function exportActivity(){
+  const rows=(DB.activity||[]).slice().sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
+  if(!rows.length)return flash('Nothing to export',true);
+  const esc=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const csv=['When,Who,Role,Action,Detail']
+    .concat(rows.map(a=>[a.ts,a.actorName,a.role,ACT_LABEL[a.action]||a.action,a.detail].map(esc).join(',')))
+    .join('\n');
+  const b=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const u=URL.createObjectURL(b), l=document.createElement('a');
+  l.href=u; l.download='rx-activity-'+todayISO()+'.csv'; l.click();
+  setTimeout(()=>URL.revokeObjectURL(u),1500);
+}
 function renderLocations(){
   const rate=+DB.settings.mileageRate||0;
   const rows=DB.locations.map(l=>{
@@ -3429,6 +3620,7 @@ function registerEvent(eid){
   const reg={id:uid(),eventId:eid,customerId:clientAs,status:'pending',paid:false,paidVia:'',checkedIn:false,created:todayISO()};
   DB.eventRegs.push(reg);
   save();pushRows('event_regs',[eventRegRow(reg)]);flash('Requested “'+ev.title+'” — awaiting owner approval ⏳');
+  logAct('event_register',ev.title,ev.id);
   notifyOwnerEventReg(ev,custById(clientAs));
   renderEvents();
 }
@@ -3442,7 +3634,9 @@ function notifyOwnerEventReg(ev,c){
 function clientCancelEventReg(id){
   if(!confirm('Cancel your registration?'))return;
   const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;
-  r.status='cancelled';save();pushRows('event_regs',[eventRegRow(r)]);flash('Registration cancelled');renderEvents();
+  r.status='cancelled';save();pushRows('event_regs',[eventRegRow(r)]);flash('Registration cancelled');
+  const _ev=eventById(r.eventId); logAct('event_cancel',_ev?_ev.title:'',r.eventId);
+  renderEvents();
 }
 function addEventToCalendar(eid){
   const ev=eventById(eid);if(!ev)return;
@@ -3945,6 +4139,17 @@ function renderAdmin(){
       </div>
       <div class="clienttag" style="margin:-6px 0 12px">When a session is marked <b style="color:var(--txt)">completed</b>, the app auto-logs a "Gas mileage" expense in Finance: round trip (2 × the location's one-way miles, set per-venue in the <b style="color:var(--txt)">Locations</b> tab) × this rate. No mileage set on a location = no auto expense for it.</div>
       <button class="btn sm" onclick="saveMileage()">Save mileage settings</button>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h3>Activity alerts</h3>
+      <div class="field" style="max-width:340px"><label class="f">Push a notification to your phone when a client or coach…</label>
+        <select id="actPush">
+          <option value="important" ${(DB.settings.activityPush||'important')==='important'?'selected':''}>Key events only — bookings, cancellations, check-ins, event sign-ups</option>
+          <option value="all" ${DB.settings.activityPush==='all'?'selected':''}>Everything — including sign-ins and profile edits</option>
+          <option value="off" ${DB.settings.activityPush==='off'?'selected':''}>Off — log activity, but never push</option>
+        </select></div>
+      <div class="clienttag" style="margin:-6px 0 12px">Everything is recorded in the <b style="color:var(--txt)">Activity</b> tab either way — this only controls what wakes your phone. "Everything" gets noisy fast if you have a lot of clients. Your own actions never notify you.</div>
+      <button class="btn sm" onclick="saveActivityPush()">Save alert setting</button>
     </div>`;
 }
 function saveNotify(){
@@ -3954,6 +4159,10 @@ function saveNotify(){
 function saveZelle(){
   DB.settings.zellePhone=($('#zellePhone').value||'').trim();
   save();flash('Zelle number saved');
+}
+function saveActivityPush(){
+  DB.settings.activityPush=$('#actPush').value||'important';
+  save();flash('Activity alert setting saved');
 }
 function saveMileage(){
   DB.settings.homeAddress=($('#homeAddr').value||'').trim()||'1 Granger Pond Way';
