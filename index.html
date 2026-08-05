@@ -722,6 +722,10 @@ function dataSig(d){return JSON.stringify({
   ev:(d.events||[]).map(x=>[x.id,x.title,x.date,x.time,x.price,x.capacity,x.active,x.location]),
   er:(d.eventRegs||[]).map(x=>[x.id,x.eventId,x.customerId,x.status,x.paid,x.checkedIn]),
   msg:(d.messages||[]).map(x=>[x.id,x.readOwner,x.readClient,x.readCoach]),
+  // activity must be in the signature or a new log row reads as "no change" and the poll
+  // returns early — which silently stopped the badge updating for activity
+  act:(d.activity||[]).length+':'+(d.activity||[]).reduce((m,a)=>(a.ts||'')>m?(a.ts||''):m,''),
+  as:d.settings&&d.settings.activitySeenAt,
   n:d.settings&&d.settings.notifyEmails});}
 /* only protect real text entry — a focused dropdown (e.g. the header coach selector)
    must NOT block live refreshes, or the owner's view goes stale */
@@ -1049,22 +1053,28 @@ function renderTabs(){
   else if(AUTH==='coach') allowed=['about','booking','availability','money','messages'];   // coach chats with owner only
   else allowed = TABS.map(tb=>tb.id).filter(x=>x!=='past'&&x!=='money');   // owner uses the full Finance tab instead
   if(!allowed.includes(TAB)) TAB = 'booking';
-  const unread=unreadCount();
+  const unread=unreadCount();                 // combined — drives the app-icon badge
+  const chatUnread=unreadMessages();          // chat only — the Messages tab pill
+  const actUnseen=(AUTH==='owner')?unseenActivityCount():0;
   $('#tabs').innerHTML = TABS.filter(tb=>allowed.includes(tb.id)).map(tb=>{
     let label=tb.label;
     if(tb.id==='booking'&&AUTH==='client')label='My Sessions';
     if(tb.id==='about'&&AUTH==='coach')label='My Profile';
     if(tb.id==='money')label=AUTH==='coach'?'Earnings':'Payments';
     let lab=t(label);
-    if(tb.id==='messages'&&unread>0)lab+=` <span class="pill red" style="padding:1px 7px">${unread}</span>`;
+    if(tb.id==='messages'&&chatUnread>0)lab+=` <span class="pill red" style="padding:1px 7px">${chatUnread}</span>`;
+    if(tb.id==='activity'&&actUnseen>0)lab+=` <span class="pill red" style="padding:1px 7px">${actUnseen}</span>`;
     return `<button data-tab="${tb.id}" class="${TAB===tb.id?'active':''}">${lab}</button>`;
   }).join('');
   $$('#tabs button').forEach(b=>b.onclick=()=>{TAB=b.dataset.tab;switchTab();});
   updateAppBadge(unread);
 }
-/* Home-screen / installed-app icon badge for unread messages (owner, coach, client).
+/* Home-screen / installed-app icon badge. The number is "things waiting for you": unread chat
+   for everyone, plus (owner only) activity not yet opened. The per-tab pills stay separate —
+   Messages shows chat alone, Activity shows activity alone — so only the icon and the browser
+   tab title combine them.
    Works on installed PWAs incl. iOS 16.4+ home-screen web apps once notification
-   permission is granted; no-ops where unsupported. Also mirrors the count in the tab title. */
+   permission is granted; no-ops where unsupported. */
 function updateAppBadge(n){
   if(n===undefined){try{n=unreadCount();}catch(e){n=0;}}
   try{ if('setAppBadge' in navigator){ n>0?navigator.setAppBadge(n):navigator.clearAppBadge(); } }catch(e){}
@@ -3711,12 +3721,18 @@ function markActivitySeen(){
   save();
   updateAppBadge();
 }
-function unreadCount(){
+/* chat only — what the Messages tab pill should show */
+function unreadMessages(){
   const M=DB.messages||[];
-  if(AUTH==='owner')return M.filter(m=>m.sender!=='owner'&&!m.readOwner).length+unseenActivityCount();
+  if(AUTH==='owner')return M.filter(m=>m.sender!=='owner'&&!m.readOwner).length;
   if(AUTH==='client')return M.filter(m=>(m.peerType||'client')==='client'&&m.clientId===clientAs&&m.sender==='owner'&&!m.readClient).length;
   if(AUTH==='coach')return M.filter(m=>m.peerType==='coach'&&m.coachId===coachAs&&m.sender==='owner'&&!m.readCoach).length;
   return 0;
+}
+/* everything waiting on this person — drives the home-screen icon badge. For the owner that's
+   unread chat plus activity they haven't opened yet, matching what the Edge Function sends. */
+function unreadCount(){
+  return unreadMessages()+((AUTH==='owner')?unseenActivityCount():0);
 }
 function markThreadRead(type,id){
   // Only mark as read when the user is actually looking at the thread. A live refresh can
