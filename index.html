@@ -643,10 +643,30 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts){
   d.activity=(acts||[]).map(a=>({id:a.id,ts:a.ts||'',role:a.role||'',actorId:a.actor_id||'',actorName:a.actor_name||'',action:a.action||'',detail:a.detail||'',refId:a.ref_id||'',notify:a.notify===true}));
   return normalize(d);
 }
-const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),family:c.family===true,share_type:c.shareType||'pct',share_val:(c.shareVal!=null?c.shareVal:0),pending:(c.pending||null),created:c.created||null,last_login:c.lastLogin||null,login_count:c.loginCount||0});
+const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),family:c.family===true,share_type:c.shareType||'pct',share_val:(c.shareVal!=null?c.shareVal:0),pending:(c.pending||null),created:c.created||null,last_login:lastLoginOf(c)||null,login_count:loginCountOf(c)});
 const actRow=a=>({id:a.id,ts:a.ts,role:a.role||'',actor_id:a.actorId||'',actor_name:a.actorName||'',
                   action:a.action||'',detail:a.detail||'',ref_id:a.refId||'',notify:a.notify===true});
-const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,approved:c.approved!==false,suspended:c.suspended===true,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',last_login:c.lastLogin||null,login_count:c.loginCount||0});
+/* Last sign-in, taken as the LATER of the record's own column and the newest 'login' row in the
+   activity log. The activity log is append-only and never bulk-synced, so it survives; the
+   column can be stale on a tab that loaded before the client signed in. Reading both ways means
+   the owner's bulk customer sync re-writes the correct value instead of blanking it — without
+   this, a stale owner tab silently reset everyone's "last seen" to never. */
+function lastLoginOf(c){
+  if(!c)return '';
+  let best=c.lastLogin||'';
+  const acts=DB.activity||[];
+  for(let i=0;i<acts.length;i++){
+    const a=acts[i];
+    if(a.action==='login'&&a.actorId===c.id&&(a.ts||'')>best)best=a.ts||'';
+  }
+  return best;
+}
+function loginCountOf(c){
+  if(!c)return 0;
+  const logged=(DB.activity||[]).filter(a=>a.action==='login'&&a.actorId===c.id).length;
+  return Math.max(c.loginCount||0,logged);
+}
+const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,approved:c.approved!==false,suspended:c.suspended===true,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',last_login:lastLoginOf(c)||null,login_count:loginCountOf(c)});
 const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,payment_requested:!!s.paymentRequested,pay:s.pay||{}});
 const expRow=e=>({id:e.id,coach_id:e.coachId||null,date:e.date,cat:e.cat,amount:e.amount,note:e.note||'',freq:e.freq||'once'});
 const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:e.coachId||null,price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||'',video:e.video||''});
@@ -991,7 +1011,7 @@ function defaultCoachId(){const a=activeCoaches();return (a[0]||(DB.coaches&&DB.
 function scopeCoach(){
   if(AUTH==='coach')return coachAs;
   if(AUTH==='client')return pickCoach||defaultCoachId();
-  return mgCoach||defaultCoachId();       // owner
+  return mgCoach||'all';                  // owner: default to every coach, not just the first
 }
 /* new records default to a concrete coach even when the owner is viewing "all" */
 function targetCoach(){const s=scopeCoach();return (!s||s==='all')?defaultCoachId():s;}
@@ -1137,7 +1157,7 @@ function initAuth(){
   const m=location.hash.match(/[#&]c=([a-z0-9]+)/i);
   if(m){const c=DB.customers.find(x=>x.token===m[1]);if(c)pendingClient=c.id;}
   let ss=null;try{ss=JSON.parse(sessionStorage.getItem('rx_sess'));}catch(e){}
-  if(ss&&ss.auth==='owner'){AUTH='owner';ROLE='owner';mgCoach=ss.mgCoach||defaultCoachId();TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();startPolling();return;}
+  if(ss&&ss.auth==='owner'){AUTH='owner';ROLE='owner';mgCoach=ss.mgCoach||'all';TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();startPolling();return;}
   if(ss&&ss.auth==='coach'&&coachById(ss.coachAs)){AUTH='coach';ROLE='coach';coachAs=ss.coachAs;TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();startPolling();return;}
   if(ss&&ss.auth==='client'&&custById(ss.clientAs)){AUTH='client';ROLE='client';clientAs=ss.clientAs;pickCoach=ss.pickCoach||defaultCoachId();TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();startPolling();return;}
   let sg=null;try{sg=JSON.parse(localStorage.getItem('rx_signup'));}catch(e){}
@@ -1261,7 +1281,7 @@ function ownerLogin(){
   const v=$('#loginPwd').value;
   if(!DB.settings.ownerPwd){if((v||'').length<4)return flash('Choose a password with 4+ characters',true);DB.settings.ownerPwd=v;save();flash('Owner password set 🔑');}
   else if(v!==DB.settings.ownerPwd)return flash('Incorrect password',true);
-  AUTH='owner';ROLE='owner';mgCoach=defaultCoachId();TAB='booking';
+  AUTH='owner';ROLE='owner';mgCoach='all';TAB='booking';
   $('#login').classList.remove('show');renderWhoami();switchTab();startPolling();
 }
 function clientLoginPick(){
@@ -2452,7 +2472,7 @@ const CUST_COLS=[
   {id:'cancels',label:'Cancels',num:true,get:c=>clientCancelCount(c)},
   {id:'credits',label:'Credits (used/total)',num:true,get:c=>totalFor(c,'1on1')+totalFor(c,'group')},
   {id:'joined',label:'Joined',get:c=>c.created||''},
-  {id:'seen',label:'Last seen',get:c=>c.lastLogin||''},
+  {id:'seen',label:'Last seen',get:c=>lastLoginOf(c)||''},
   {id:'next',label:'Next session',get:c=>{const n=sortSessions(DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.date>=todayISO()&&s.status==='scheduled'))[0];return n?(n.date+n.time):'';}}
 ];
 const COACH_COLS=[
@@ -2948,7 +2968,7 @@ function delCoach(id){
   const warn=st.total>0?('This coach has '+st.total+' session(s); deleting leaves those sessions without a coach. Consider Suspend instead.'):'';
   confirmByName('coach',co.name,()=>{
     DB.coaches=DB.coaches.filter(c=>c.id!==id);
-    if(mgCoach===id)mgCoach=defaultCoachId();
+    if(mgCoach===id)mgCoach='all';
     save();flash('Coach deleted');renderWhoami();renderCoaches();
   },warn);
 }
@@ -2971,10 +2991,11 @@ function actAgo(ts){
   return fmtDate(ts.slice(0,10));
 }
 function lastSeenHtml(rec){
-  if(!rec||!rec.lastLogin)return '<span class="muted small">never</span>';
-  const days=(Date.now()-new Date(rec.lastLogin).getTime())/864e5;
+  const seen=lastLoginOf(rec), n=loginCountOf(rec);
+  if(!seen)return '<span class="muted small">never</span>';
+  const days=(Date.now()-new Date(seen).getTime())/864e5;
   const cls=days<=7?'green':days<=30?'yellow':'red';
-  return `<span class="pill ${cls}">${actAgo(rec.lastLogin)}</span><div class="clienttag">${rec.loginCount||0} sign-in${(rec.loginCount||0)===1?'':'s'}</div>`;
+  return `<span class="pill ${cls}">${actAgo(seen)}</span><div class="clienttag">${n} sign-in${n===1?'':'s'}</div>`;
 }
 function renderActivity(){
   const el=$('#view-activity'); if(!el)return;
@@ -2994,20 +3015,20 @@ function renderActivity(){
     ||'<tr><td colspan="4"><div class="empty">Nothing logged yet — activity appears here as clients and coaches use the app.</div></td></tr>';
   // dormant accounts are usually the most actionable thing on this page
   const stale=DB.customers.filter(c=>c.approved!==false&&!c.suspended)
-    .filter(c=>!c.lastLogin||(Date.now()-new Date(c.lastLogin).getTime())/864e5>30)
-    .sort((a,b)=>(a.lastLogin||'').localeCompare(b.lastLogin||''));
+    .filter(c=>{const t=lastLoginOf(c);return !t||(Date.now()-new Date(t).getTime())/864e5>30;})
+    .sort((a,b)=>(lastLoginOf(a)||'').localeCompare(lastLoginOf(b)||''));
   el.innerHTML=`
     <h1 class="page">Activity</h1>
     <div class="sub">Everything clients and coaches do in the app — sign-ins, bookings, cancellations, payments and more. Kept for ${ACT_KEEP_DAYS} days.</div>
     <div class="stats" style="margin-bottom:14px">
       <div class="stat"><div class="k">Logged events</div><div class="v">${(DB.activity||[]).length}</div><div class="d muted">last ${ACT_KEEP_DAYS} days</div></div>
-      <div class="stat"><div class="k">Active this week</div><div class="v">${DB.customers.filter(c=>c.lastLogin&&(Date.now()-new Date(c.lastLogin).getTime())/864e5<=7).length}</div><div class="d" style="color:var(--green)">clients signed in</div></div>
+      <div class="stat"><div class="k">Active this week</div><div class="v">${DB.customers.filter(c=>{const t=lastLoginOf(c);return t&&(Date.now()-new Date(t).getTime())/864e5<=7;}).length}</div><div class="d" style="color:var(--green)">clients signed in</div></div>
       <div class="stat"><div class="k">Dormant</div><div class="v">${stale.length}</div><div class="d" style="color:${stale.length?'var(--red)':'var(--green)'}">30+ days / never</div></div>
       <div class="stat"><div class="k">Push alerts</div><div class="v" style="font-size:20px">${{off:'Off',important:'Key events',all:'Everything'}[DB.settings.activityPush||'important']}</div><div class="d muted">change in Admin</div></div>
     </div>
     ${stale.length?`<div class="panel" style="border-color:var(--yellow);margin-bottom:14px">
       <h3 style="margin:0 0 8px">Haven't signed in recently (${stale.length})</h3>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">${stale.slice(0,24).map(c=>`<button class="btn ghost sm" onclick="viewCustomer('${c.id}')">${c.name} · ${c.lastLogin?actAgo(c.lastLogin):'never'}</button>`).join('')}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${stale.slice(0,24).map(c=>`<button class="btn ghost sm" onclick="viewCustomer('${c.id}')">${c.name} · ${lastLoginOf(c)?actAgo(lastLoginOf(c)):'never'}</button>`).join('')}</div>
     </div>`:''}
     <div class="row" style="margin-bottom:12px;gap:10px;flex-wrap:wrap">
       <div class="field" style="max-width:230px;margin-bottom:0"><label class="f">Who</label>
