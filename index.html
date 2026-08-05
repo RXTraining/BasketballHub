@@ -572,6 +572,7 @@ function normalize(d){
   if(d.settings.defaultClientPwd===undefined)d.settings.defaultClientPwd='rxtraining';
   ['notifyEmails','ejService','ejTemplate','ejKey','zellePhone'].forEach(k=>{if(d.settings[k]===undefined)d.settings[k]='';});
   if(!d.settings.activityPush)d.settings.activityPush='important';
+  if(d.settings.activitySeenAt===undefined)d.settings.activitySeenAt='';
   if(!d.settings.homeAddress)d.settings.homeAddress='1 Granger Pond Way';
   if(d.settings.mileageRate===undefined||d.settings.mileageRate===null||d.settings.mileageRate==='')d.settings.mileageRate=0.70;
   if(!d.cashEntries)d.cashEntries=[];
@@ -625,7 +626,7 @@ function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.
 /* ----- relational mapping (separate tables in Supabase) ----- */
 function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts){
   const d={};
-  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',activityPush:(st&&st.activity_push)||'important',homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
+  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',activityPush:(st&&st.activity_push)||'important',activitySeenAt:(st&&st.activity_seen_at)||'',homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
   d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',
     family:(c.family==null?undefined:c.family===true),shareType:(c.share_type||'pct'),shareVal:(c.share_val!=null?Number(c.share_val):0),
     rate1on1:(c.rate_1on1!=null?Number(c.rate_1on1):undefined),rateGroup:(c.rate_group!=null?Number(c.rate_group):undefined),
@@ -902,7 +903,7 @@ async function cloudPush(){
     // added yet) can't block everything else — the critical stuff still saves.
     const fails=[];
     const push=async(name,fn)=>{try{await fn();}catch(e){fails.push(name);console.warn('sync failed:',name,e&&e.message);}};
-    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null,zelle_phone:DB.settings.zellePhone||null,activity_push:DB.settings.activityPush||'important',home_address:DB.settings.homeAddress||null,mileage_rate:DB.settings.mileageRate!=null?DB.settings.mileageRate:null});if(error)throw error;});
+    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null,zelle_phone:DB.settings.zellePhone||null,activity_push:DB.settings.activityPush||'important',activity_seen_at:DB.settings.activitySeenAt||null,home_address:DB.settings.homeAddress||null,mileage_rate:DB.settings.mileageRate!=null?DB.settings.mileageRate:null});if(error)throw error;});
     await push('coaches',()=>syncTable('coaches',(DB.coaches||[]).map(coachRow)));
     await push('locations',()=>syncTable('locations',DB.locations.map(l=>({id:l.id,name:l.name,address:l.address||'',miles:l.miles||0}))));
     await push('customers',()=>syncTable('customers',DB.customers.map(custRow)));
@@ -2999,6 +3000,7 @@ function lastSeenHtml(rec){
 }
 function renderActivity(){
   const el=$('#view-activity'); if(!el)return;
+  markActivitySeen();
   let rows=(DB.activity||[]).slice().sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
   if(actFilterWho!=='all')rows=rows.filter(a=>a.actorId===actFilterWho);
   if(actFilterKind!=='all')rows=rows.filter(a=>a.action===actFilterKind);
@@ -3692,9 +3694,26 @@ function escapeHtml(s){return (s||'').toString().replace(/&/g,'&amp;').replace(/
 function fmtChatTime(iso){try{return new Date(iso).toLocaleString('en-US',{timeZone:TZ,month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
 function peerName(type,id){return type==='coach'?coachName(id):(custById(id)?custById(id).name:'client');}
 function threadMsgs(type,id){return (DB.messages||[]).filter(m=>(m.peerType||'client')===type && (type==='coach'?m.coachId===id:m.clientId===id)).sort((a,b)=>(a.created||'').localeCompare(b.created||''));}
+/* Activity the owner hasn't looked at yet — anything notify-worthy logged after the last time
+   they opened the Activity tab. Feeds the app-icon badge alongside unread messages, so the
+   number means "things waiting for you", not just chat. */
+function unseenActivityCount(){
+  const seen=DB.settings.activitySeenAt||'';
+  return (DB.activity||[]).filter(a=>a.notify===true&&a.role!=='owner'&&(a.ts||'')>seen).length;
+}
+/* Called when the owner opens Activity — moves the watermark forward and clears that part
+   of the badge. */
+function markActivitySeen(){
+  if(AUTH!=='owner')return;
+  const newest=(DB.activity||[]).reduce((m,a)=>(a.ts||'')>m?(a.ts||''):m,'');
+  if(!newest||newest===DB.settings.activitySeenAt)return;
+  DB.settings.activitySeenAt=newest;
+  save();
+  updateAppBadge();
+}
 function unreadCount(){
   const M=DB.messages||[];
-  if(AUTH==='owner')return M.filter(m=>m.sender!=='owner'&&!m.readOwner).length;
+  if(AUTH==='owner')return M.filter(m=>m.sender!=='owner'&&!m.readOwner).length+unseenActivityCount();
   if(AUTH==='client')return M.filter(m=>(m.peerType||'client')==='client'&&m.clientId===clientAs&&m.sender==='owner'&&!m.readClient).length;
   if(AUTH==='coach')return M.filter(m=>m.peerType==='coach'&&m.coachId===coachAs&&m.sender==='owner'&&!m.readCoach).length;
   return 0;
