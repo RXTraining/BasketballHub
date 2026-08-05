@@ -16,10 +16,12 @@ self.addEventListener('push', event => {
       icon: '/icon-192.png', badge: '/icon-192.png',
       data: { url: data.url || '/' }
     });
-    // Paint the unread count on the home-screen / app icon.
-    // Only touch the badge when the payload actually carries a count. Activity alerts omit it
-    // on purpose — the badge means "unread messages", and treating a missing value as 0 would
-    // wipe a genuine unread count every time someone logged in or booked a session.
+    // Paint the count on the home-screen / app icon.
+    // The number means "things waiting for you": unread chat PLUS activity the owner hasn't
+    // opened yet. The server sends the combined total on both kinds of push, and it clears
+    // when the Activity tab / message thread is viewed.
+    // The undefined check matters: an older payload (or any push without a count) must leave
+    // the badge alone rather than be read as 0, which would wipe a real count.
     try {
       if (data.badge !== undefined && data.badge !== null &&
           self.navigator && 'setAppBadge' in self.navigator) {
