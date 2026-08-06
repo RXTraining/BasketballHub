@@ -1918,6 +1918,15 @@ function openGroupsFor(coachId,cid){
     .sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
 }
 function myJoinPending(s,cid){return (s.joinReq||[]).includes(cid);}
+/* The group already sitting on a given coach/date/time, if any. Used both to label the slot with
+   its headcount and — importantly — to make a client tapping that slot JOIN it instead of
+   creating a second parallel group at the same time. Without this you end up with two groups of
+   one at 7:00 PM rather than one group of two. */
+function groupAtSlot(coachId,date,time){
+  return (DB.sessions||[]).find(s=>
+    s.type==='group' && s.coachId===coachId && s.date===date && s.time===time &&
+    (s.status==='pending'||s.status==='scheduled')) || null;
+}
 /* Per-player cost never changes as a group fills: price is rate x hours x players, so each
    player's share stays at rate x hours. Worth showing up front so nobody expects a discount. */
 function groupShare(s){
@@ -2110,23 +2119,44 @@ function submitRequest(){
   const dur=type==='1on1'?60:90;
   const coachId=($('#rqCoach')?$('#rqCoach').value:'')||pickCoach||defaultCoachId();
   const comment=($('#rqComment')?$('#rqComment').value:'').trim();
-  const created=[], taken=[];
+  const created=[], taken=[], joined=[];
   reqSel.forEach(sel=>{
     // re-check each slot is still open (another client may have just taken it)
     const stillOpen=availableSlots(sel.date,type,coachId).some(s=>s.time===sel.time&&s.location===sel.loc);
     if(!stillOpen){ taken.push(sel); return; }
+    // If a group already exists at this exact slot, ask to JOIN it rather than creating a second
+    // group at the same time — otherwise two clients wanting the same session end up in separate
+    // groups of one, which is never what either of them meant.
+    if(type==='group'){
+      const g=groupAtSlot(coachId,sel.date,sel.time);
+      if(g && !(g.customerIds||[]).includes(cid)){
+        if(groupSpots(g)<=0){ taken.push(sel); return; }
+        if(!myJoinPending(g,cid)){ g.joinReq=(g.joinReq||[]).concat([cid]); }
+        joined.push(g);
+        return;
+      }
+      if(g && (g.customerIds||[]).includes(cid)) return;   // already in that group
+    }
     created.push({id:uid(),coachId,customerIds:[cid],type,date:sel.date,time:sel.time,
       dur,price:computePrice(type,dur,1,coachId),status:'pending',paid:false,paidVia:'',checkedIn:false,location:sel.loc||'TBD',
+      joinReq:[],formAlerted:false,
       notes:'Client request'+(comment?(' — '+comment):'')});
   });
-  if(!created.length){reqSel=[];renderOpenSlots();return flash('Those times were just taken — please pick another',true);}
+  if(!created.length&&!joined.length){reqSel=[];renderOpenSlots();return flash('Those times were just taken — please pick another',true);}
   created.forEach(s=>DB.sessions.push(s));
   reqSel=[];
-  save();pushRows('sessions',created.map(sessRow));
-  flash((created.length>1?created.length+' requests':'Request')+' sent to '+coachName(coachId)+' — awaiting confirmation 🏀'
+  save();pushRows('sessions',created.concat(joined).map(sessRow));
+  joined.forEach(g=>{ logAct('group_join_request',fmtDT(g.date,g.time)+' · '+coachName(coachId),g.id);
+                      notifyOwnerJoin(g,custById(cid)); });
+  const bits=[];
+  if(created.length)bits.push(created.length>1?(created.length+' requests sent'):'Request sent');
+  if(joined.length)bits.push(joined.length>1?('asked to join '+joined.length+' groups'):'asked to join a group');
+  flash(bits.join(' · ')+' — awaiting confirmation 🏀'
     +(taken.length?(' ('+taken.length+' time'+(taken.length>1?'s':'')+' had just been taken and were skipped)'):''));
-  logAct('booking_request',created.length+'× '+(created[0].type==='1on1'?'1:1':'Group')+' with '+coachName(coachId)+' · '+created.map(x=>fmtDT(x.date,x.time)).join(', '),created[0].id);
-  if(created.length>1)notifyOwnerBatch(created,comment); else notifyOwner(created[0],comment);
+  if(created.length){
+    logAct('booking_request',created.length+'× '+(created[0].type==='1on1'?'1:1':'Group')+' with '+coachName(coachId)+' · '+created.map(x=>fmtDT(x.date,x.time)).join(', '),created[0].id);
+    if(created.length>1)notifyOwnerBatch(created,comment); else notifyOwner(created[0],comment);
+  }
   renderBooking();
 }
 /* ---- free SMS via carrier email-to-SMS gateways ---- */
@@ -3627,7 +3657,17 @@ function renderOpenSlots(){
   list.innerHTML=Object.keys(byd).sort().map(dt=>`<div style="margin-bottom:8px"><div class="clienttag" style="margin-bottom:5px"><b style="color:var(--txt)">${fmtDate(dt)}</b></div><div class="row" style="gap:6px;flex-wrap:wrap">${byd[dt].map(s=>{
       if(!s.open)return `<span class="slotchip" style="opacity:.45;cursor:not-allowed;text-decoration:line-through" title="Booked by another player">${fmtT(s.time)} · ${s.location} · Booked by others</span>`;
       const on=isSel(dt,s);
-      return `<button type="button" class="slotchip${on?' sel':''}" onclick="setReqSlot('${dt}','${s.time}','${(s.location||'').replace(/'/g,"\\'")}')">${on?'✓ ':''}${fmtT(s.time)} · ${s.location}</button>`;
+      // For group requests, say how full an existing group at this time already is — otherwise a
+      // client has no way to tell an empty slot from one with players already waiting.
+      let extra='';
+      if(type==='group'){
+        const g=groupAtSlot(cid,dt,s.time);
+        if(g){
+          const n=(g.customerIds||[]).length;
+          extra=` · ${n} of ${MAX_GROUP}`+(myJoinPending(g,clientAs)?' · '+t('requested'):' · '+t('join'));
+        }
+      }
+      return `<button type="button" class="slotchip${on?' sel':''}" onclick="setReqSlot('${dt}','${s.time}','${(s.location||'').replace(/'/g,"\\'")}')">${on?'✓ ':''}${fmtT(s.time)} · ${s.location}${extra}</button>`;
     }).join('')}</div></div>`).join('')
     +(anyOpen?'':'<div class="clienttag" style="margin-top:6px">No open times right now — all posted windows are booked by other players. Check back soon or pick another coach.</div>')
     +(reqSel.length?`<div class="clienttag" style="margin-top:8px">${reqSel.length} time${reqSel.length>1?'s':''} selected — tap a time again to remove it, or <a href="#" onclick="reqSel=[];renderOpenSlots();return false;">clear all</a>.</div>`:'');
