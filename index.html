@@ -1891,7 +1891,12 @@ function groupFormHours(){const h=+DB.settings.groupFormHours;return (h&&h>0)?h:
    Forming sessions are deliberately treated as NOT holding their time slot (see allCandidateSlots),
    so a group nobody joins can't sit on a prime time while 1:1 requests are turned away. */
 function isForming(s){
-  return !!s && s.type==='group' && s.status==='pending' &&
+  // Headcount decides this, NOT approval state. A group with one player is still "forming" even
+  // after the owner confirms it, so it keeps letting 1:1 requests through until it genuinely has
+  // the minimum players. Gating on status==='pending' meant approving a group of one instantly
+  // locked the slot against everyone else — the opposite of the intent.
+  return !!s && s.type==='group' &&
+         s.status!=='cancelled' && s.status!=='completed' &&
          (s.customerIds||[]).length < groupMin();
 }
 /* The moment we stop waiting for more players — groupFormHours before the session starts. */
