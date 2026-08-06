@@ -573,6 +573,8 @@ function normalize(d){
   ['notifyEmails','ejService','ejTemplate','ejKey','zellePhone'].forEach(k=>{if(d.settings[k]===undefined)d.settings[k]='';});
   if(!d.settings.activityPush)d.settings.activityPush='important';
   if(d.settings.activitySeenAt===undefined)d.settings.activitySeenAt='';
+  if(!d.settings.groupMinPlayers)d.settings.groupMinPlayers=2;
+  if(!d.settings.groupFormHours)d.settings.groupFormHours=48;
   if(!d.settings.homeAddress)d.settings.homeAddress='1 Granger Pond Way';
   if(d.settings.mileageRate===undefined||d.settings.mileageRate===null||d.settings.mileageRate==='')d.settings.mileageRate=0.70;
   if(!d.cashEntries)d.cashEntries=[];
@@ -592,7 +594,7 @@ function normalize(d){
     if(c.approved===undefined)c.approved=true;
     if(c.suspended===undefined)c.suspended=false;
   });
-  (d.sessions||[]).forEach(s=>{if(s.paidVia===undefined)s.paidVia=s.paid?'cash':'';if(s.paymentRequested===undefined)s.paymentRequested=false;if(!s.pay||typeof s.pay!=='object')s.pay={};});
+  (d.sessions||[]).forEach(s=>{if(s.paidVia===undefined)s.paidVia=s.paid?'cash':'';if(s.paymentRequested===undefined)s.paymentRequested=false;if(!s.pay||typeof s.pay!=='object')s.pay={};if(!Array.isArray(s.joinReq))s.joinReq=[];if(s.formAlerted===undefined)s.formAlerted=false;});
   // ----- multi-coach: seed a coach + stamp coach_id on every record -----
   if(!d.coaches||!d.coaches.length)d.coaches=[{id:'rx1',name:'Raymond Xu',tagline:'Lexington, MA · AAU Level Training',bio:"Training isn't just about drills. It's about teaching you the love of the game — the dedication, the grind, the mindset that you never give up. That's what every session is built on.",affiliation:'AAU',affiliationSub:'Middlesex Magic',photo:'',pwd:'coach',active:true}];
   const gR1=(d.settings&&d.settings.rate1on1)||30, gRG=(d.settings&&d.settings.rateGroup)||20;
@@ -626,7 +628,7 @@ function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.
 /* ----- relational mapping (separate tables in Supabase) ----- */
 function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts){
   const d={};
-  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',activityPush:(st&&st.activity_push)||'important',activitySeenAt:(st&&st.activity_seen_at)||'',homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
+  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',activityPush:(st&&st.activity_push)||'important',activitySeenAt:(st&&st.activity_seen_at)||'',groupMinPlayers:(st&&st.group_min_players)||2,groupFormHours:(st&&st.group_form_hours)||48,homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
   d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',
     family:(c.family==null?undefined:c.family===true),shareType:(c.share_type||'pct'),shareVal:(c.share_val!=null?Number(c.share_val):0),
     rate1on1:(c.rate_1on1!=null?Number(c.rate_1on1):undefined),rateGroup:(c.rate_group!=null?Number(c.rate_group):undefined),
@@ -635,7 +637,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts){
   d.availability=(avail||[]).map(a=>({id:a.id,coachId:a.coach_id||'',date:a.date,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||'',approved:a.approved!==false}));
   d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',inGroup:!!c.in_group,approved:c.approved!==false,suspended:c.suspended===true,creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
     packages:(pkg||[]).filter(p=>p.customer_id===c.id).map(p=>({id:p.id,coachId:p.coach_id||'',type:p.type,qty:p.qty,amount:Number(p.amount),date:p.date}))}));
-  d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||'',paymentRequested:!!s.payment_requested,pay:(s.pay&&typeof s.pay==='object')?s.pay:{}}));
+  d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||'',paymentRequested:!!s.payment_requested,pay:(s.pay&&typeof s.pay==='object')?s.pay:{},joinReq:Array.isArray(s.join_req)?s.join_req:[],formAlerted:!!s.form_alerted}));
   d.expenses=(exp||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||'',freq:e.freq||'once'}));
   d.cashEntries=(cash||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,amount:Number(e.amount),note:e.note||'',customerId:e.customer_id||'',type:e.type||'1on1',qty:e.qty||1}));
   d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||'',video:e.video||''}));
@@ -668,7 +670,7 @@ function loginCountOf(c){
   return Math.max(c.loginCount||0,logged);
 }
 const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,approved:c.approved!==false,suspended:c.suspended===true,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',last_login:lastLoginOf(c)||null,login_count:loginCountOf(c)});
-const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,payment_requested:!!s.paymentRequested,pay:s.pay||{}});
+const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,payment_requested:!!s.paymentRequested,pay:s.pay||{},join_req:s.joinReq||[],form_alerted:!!s.formAlerted});
 const expRow=e=>({id:e.id,coach_id:e.coachId||null,date:e.date,cat:e.cat,amount:e.amount,note:e.note||'',freq:e.freq||'once'});
 const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:e.coachId||null,price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||'',video:e.video||''});
 const eventRegRow=r=>({id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||''});
@@ -714,7 +716,7 @@ async function bootLoad(){
 /* ---- live-ish sync: poll the cloud and refresh the view when data changes ---- */
 let pollTimer=null, lastSig='';
 function dataSig(d){return JSON.stringify({
-  s:(d.sessions||[]).map(x=>[x.id,x.coachId,x.status,x.checkedIn,x.paidVia,x.date,x.time,x.price,x.feedback||'',(x.media||[]).length]),
+  s:(d.sessions||[]).map(x=>[x.id,x.coachId,x.status,x.checkedIn,x.paidVia,x.date,x.time,x.price,x.feedback||'',(x.media||[]).length,(x.customerIds||[]).length,(x.joinReq||[]).length]),
   c:(d.customers||[]).map(x=>[x.id,x.name,x.email,x.pwd,x.creditsTotal,x.packages.length]),
   a:(d.availability||[]).map(x=>[x.id,x.coachId,x.date,x.start,x.end,x.location]),
   co:(d.coaches||[]).map(x=>[x.id,x.name,x.active,x.tagline,x.bio,x.affiliation,x.rate1on1,x.rateGroup,x.pending]),
@@ -907,7 +909,7 @@ async function cloudPush(){
     // added yet) can't block everything else — the critical stuff still saves.
     const fails=[];
     const push=async(name,fn)=>{try{await fn();}catch(e){fails.push(name);console.warn('sync failed:',name,e&&e.message);}};
-    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null,zelle_phone:DB.settings.zellePhone||null,activity_push:DB.settings.activityPush||'important',activity_seen_at:DB.settings.activitySeenAt||null,home_address:DB.settings.homeAddress||null,mileage_rate:DB.settings.mileageRate!=null?DB.settings.mileageRate:null});if(error)throw error;});
+    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null,zelle_phone:DB.settings.zellePhone||null,activity_push:DB.settings.activityPush||'important',activity_seen_at:DB.settings.activitySeenAt||null,group_min_players:DB.settings.groupMinPlayers||2,group_form_hours:DB.settings.groupFormHours||48,home_address:DB.settings.homeAddress||null,mileage_rate:DB.settings.mileageRate!=null?DB.settings.mileageRate:null});if(error)throw error;});
     await push('coaches',()=>syncTable('coaches',(DB.coaches||[]).map(coachRow)));
     await push('locations',()=>syncTable('locations',DB.locations.map(l=>({id:l.id,name:l.name,address:l.address||'',miles:l.miles||0}))));
     await push('customers',()=>syncTable('customers',DB.customers.map(custRow)));
@@ -1135,7 +1137,8 @@ function switchTab(){
   saveSess();
 }
 function saveSess(){try{sessionStorage.setItem('rx_sess',JSON.stringify({auth:AUTH,clientAs,coachAs,mgCoach,pickCoach,tab:TAB}));}catch(e){}}
-function refreshOwner(){const f={about:renderAbout,booking:renderBooking,past:renderPast,money:renderMoney,events:renderEvents,messages:renderMessages,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,activity:renderActivity,admin:renderAdmin}[TAB];if(f)f();if(TAB!=='messages'&&(AUTH==='owner'||AUTH==='client'))renderTabs();if(AUTH==='owner')renderWhoami();}
+function refreshOwner(){if(AUTH==='owner')try{alertUnfilledGroups();}catch(e){}
+  const f={about:renderAbout,booking:renderBooking,past:renderPast,money:renderMoney,events:renderEvents,messages:renderMessages,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,activity:renderActivity,admin:renderAdmin}[TAB];if(f)f();if(TAB!=='messages'&&(AUTH==='owner'||AUTH==='client'))renderTabs();if(AUTH==='owner')renderWhoami();}
 
 /* ---------- Auth ---------- */
 function ensureTokens(){let ch=false;DB.customers.forEach(c=>{if(!c.token){c.token=uid()+uid();ch=true;}});if(ch)save();}
@@ -1153,8 +1156,9 @@ function approvalsCount(){
   const ap=(DB.availability||[]).filter(a=>a.approved===false && a.date>=todayISO()).length;
   const er=(DB.eventRegs||[]).filter(r=>r.status==='pending'&&eventById(r.eventId)).length;
   const se=(DB.sessions||[]).filter(s=>s.status==='pending').length;
+  const jr=(DB.sessions||[]).reduce((n,s)=>n+((s.joinReq||[]).length),0);
   const nc=(DB.customers||[]).filter(c=>c.approved===false).length;
-  return cp+ap+er+se+nc;
+  return cp+ap+er+se+nc+jr;
 }
 function renderWhoami(){
   if(AUTH==='owner'){const n=approvalsCount();const appr=n?`<button class="btn sm" style="background:var(--yellow);color:#211c00;font-weight:800;border:0" onclick="openApprovals()">⏳ ${n} to approve</button>`:'';
@@ -1730,6 +1734,7 @@ function clientCard(s){
         <button class="btn ghost sm" onclick="addToCalendar('${s.id}')">${t('📅 Add to calendar')}</button>
       </div>
     </div>
+    ${unfilledNoticeHtml(s)}
     ${(s.feedback||(s.media&&s.media.length))?`<div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
       ${s.feedback?`<div class="small"><b style="color:var(--accent2)">📣 ${t('Coach feedback:')}</b> ${s.feedback}</div>`:''}
       ${mediaThumbs(s)?`<div style="margin-top:4px">${mediaThumbs(s)}</div>`:''}
@@ -1790,6 +1795,7 @@ function renderBookingClient(){
           <button class="btn" id="rqSubmitBtn" style="width:100%" onclick="submitRequest()">${t('Request Session')}</button>
           <p class="muted small" style="margin-top:10px"><b style="color:var(--txt)">${t('All times are Boston (ET).')||'All times are Boston (ET).'}</b></p>
         </div>
+        ${openGroupsHtml()}
         <div class="panel" style="margin-top:16px"><h3>${t('Your packages')}</h3>${pkgHist}
           <p class="muted small" style="margin-top:8px">${t('To buy a package, ask the Owner — your used/total balance updates automatically.')}</p></div>
       </div>
@@ -1864,6 +1870,239 @@ function logFeedbackViews(list){
       .forEach(s=>logAct('feedback_viewed',fmtDT(s.date,s.time),s.id));
 }
 
+/* ============================================================================
+   OPEN GROUPS — how a client joins a group without knowing anyone.
+
+   A client who requests a "Group" session creates a group of one. That session is then
+   discoverable by every other client of the same coach, who can ask to join it. So the two cases
+   — "join a group that exists" and "start one and wait for others" — are the same mechanism.
+
+   Join requests are held in s.joinReq rather than being pushed straight into customerIds, because
+   a session has ONE status: adding a pending joiner to a session that's already 'scheduled' would
+   either un-confirm it for the players already booked, or sneak an unapproved player in. The owner
+   approves from the same queue as everything else.
+
+   Clients never see who else is in a group — only the number of spots. Most players are minors and
+   the rest of the app already hides their identities from each other; that stays true here.
+   ============================================================================ */
+function groupMin(){return Math.max(2,+DB.settings.groupMinPlayers||2);}
+function groupFormHours(){const h=+DB.settings.groupFormHours;return (h&&h>0)?h:48;}
+/* "Forming" = a group request still short of the minimum headcount and not yet confirmed.
+   Forming sessions are deliberately treated as NOT holding their time slot (see allCandidateSlots),
+   so a group nobody joins can't sit on a prime time while 1:1 requests are turned away. */
+function isForming(s){
+  return !!s && s.type==='group' && s.status==='pending' &&
+         (s.customerIds||[]).length < groupMin();
+}
+/* The moment we stop waiting for more players — groupFormHours before the session starts. */
+function formDeadline(s){
+  try{ return new Date(new Date(s.date+'T'+(s.time||'00:00')).getTime()-groupFormHours()*3600e3); }
+  catch(e){ return null; }
+}
+function formHoursLeft(s){
+  const d=formDeadline(s); if(!d)return 0;
+  return (d.getTime()-Date.now())/3600e3;
+}
+/* Past the cutoff and still short of the minimum — needs a decision from the owner and the client. */
+function groupUnfilled(s){ return isForming(s) && formHoursLeft(s)<=0; }
+function groupSpots(s){return Math.max(0,MAX_GROUP-(s.customerIds||[]).length);}
+/* Group sessions of this coach that the given client could still join. */
+function openGroupsFor(coachId,cid){
+  const now=todayISO();
+  return DB.sessions.filter(s=>
+      s.type==='group' && s.coachId===coachId &&
+      (s.status==='pending'||s.status==='scheduled') &&
+      s.date>=now &&
+      !(s.customerIds||[]).includes(cid) &&
+      groupSpots(s)>0)
+    .sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
+}
+function myJoinPending(s,cid){return (s.joinReq||[]).includes(cid);}
+/* Per-player cost never changes as a group fills: price is rate x hours x players, so each
+   player's share stays at rate x hours. Worth showing up front so nobody expects a discount. */
+function groupShare(s){
+  const n=Math.max(1,(s.customerIds||[]).length);
+  return s.price/n;
+}
+function requestJoinGroup(id){
+  const s=DB.sessions.find(x=>x.id===id); if(!s||!clientAs)return;
+  if((s.customerIds||[]).includes(clientAs))return flash(t('You are already in this session'),true);
+  if(myJoinPending(s,clientAs))return flash(t('Your request is already waiting for approval'),true);
+  if(groupSpots(s)<=0)return flash(t('That group is full'),true);
+  if(!confirm(t('Ask to join this group session?')+'\n\n'+fmtDT(s.date,s.time)+' · '+(s.location||'TBD')+'\n'+money(groupShare(s))+' '+t('per player')))return;
+  s.joinReq=(s.joinReq||[]).concat([clientAs]);
+  save(); pushRows('sessions',[sessRow(s)]);
+  logAct('group_join_request',fmtDT(s.date,s.time)+' · '+coachName(s.coachId),s.id);
+  notifyOwnerJoin(s,custById(clientAs));
+  flash(t('Request sent — waiting for approval ⏳'));
+  renderBooking();
+}
+function cancelJoinRequest(id){
+  const s=DB.sessions.find(x=>x.id===id); if(!s||!clientAs)return;
+  if(!confirm(t('Withdraw your request to join this group?')))return;
+  s.joinReq=(s.joinReq||[]).filter(x=>x!==clientAs);
+  save(); pushRows('sessions',[sessRow(s)]);
+  flash(t('Request withdrawn'));
+  renderBooking();
+}
+function notifyOwnerJoin(s,c){
+  const emails=(DB.settings.notifyEmails||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(!emails.length||!(supa&&SUPA_OK))return;
+  supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:'rx@rxtraining.org',
+    subject:'RX Training — group join request from '+((c&&c.name)||'a client'),
+    text:((c&&c.name)||'A client')+' asked to join a group session:\n'+fmtDT(s.date,s.time)+
+         '\nCoach: '+coachName(s.coachId)+'\nLocation: '+(s.location||'TBD')+
+         '\nCurrently '+(s.customerIds||[]).length+' of '+MAX_GROUP+' players.'+
+         '\n\nApprove in RX.TRAINING (⏳ approvals).'}}).then(()=>{},()=>{});
+}
+/* Owner approves: the joiner moves into customerIds and the session is re-priced for the new
+   headcount. Re-pricing matters — the group rate is per player, so the session total must grow
+   or the extra player trains free. */
+function approveJoin(sid,cid){
+  const s=DB.sessions.find(x=>x.id===sid); if(!s)return;
+  if(groupSpots(s)<=0){flash('That group is already full — decline or remove someone first',true);return;}
+  s.customerIds=(s.customerIds||[]).concat([cid]);
+  s.joinReq=(s.joinReq||[]).filter(x=>x!==cid);
+  s.price=computePrice('group',s.dur,s.customerIds.length,s.coachId);
+  save();
+  const c=custById(cid);
+  if(c&&c.email)emailClient(c.email,'RX Training — you’re in the group session',
+    'Hi '+firstName(c.name)+',\n\nYou’ve been added to the group session:\n'+fmtDT(s.date,s.time)+
+    '\nCoach: '+coachName(s.coachId)+'\nLocation: '+(s.location||'TBD')+
+    '\nYour share: '+money(groupShare(s))+'\n\n— RX Training');
+  flash('Added to the group ✅');
+  refreshApprovals();
+}
+function rejectJoin(sid,cid){
+  const s=DB.sessions.find(x=>x.id===sid); if(!s)return;
+  const c=custById(cid);
+  if(!confirm('Decline '+((c&&c.name)||'this client')+'’s request to join this group?'))return;
+  s.joinReq=(s.joinReq||[]).filter(x=>x!==cid);
+  save();
+  if(c&&c.email)emailClient(c.email,'RX Training — group session update',
+    'Hi '+firstName(c.name)+',\n\nUnfortunately that group session ('+fmtDT(s.date,s.time)+
+    ') couldn’t take another player. Please request another time in the app.\n\n— RX Training');
+  flash('Request declined');
+  refreshApprovals();
+}
+/* Client-side panel: groups of the selected coach with room, shown WITHOUT naming anyone. */
+function openGroupsHtml(){
+  if(!clientAs)return '';
+  const cid=pickCoach||defaultCoachId();
+  const list=openGroupsFor(cid,clientAs);
+  if(!list.length){
+    return `<div class="panel" style="margin-top:16px">
+      <h3>${t('Join a group')}</h3>
+      <div class="clienttag">${t('No groups with open spots right now. Request a Group time above and other players can join yours.')}</div></div>`;
+  }
+  const rows=list.map(s=>{
+    const n=(s.customerIds||[]).length, spots=groupSpots(s);
+    const mine=myJoinPending(s,clientAs);
+    const forming=isForming(s);
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);flex-wrap:wrap">
+      <div style="min-width:0;flex:1">
+        <b>${fmtDT(s.date,s.time)}</b>
+        <span class="pill ${spots<=1?'orange':'green'}">${n} ${t('of')} ${MAX_GROUP} ${t('players')}</span>
+        ${forming?`<span class="pill yellow" title="${t('Needs at least')} ${groupMin()} ${t('players')}">${t('Forming')}</span>`:''}
+        <div class="clienttag" style="margin-top:3px">📍 ${s.location||'TBD'} · ${s.dur} ${t('min')} · <b style="color:var(--txt)">${money(groupShare(s))}</b> ${t('per player')}</div>
+      </div>
+      <div class="actions">${mine
+        ? `<span class="pill yellow">${t('⏳ Pending approval')}</span><button class="btn ghost sm" onclick="cancelJoinRequest('${s.id}')">${t('Withdraw')}</button>`
+        : `<button class="btn sm" onclick="requestJoinGroup('${s.id}')">${t('Ask to join')}</button>`}</div>
+    </div>`;
+  }).join('');
+  return `<div class="panel" style="margin-top:16px">
+    <h3>${t('Join a group')} — 🏀 ${coachName(cid)}</h3>
+    <div class="clienttag" style="margin-bottom:6px">${t('Groups with room for more players. You keep your own payment and credits — you only share the session.')}</div>
+    ${rows}
+    <p class="muted small" style="margin-top:10px">${t('Player names are private — you’ll only see how many spots are left.')}</p></div>`;
+}
+/* Shown on the client's own pending group card once the cutoff has passed and nobody joined:
+   keep the slot as a 1:1 at the 1:1 price, or drop it. Nothing is re-priced or cancelled without
+   the client choosing. */
+function unfilledNoticeHtml(s){
+  if(!clientAs||!groupUnfilled(s)||!(s.customerIds||[]).includes(clientAs))return '';
+  const solo=computePrice('1on1',s.dur,1,s.coachId);
+  return `<div style="background:var(--panel2);border-left:3px solid var(--yellow);border-radius:0 8px 8px 0;padding:9px 11px;margin-top:8px">
+    <b class="small">${t('Not enough players joined this group')}</b>
+    <div class="clienttag" style="margin:4px 0 8px">${t('You can keep this time as a 1:1 session at the 1:1 rate')} (<b style="color:var(--txt)">${money(solo)}</b>), ${t('or cancel it and pick another time.')}</div>
+    <div class="actions"><button class="btn sm" onclick="convertToSolo('${s.id}')">${t('Keep as 1:1')} · ${money(solo)}</button>
+      <button class="btn ghost sm" onclick="clientCancel('${s.id}')">${t('Cancel')}</button></div></div>`;
+}
+/* Owner-side equivalent of convertToSolo — used from the "didn't fill" queue. Keeps the first
+   client on the slot as a 1:1 and re-prices at the 1:1 rate. */
+/* Two pending requests can now legitimately want the same time — a forming group no longer holds
+   its slot, so a 1:1 request can land on top of it. Approving one doesn't auto-decline the other,
+   so the queue has to say plainly which requests collide before the owner picks. */
+function pendingConflicts(s){
+  if(!s||s.status!=='pending'||!s.time)return [];
+  const [h,m]=s.time.split(':').map(Number);
+  const aS=h*60+m, aE=aS+(s.dur||60);
+  return (DB.sessions||[]).filter(o=>{
+    if(o.id===s.id||o.status!=='pending')return false;
+    if(o.coachId!==s.coachId||o.date!==s.date||!o.time)return false;
+    const [h2,m2]=o.time.split(':').map(Number);
+    const bS=h2*60+m2, bE=bS+(o.dur||60);
+    // same start, or overlapping by more than 15 min — matches the booking-overlap rule
+    if(bS===aS)return true;
+    return Math.min(aE,bE)-Math.max(aS,bS) > 15;
+  });
+}
+function conflictFlagHtml(s){
+  const c=pendingConflicts(s);
+  if(!c.length)return '';
+  const who=c.map(o=>custNames(o.customerIds)+' ('+(o.type==='1on1'?'1:1':'Group')+' '+fmtT(o.time)+')').join(', ');
+  return `<div class="clienttag" style="color:var(--red);margin-top:3px">⚠ Same slot as ${who} — approving one doesn't decline the other</div>`;
+}
+function ownerMakeSolo(id){
+  const s=DB.sessions.find(x=>x.id===id); if(!s)return;
+  const solo=computePrice('1on1',s.dur,1,s.coachId);
+  const keep=(s.customerIds||[])[0];
+  const c=custById(keep);
+  if(!confirm('Convert this to a 1:1 for '+((c&&c.name)||'the client')+'?\n\n'+fmtDT(s.date,s.time)+
+              '\nPrice changes to '+money(solo)+' (1:1 rate).'))return;
+  s.type='1on1'; s.customerIds=keep?[keep]:[]; s.joinReq=[]; s.price=solo;
+  save();
+  if(c&&c.email)emailClient(c.email,'RX Training — your session is now 1:1',
+    'Hi '+firstName(c.name)+',\n\nNot enough players joined, so your '+fmtDT(s.date,s.time)+
+    ' session is now a 1:1 at '+money(solo)+'.\n\n— RX Training');
+  flash('Converted to 1:1');
+  refreshApprovals();
+}
+function convertToSolo(id){
+  const s=DB.sessions.find(x=>x.id===id); if(!s||!clientAs)return;
+  const solo=computePrice('1on1',s.dur,1,s.coachId);
+  if(!confirm(t('Keep this time as a 1:1 session?')+'\n\n'+fmtDT(s.date,s.time)+'\n'+money(solo)+' ('+t('1:1 rate')+')'))return;
+  s.type='1on1';
+  s.customerIds=[clientAs];
+  s.joinReq=[];
+  s.price=solo;
+  save(); pushRows('sessions',[sessRow(s)]);
+  logAct('group_to_solo',fmtDT(s.date,s.time),s.id);
+  flash(t('Switched to 1:1 — waiting for approval ⏳'));
+  renderBooking();
+}
+/* Owner-side: message each stranded client once when their group misses the cutoff, so they
+   aren't left waiting. Runs on the owner's refresh; formAlerted stops it repeating. */
+function alertUnfilledGroups(){
+  if(AUTH!=='owner')return;
+  const hit=DB.sessions.filter(s=>groupUnfilled(s)&&!s.formAlerted&&(s.customerIds||[]).length);
+  if(!hit.length)return;
+  const msgs=[];
+  hit.forEach(s=>{
+    const solo=computePrice('1on1',s.dur,1,s.coachId);
+    s.customerIds.forEach(cid=>{
+      const c=custById(cid);
+      msgs.push({id:uid(),peerType:'client',clientId:cid,coachId:'',sender:'owner',
+        text:'Hi'+(c?' '+firstName(c.name):'')+'! Not enough players joined your group session on '+
+             fmtDT(s.date,s.time)+'. You can keep the time as a 1:1 at '+money(solo)+
+             ', or cancel and pick another slot — open My Sessions to choose. 🏀',
+        media:[],created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false});
+    });
+    s.formAlerted=true;
+  });
+  if(msgs.length){ msgs.forEach(m=>DB.messages.push(m)); save(); pushRows('messages',msgs.map(messageRow)); }
+}
 function submitRequest(){
   const cid=clientAs;if(!cid)return flash('Please sign in again',true);
   if(!reqSel.length)return flash('Tap one or more of the coach’s open times above to select them',true);
@@ -2792,9 +3031,11 @@ function openApprovals(){
   const avail=(DB.availability||[]).filter(a=>a.approved===false&&a.date>=todayISO()).sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
   const evregs=eventPendingRegs();
   const psess=(DB.sessions||[]).filter(s=>s.status==='pending').sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
+  const joins=(DB.sessions||[]).filter(s=>(s.joinReq||[]).length).sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
+  const unfilled=(DB.sessions||[]).filter(groupUnfilled).sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
   const newcust=(DB.customers||[]).filter(c=>c.approved===false);
   let body='';
-  if(!coaches.length&&!avail.length&&!evregs.length&&!psess.length&&!newcust.length){body='<div class="empty">Nothing pending — all caught up! 🎉</div>';}
+  if(!coaches.length&&!avail.length&&!evregs.length&&!psess.length&&!newcust.length&&!joins.length&&!unfilled.length){body='<div class="empty">Nothing pending — all caught up! 🎉</div>';}
   else{
     if(newcust.length){
       body+=`<h3 style="margin:4px 0 8px">New account requests (${newcust.length})</h3>`;
@@ -2802,7 +3043,24 @@ function openApprovals(){
     }
     if(psess.length){
       body+=`<h3 style="margin:4px 0 8px">Session requests (${psess.length})</h3>`;
-      body+='<div style="overflow-x:auto"><table><thead><tr><th>Client</th><th>Coach</th><th>When</th><th>Type</th><th></th></tr></thead><tbody>'+psess.map(s=>`<tr><td>${custNames(s.customerIds)}</td><td>${coachName(s.coachId)}</td><td>${fmtDT(s.date,s.time)}</td><td>${s.type==='1on1'?'1:1':'Group'}</td><td class="right"><div class="actions"><button class="btn sm" onclick="doApproveSession('${s.id}')">Approve</button><button class="iconbtn" title="Decline" onclick="doRejectSession('${s.id}')">✕</button></div></td></tr>`).join('')+'</tbody></table></div>';
+      body+='<div style="overflow-x:auto"><table><thead><tr><th>Client</th><th>Coach</th><th>When</th><th>Type</th><th></th></tr></thead><tbody>'+psess.map(s=>`<tr><td>${custNames(s.customerIds)}${conflictFlagHtml(s)}</td><td>${coachName(s.coachId)}</td><td>${fmtDT(s.date,s.time)}</td><td>${s.type==='1on1'?'1:1':'Group'}${isForming(s)?'<div class="clienttag">forming · '+(s.customerIds||[]).length+' of '+MAX_GROUP+'</div>':''}</td><td class="right"><div class="actions"><button class="btn sm" onclick="doApproveSession('${s.id}')">Approve</button><button class="iconbtn" title="Decline" onclick="doRejectSession('${s.id}')">✕</button></div></td></tr>`).join('')+'</tbody></table></div>';
+    }
+    if(joins.length){
+      const rows=joins.flatMap(s=>(s.joinReq||[]).map(cid=>{const c=custById(cid);return `<tr>
+        <td><b>${c?c.name:'?'}</b></td><td>${coachName(s.coachId)}</td><td>${fmtDT(s.date,s.time)}</td>
+        <td>${(s.customerIds||[]).length} of ${MAX_GROUP} players<div class="clienttag">${money(s.price/Math.max(1,(s.customerIds||[]).length+1))} each after joining</div></td>
+        <td class="right"><div class="actions"><button class="btn sm" onclick="approveJoin('${s.id}','${cid}')">Add to group</button><button class="iconbtn" title="Decline" onclick="rejectJoin('${s.id}','${cid}')">✕</button></div></td></tr>`;})).join('');
+      body+=`<h3 style="margin:4px 0 8px">Group join requests (${joins.reduce((n,s)=>n+(s.joinReq||[]).length,0)})</h3>`;
+      body+='<div style="overflow-x:auto"><table><thead><tr><th>Client</th><th>Coach</th><th>When</th><th>Group</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+    }
+    if(unfilled.length){
+      body+=`<h3 style="margin:14px 0 8px">⚠ Groups that didn't fill (${unfilled.length})</h3>`;
+      body+=`<div class="clienttag" style="margin-bottom:8px">Past the ${groupFormHours()}h cutoff and still under ${groupMin()} players. The client has been messaged and can switch it to a 1:1 themselves — or decide it here.</div>`;
+      body+='<div style="overflow-x:auto"><table><thead><tr><th>Client</th><th>Coach</th><th>When</th><th>Players</th><th></th></tr></thead><tbody>'+unfilled.map(s=>{
+        const solo=computePrice('1on1',s.dur,1,s.coachId);
+        return `<tr><td>${custNames(s.customerIds)}</td><td>${coachName(s.coachId)}</td><td>${fmtDT(s.date,s.time)}</td>
+        <td>${(s.customerIds||[]).length} of ${MAX_GROUP}</td>
+        <td class="right"><div class="actions"><button class="btn sm" onclick="ownerMakeSolo('${s.id}')">Make 1:1 · ${money(solo)}</button><button class="iconbtn" title="Decline the request" onclick="doRejectSession('${s.id}')">✕</button></div></td></tr>`;}).join('')+'</tbody></table></div>';
     }
     if(evregs.length){
       body+=`<h3 style="margin:4px 0 8px">Event registrations (${evregs.length})</h3>`;
@@ -2833,7 +3091,17 @@ function doApproveCustomer(id){const c=custById(id);if(c){c.approved=true;if(!c.
   flash('Account approved ✅ — '+c.name+' can now sign in');}refreshApprovals();}
 function doRejectCustomer(id){const c=custById(id);if(!c)return;if(!confirm('Reject and remove this account request for '+c.name+'?'))return;DB.customers=DB.customers.filter(x=>x.id!==id);save();flash('Request removed');refreshApprovals();}
 function doApproveSession(id){
-  const s=DB.sessions.find(x=>x.id===id);if(s){s.status='scheduled';clearCancel(s);save();
+  const s=DB.sessions.find(x=>x.id===id);
+  // the competing request stays pending unless the owner acts on it — say so rather than
+  // letting them assume approving one cleared the other
+  if(s){
+    const conf=pendingConflicts(s);
+    if(conf.length && !confirm('Heads up — '+conf.length+' other pending request'+(conf.length>1?'s':'')+
+        ' want'+(conf.length>1?'':'s')+' this same time:\n\n'+
+        conf.map(o=>'• '+custNames(o.customerIds)+' — '+(o.type==='1on1'?'1:1':'Group')+' '+fmtDT(o.date,o.time)).join('\n')+
+        '\n\nApprove this one anyway? The other'+(conf.length>1?'s':'')+' will stay pending for you to decline.'))return;
+  }
+  if(s){s.status='scheduled';clearCancel(s);save();
     const c=custById(s.customerIds[0]);
     if(c&&c.email)emailClient(c.email,'RX Training — your session is confirmed','Hi '+firstName(c.name)+',\n\nYour '+(s.type==='1on1'?'1:1 Private':'group')+' session with '+coachName(s.coachId)+' is confirmed:\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location+'\n\n— RX Training');
     textConfirm(s);
@@ -3309,11 +3577,15 @@ function allCandidateSlots(dateStr,type,cid){
       if(conflict){ seen[t]=1; out.push({time:t,location:r.location,slotMin:step,open:false}); continue; }
       const at=sessAt(t); let open;
       if(type==='group'){
-        const has1on1=at.some(s=>s.type==='1on1');
+        const has1on1=at.some(s=>s.type==='1on1'&&!isForming(s));
         const groupClients=at.filter(s=>s.type==='group').reduce((a,s)=>a+s.customerIds.length,0);
         open = !has1on1 && groupClients<MAX_GROUP;   // group full at 4 clients
       }else{
-        open = at.length===0;                         // 1:1 needs the slot to itself
+        // A "forming" group — still pending and below the minimum headcount — must NOT hold this
+        // slot hostage. Otherwise one speculative group request that never fills sits on a prime
+        // time for weeks while people wanting 1:1 are told it's taken. Both requests can coexist
+        // as pending; the owner picks one in the approvals queue.
+        open = at.filter(s=>!isForming(s)).length===0;
       }
       seen[t]=1; out.push({time:t,location:r.location,slotMin:step,open});
     }
@@ -4206,6 +4478,17 @@ function renderAdmin(){
         </select></div>
       <div class="clienttag" style="margin:-6px 0 12px">Everything is recorded in the <b style="color:var(--txt)">Activity</b> tab either way — this only controls what wakes your phone. "Everything" gets noisy fast if you have a lot of clients. Your own actions never notify you.</div>
       <button class="btn sm" onclick="saveActivityPush()">Save alert setting</button>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h3>Group forming</h3>
+      <div class="row">
+        <div class="field"><label class="f">Minimum players for a group</label>
+          <input type="number" min="2" max="${MAX_GROUP}" id="grpMin" value="${DB.settings.groupMinPlayers||2}"></div>
+        <div class="field"><label class="f">Stop waiting for players (hours before)</label>
+          <input type="number" min="1" id="grpHours" value="${DB.settings.groupFormHours||48}"></div>
+      </div>
+      <div class="clienttag" style="margin:-6px 0 12px">A group request below the minimum is <b style="color:var(--txt)">forming</b> — it does <b style="color:var(--txt)">not</b> block that time from 1:1 requests, so a group nobody joins can't sit on a prime slot. Past the cutoff it appears in your approvals under "Groups that didn't fill", and the client is messaged once offering to keep the time as a 1:1 at the 1:1 rate, or cancel.</div>
+      <button class="btn sm" onclick="saveGroupForming()">Save group settings</button>
     </div>`;
 }
 function saveNotify(){
@@ -4215,6 +4498,11 @@ function saveNotify(){
 function saveZelle(){
   DB.settings.zellePhone=($('#zellePhone').value||'').trim();
   save();flash('Zelle number saved');
+}
+function saveGroupForming(){
+  DB.settings.groupMinPlayers=Math.max(2,Math.min(MAX_GROUP,+$('#grpMin').value||2));
+  DB.settings.groupFormHours=Math.max(1,+$('#grpHours').value||48);
+  save();flash('Group settings saved');renderAdmin();
 }
 function saveActivityPush(){
   DB.settings.activityPush=$('#actPush').value||'important';
