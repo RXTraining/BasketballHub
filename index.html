@@ -1885,6 +1885,12 @@ function logFeedbackViews(list){
    Clients never see who else is in a group — only the number of spots. Most players are minors and
    the rest of the app already hides their identities from each other; that stays true here.
    ============================================================================ */
+/* A group that never filled becomes a STANDARD 1:1 — 60 minutes at the 1:1 rate — not a 90-minute
+   private session. Keeping the group's 90 min would bill 1.5x the hourly rate (e.g. $53 instead of
+   $35), a big jump on a change the client didn't ask for. Defined once so every place that quotes
+   the price and the code that applies it can't drift apart. */
+const SOLO_DUR=60;
+function soloPriceFor(s){return computePrice('1on1',SOLO_DUR,1,s.coachId);}
 function groupMin(){return Math.max(2,+DB.settings.groupMinPlayers||2);}
 function groupFormHours(){const h=+DB.settings.groupFormHours;return (h&&h>0)?h:48;}
 /* "Forming" = a group request still short of the minimum headcount and not yet confirmed.
@@ -2036,11 +2042,11 @@ function openGroupsHtml(){
    the client choosing. */
 function unfilledNoticeHtml(s){
   if(!clientAs||!groupUnfilled(s)||!(s.customerIds||[]).includes(clientAs))return '';
-  const solo=computePrice('1on1',s.dur,1,s.coachId);
+  const solo=soloPriceFor(s);
   return `<div style="background:var(--panel2);border-left:3px solid var(--yellow);border-radius:0 8px 8px 0;padding:9px 11px;margin-top:8px">
     <b class="small">${t('Not enough players joined this group')}</b>
-    <div class="clienttag" style="margin:4px 0 8px">${t('You can keep this time as a 1:1 session at the 1:1 rate')} (<b style="color:var(--txt)">${money(solo)}</b>), ${t('or cancel it and pick another time.')}</div>
-    <div class="actions"><button class="btn sm" onclick="convertToSolo('${s.id}')">${t('Keep as 1:1')} · ${money(solo)}</button>
+    <div class="clienttag" style="margin:4px 0 8px">${t('You can keep this time as a standard')} ${SOLO_DUR}-${t('min 1:1 session')} (<b style="color:var(--txt)">${money(solo)}</b>), ${t('or cancel it and pick another time.')}</div>
+    <div class="actions"><button class="btn sm" onclick="convertToSolo('${s.id}')">${t('Keep as 1:1')} · ${SOLO_DUR} ${t('min')} · ${money(solo)}</button>
       <button class="btn ghost sm" onclick="clientCancel('${s.id}')">${t('Cancel')}</button></div></div>`;
 }
 /* Owner-side equivalent of convertToSolo — used from the "didn't fill" queue. Keeps the first
@@ -2070,26 +2076,27 @@ function conflictFlagHtml(s){
 }
 function ownerMakeSolo(id){
   const s=DB.sessions.find(x=>x.id===id); if(!s)return;
-  const solo=computePrice('1on1',s.dur,1,s.coachId);
+  const solo=soloPriceFor(s);
   const keep=(s.customerIds||[])[0];
   const c=custById(keep);
   if(!confirm('Convert this to a 1:1 for '+((c&&c.name)||'the client')+'?\n\n'+fmtDT(s.date,s.time)+
-              '\nPrice changes to '+money(solo)+' (1:1 rate).'))return;
-  s.type='1on1'; s.customerIds=keep?[keep]:[]; s.joinReq=[]; s.price=solo;
+              '\nBecomes a standard '+SOLO_DUR+'-min 1:1 at '+money(solo)+' (was '+s.dur+' min at '+money(s.price)+').'))return;
+  s.type='1on1'; s.customerIds=keep?[keep]:[]; s.joinReq=[]; s.dur=SOLO_DUR; s.price=solo;
   save();
   if(c&&c.email)emailClient(c.email,'RX Training — your session is now 1:1',
     'Hi '+firstName(c.name)+',\n\nNot enough players joined, so your '+fmtDT(s.date,s.time)+
-    ' session is now a 1:1 at '+money(solo)+'.\n\n— RX Training');
+    ' session is now a standard '+SOLO_DUR+'-minute 1:1 at '+money(solo)+'.\n\n— RX Training');
   flash('Converted to 1:1');
   refreshApprovals();
 }
 function convertToSolo(id){
   const s=DB.sessions.find(x=>x.id===id); if(!s||!clientAs)return;
-  const solo=computePrice('1on1',s.dur,1,s.coachId);
-  if(!confirm(t('Keep this time as a 1:1 session?')+'\n\n'+fmtDT(s.date,s.time)+'\n'+money(solo)+' ('+t('1:1 rate')+')'))return;
+  const solo=soloPriceFor(s);
+  if(!confirm(t('Keep this time as a 1:1 session?')+'\n\n'+fmtDT(s.date,s.time)+'\n'+SOLO_DUR+' '+t('min')+' · '+money(solo)+' ('+t('1:1 rate')+')'))return;
   s.type='1on1';
   s.customerIds=[clientAs];
   s.joinReq=[];
+  s.dur=SOLO_DUR;          // 90-min group -> standard 60-min 1:1
   s.price=solo;
   save(); pushRows('sessions',[sessRow(s)]);
   logAct('group_to_solo',fmtDT(s.date,s.time),s.id);
@@ -2104,13 +2111,13 @@ function alertUnfilledGroups(){
   if(!hit.length)return;
   const msgs=[];
   hit.forEach(s=>{
-    const solo=computePrice('1on1',s.dur,1,s.coachId);
+    const solo=soloPriceFor(s);
     s.customerIds.forEach(cid=>{
       const c=custById(cid);
       msgs.push({id:uid(),peerType:'client',clientId:cid,coachId:'',sender:'owner',
         text:'Hi'+(c?' '+firstName(c.name):'')+'! Not enough players joined your group session on '+
-             fmtDT(s.date,s.time)+'. You can keep the time as a 1:1 at '+money(solo)+
-             ', or cancel and pick another slot — open My Sessions to choose. 🏀',
+             fmtDT(s.date,s.time)+'. You can keep the time as a standard '+SOLO_DUR+'-minute 1:1 at '+
+             money(solo)+', or cancel and pick another slot — open My Sessions to choose. 🏀',
         media:[],created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false});
     });
     s.formAlerted=true;
@@ -3092,10 +3099,10 @@ function openApprovals(){
       body+=`<h3 style="margin:14px 0 8px">⚠ Groups that didn't fill (${unfilled.length})</h3>`;
       body+=`<div class="clienttag" style="margin-bottom:8px">Past the ${groupFormHours()}h cutoff and still under ${groupMin()} players. The client has been messaged and can switch it to a 1:1 themselves — or decide it here.</div>`;
       body+='<div style="overflow-x:auto"><table><thead><tr><th>Client</th><th>Coach</th><th>When</th><th>Players</th><th></th></tr></thead><tbody>'+unfilled.map(s=>{
-        const solo=computePrice('1on1',s.dur,1,s.coachId);
+        const solo=soloPriceFor(s);
         return `<tr><td>${custNames(s.customerIds)}</td><td>${coachName(s.coachId)}</td><td>${fmtDT(s.date,s.time)}</td>
         <td>${(s.customerIds||[]).length} of ${MAX_GROUP}</td>
-        <td class="right"><div class="actions"><button class="btn sm" onclick="ownerMakeSolo('${s.id}')">Make 1:1 · ${money(solo)}</button><button class="iconbtn" title="Decline the request" onclick="doRejectSession('${s.id}')">✕</button></div></td></tr>`;}).join('')+'</tbody></table></div>';
+        <td class="right"><div class="actions"><button class="btn sm" onclick="ownerMakeSolo('${s.id}')">Make 1:1 · ${SOLO_DUR}min · ${money(solo)}</button><button class="iconbtn" title="Decline the request" onclick="doRejectSession('${s.id}')">✕</button></div></td></tr>`;}).join('')+'</tbody></table></div>';
     }
     if(evregs.length){
       body+=`<h3 style="margin:4px 0 8px">Event registrations (${evregs.length})</h3>`;
