@@ -498,6 +498,14 @@ const todayISO = ()=> new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric
 function nowBoston(){return new Date(new Date().toLocaleString('en-US',{timeZone:TZ}));}
 const uid = ()=> Math.random().toString(36).slice(2,9);
 const MAX_GROUP = 4;
+/* Upload caps. Cloudflare's own ceiling on this path is 100MB (Free/Pro request-body limit), so
+   90 abuts it with headroom for request overhead. Keep this in step with MAX_VIDEO in
+   functions/api/media.js — the Pages Function rejects independently, and a mismatch shows up as
+   a confusing 413 after the client has already sat through the upload.
+   Images are checked pre-compression; the app downscales them before sending, and the function
+   enforces its own 8MB on the compressed result. */
+const MAX_VIDEO_MB = 90;
+const MAX_IMAGE_MB = 50;
 
 /* ---------- Seed data ---------- */
 function seed(){
@@ -1684,7 +1692,7 @@ function openCoachStatus(id){
     <div class="field"><label class="f">📎 Photos / videos for client</label>
       <input type="file" accept="image/*,video/*" multiple onchange="addMediaFiles(this)">
       <div id="sMediaPrev" style="margin-top:8px"></div>
-      <div class="clienttag" style="margin-top:4px">Shown to the client with this session. Photos are compressed automatically; keep videos under 25MB.</div></div>
+      <div class="clienttag" style="margin-top:4px">Shown to the client with this session. Photos are compressed automatically. Videos up to ${MAX_VIDEO_MB}MB — but a trimmed 1080p clip (~30MB) uploads faster and plays without buffering on a phone.</div></div>
     <p class="muted small">Status, cash payment, feedback and media can be updated here — other session details are managed by the owner. Changes sync to the owner and the client.</p>
   `,`<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="coachSaveSession('${id}')">Save</button>`);
   renderMediaPrev();
@@ -2408,7 +2416,7 @@ function ownerCheckIn(id){const s=DB.sessions.find(x=>x.id===id);s.checkedIn=tru
 /* session feedback media (photos/videos stored with the session) */
 const mUrl=m=>m.url||m.data||'';
 /* ---- video links (YouTube / Vimeo / Drive / direct file) ------------------
-   Uploads are capped at 25MB, which most real training footage blows past — a pasted link
+   Uploads are capped at MAX_VIDEO_MB, which long 4K footage still blows past — a pasted link
    sidesteps that entirely and costs no storage or egress, so both paths are supported
    everywhere a video can be attached. */
 const safeUrl=u=>String(u||'').trim().replace(/["'<>\s]/g,'');
@@ -2446,8 +2454,8 @@ async function addMediaFiles(input){
   const files=[...input.files];input.value='';
   for(const f of files){
     const type=f.type.indexOf('video')===0?'video':'image';
-    if(type==='video' && f.size>25*1024*1024){flash(f.name+' is too large — please keep videos under 25MB (trim or lower the resolution).',true);continue;}
-    if(f.size>50*1024*1024){flash(f.name+' is too large (max 50MB)',true);continue;}
+    if(type==='video' && f.size>MAX_VIDEO_MB*1024*1024){flash(f.name+' is '+Math.round(f.size/1048576)+'MB — the limit is '+MAX_VIDEO_MB+'MB. Trim the clip or record at 1080p instead of 4K, or paste a YouTube link for long videos.',true);continue;}
+    if(type==='image' && f.size>MAX_IMAGE_MB*1024*1024){flash(f.name+' is too large (max '+MAX_IMAGE_MB+'MB)',true);continue;}
     // compress photos; leave videos as-is (can't transcode in-browser)
     let upFile=f, upType=f.type, upName=f.name||'file';
     if(type==='image'){const c=await compressImage(f);if(c){upFile=c;upType='image/jpeg';upName=(f.name||'photo').replace(/\.[^.]+$/,'')+'.jpg';}}
@@ -3855,7 +3863,7 @@ function openEvent(id){
       <input id="evVideo" value="${safeUrl(ev.video||'')}" placeholder="Paste a YouTube / Vimeo / Drive link…">
       <div class="row" style="gap:8px;align-items:center;margin-top:6px">
         <label class="btn ghost sm" style="cursor:pointer">⬆ …or upload a video<input type="file" accept="video/*" style="display:none" onchange="uploadEventVideo(this)"></label>
-        <span class="clienttag">Uploads capped at 25MB — for longer footage use an (unlisted) YouTube link.</span>
+        <span class="clienttag">Uploads up to ${MAX_VIDEO_MB}MB. For long footage an (unlisted) YouTube link streams better on phones.</span>
       </div>
       <div id="evVideoPrev" style="margin-top:8px">${videoHtml(ev.video||'','280px')}</div></div>
     <label class="f" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="evActive" ${ev.active!==false?'checked':''} style="width:auto"> Published (visible to clients)</label>
@@ -3871,7 +3879,7 @@ async function uploadEventVideo(input){
   const f=input.files&&input.files[0];input.value='';
   if(!f)return;
   if(f.type.indexOf('video')!==0)return flash('Please choose a video file',true);
-  if(f.size>25*1024*1024)return flash('Video is too large — keep uploads under 25MB, or paste a YouTube link instead.',true);
+  if(f.size>MAX_VIDEO_MB*1024*1024)return flash('That video is '+Math.round(f.size/1048576)+'MB — the limit is '+MAX_VIDEO_MB+'MB. Trim it, record at 1080p, or paste a YouTube link instead.',true);
   flash('Uploading video…');
   try{
     let url='';
@@ -4224,7 +4232,7 @@ function openBroadcast(){
     <div class="field"><label class="f">…or upload a video / photo</label>
       <input type="file" accept="image/*,video/*" multiple onchange="addMediaFiles(this)">
       <div id="sMediaPrev" style="margin-top:8px"></div>
-      <div class="clienttag" style="margin-top:4px">Uploads are capped at 25MB — for anything longer, put it on YouTube (unlisted works) and paste the link above instead.</div></div>
+      <div class="clienttag" style="margin-top:4px">Uploads up to ${MAX_VIDEO_MB}MB. Longer or higher-quality footage is better on YouTube (unlisted works) — paste the link above; it streams adaptively so clients on slow connections aren't left buffering.</div></div>
     <div class="field"><label class="f">Send to (${active.length} active client${active.length>1?'s':''})</label>
       <div style="margin-bottom:6px"><button type="button" class="btn ghost sm" onclick="bcastAll(true)">Select all</button> <button type="button" class="btn ghost sm" onclick="bcastAll(false)">Clear</button></div>
       <div style="max-height:180px;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px">
