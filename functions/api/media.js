@@ -13,8 +13,11 @@
  * Uploads are namespaced per client:  media/<customerId>/<uid>-<filename>
  */
 
-const MAX_IMAGE = 8 * 1024 * 1024;    // 8 MB (app compresses photos first)
-const MAX_VIDEO = 25 * 1024 * 1024;   // 25 MB
+const MAX_IMAGE = 8 * 1024 * 1024;    // 8 MB (app compresses photos before sending)
+// 90 MB sits just under Cloudflare's 100 MB request-body limit on Free/Pro plans, leaving room
+// for request overhead. Must match MAX_VIDEO_MB in index.html — if the app allows more than the
+// function does, the upload fails with a 413 only after the user has waited through it.
+const MAX_VIDEO = 90 * 1024 * 1024;   // 90 MB
 const ALLOWED = [/^image\//, /^video\//];
 
 function cors(resp) {
@@ -64,8 +67,12 @@ export async function onRequest(context) {
     if (!ALLOWED.some((re) => re.test(ctype))) return json({ error: "file type not allowed" }, 415);
     const isVideo = ctype.startsWith("video/");
     const body = await request.arrayBuffer();
-    if (body.byteLength > (isVideo ? MAX_VIDEO : MAX_IMAGE))
-      return json({ error: "file too large" }, 413);
+    const cap = isVideo ? MAX_VIDEO : MAX_IMAGE;
+    if (body.byteLength > cap)
+      return json({
+        error: `file too large — ${Math.round(body.byteLength / 1048576)}MB exceeds the ` +
+               `${Math.round(cap / 1048576)}MB limit for ${isVideo ? "videos" : "images"}`,
+      }, 413);
 
     const customer = safe(request.headers.get("x-customer-id"), "unassigned");
     const name = safe(request.headers.get("x-file-name"), isVideo ? "clip.mp4" : "photo.jpg");
