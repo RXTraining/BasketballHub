@@ -824,6 +824,7 @@ const ACT_LABEL={
   checkin:'checked in', payment:'payment recorded', credit_used:'used a package credit',
   profile_edit:'updated contact info', event_register:'registered for an event',
   event_cancel:'cancelled an event registration', feedback_viewed:'read coach feedback',
+  media_added:'added photos/video to a session',
   signup:'created an account'
 };
 function actShouldNotify(action){
@@ -1698,6 +1699,7 @@ function openCoachStatus(id){
   renderMediaPrev();
 }
 function coachSaveSession(id){
+  if(blockIfUploading())return;
   const s=DB.sessions.find(x=>x.id===id);if(!s){closeModal();return;}
   const wasPaid=s.paid;
   const isGroup=s.type==='group'&&s.customerIds.length>1;
@@ -1714,10 +1716,12 @@ function coachSaveSession(id){
     if(pv && s.paidVia!=='package'){ if(pv.checked){s.paid=true;s.paidVia='cash';if(!wasPaid)logAct('payment',money(s.price)+' cash · '+custNames(s.customerIds),s.id);}else{s.paid=false;s.paidVia='';} }
   }
   const fb=document.getElementById('csFeedback'); if(fb)s.feedback=fb.value;
+  const prevMedia=(s.media||[]).length;   // captured BEFORE the overwrite below
   s.media=editMedia.slice();
   const st=document.getElementById('csStatus').value;
   if(st!==s.status){ coachSetStatus(id,st,true); }
   else { save();flash('Session updated');refreshOwner(); }
+  notifyMediaAdded(s,prevMedia,'coach');
   if(!isGroup && s.paid&&!wasPaid)notifyPaymentReceived(s);
   mediaCust=null;
   closeModal();
@@ -2248,6 +2252,52 @@ function requestPaymentZelle(s){
   pushRows('messages',[messageRow(m)]);
   pushRows('sessions',[sessRow(s)]);
 }
+/* ---------------------------------------------------------------------------
+   New photos/videos on a session were previously attached in silence — the client only found
+   them by happening to open Past Sessions. This posts a chat message to everyone with a stake in
+   the session, which rides the existing push + unread-badge path, so nobody has to go looking.
+
+   Group sessions get one message per player (never a shared thread), so no client learns who else
+   was in the session. actor is who uploaded: 'coach' | 'owner'.
+   --------------------------------------------------------------------------- */
+function mediaWord(list){
+  const v=list.filter(m=>m&&(m.type==='video'||m.type==='link')).length;
+  const p=list.length-v;
+  if(v&&p)return v+' video'+(v>1?'s':'')+' and '+p+' photo'+(p>1?'s':'');
+  if(v)return v+' video'+(v>1?'s':'');
+  return p+' photo'+(p>1?'s':'');
+}
+function notifyMediaAdded(s,prevCount,actor){
+  if(!s)return;
+  const now=(s.media||[]).length;
+  const added=now-(prevCount||0);
+  if(added<=0)return;                       // nothing new (or files were removed)
+  const fresh=(s.media||[]).slice(-added);
+  const what=mediaWord(fresh);
+  const who=actor==='coach'?coachName(s.coachId):'Raymond';
+  const when=fmtDT(s.date,s.time);
+  const msgs=[];
+  // every player in the session, each in their own private thread
+  (s.customerIds||[]).forEach(cid=>{
+    const c=custById(cid);
+    msgs.push({id:uid(),peerType:'client',clientId:cid,coachId:'',sender:'owner',
+      text:'Hi'+(c?' '+firstName(c.name):'')+'! 🎬 '+who+' added '+what+' to your session on '+when+
+           '. Open Past Sessions in the app to watch.',
+      media:[],created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false});
+  });
+  // if the OWNER uploaded, let the coach know too (the reverse case reaches the owner via the
+  // activity log below, which already pushes to their phone)
+  if(actor==='owner'&&s.coachId){
+    msgs.push({id:uid(),peerType:'coach',clientId:'',coachId:s.coachId,sender:'owner',
+      text:'🎬 '+what+' added to the '+when+' session ('+custNames(s.customerIds)+').',
+      media:[],created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false});
+  }
+  if(!msgs.length)return;
+  msgs.forEach(m=>DB.messages.push(m));
+  save();
+  pushRows('messages',msgs.map(messageRow));
+  logAct('media_added',what+' · '+when,s.id);
+}
 /* Closes the loop on requestPaymentZelle(): once a session (or, for a group, one specific
    player) that we'd asked to Zelle gets marked paid, post a short "payment received"
    confirmation in their chat thread. Without this, the original "Amount due: $X" message just
@@ -2450,11 +2500,31 @@ async function compressImage(file,maxDim=1600,quality=0.8){
     return (blob && blob.size<file.size)?blob:null;
   }catch(e){return null;}
 }
+/* Number of uploads still in flight. addMediaFiles is async — it awaits the upload and only THEN
+   pushes into editMedia. Without this counter, hitting Save mid-upload captured editMedia before
+   the file landed and the attachment was silently dropped: no error, no file, just gone. That is
+   near-certain on a phone with a large video, where the upload takes many seconds. */
+let mediaBusy=0;
+function mediaUploading(){return mediaBusy>0;}
+/* Guard every Save path that persists editMedia. Returns true if the caller should stop. */
+function blockIfUploading(){
+  if(!mediaUploading())return false;
+  flash('Still uploading '+mediaBusy+' file'+(mediaBusy>1?'s':'')+' — wait for the preview to appear, then save.',true);
+  return true;
+}
 async function addMediaFiles(input){
   const files=[...input.files];input.value='';
   for(const f of files){
+    mediaBusy++; renderMediaPrev();
+    try{
     const type=f.type.indexOf('video')===0?'video':'image';
-    if(type==='video' && f.size>MAX_VIDEO_MB*1024*1024){flash(f.name+' is '+Math.round(f.size/1048576)+'MB — the limit is '+MAX_VIDEO_MB+'MB. Trim the clip or record at 1080p instead of 4K, or paste a YouTube link for long videos.',true);continue;}
+    if(type==='video' && f.size>MAX_VIDEO_MB*1024*1024){
+      // A flash alone is too easy to miss — the coach walks away believing the video attached.
+      // Block with a dialog so a rejected file is never mistaken for a saved one.
+      const msg=f.name+' is '+Math.round(f.size/1048576)+'MB, over the '+MAX_VIDEO_MB+'MB limit, so it was NOT attached.\n\n'+
+        'Trim the clip, record at 1080p instead of 4K, or put it on YouTube (unlisted) and paste the link.';
+      flash('Video too large — not attached',true); alert(msg); continue;
+    }
     if(type==='image' && f.size>MAX_IMAGE_MB*1024*1024){flash(f.name+' is too large (max '+MAX_IMAGE_MB+'MB)',true);continue;}
     // compress photos; leave videos as-is (can't transcode in-browser)
     let upFile=f, upType=f.type, upName=f.name||'file';
@@ -2488,13 +2558,15 @@ async function addMediaFiles(input){
       r.onload=()=>{editMedia.push({type,name:upName,data:r.result});renderMediaPrev();};
       r.readAsDataURL(upFile);
     }
+    } finally { mediaBusy=Math.max(0,mediaBusy-1); renderMediaPrev(); }
   }
 }
 function renderMediaPrev(){
   const el=$('#sMediaPrev');if(!el)return;
-  el.innerHTML=editMedia.length?editMedia.map((m,i)=>`<div style="position:relative;display:inline-block;margin:0 8px 8px 0;vertical-align:top">
+  const busy=mediaUploading()?`<div class="clienttag" style="color:var(--yellow);margin-bottom:6px">⏳ Uploading ${mediaBusy} file${mediaBusy>1?'s':''}… don't save or close yet.</div>`:'';
+  el.innerHTML=busy+(editMedia.length?editMedia.map((m,i)=>`<div style="position:relative;display:inline-block;margin:0 8px 8px 0;vertical-align:top">
     ${m.type==='image'?`<img src="${mUrl(m)}" style="width:84px;height:84px;object-fit:cover;border-radius:8px">`:`<video src="${mUrl(m)}" style="width:84px;height:84px;object-fit:cover;border-radius:8px"></video>`}
-    <button class="iconbtn" style="position:absolute;top:-8px;right:-8px;padding:2px 7px" onclick="rmMedia(${i})">✕</button></div>`).join(''):'<span class="clienttag">No attachments yet.</span>';
+    <button class="iconbtn" style="position:absolute;top:-8px;right:-8px;padding:2px 7px" onclick="rmMedia(${i})">✕</button></div>`).join(''):(busy?'':'<span class="clienttag">No attachments yet.</span>'));
 }
 function rmMedia(i){const m=editMedia[i];
   if(m&&m.key&&useR2()){fetch(R2_ENDPOINT+'?key='+encodeURIComponent(m.key)+'&token='+encodeURIComponent(R2_TOKEN),{method:'DELETE'}).catch(()=>{});}
@@ -2576,6 +2648,7 @@ function recalcPrice(){
 }
 function afterSessionSave(){const rc=sessionReturnCust;sessionReturnCust=null;closeModal();if(rc&&custById(rc))viewCustomer(rc);else refreshOwner();}
 function saveSession(id,emailAfter){
+  if(blockIfUploading())return;
   const ids=$$('.sCustCb').filter(cb=>cb.checked).map(cb=>cb.value);
   if(!ids.length)return flash('Tick at least one client',true);
   const type=$('#sType').value;
@@ -2630,6 +2703,7 @@ function saveSession(id,emailAfter){
   const prevStatus=exSess.status; // captured before Object.assign mutates exSess in place
   const prevPaid=exSess.paid;
   const prevMemberPaid={}; exSess.customerIds.forEach(cid=>{prevMemberPaid[cid]=custPay(exSess,cid).paid;});
+  const prevMediaCount=(exSess.media||[]).length;   // before Object.assign overwrites it
   Object.assign(DB.sessions.find(x=>x.id===id),obj);
   const savedSess=DB.sessions.find(x=>x.id===id);
   if(!save())return;flash('Session saved'); // save() re-derives the auto gas/payout expenses
@@ -2639,6 +2713,7 @@ function saveSession(id,emailAfter){
   if(obj.status==='cancelled' && prevStatus!=='cancelled'){
     notifyCancellation(savedSess,'owner');
   }
+  notifyMediaAdded(savedSess,prevMediaCount,'owner');
   if(obj.type==='group' && obj.customerIds.length>1){
     // the bulk Payment dropdown can mark everyone paid at once (via the legacy fallback) —
     // still confirm to each individual player who'd previously been sent a Zelle request.
@@ -4198,6 +4273,7 @@ function renderMessages(){
 function openThread(type,id){ownerThread={type,id};editMedia=[];chatThreadKey=null;renderMessages();}
 function backToInbox(){ownerThread=null;editMedia=[];renderMessages();}
 function sendMessage(){
+  if(blockIfUploading())return;
   const inp=$('#chatInput');const text=(inp?inp.value:'').trim();
   const linkEl=$('#chatVideoLink');const link=linkEl?safeUrl(linkEl.value):'';
   if(link&&!videoEmbed(link))return flash('That video link doesn\'t look like a URL — it should start with https://',true);
@@ -4244,6 +4320,7 @@ function openBroadcast(){
 }
 function bcastAll(on){$$('.bcCb').forEach(cb=>{cb.checked=on;});}
 function sendBroadcast(){
+  if(blockIfUploading())return;
   const text=($('#bcText').value||'').trim();
   const link=safeUrl($('#bcLink').value||'');
   if(link&&!videoEmbed(link))return flash('That video link doesn\'t look like a URL — it should start with https://',true);
