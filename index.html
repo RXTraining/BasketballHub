@@ -303,7 +303,8 @@
   .lp-stat{background:var(--lp-soft);border:1px solid var(--lp-line);border-radius:14px;padding:16px 26px;min-width:150px}
   .lp-stat b{display:block;font-size:24px;font-weight:900;color:var(--lp-volt-d)}
   .lp-stat span{font-size:12px;color:var(--lp-mut);font-weight:700;letter-spacing:.4px}
-  .lp-sec{padding:52px 0;border-top:1px solid var(--lp-line)}
+  .lp-sec{padding:52px 0;border-top:1px solid var(--lp-line);
+    scroll-margin-top:calc(var(--lp-navh,52px) + var(--lp-railh,0px) + 12px)}
   .lp-kicker{font-size:12.5px;font-weight:800;letter-spacing:2.5px;text-transform:uppercase;color:var(--lp-volt-d);margin-bottom:7px}
   .lp-h2{font-size:clamp(28px,5vw,44px);font-weight:900;letter-spacing:-.8px;margin:0 0 18px}
   .lp-p{font-size:15.5px;line-height:1.7;color:var(--lp-mut);max-width:720px}
@@ -347,7 +348,9 @@
   /* mobile-only section jumper — the text nav is hidden below 720px */
   .lp-jump{display:none;gap:7px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:9px 14px;
     border-bottom:1px solid var(--lp-line);background:var(--lp-soft);position:sticky;
-    top:calc(52px + env(safe-area-inset-top,0px));z-index:19;scrollbar-width:none}
+    /* --lp-navh is measured at runtime; a hardcoded offset drifts with the safe-area inset and
+       leaves the rail tucked half-under the nav */
+    top:var(--lp-navh,52px);z-index:19;scrollbar-width:none}
   .lp-jump::-webkit-scrollbar{display:none}
   .lp-jump button{flex:none;background:#fff;border:1.5px solid var(--lp-line);color:var(--lp-ink);
     font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:999px;cursor:pointer;font-family:inherit}
@@ -544,6 +547,38 @@ const DB_KEY = 'rxtraining_v2';
 /* ---------- i18n: English / 中文 (client-facing) ---------- */
 let LANG='en'; try{LANG=localStorage.getItem('rx_lang')||'en';}catch(e){}
 const ZH={
+  /* --- landing page prose --- */
+  'HERO_LEDE':'由 <b>{name}</b> 创办 —— 一名现役 AAU 球员，而非早已退役的教练。每一堂课都建立在<b>对篮球的热爱</b>之上：投入、拼搏，以及<b>永不放弃</b>的信念。',
+  'ABOUT_P1':'RX.TRAINING 由 <b>{name}</b> 创办。他是列克星敦高中的学生运动员，效力于马萨诸塞州最具竞争力的 AAU 球队之一 <b>Middlesex Magic</b>。理念很简单：球员向仍在场上竞技的人学习，进步最快。',
+  'ABOUT_P2':'如今这一标准适用于团队中的每一位教练。我们的训练绝非千篇一律 —— 每堂课都包含<b>实战情境</b>：真实的判断、真实的决策、真实的压力，而不只是机械练习。我们培养的是关键时刻能打出来的运动员。',
+  'CARD_AAU':'现效力于 Middlesex Magic —— 美国东北部高水平竞技篮球队。',
+  'CARD_LIVE':'每堂课都置身真实比赛场景 —— 有防守人、有比赛时间、需要做出决策。',
+  'CARD_IQ':'理解比赛与技术训练同样重要。我们教球员在场上观察与思考。',
+  'CARD_GRIT':'我们以专注与坚韧投入每一堂课，也期待每一位球员做到同样。',
+  'QUOTE':'我教的不只是篮球，更是<em>对这项运动的热爱</em> —— 我的投入、我的拼搏，以及<em>永不放弃</em>的信念。',
+  'COACHES_P':'这里的每位教练都仍在赛场上竞技。你不是在向早已停止打球的人学习。',
+  'SPORTS_P':'RX 会不断成长。同一个应用、同样的教学标准 —— 当合适的教练加入，我们就开设新的运动项目。',
+  'SPORTS_CTA':'你是这些项目的教练，并希望在 RX 开课？',
+  'PLAN1_DESC':'完全围绕你的技术特点定制，包含实战对抗 —— 真实防守、真实判断、真实压力。',
+  'PLAN2_DESC':'2–{max} 人小组课。球员之间的竞争营造出接近比赛的强度 —— 一起训练，共同进步。',
+  'B_BALL':'控球与运球',
+  'B_SHOT':'投篮姿势与技术',
+  'B_FOOT':'脚步与运动能力',
+  'B_1V1':'实战一对一情境',
+  'B_VISION':'场上视野与决策',
+  'B_MENTAL':'心理韧性与自信',
+  'G_DRILLS':'实战情境训练与一对一对抗',
+  'G_SCEN':'竞争性比赛情境',
+  'G_TEAM':'团队战术与空间概念',
+  'G_COMM':'场上沟通',
+  'G_VALUE':'与朋友、队友一起，超高性价比',
+  'AVAIL_LINE':'服务范围：<b>马萨诸塞州列克星敦</b>地区 · 时间灵活 · 预约与管理均可在应用内完成。',
+  'FILM_P':'观看我们代表 <b>Middlesex Magic</b> 参加 AAU 比赛。这就是我们带入每一堂训练课的水准。',
+  'BOOK_P':'注册账号即可查看实时可预约时段、预约一对一或小组课、查询付款记录，并在每堂课后收到教练的视频反馈。',
+  'NO_COACHES':'教练团队正在扩充中 —— 敬请期待。',
+  'FOUNDER':'创办人',
+  'Founder':'创办人',
+  'Built with':'用心打造',
   // tabs / roles
   'My Sessions':'我的课程','Past Sessions':'历史课程','Payments':'付款','Events':'活动',
   'Player':'学员','Coach':'教练',
@@ -644,6 +679,38 @@ const ZH={
   'Session cancelled':'课程已取消','Registration cancelled':'报名已取消'
 };
 const KO={
+  /* --- landing page prose --- */
+  'HERO_LEDE':'<b>{name}</b>이(가) 설립했습니다 — 오래전 은퇴한 코치가 아니라 현역 AAU 선수입니다. 모든 세션은 <b>경기에 대한 사랑</b> 위에 세워집니다: 헌신, 노력, 그리고 <b>절대 포기하지 않는</b> 믿음.',
+  'ABOUT_P1':'RX.TRAINING은 렉싱턴 고등학교 학생 선수이자 매사추세츠에서 가장 경쟁이 치열한 AAU 프로그램 중 하나인 <b>Middlesex Magic</b>에서 뛰는 <b>{name}</b>이(가) 설립했습니다. 발상은 단순합니다 — 선수는 지금도 코트에서 경쟁하는 사람에게 가장 빠르게 배웁니다.',
+  'ABOUT_P2':'이 기준은 이제 모든 코치에게 적용됩니다. 이곳의 훈련은 획일적이지 않습니다 — 모든 세션에 <b>실전 상황</b>이 포함됩니다: 실제 판단, 실제 결정, 실제 압박. 단순 반복 훈련이 아닙니다. 중요한 순간에 해내는 선수를 만듭니다.',
+  'CARD_AAU':'현재 Middlesex Magic 소속 — 미 북동부의 높은 수준의 경쟁 농구.',
+  'CARD_LIVE':'모든 세션이 실제 경기 상황입니다 — 수비수가 붙고, 시계가 돌아가고, 결정을 내려야 합니다.',
+  'CARD_IQ':'경기를 이해하는 것은 훈련만큼 중요합니다. 코트에서 읽고 생각하는 법을 가르칩니다.',
+  'CARD_GRIT':'우리는 모든 세션에 헌신과 강인함을 쏟고, 모든 선수에게도 같은 것을 기대합니다.',
+  'QUOTE':'저는 농구만 가르치는 것이 아닙니다. <em>경기에 대한 사랑</em>을 가르칩니다 — 저의 헌신, 저의 노력, 그리고 <em>절대 포기하지 않는</em> 믿음을.',
+  'COACHES_P':'이곳의 모든 코치는 여전히 경쟁합니다. 오래전 은퇴한 사람에게 배우는 것이 아닙니다.',
+  'SPORTS_P':'RX는 성장합니다. 같은 앱, 같은 코칭 기준 — 알맞은 코치가 합류하면 새로운 종목을 엽니다.',
+  'SPORTS_CTA':'이 종목의 코치이시고 RX에서 세션을 운영하고 싶으신가요?',
+  'PLAN1_DESC':'당신의 플레이에 맞춘 완전 맞춤형 세션. 실전 반복 포함 — 실제 수비, 실제 판단, 실제 압박.',
+  'PLAN2_DESC':'2–{max}명 소그룹. 선수 간 경쟁이 실전에 가까운 강도를 만듭니다 — 함께 배우고 함께 성장합니다.',
+  'B_BALL':'볼 핸들링 &amp; 드리블',
+  'B_SHOT':'슈팅 폼 &amp; 메커니즘',
+  'B_FOOT':'풋워크 &amp; 운동 능력',
+  'B_1V1':'실전 1대1 상황',
+  'B_VISION':'코트 시야 &amp; 의사결정',
+  'B_MENTAL':'멘탈 강화 &amp; 자신감',
+  'G_DRILLS':'실전 상황 훈련 &amp; 1대1',
+  'G_SCEN':'경쟁적 경기 시나리오',
+  'G_TEAM':'팀 개념 &amp; 스페이싱',
+  'G_COMM':'코트 위 커뮤니케이션',
+  'G_VALUE':'친구·팀 동료와 함께하면 더 좋은 가격',
+  'AVAIL_LINE':'<b>매사추세츠주 렉싱턴</b> 지역에서 진행 · 유연한 일정 · 예약과 관리는 모두 앱에서.',
+  'FILM_P':'<b>Middlesex Magic</b>과 함께한 AAU 경기를 확인하세요. 모든 트레이닝에 가져오는 수준입니다.',
+  'BOOK_P':'계정을 만들면 실시간 예약 가능 시간 확인, 1:1·그룹 세션 예약, 결제 내역 확인, 그리고 매 세션 후 코치의 영상 피드백을 받을 수 있습니다.',
+  'NO_COACHES':'코치진을 확충하고 있습니다 — 곧 만나보세요.',
+  'FOUNDER':'창립자',
+  'Founder':'창립자',
+  'Built with':'만든 사람',
   'My Sessions':'내 수업','Past Sessions':'지난 수업','Payments':'결제','Events':'이벤트',
   'Player':'회원','Coach':'코치',
   'Players: enter your name and password (or open your personal link).':'회원: 이름과 비밀번호를 입력하세요 (또는 개인 링크를 여세요).',
@@ -736,6 +803,38 @@ const KO={
   'Session cancelled':'수업이 취소되었습니다','Registration cancelled':'등록이 취소되었습니다'
 };
 const JA={
+  /* --- landing page prose --- */
+  'HERO_LEDE':'<b>{name}</b> が創設 —— 何年も前に引退したコーチではなく、現役の AAU 選手です。すべてのセッションは<b>競技への愛</b>の上に成り立っています：献身、努力、そして<b>決して諦めない</b>という信念。',
+  'ABOUT_P1':'RX.TRAINING は、レキシントン高校の学生アスリートで、マサチューセッツ州で最も競争の激しい AAU プログラムのひとつ <b>Middlesex Magic</b> でプレーする <b>{name}</b> が創設しました。考え方はシンプルです —— 選手は 今もコートで戦っている人から最も速く学びます。',
+  'ABOUT_P2':'その基準は今、すべてのコーチに共有されています。ここでのトレーニングは型どおりではありません —— すべてのセッションに<b>実戦状況</b>が含まれます：本物の判断、本物の決断、本物のプレッシャー。単なるドリルではありません。ここぞという場面で力を出せる選手を育てます。',
+  'CARD_AAU':'現在 Middlesex Magic に所属 —— 米国北東部のハイレベルな競技バスケットボール。',
+  'CARD_LIVE':'すべてのセッションが実戦形式です —— ディフェンダーがつき、時計が動き、判断を迫られます。',
+  'CARD_IQ':'競技を理解することはドリルと同じくらい重要です。コート上で読み、考える力を教えます。',
+  'CARD_GRIT':'私たちはすべてのセッションに献身と強さを持ち込み、選手にも同じものを求めます。',
+  'QUOTE':'私が教えているのはバスケットボールだけではありません。<em>競技への愛</em>を伝えています —— 私の献身、私の努力、そして<em>決して諦めない</em>という信念を。',
+  'COACHES_P':'ここのコーチは全員、今も競技を続けています。引退した人から学ぶのではありません。',
+  'SPORTS_P':'RX は成長し続けます。同じアプリ、同じ指導基準 —— ふさわしいコーチが加われば新しい競技を開きます。',
+  'SPORTS_CTA':'これらの競技のコーチで、RX でセッションを開きたい方はいませんか？',
+  'PLAN1_DESC':'あなたのプレーに合わせた完全個別指導。実戦形式のレップ付き —— 本物のディフェンス、判断、プレッシャー。',
+  'PLAN2_DESC':'2〜{max} 名の少人数グループ。選手同士の競争が実戦に近い強度を生みます —— 一緒に学び、共に成長。',
+  'B_BALL':'ボールハンドリング &amp; ドリブル',
+  'B_SHOT':'シュートフォーム &amp; メカニクス',
+  'B_FOOT':'フットワーク &amp; 運動能力',
+  'B_1V1':'実戦 1on1 の状況',
+  'B_VISION':'コートビジョン &amp; 判断力',
+  'B_MENTAL':'メンタルの強さ &amp; 自信',
+  'G_DRILLS':'実戦形式ドリル &amp; 1on1',
+  'G_SCEN':'競争型のゲームシナリオ',
+  'G_TEAM':'チーム戦術 &amp; スペーシング',
+  'G_COMM':'コート上のコミュニケーション',
+  'G_VALUE':'友達・チームメイトと一緒ならお得',
+  'AVAIL_LINE':'<b>マサチューセッツ州レキシントン</b>周辺で実施 · 柔軟なスケジュール · 予約も管理もアプリで完結。',
+  'FILM_P':'<b>Middlesex Magic</b> での AAU の試合をご覧ください。すべてのトレーニングに持ち込んでいるレベルです。',
+  'BOOK_P':'アカウントを作成すると、空き状況の確認、1:1・グループの予約、支払い状況の確認、そして毎回のセッション後にコーチからの動画フィードバックが受け取れます。',
+  'NO_COACHES':'コーチを増員中です —— もう少しお待ちください。',
+  'FOUNDER':'創設者',
+  'Founder':'創設者',
+  'Built with':'制作',
   'My Sessions':'マイセッション','Past Sessions':'過去のセッション','Payments':'支払い','Events':'イベント',
   'Player':'会員','Coach':'コーチ',
   'Players: enter your name and password (or open your personal link).':'会員：名前とパスワードを入力してください（または個人リンクを開いてください）。',
@@ -831,6 +930,9 @@ const LANGDICT={zh:ZH,ko:KO,ja:JA};
 const LANG_NAMES={en:'EN',zh:'中文',ko:'한국어',ja:'日本語'};
 function nextLang(){const o=['en','zh','ko','ja'];return o[(o.indexOf(LANG)+1)%o.length];}
 function t(s){const d=LANGDICT[LANG];return (d&&d[s])?d[s]:s;}
+/* t() plus {token} substitution — lets each language put the coach name or group size where its
+   own grammar needs it, instead of forcing English word order by splitting the sentence. */
+function tf(k,v){let out=t(k);for(const n in (v||{}))out=out.split('{'+n+'}').join(v[n]);return out;}
 function setLang(l){LANG=l;try{localStorage.setItem('rx_lang',l);}catch(e){}try{if(!AUTH&&$('#login')&&$('#login').classList.contains('show')){const su=$('#signupPanel');if(su&&!su.classList.contains('hidden')){applyLoginLang();renderSignup();}else showLogin();}else{renderWhoami();renderTabs();refreshOwner();}}catch(e){}}
 function langToggleHtml(){return '<select class="coachsel" title="Language" onchange="setLang(this.value)">'+Object.keys(LANG_NAMES).map(k=>'<option value="'+k+'" '+(LANG===k?'selected':'')+'>'+LANG_NAMES[k]+'</option>').join('')+'</select>';}
 const $ = (s,el=document)=>el.querySelector(s);
@@ -1585,7 +1687,7 @@ function closeAuth(){
    the business doesn't read as one person. Rates and sport come from live records. */
 function lpCoachCards(){
   const list=activeCoaches();
-  if(!list.length)return '<div class="lp-card">Coaches are being added — check back soon.</div>';
+  if(!list.length)return '<div class="lp-card">'+t('NO_COACHES')+'</div>';
   return list.map((c,i)=>{
     const founder=(c.name||'').trim().toLowerCase()==='raymond xu';
     const initials=(c.name||'?').split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
@@ -1597,7 +1699,7 @@ function lpCoachCards(){
       <div class="lp-coach-top">
         ${photo}
         <div style="min-width:0">
-          <div class="lp-coach-name">${c.name}${founder?'<span class="lp-badge">FOUNDER</span>':''}</div>
+          <div class="lp-coach-name">${c.name}${founder?'<span class="lp-badge">'+t('FOUNDER')+'</span>':''}</div>
           <div class="lp-coach-sport">${c.sport||'Basketball'}${c.affiliation?' · '+c.affiliation:''}</div>
         </div>
       </div>
@@ -1620,7 +1722,26 @@ function lpSportChips(){
       <b>${sp}</b><span>${on?t('Now training'):t('Coming soon')}</span></div>`;
   }).join('');
 }
-function lpGo(id){const el=document.getElementById(id); if(el)el.scrollIntoView({behavior:'smooth',block:'start'});}
+/* Height of the sticky nav (+ jump rail when visible), published as CSS vars so both the rail's
+   sticky offset and the scroll target use the same real numbers. */
+function lpMeasureBars(){
+  const page=$('#lpPage'); if(!page)return {nav:0,rail:0};
+  const nav=page.querySelector('.lp-nav'), rail=page.querySelector('.lp-jump');
+  const nh=nav?Math.round(nav.getBoundingClientRect().height):0;
+  const rh=(rail&&getComputedStyle(rail).display!=='none')?Math.round(rail.getBoundingClientRect().height):0;
+  page.style.setProperty('--lp-navh',nh+'px');
+  page.style.setProperty('--lp-railh',rh+'px');
+  return {nav:nh,rail:rh};
+}
+/* scrollIntoView({block:'start'}) parks the section under the sticky bars — offset by their
+   combined height so the heading (and the rail itself) stay visible. */
+function lpGo(id){
+  const el=document.getElementById(id), box=$('#login'); if(!el||!box)return;
+  const {nav,rail}=lpMeasureBars();
+  const top=box.scrollTop+el.getBoundingClientRect().top-box.getBoundingClientRect().top-(nav+rail+10);
+  try{ box.scrollTo({top:Math.max(0,top),behavior:'smooth'}); }
+  catch(e){ box.scrollTop=Math.max(0,top); }
+}
 function renderLanding(){
   const el=$('#lpPage'); if(!el)return;
   const co=(activeCoaches()[0])||{};
@@ -1661,7 +1782,7 @@ function renderLanding(){
     <header class="lp-hero">
       <h1 class="lp-h1 reveal">RX<i class="lp-dot" id="lpBall">🏀</i>TRAINING</h1>
       <div class="lp-role reveal">${t('Train like you play')}</div>
-      <p class="lp-lede reveal">Founded by <b>${co.name||'Raymond Xu'}</b> — an active AAU competitor, not a coach who stopped playing years ago. Every session is built on the <b>love of the game</b>: the dedication, the grind, and the belief that <b>you never give up</b>.</p>
+      <p class="lp-lede reveal">${tf('HERO_LEDE',{name:co.name||'Raymond Xu'})}</p>
       <div class="lp-cta reveal">
         <button class="lp-btn solid lp-big" onclick="openAuth('book')">${t('Book a session →')}</button>
         <button class="lp-btn line lp-big" onclick="lpGo('lpCoaches')">${t('Meet the coaches')}</button>
@@ -1677,17 +1798,17 @@ function renderLanding(){
     <section class="lp-sec" id="lpAbout">
       <div class="lp-kicker">${t('Who we are')}</div>
       <h2 class="lp-h2">${t('THE RX APPROACH')}</h2>
-      <p class="lp-p">RX.TRAINING was founded by <b>${co.name||'Raymond Xu'}</b>, a student-athlete at Lexington High School playing for <b>Middlesex Magic</b> — one of the most competitive AAU programs in Massachusetts. The idea was simple: players learn fastest from people still in the gym competing.</p>
-      <p class="lp-p" style="margin-top:12px">That standard now runs across every coach on the roster. Training here isn't cookie-cutter — every session includes <b>live game situations</b>: real reads, real decisions, real pressure. Not just drills. We build athletes who perform when it counts.</p>
+      <p class="lp-p">${tf('ABOUT_P1',{name:co.name||'Raymond Xu'})}</p>
+      <p class="lp-p" style="margin-top:12px">${t('ABOUT_P2')}</p>
       <div class="lp-grid">
-        <div class="lp-card"><div class="lp-ico">⚡</div><h4>${t('Active AAU competitor')}</h4><p>Currently playing for Middlesex Magic — high-level competitive basketball in the Northeast.</p></div>
-        <div class="lp-card"><div class="lp-ico">🎮</div><h4>${t('Live situation training')}</h4><p>Every session puts you in real game scenarios — defender on you, clock running, a decision to make.</p></div>
-        <div class="lp-card"><div class="lp-ico">🧠</div><h4>${t('Game IQ first')}</h4><p>Understanding the game matters as much as the drills. I teach players to read and think on the court.</p></div>
-        <div class="lp-card"><div class="lp-ico">🔥</div><h4>${t('Never give up')}</h4><p>I bring dedication and toughness to every session — and expect the same from every player I train.</p></div>
+        <div class="lp-card"><div class="lp-ico">⚡</div><h4>${t('Active AAU competitor')}</h4><p>${t('CARD_AAU')}</p></div>
+        <div class="lp-card"><div class="lp-ico">🎮</div><h4>${t('Live situation training')}</h4><p>${t('CARD_LIVE')}</p></div>
+        <div class="lp-card"><div class="lp-ico">🧠</div><h4>${t('Game IQ first')}</h4><p>${t('CARD_IQ')}</p></div>
+        <div class="lp-card"><div class="lp-ico">🔥</div><h4>${t('Never give up')}</h4><p>${t('CARD_GRIT')}</p></div>
       </div>
       <div class="lp-quote">
-        <p>I'm not only teaching kids basketball. I'm teaching them the <em>love of the game</em> — my dedication, my grind, and the belief that <em>you never give up</em>.</p>
-        <cite>— ${co.name||'Raymond Xu'}, Founder · Middlesex Magic (AAU)</cite>
+        <p>${t('QUOTE')}</p>
+        <cite>— ${co.name||'Raymond Xu'}, ${t('Founder')} · Middlesex Magic (AAU)</cite>
       </div>
     </section>
 
@@ -1698,19 +1819,19 @@ function renderLanding(){
         <div class="lp-plan hot">
           <div class="lp-ico">🎯</div><h3>${t('1-on-1 Training')}</h3>
           <div class="lp-cost">${money(r1)} <small>· ${t('1 hour')}</small></div>
-          <p class="lp-p" style="font-size:14px">Fully personalised around your game, including live reps — real defence, real reads, real pressure.</p>
-          <ul><li>Ball handling &amp; dribbling</li><li>Shooting form &amp; mechanics</li><li>Footwork &amp; athleticism</li><li>Live 1v1 game situations</li><li>Court vision &amp; decision making</li><li>Mental toughness &amp; confidence</li></ul>
+          <p class="lp-p" style="font-size:14px">${t('PLAN1_DESC')}</p>
+          <ul>${['B_BALL','B_SHOT','B_FOOT','B_1V1','B_VISION','B_MENTAL'].map(k=>'<li>'+t(k)+'</li>').join('')}</ul>
           <button class="lp-btn solid" style="width:100%;margin-top:18px" onclick="openAuth('book')">${t('Book 1-on-1')}</button>
         </div>
         <div class="lp-plan">
           <div class="lp-ico">👥</div><h3>${t('Group Lessons')}</h3>
           <div class="lp-cost">${money(rg)} <small>· ${t('per player')} · ${t('1 hour')}</small></div>
-          <p class="lp-p" style="font-size:14px">Small groups of 2–${MAX_GROUP}. Competition between players creates live-game intensity — learn together, grow together.</p>
-          <ul><li>Live situation drills &amp; 1v1 reps</li><li>Competitive game scenarios</li><li>Team concepts &amp; spacing</li><li>On-court communication</li><li>Great value for friends &amp; teammates</li></ul>
+          <p class="lp-p" style="font-size:14px">${tf('PLAN2_DESC',{max:MAX_GROUP})}</p>
+          <ul>${['G_DRILLS','G_SCEN','G_TEAM','G_COMM','G_VALUE'].map(k=>'<li>'+t(k)+'</li>').join('')}</ul>
           <button class="lp-btn line" style="width:100%;margin-top:18px" onclick="openAuth('book')">${t('Book a group')}</button>
         </div>
       </div>
-      <p class="lp-p" style="margin-top:18px">📍 Available in the <b>Lexington, MA</b> area · flexible scheduling · book and manage everything in the app.</p>
+      <p class="lp-p" style="margin-top:18px">📍 ${t('AVAIL_LINE')}</p>
       ${ev?`<div class="lp-event">
         <div class="lp-ico">🌟</div>
         <h3>${ev.title}</h3>
@@ -1723,29 +1844,29 @@ function renderLanding(){
     <section class="lp-sec" id="lpCoaches">
       <div class="lp-kicker">${t('The team')}</div>
       <h2 class="lp-h2">${t('YOUR COACHES')}</h2>
-      <p class="lp-p">Every coach here still competes. You're not learning from someone who stopped playing years ago.</p>
+      <p class="lp-p">${t('COACHES_P')}</p>
       <div class="lp-coaches">${lpCoachCards()}</div>
     </section>
 
     <section class="lp-sec" id="lpSports">
       <div class="lp-kicker">${t("What's next")}</div>
       <h2 class="lp-h2">${t('MORE THAN BASKETBALL')}</h2>
-      <p class="lp-p">RX is built to grow. Same app, same coaching standard — new sports as we bring the right coaches on.</p>
+      <p class="lp-p">${t('SPORTS_P')}</p>
       <div class="lp-sports">${lpSportChips()}</div>
-      <p class="lp-p" style="margin-top:16px;font-size:14px">Coach in one of these and want to run sessions on RX? <a href="mailto:xuraymond777@gmail.com" style="color:var(--lp-volt-d);font-weight:800">${t('Get in touch →')}</a></p>
+      <p class="lp-p" style="margin-top:16px;font-size:14px">${t('SPORTS_CTA')} <a href="mailto:xuraymond777@gmail.com" style="color:var(--lp-volt-d);font-weight:800">${t('Get in touch →')}</a></p>
     </section>
 
     <section class="lp-sec" id="lpFilm">
       <div class="lp-kicker">${t('See me play')}</div>
       <h2 class="lp-h2">${t('AAU HIGHLIGHTS')}</h2>
-      <p class="lp-p">Watch me compete at the AAU level with <b>Middlesex Magic</b>. This is the level of play I bring to every training session.</p>
+      <p class="lp-p">${t('FILM_P')}</p>
       <div class="lp-vid"><iframe src="https://www.youtube.com/embed/1odU-4Ml2sw" title="AAU highlights" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe></div>
     </section>
 
     <section class="lp-sec" id="lpBook">
       <div class="lp-kicker">${t('Book a session')}</div>
       <h2 class="lp-h2">${t("LET'S WORK")}</h2>
-      <p class="lp-p">Create an account to see live availability, book 1-on-1 or group sessions, track payments, and get video feedback from your coach after every session.</p>
+      <p class="lp-p">${t('BOOK_P')}</p>
       <div class="lp-cta" style="justify-content:flex-start;margin-top:22px">
         <button class="lp-btn solid lp-big" onclick="openAuth('signup')">${t('Create your account')}</button>
         <button class="lp-btn line lp-big" onclick="openAuth('client')">${t('I already have one')}</button>
@@ -1757,7 +1878,7 @@ function renderLanding(){
     </section>
 
     <footer class="lp-foot">
-      © ${new Date().getFullYear()} RX Training · ${co.name||'Raymond Xu'} · Lexington, MA · Built with 🏀
+      © ${new Date().getFullYear()} RX Training · ${co.name||'Raymond Xu'} · Lexington, MA · ${t('Built with')} 🏀
       <div style="margin-top:10px"><button class="lp-btn line mini" onclick="openAuth('coach')">${t('Coach sign in')}</button>
         <button class="lp-btn line mini" onclick="openAuth('owner')">🔑 Owner</button></div>
     </footer>
@@ -1791,6 +1912,12 @@ function lpAnimate(){
     }
   }
   lpBallCycle();
+  lpMeasureBars();
+  if(!window.__lpResize){
+    window.__lpResize=true;
+    window.addEventListener('resize',()=>lpMeasureBars());
+    window.addEventListener('orientationchange',()=>setTimeout(lpMeasureBars,250));
+  }
 }
 /* The brand dot is a bouncing ball that swaps sport every couple of seconds — a small nod to the
    multi-sport roadmap. Single interval, cleared and restarted on each render so repeated repaints
