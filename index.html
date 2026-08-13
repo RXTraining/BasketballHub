@@ -1353,6 +1353,14 @@ function applyLoginLang(){
    ============================================================================ */
 function openAuth(which){
   const v=$('#authveil'); if(!v)return;
+  // 'book' picks the right door: a returning player on this device gets sign-in with their name
+  // already filled, a first-time visitor gets the create-account form. Sending an existing client
+  // to a signup screen is how you end up with duplicate accounts.
+  if(which==='book'){
+    let last=''; try{last=localStorage.getItem('rx_lastclient')||'';}catch(e){}
+    which = last ? 'client' : 'signup';
+    if(last)setTimeout(()=>{const f=$('#loginClient'); if(f&&!f.value){f.value=last;const pw=$('#loginClientPwd'); if(pw)pw.focus();}},90);
+  }
   v.classList.add('show');
   if(which==='signup'){ toggleOwnerLogin(false); showLoginTab('client'); openSignup(); }
   else if(which==='owner'){ toggleOwnerLogin(true); }
@@ -1388,7 +1396,7 @@ function lpCoachCards(){
       ${c.tagline?`<div class="lp-coach-tag">${c.tagline}</div>`:''}
       ${bio?`<p class="lp-coach-bio">${bio.length>210?bio.slice(0,210)+'…':bio}</p>`:''}
       <div class="lp-coach-rates"><span>1:1 <b>${money(coachRate(c.id,'1on1'))}</b>/hr</span><span>Group <b>${money(coachRate(c.id,'group'))}</b>/player</span></div>
-      <button class="lp-btn solid" style="width:100%;margin-top:14px" onclick="openAuth('signup')">Book with ${firstName(c.name)}</button>
+      <button class="lp-btn solid" style="width:100%;margin-top:14px" onclick="openAuth('book')">Book with ${firstName(c.name)}</button>
     </article>`;
   }).join('');
 }
@@ -1437,7 +1445,7 @@ function renderLanding(){
       <div class="lp-role reveal">Train like you play</div>
       <p class="lp-lede reveal">Founded by <b>${co.name||'Raymond Xu'}</b> — an active AAU competitor, not a coach who stopped playing years ago. Every session is built on the <b>love of the game</b>: the dedication, the grind, and the belief that <b>you never give up</b>.</p>
       <div class="lp-cta reveal">
-        <button class="lp-btn solid lp-big" onclick="openAuth('signup')">Book a session →</button>
+        <button class="lp-btn solid lp-big" onclick="openAuth('book')">Book a session →</button>
         <button class="lp-btn line lp-big" onclick="lpGo('lpCoaches')">Meet the coaches</button>
       </div>
       <div class="lp-stats">
@@ -1474,14 +1482,14 @@ function renderLanding(){
           <div class="lp-cost">${money(r1)} <small>· 1 hour</small></div>
           <p class="lp-p" style="font-size:14px">Fully personalised around your game, including live reps — real defence, real reads, real pressure.</p>
           <ul><li>Ball handling &amp; dribbling</li><li>Shooting form &amp; mechanics</li><li>Footwork &amp; athleticism</li><li>Live 1v1 game situations</li><li>Court vision &amp; decision making</li><li>Mental toughness &amp; confidence</li></ul>
-          <button class="lp-btn solid" style="width:100%;margin-top:18px" onclick="openAuth('signup')">Book 1-on-1</button>
+          <button class="lp-btn solid" style="width:100%;margin-top:18px" onclick="openAuth('book')">Book 1-on-1</button>
         </div>
         <div class="lp-plan">
           <div class="lp-ico">👥</div><h3>Group Lessons</h3>
           <div class="lp-cost">${money(rg)} <small>· per player · 1 hour</small></div>
           <p class="lp-p" style="font-size:14px">Small groups of 2–${MAX_GROUP}. Competition between players creates live-game intensity — learn together, grow together.</p>
           <ul><li>Live situation drills &amp; 1v1 reps</li><li>Competitive game scenarios</li><li>Team concepts &amp; spacing</li><li>On-court communication</li><li>Great value for friends &amp; teammates</li></ul>
-          <button class="lp-btn line" style="width:100%;margin-top:18px" onclick="openAuth('signup')">Book a group</button>
+          <button class="lp-btn line" style="width:100%;margin-top:18px" onclick="openAuth('book')">Book a group</button>
         </div>
       </div>
       <p class="lp-p" style="margin-top:18px">📍 Available in the <b>Lexington, MA</b> area · flexible scheduling · book and manage everything in the app.</p>
@@ -1490,7 +1498,7 @@ function renderLanding(){
         <h3>${ev.title}</h3>
         <p>${(ev.detail||'').slice(0,240)}${(ev.detail||'').length>240?'…':''}</p>
         <p style="font-weight:800">📅 ${eventWhen(ev)}${ev.location?' · 📍 '+ev.location:''}${ev.price?' · '+money(ev.price):' · Free'}</p>
-        <button class="lp-btn solid" onclick="openAuth('signup')">Reserve your spot →</button>
+        <button class="lp-btn solid" onclick="openAuth('book')">Reserve your spot →</button>
       </div>`:''}
     </section>
 
@@ -1692,6 +1700,8 @@ function coachLoginPick(){
 }
 function loginAsClient(id){
   try{localStorage.removeItem('rx_signup');}catch(e){}
+  // remember this device's last player so "Book a session" can go straight to sign-in next time
+  try{const c=custById(id); if(c)localStorage.setItem('rx_lastclient',c.name||'');}catch(e){}
   if(signupTimer){clearInterval(signupTimer);signupTimer=null;}
   AUTH='client';ROLE='client';clientAs=id;pickCoach=defaultCoachId();TAB='booking';
   $('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();
