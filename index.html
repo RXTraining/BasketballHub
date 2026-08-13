@@ -283,7 +283,9 @@
   .lp-cost small{font-size:13px;color:var(--lp-mut);font-weight:700}
   .lp-plan ul{margin:14px 0 0;padding-left:0;list-style:none}
   .lp-plan li{font-size:13.5px;line-height:1.55;color:var(--lp-mut);padding-left:20px;position:relative;margin-bottom:7px}
-  .lp-plan li:before{content:"\\2713";position:absolute;left:0;color:var(--lp-volt-d);font-weight:900}
+  /* literal ✓ rather than a "\2713" escape — the escaped form is easy to double-escape by
+     accident, which renders the code as text instead of a tick */
+  .lp-plan li:before{content:"✓";position:absolute;left:0;top:0;color:var(--lp-volt-d);font-weight:900}
   .lp-event{background:linear-gradient(100deg,var(--lp-volt) 0%,#e9ff9a 100%);border-radius:18px;padding:26px;margin-top:26px;color:#202c06}
   .lp-event h3{margin:4px 0 8px;font-size:21px;font-weight:900}
   .lp-event p{margin:0 0 14px;font-size:14.5px;line-height:1.6}
