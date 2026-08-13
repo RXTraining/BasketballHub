@@ -202,11 +202,91 @@
   .cchip.done{opacity:.55}
   @media(max-width:640px){.calcell{min-height:70px}.cchip{font-size:9px}}
 
-  .login{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;
+  /* generic centred overlay — used by the Supabase connect screen, which used to share
+     the .login class before .login became the public landing page */
+  .overlay{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;
     padding:calc(env(safe-area-inset-top,0px) + 64px) 18px 24px;
     background:radial-gradient(900px 500px at 70% -10%,rgba(255,106,0,.18),transparent 60%),var(--bg)}
-  .login.show{display:flex}
-  .login .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:30px;max-width:680px;width:100%;box-shadow:var(--shadow)}
+  .overlay.show{display:flex}
+  /* ============ PUBLIC LANDING PAGE ============================================
+     Own palette ("Electric Court": white + volt + ink), scoped under .login so it can't leak
+     into the signed-in app, which stays dark until that's re-themed separately. */
+  .login{position:fixed;inset:0;z-index:300;display:none;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    background:var(--lp-bg);color:var(--lp-ink)}
+  .login.show{display:block}
+  :root{
+    --lp-bg:#ffffff; --lp-soft:#f4f7f2; --lp-ink:#0f1410; --lp-mut:#5c6b60; --lp-line:#e2e9e0;
+    --lp-volt:#c8ff2e; --lp-volt-d:#6fb500; --lp-orange:#ff6a00;
+  }
+  .lp{font-family:inherit}
+  .lp-nav{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--lp-line);padding:11px 20px;display:flex;align-items:center;gap:18px}
+  .lp-logo{font-size:19px;font-weight:900;letter-spacing:.4px;color:var(--lp-ink)}
+  .lp-logo i{color:var(--lp-volt-d);font-style:normal}
+  .lp-links{display:flex;gap:20px;margin-left:14px}
+  .lp-links a{color:var(--lp-mut);text-decoration:none;font-size:13.5px;font-weight:700}
+  .lp-links a:hover{color:var(--lp-ink)}
+  .lp-auth{margin-left:auto;display:flex;gap:9px;align-items:center}
+  .lp-btn{border:0;cursor:pointer;font-weight:800;border-radius:999px;font-size:13.5px;padding:9px 18px;font-family:inherit}
+  .lp-btn.solid{background:var(--lp-volt-d);color:#fff}
+  .lp-btn.solid:hover{background:#5da000}
+  .lp-btn.line{background:transparent;color:var(--lp-ink);border:1.5px solid var(--lp-line)}
+  .lp-btn.line:hover{border-color:var(--lp-volt-d);color:var(--lp-volt-d)}
+  .lp-btn.mini{font-size:12px;padding:6px 12px}
+  .lp-wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+  .lp-hero{padding:62px 0 46px;text-align:center}
+  .lp-tag{display:inline-block;background:var(--lp-volt);color:#24310a;font-weight:800;font-size:12.5px;
+    padding:6px 15px;border-radius:999px;margin-bottom:20px}
+  .lp-h1{font-size:clamp(42px,8vw,78px);line-height:.95;font-weight:900;letter-spacing:-1.5px;margin:0 0 8px}
+  .lp-h1 span{display:block;color:var(--lp-volt-d)}
+  .lp-role{font-size:clamp(15px,2.4vw,19px);font-weight:800;color:var(--lp-mut);letter-spacing:3px;text-transform:uppercase;margin-bottom:20px}
+  .lp-lede{max-width:640px;margin:0 auto 26px;font-size:16.5px;line-height:1.65;color:var(--lp-mut)}
+  .lp-lede b{color:var(--lp-ink)}
+  .lp-cta{display:flex;gap:11px;justify-content:center;flex-wrap:wrap}
+  .lp-big{font-size:15px;padding:13px 26px}
+  .lp-stats{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:44px}
+  .lp-stat{background:var(--lp-soft);border:1px solid var(--lp-line);border-radius:14px;padding:16px 26px;min-width:150px}
+  .lp-stat b{display:block;font-size:24px;font-weight:900;color:var(--lp-volt-d)}
+  .lp-stat span{font-size:12px;color:var(--lp-mut);font-weight:700;letter-spacing:.4px}
+  .lp-sec{padding:52px 0;border-top:1px solid var(--lp-line)}
+  .lp-kicker{font-size:12.5px;font-weight:800;letter-spacing:2.5px;text-transform:uppercase;color:var(--lp-volt-d);margin-bottom:7px}
+  .lp-h2{font-size:clamp(28px,5vw,44px);font-weight:900;letter-spacing:-.8px;margin:0 0 18px}
+  .lp-p{font-size:15.5px;line-height:1.7;color:var(--lp-mut);max-width:720px}
+  .lp-p b{color:var(--lp-ink)}
+  .lp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:26px}
+  .lp-card{background:var(--lp-soft);border:1px solid var(--lp-line);border-radius:16px;padding:20px}
+  .lp-card h4{margin:8px 0 6px;font-size:15.5px;font-weight:800}
+  .lp-card p{margin:0;font-size:13.5px;line-height:1.6;color:var(--lp-mut)}
+  .lp-ico{font-size:24px}
+  .lp-quote{background:var(--lp-ink);color:#fff;border-radius:20px;padding:34px;margin-top:30px}
+  .lp-quote p{font-size:clamp(17px,2.6vw,23px);line-height:1.5;font-weight:700;margin:0 0 12px}
+  .lp-quote em{color:var(--lp-volt);font-style:normal}
+  .lp-quote cite{font-size:13px;color:#9fb09f;font-style:normal}
+  .lp-price{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:26px}
+  .lp-plan{border:2px solid var(--lp-line);border-radius:18px;padding:24px;background:#fff}
+  .lp-plan.hot{border-color:var(--lp-volt-d)}
+  .lp-plan h3{margin:6px 0 2px;font-size:20px;font-weight:900}
+  .lp-cost{font-size:30px;font-weight:900;color:var(--lp-volt-d);margin-bottom:2px}
+  .lp-cost small{font-size:13px;color:var(--lp-mut);font-weight:700}
+  .lp-plan ul{margin:14px 0 0;padding-left:0;list-style:none}
+  .lp-plan li{font-size:13.5px;line-height:1.55;color:var(--lp-mut);padding-left:20px;position:relative;margin-bottom:7px}
+  .lp-plan li:before{content:"\\2713";position:absolute;left:0;color:var(--lp-volt-d);font-weight:900}
+  .lp-event{background:linear-gradient(100deg,var(--lp-volt) 0%,#e9ff9a 100%);border-radius:18px;padding:26px;margin-top:26px;color:#202c06}
+  .lp-event h3{margin:4px 0 8px;font-size:21px;font-weight:900}
+  .lp-event p{margin:0 0 14px;font-size:14.5px;line-height:1.6}
+  .lp-vid{position:relative;width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;margin-top:22px;background:var(--lp-soft)}
+  .lp-vid iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+  .lp-foot{border-top:1px solid var(--lp-line);padding:26px 0 40px;text-align:center;color:var(--lp-mut);font-size:13px}
+  .lp-contact{display:flex;gap:11px;justify-content:center;flex-wrap:wrap;margin-top:20px}
+  @media(max-width:720px){.lp-links{display:none}.lp-hero{padding:40px 0 34px}}
+  /* auth card floats over the landing page */
+  .authveil{position:fixed;inset:0;z-index:340;background:rgba(8,12,8,.55);backdrop-filter:blur(3px);
+    display:none;align-items:flex-start;justify-content:center;overflow-y:auto;
+    padding:calc(env(safe-area-inset-top,0px) + 40px) 16px 40px}
+  .authveil.show{display:flex}
+  .authveil .card,.overlay .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:30px;max-width:680px;width:100%;box-shadow:var(--shadow);position:relative}
+  .authclose{position:absolute;top:12px;right:14px;background:var(--panel2);border:1px solid var(--line);
+    color:var(--muted);border-radius:999px;width:30px;height:30px;cursor:pointer;font-size:15px;line-height:1}
   .loginrow{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}
   @media(max-width:640px){.loginrow{grid-template-columns:1fr}}
   .lbox{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:20px}
@@ -278,9 +358,15 @@
 </div>
 
 <div class="login" id="login">
-  <button class="ownerbtn" onclick="toggleOwnerLogin(true)" title="Owner sign in">🔑 Owner</button>
-  <button class="ownerbtn" style="right:auto;left:18px" title="Language" onclick="setLang(nextLang())">🌐 <span id="langLbl"></span></button>
+  <!-- public marketing page: what a visitor to rxtraining.org sees before signing in.
+       Rates, coaches and events are read from live data so it can't go stale. -->
+  <div class="lp" id="lpPage"></div>
+</div>
+
+<!-- the original sign-in / sign-up / owner card, now floating over the landing page -->
+<div class="authveil" id="authveil" onclick="if(event.target===this)closeAuth()">
   <div class="card" style="max-width:420px">
+    <button class="authclose" onclick="closeAuth()" title="Close">✕</button>
     <div class="logo" style="font-size:30px;margin-bottom:4px">RX<span class="dot">.</span>TRAINING</div>
     <div id="clientPanel">
       <div class="seg" style="margin-bottom:16px">
@@ -312,7 +398,7 @@
   </div>
 </div>
 
-<div class="login" id="connect">
+<div class="overlay" id="connect">
   <div class="card" style="max-width:480px">
     <div class="logo" style="font-size:28px;margin-bottom:4px">RX<span class="dot">.</span>TRAINING</div>
     <div class="muted small" style="margin-bottom:16px">☁︎ Connect your Supabase database</div>
@@ -1181,9 +1267,9 @@ function initAuth(){
   const m=location.hash.match(/[#&]c=([a-z0-9]+)/i);
   if(m){const c=DB.customers.find(x=>x.token===m[1]);if(c)pendingClient=c.id;}
   let ss=null;try{ss=JSON.parse(sessionStorage.getItem('rx_sess'));}catch(e){}
-  if(ss&&ss.auth==='owner'){AUTH='owner';ROLE='owner';mgCoach=ss.mgCoach||'all';TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();startPolling();return;}
-  if(ss&&ss.auth==='coach'&&coachById(ss.coachAs)){AUTH='coach';ROLE='coach';coachAs=ss.coachAs;TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();startPolling();return;}
-  if(ss&&ss.auth==='client'&&custById(ss.clientAs)){AUTH='client';ROLE='client';clientAs=ss.clientAs;pickCoach=ss.pickCoach||defaultCoachId();TAB=ss.tab||'booking';$('#login').classList.remove('show');renderWhoami();switchTab();startPolling();return;}
+  if(ss&&ss.auth==='owner'){AUTH='owner';ROLE='owner';mgCoach=ss.mgCoach||'all';TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();return;}
+  if(ss&&ss.auth==='coach'&&coachById(ss.coachAs)){AUTH='coach';ROLE='coach';coachAs=ss.coachAs;TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();return;}
+  if(ss&&ss.auth==='client'&&custById(ss.clientAs)){AUTH='client';ROLE='client';clientAs=ss.clientAs;pickCoach=ss.pickCoach||defaultCoachId();TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();return;}
   let sg=null;try{sg=JSON.parse(localStorage.getItem('rx_signup'));}catch(e){}
   if(sg&&sg.id){showLogin();showSignupStatus();return;}
   showLogin();
@@ -1201,6 +1287,145 @@ function applyLoginLang(){
   const lcp=$('#loginCoachPwd');if(lcp)lcp.placeholder=t('Your password');
   const ch=$('#coachHint');if(ch)ch.textContent=t('Coaches: sign in with your name and the password set by the owner.');
 }
+/* ============================================================================
+   PUBLIC LANDING PAGE (rxtraining.org before sign-in)
+
+   Content mirrors the marketing site, but prices, coaches and the featured event are read from
+   live app data — so a rate change in Admin updates the shop window automatically instead of
+   quietly leaving a wrong number on the internet.
+   ============================================================================ */
+function openAuth(which){
+  const v=$('#authveil'); if(!v)return;
+  v.classList.add('show');
+  if(which==='signup'){ toggleOwnerLogin(false); showLoginTab('client'); openSignup(); }
+  else if(which==='owner'){ toggleOwnerLogin(true); }
+  else { toggleOwnerLogin(false); showLoginTab(which==='coach'?'coach':'client'); }
+  setTimeout(()=>{const f=v.querySelector('input:not([type=hidden])'); if(f)f.focus();},80);
+}
+function closeAuth(){
+  const v=$('#authveil'); if(v)v.classList.remove('show');
+  const sp=$('#signupPanel'), cp=$('#clientPanel');
+  if(sp&&cp&&!sp.classList.contains('hidden')){ sp.classList.add('hidden'); cp.classList.remove('hidden'); }
+}
+function lpGo(id){const el=document.getElementById(id); if(el)el.scrollIntoView({behavior:'smooth',block:'start'});}
+function renderLanding(){
+  const el=$('#lpPage'); if(!el)return;
+  const co=(activeCoaches()[0])||{};
+  const r1=coachRate(co.id,'1on1'), rg=coachRate(co.id,'group');
+  const nCoach=activeCoaches().length;
+  // next published, upcoming event doubles as the "special event" banner
+  const ev=(DB.events||[]).filter(e=>e.active!==false&&e.date>=todayISO())
+            .sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')))[0];
+  const done=DB.sessions.filter(s=>s.status==='completed').length;
+  el.innerHTML=`
+  <nav class="lp-nav">
+    <span class="lp-logo">RX<i>.</i>TRAINING</span>
+    <span class="lp-links">
+      <a href="#" onclick="lpGo('lpAbout');return false">About</a>
+      <a href="#" onclick="lpGo('lpSessions');return false">Sessions</a>
+      <a href="#" onclick="lpGo('lpFilm');return false">Highlights</a>
+      <a href="#" onclick="lpGo('lpBook');return false">Book</a>
+    </span>
+    <span class="lp-auth">
+      <button class="lp-btn line mini" title="Language" onclick="setLang(nextLang())">🌐 <span id="langLbl"></span></button>
+      <button class="lp-btn line" onclick="openAuth('client')">Sign in</button>
+      <button class="lp-btn solid" onclick="openAuth('signup')">Create account</button>
+    </span>
+  </nav>
+
+  <div class="lp-wrap">
+    <header class="lp-hero">
+      <span class="lp-tag">🏀 Lexington, MA · AAU Level Training</span>
+      <h1 class="lp-h1">${(co.name||'RAYMOND XU').split(' ')[0].toUpperCase()}<span>${(co.name||'Raymond Xu').split(' ').slice(1).join(' ').toUpperCase()}</span></h1>
+      <div class="lp-role">Basketball Trainer</div>
+      <p class="lp-lede">Training isn't just about drills. It's about the <b>love of the game</b> — the dedication, the grind, the mindset that <b>you never give up</b>. That's what every session is built on.</p>
+      <div class="lp-cta">
+        <button class="lp-btn solid lp-big" onclick="openAuth('signup')">Book a session →</button>
+        <button class="lp-btn line lp-big" onclick="lpGo('lpSessions')">See what I offer</button>
+      </div>
+      <div class="lp-stats">
+        <div class="lp-stat"><b>AAU</b><span>MIDDLESEX MAGIC</span></div>
+        <div class="lp-stat"><b>${done||'100+'}</b><span>SESSIONS COACHED</span></div>
+        <div class="lp-stat"><b>${nCoach}</b><span>TRAINER${nCoach>1?'S':''}</span></div>
+        <div class="lp-stat"><b>100%</b><span>PLAYER-LED</span></div>
+      </div>
+    </header>
+
+    <section class="lp-sec" id="lpAbout">
+      <div class="lp-kicker">Who I am</div>
+      <h2 class="lp-h2">THE TRAINER</h2>
+      <p class="lp-p">I'm a student-athlete at Lexington High School and play for <b>Middlesex Magic</b>, one of the most competitive AAU programs in Massachusetts. I know what it takes to compete at a high level because I live it — I'm in the gym grinding every week, and I bring that same energy to training.</p>
+      <p class="lp-p" style="margin-top:12px">My training isn't cookie-cutter. Every session includes <b>live game situations</b> — real reads, real decisions, real pressure. Not just drills. I build players who can actually perform when it counts.</p>
+      <div class="lp-grid">
+        <div class="lp-card"><div class="lp-ico">⚡</div><h4>Active AAU competitor</h4><p>Currently playing for Middlesex Magic — high-level competitive basketball in the Northeast.</p></div>
+        <div class="lp-card"><div class="lp-ico">🎮</div><h4>Live situation training</h4><p>Every session puts you in real game scenarios — defender on you, clock running, a decision to make.</p></div>
+        <div class="lp-card"><div class="lp-ico">🧠</div><h4>Game IQ first</h4><p>Understanding the game matters as much as the drills. I teach players to read and think on the court.</p></div>
+        <div class="lp-card"><div class="lp-ico">🔥</div><h4>Never give up</h4><p>I bring dedication and toughness to every session — and expect the same from every player I train.</p></div>
+      </div>
+      <div class="lp-quote">
+        <p>I'm not only teaching kids basketball. I'm teaching them the <em>love of the game</em> — my dedication, my grind, and the belief that <em>you never give up</em>.</p>
+        <cite>— ${co.name||'Raymond Xu'}, Trainer &amp; Middlesex Magic player</cite>
+      </div>
+    </section>
+
+    <section class="lp-sec" id="lpSessions">
+      <div class="lp-kicker">What I offer</div>
+      <h2 class="lp-h2">SESSIONS</h2>
+      <div class="lp-price">
+        <div class="lp-plan hot">
+          <div class="lp-ico">🎯</div><h3>1-on-1 Training</h3>
+          <div class="lp-cost">${money(r1)} <small>· 1 hour</small></div>
+          <p class="lp-p" style="font-size:14px">Fully personalised around your game, including live reps — real defence, real reads, real pressure.</p>
+          <ul><li>Ball handling &amp; dribbling</li><li>Shooting form &amp; mechanics</li><li>Footwork &amp; athleticism</li><li>Live 1v1 game situations</li><li>Court vision &amp; decision making</li><li>Mental toughness &amp; confidence</li></ul>
+          <button class="lp-btn solid" style="width:100%;margin-top:18px" onclick="openAuth('signup')">Book 1-on-1</button>
+        </div>
+        <div class="lp-plan">
+          <div class="lp-ico">👥</div><h3>Group Lessons</h3>
+          <div class="lp-cost">${money(rg)} <small>· per player · 1 hour</small></div>
+          <p class="lp-p" style="font-size:14px">Small groups of 2–${MAX_GROUP}. Competition between players creates live-game intensity — learn together, grow together.</p>
+          <ul><li>Live situation drills &amp; 1v1 reps</li><li>Competitive game scenarios</li><li>Team concepts &amp; spacing</li><li>On-court communication</li><li>Great value for friends &amp; teammates</li></ul>
+          <button class="lp-btn line" style="width:100%;margin-top:18px" onclick="openAuth('signup')">Book a group</button>
+        </div>
+      </div>
+      <p class="lp-p" style="margin-top:18px">📍 Available in the <b>Lexington, MA</b> area · flexible scheduling · book and manage everything in the app.</p>
+      ${ev?`<div class="lp-event">
+        <div class="lp-ico">🌟</div>
+        <h3>${ev.title}</h3>
+        <p>${(ev.detail||'').slice(0,240)}${(ev.detail||'').length>240?'…':''}</p>
+        <p style="font-weight:800">📅 ${eventWhen(ev)}${ev.location?' · 📍 '+ev.location:''}${ev.price?' · '+money(ev.price):' · Free'}</p>
+        <button class="lp-btn solid" onclick="openAuth('signup')">Reserve your spot →</button>
+      </div>`:''}
+    </section>
+
+    <section class="lp-sec" id="lpFilm">
+      <div class="lp-kicker">See me play</div>
+      <h2 class="lp-h2">AAU HIGHLIGHTS</h2>
+      <p class="lp-p">Watch me compete at the AAU level with <b>Middlesex Magic</b>. This is the level of play I bring to every training session.</p>
+      <div class="lp-vid"><iframe src="https://www.youtube.com/embed/1odU-4Ml2sw" title="AAU highlights" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe></div>
+    </section>
+
+    <section class="lp-sec" id="lpBook">
+      <div class="lp-kicker">Book a session</div>
+      <h2 class="lp-h2">LET'S WORK</h2>
+      <p class="lp-p">Create an account to see live availability, book 1-on-1 or group sessions, track payments, and get video feedback from your coach after every session.</p>
+      <div class="lp-cta" style="justify-content:flex-start;margin-top:22px">
+        <button class="lp-btn solid lp-big" onclick="openAuth('signup')">Create your account</button>
+        <button class="lp-btn line lp-big" onclick="openAuth('client')">I already have one</button>
+      </div>
+      <div class="lp-contact">
+        <a class="lp-btn line" href="tel:3399270851">📱 (339) 927-0851</a>
+        <a class="lp-btn line" href="mailto:xuraymond777@gmail.com">✉️ xuraymond777@gmail.com</a>
+      </div>
+    </section>
+
+    <footer class="lp-foot">
+      © ${new Date().getFullYear()} RX Training · ${co.name||'Raymond Xu'} · Lexington, MA · Built with 🏀
+      <div style="margin-top:10px"><button class="lp-btn line mini" onclick="openAuth('coach')">Coach sign in</button>
+        <button class="lp-btn line mini" onclick="openAuth('owner')">🔑 Owner</button></div>
+    </footer>
+  </div>`;
+  try{ set('langLbl',LANG_NAMES[LANG]||'EN'); }catch(e){}
+}
 function showLogin(){
   AUTH=null;renderWhoami();
   if(pendingClient){const pc=custById(pendingClient);if(pc){$('#loginClient').value=pc.name;$('#clientHint').textContent=(LANG==='zh'?('欢迎回来，'+firstName(pc.name)+' — 请输入密码。'):('Welcome back, '+firstName(pc.name)+' — enter your password.'));}}
@@ -1212,9 +1437,12 @@ function showLogin(){
   applyLoginLang();
   showLoginTab('client');
   toggleOwnerLogin(false);
+  renderLanding();                 // repaint marketing page (picks up live rates/events)
+  closeAuth();                     // landing first — the card opens only on Sign in / Create account
   $('#login').classList.add('show');
 }
 function openSignup(){
+  const _v=$('#authveil'); if(_v)_v.classList.add('show');
   if($('#clientPanel'))$('#clientPanel').classList.add('hidden');
   if($('#ownerPanel'))$('#ownerPanel').classList.add('hidden');
   if($('#signupPanel'))$('#signupPanel').classList.remove('hidden');
@@ -1306,7 +1534,7 @@ function ownerLogin(){
   if(!DB.settings.ownerPwd){if((v||'').length<4)return flash('Choose a password with 4+ characters',true);DB.settings.ownerPwd=v;save();flash('Owner password set 🔑');}
   else if(v!==DB.settings.ownerPwd)return flash('Incorrect password',true);
   AUTH='owner';ROLE='owner';mgCoach='all';TAB='booking';
-  $('#login').classList.remove('show');renderWhoami();switchTab();startPolling();
+  $('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();
 }
 function clientLoginPick(){
   const name=($('#loginClient').value||'').trim().toLowerCase();
@@ -1336,12 +1564,12 @@ function loginAsClient(id){
   try{localStorage.removeItem('rx_signup');}catch(e){}
   if(signupTimer){clearInterval(signupTimer);signupTimer=null;}
   AUTH='client';ROLE='client';clientAs=id;pickCoach=defaultCoachId();TAB='booking';
-  $('#login').classList.remove('show');renderWhoami();switchTab();startPolling();
+  $('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();
   stampLogin('client',id);
 }
 function loginAsCoach(id){
   AUTH='coach';ROLE='coach';coachAs=id;TAB='booking';
-  $('#login').classList.remove('show');renderWhoami();switchTab();startPolling();
+  $('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();
   stampLogin('coach',id);
   flash('Signed in as coach 🏀');
 }
