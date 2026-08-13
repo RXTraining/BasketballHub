@@ -223,7 +223,10 @@
   /* ============ PUBLIC LANDING PAGE ============================================
      Own palette ("Electric Court": white + volt + ink), scoped under .login so it can't leak
      into the signed-in app, which stays dark until that's re-themed separately. */
-  .login{position:fixed;inset:0;z-index:300;display:none;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  /* the landing page is its own scroll container; overscroll-behavior stops iOS handing the
+   gesture to the page underneath, which was leaving the page occasionally stuck */
+  .login{position:fixed;inset:0;z-index:300;display:none;overflow-y:auto;overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
     background:var(--lp-bg);color:var(--lp-ink);padding-bottom:env(safe-area-inset-bottom,0px)}
   .login.show{display:block}
   :root{
@@ -292,8 +295,25 @@
   .lp-vid{position:relative;width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;margin-top:22px;background:var(--lp-soft)}
   .lp-vid iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
   /* ---- brand mark: the dot pulses, a small bit of life without being noisy ---- */
-  .lp-dot{font-style:normal;color:var(--lp-volt-d);display:inline-block;animation:lpPulse 2.4s ease-in-out infinite}
-  @keyframes lpPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.25);opacity:.65}}
+  .lp-dot{font-style:normal;display:inline-block;font-size:.62em;vertical-align:.12em;margin:0 .04em;
+    animation:lpBounce 1.1s cubic-bezier(.3,.8,.4,1) infinite}
+  @keyframes lpBounce{
+    0%   {transform:translateY(0)      scale(1,1)}
+    28%  {transform:translateY(-.34em) scale(.94,1.06)}
+    52%  {transform:translateY(0)      scale(1.1,.9)}
+    68%  {transform:translateY(-.10em) scale(.98,1.02)}
+    100% {transform:translateY(0)      scale(1,1)}}
+  .lp-dot.swap{animation:lpSwap .42s ease}
+  @keyframes lpSwap{0%{transform:scale(1) rotate(0)}45%{transform:scale(.35) rotate(180deg);opacity:.25}100%{transform:scale(1) rotate(360deg);opacity:1}}
+  /* mobile-only section jumper — the text nav is hidden below 720px */
+  .lp-jump{display:none;gap:7px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:9px 14px;
+    border-bottom:1px solid var(--lp-line);background:var(--lp-soft);position:sticky;
+    top:calc(52px + env(safe-area-inset-top,0px));z-index:19;scrollbar-width:none}
+  .lp-jump::-webkit-scrollbar{display:none}
+  .lp-jump button{flex:none;background:#fff;border:1.5px solid var(--lp-line);color:var(--lp-ink);
+    font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:999px;cursor:pointer;font-family:inherit}
+  .lp-jump button:active{border-color:var(--lp-volt-d);color:var(--lp-volt-d)}
+  @media(max-width:720px){.lp-jump{display:flex}}
   /* ---- scroll-reveal: elements rise in as they enter the viewport ---- */
   .reveal{opacity:0;transform:translateY(16px)}
   .reveal.in{animation:lpUp .55s cubic-bezier(.22,.9,.3,1) forwards}
@@ -497,6 +517,54 @@ const ZH={
   'Your prepaid sessions':'您的预付课程',
   'No package yet — ask the Owner about prepaid packs.':'暂无套餐 — 可向管理员咨询预付套餐。',
   'Request a session':'预约课程','Session type':'课程类型','Date':'日期','Comment (optional)':'备注（可选）',
+  /* --- public landing page --- */
+  'Train like you play':'像比赛一样训练',
+  'Book a session →':'预约课程 →',
+  'Meet the coaches':'认识教练团队',
+  'Sign in':'登录',
+  'Create account':'注册账号',
+  'About':'关于',
+  'Sessions':'课程',
+  'Coaches':'教练',
+  'Sports':'项目',
+  'Highlights':'精彩集锦',
+  'Book':'预约',
+  'COMPETITION LEVEL':'竞技水平',
+  'SESSIONS COACHED':'已完成课程',
+  'PLAYER-LED':'球员主导',
+  'COACH':'教练',
+  'COACHES':'教练',
+  'Who we are':'关于我们',
+  'THE RX APPROACH':'RX 训练理念',
+  'Active AAU competitor':'现役 AAU 球员',
+  'Live situation training':'实战情境训练',
+  'Game IQ first':'球商优先',
+  'Never give up':'永不放弃',
+  'The team':'教练团队',
+  'YOUR COACHES':'你的教练',
+  'What\'s next':'未来规划',
+  'MORE THAN BASKETBALL':'不止于篮球',
+  'Now training':'已开课',
+  'Coming soon':'即将开放',
+  'What I offer':'课程内容',
+  'SESSIONS':'课程',
+  '1-on-1 Training':'一对一训练',
+  'Group Lessons':'小组课',
+  '1 hour':'1 小时',
+  'per player':'每人',
+  'Book 1-on-1':'预约一对一',
+  'Book a group':'预约小组课',
+  'Book with':'预约',
+  'See me play':'观看比赛',
+  'AAU HIGHLIGHTS':'AAU 精彩集锦',
+  'Book a session':'预约课程',
+  'LET\'S WORK':'开始训练吧',
+  'Create your account':'创建账号',
+  'I already have one':'我已有账号',
+  'Reserve your spot →':'立即报名 →',
+  'Get in touch →':'联系我们 →',
+  'Coach sign in':'教练登录',
+  'Founded by':'创办人',
   'Request Session':'提交预约','Your packages':'您的套餐',
   'To buy a package, ask the Owner — your used/total balance updates automatically.':'购买套餐请联系管理员 — 已用/总数会自动更新。',
   'Today':'今天','Pending — awaiting confirmation':'待确认','Your booked sessions':'已预约课程',
@@ -546,6 +614,54 @@ const KO={
   'Your prepaid sessions':'선불 수업',
   'No package yet — ask the Owner about prepaid packs.':'아직 패키지가 없습니다 — 관리자에게 선불 패키지를 문의하세요.',
   'Request a session':'수업 예약','Session type':'수업 유형','Date':'날짜','Comment (optional)':'메모 (선택)',
+  /* --- public landing page --- */
+  'Train like you play':'경기처럼 훈련하라',
+  'Book a session →':'세션 예약 →',
+  'Meet the coaches':'코치진 만나기',
+  'Sign in':'로그인',
+  'Create account':'계정 만들기',
+  'About':'소개',
+  'Sessions':'세션',
+  'Coaches':'코치',
+  'Sports':'종목',
+  'Highlights':'하이라이트',
+  'Book':'예약',
+  'COMPETITION LEVEL':'경쟁 수준',
+  'SESSIONS COACHED':'진행한 세션',
+  'PLAYER-LED':'선수 주도',
+  'COACH':'코치',
+  'COACHES':'코치',
+  'Who we are':'우리는',
+  'THE RX APPROACH':'RX 트레이닝 방식',
+  'Active AAU competitor':'현역 AAU 선수',
+  'Live situation training':'실전 상황 훈련',
+  'Game IQ first':'게임 IQ 우선',
+  'Never give up':'포기하지 않는 자세',
+  'The team':'팀',
+  'YOUR COACHES':'당신의 코치',
+  'What\'s next':'다음 단계',
+  'MORE THAN BASKETBALL':'농구 그 이상',
+  'Now training':'운영 중',
+  'Coming soon':'곧 시작',
+  'What I offer':'제공 프로그램',
+  'SESSIONS':'세션',
+  '1-on-1 Training':'1:1 트레이닝',
+  'Group Lessons':'그룹 레슨',
+  '1 hour':'1시간',
+  'per player':'1인당',
+  'Book 1-on-1':'1:1 예약',
+  'Book a group':'그룹 예약',
+  'Book with':'예약:',
+  'See me play':'경기 보기',
+  'AAU HIGHLIGHTS':'AAU 하이라이트',
+  'Book a session':'세션 예약',
+  'LET\'S WORK':'시작해 봅시다',
+  'Create your account':'계정 만들기',
+  'I already have one':'이미 계정이 있어요',
+  'Reserve your spot →':'자리 예약 →',
+  'Get in touch →':'문의하기 →',
+  'Coach sign in':'코치 로그인',
+  'Founded by':'창립자',
   'Request Session':'예약 요청','Your packages':'내 패키지',
   'To buy a package, ask the Owner — your used/total balance updates automatically.':'패키지 구매는 관리자에게 문의하세요 — 사용/총 잔액은 자동으로 업데이트됩니다.',
   'Today':'오늘','Pending — awaiting confirmation':'확인 대기 중','Your booked sessions':'예약된 수업',
@@ -590,6 +706,54 @@ const JA={
   'Your prepaid sessions':'プリペイドセッション',
   'No package yet — ask the Owner about prepaid packs.':'パッケージがありません — 管理者にプリペイドパックについてお問い合わせください。',
   'Request a session':'セッション予約','Session type':'セッション種別','Date':'日付','Comment (optional)':'コメント（任意）',
+  /* --- public landing page --- */
+  'Train like you play':'試合のように鍛える',
+  'Book a session →':'セッションを予約 →',
+  'Meet the coaches':'コーチ陣を見る',
+  'Sign in':'ログイン',
+  'Create account':'アカウント作成',
+  'About':'紹介',
+  'Sessions':'セッション',
+  'Coaches':'コーチ',
+  'Sports':'競技',
+  'Highlights':'ハイライト',
+  'Book':'予約',
+  'COMPETITION LEVEL':'競技レベル',
+  'SESSIONS COACHED':'実施セッション',
+  'PLAYER-LED':'選手主導',
+  'COACH':'コーチ',
+  'COACHES':'コーチ',
+  'Who we are':'私たちについて',
+  'THE RX APPROACH':'RX のトレーニング理念',
+  'Active AAU competitor':'現役 AAU 選手',
+  'Live situation training':'実戦形式のトレーニング',
+  'Game IQ first':'ゲーム IQ 重視',
+  'Never give up':'諦めない姿勢',
+  'The team':'チーム',
+  'YOUR COACHES':'あなたのコーチ',
+  'What\'s next':'これから',
+  'MORE THAN BASKETBALL':'バスケットボールだけじゃない',
+  'Now training':'開講中',
+  'Coming soon':'近日開始',
+  'What I offer':'提供内容',
+  'SESSIONS':'セッション',
+  '1-on-1 Training':'1:1 トレーニング',
+  'Group Lessons':'グループレッスン',
+  '1 hour':'1時間',
+  'per player':'1人あたり',
+  'Book 1-on-1':'1:1 を予約',
+  'Book a group':'グループを予約',
+  'Book with':'予約：',
+  'See me play':'プレーを見る',
+  'AAU HIGHLIGHTS':'AAU ハイライト',
+  'Book a session':'セッション予約',
+  'LET\'S WORK':'さあ始めよう',
+  'Create your account':'アカウントを作成',
+  'I already have one':'すでに持っています',
+  'Reserve your spot →':'枠を確保 →',
+  'Get in touch →':'お問い合わせ →',
+  'Coach sign in':'コーチログイン',
+  'Founded by':'創設者',
   'Request Session':'予約する','Your packages':'マイパッケージ',
   'To buy a package, ask the Owner — your used/total balance updates automatically.':'パッケージ購入は管理者へ — 使用/合計残高は自動更新されます。',
   'Today':'今日','Pending — awaiting confirmation':'確認待ち','Your booked sessions':'予約済みセッション',
@@ -1398,7 +1562,7 @@ function lpCoachCards(){
       ${c.tagline?`<div class="lp-coach-tag">${c.tagline}</div>`:''}
       ${bio?`<p class="lp-coach-bio">${bio.length>210?bio.slice(0,210)+'…':bio}</p>`:''}
       <div class="lp-coach-rates"><span>1:1 <b>${money(coachRate(c.id,'1on1'))}</b>/hr</span><span>Group <b>${money(coachRate(c.id,'group'))}</b>/player</span></div>
-      <button class="lp-btn solid" style="width:100%;margin-top:14px" onclick="openAuth('book')">Book with ${firstName(c.name)}</button>
+      <button class="lp-btn solid" style="width:100%;margin-top:14px" onclick="openAuth('book')">${t('Book with')} ${firstName(c.name)}</button>
     </article>`;
   }).join('');
 }
@@ -1411,7 +1575,7 @@ function lpSportChips(){
     const on=!!live[sp.toLowerCase()];
     return `<div class="lp-sport ${on?'on':''} reveal" style="animation-delay:${i*70}ms">
       <span class="lp-sport-ico">${icon[sp.toLowerCase()]||'🏅'}</span>
-      <b>${sp}</b><span>${on?'Now training':'Coming soon'}</span></div>`;
+      <b>${sp}</b><span>${on?t('Now training'):t('Coming soon')}</span></div>`;
   }).join('');
 }
 function lpGo(id){const el=document.getElementById(id); if(el)el.scrollIntoView({behavior:'smooth',block:'start'});}
@@ -1428,46 +1592,54 @@ function renderLanding(){
   <nav class="lp-nav">
     <span class="lp-logo">RX<i>.</i>TRAINING</span>
     <span class="lp-links">
-      <a href="#" onclick="lpGo('lpAbout');return false">About</a>
-      <a href="#" onclick="lpGo('lpSessions');return false">Sessions</a>
-      <a href="#" onclick="lpGo('lpFilm');return false">Highlights</a>
-      <a href="#" onclick="lpGo('lpBook');return false">Book</a>
+      <a href="#" onclick="lpGo('lpAbout');return false">${t('About')}</a>
+      <a href="#" onclick="lpGo('lpSessions');return false">${t('Sessions')}</a>
+      <a href="#" onclick="lpGo('lpFilm');return false">${t('Highlights')}</a>
+      <a href="#" onclick="lpGo('lpBook');return false">${t('Book')}</a>
     </span>
     <span class="lp-auth">
       <button class="lp-btn line mini" title="Language" onclick="setLang(nextLang())">🌐 <span id="langLbl"></span></button>
-      <button class="lp-btn line" onclick="openAuth('client')">Sign in</button>
-      <button class="lp-btn solid" onclick="openAuth('signup')">Create account</button>
+      <button class="lp-btn line" onclick="openAuth('client')">${t('Sign in')}</button>
+      <button class="lp-btn solid" onclick="openAuth('signup')">${t('Create account')}</button>
     </span>
   </nav>
+  <!-- portrait phones hide the text nav, so give them a scrollable jump rail instead -->
+  <div class="lp-jump">
+    <button onclick="lpGo('lpAbout')">${t('About')}</button>
+    <button onclick="lpGo('lpSessions')">${t('Sessions')}</button>
+    <button onclick="lpGo('lpCoaches')">${t('Coaches')}</button>
+    <button onclick="lpGo('lpSports')">${t('Sports')}</button>
+    <button onclick="lpGo('lpFilm')">${t('Highlights')}</button>
+    <button onclick="lpGo('lpBook')">${t('Book')}</button>
+  </div>
 
   <div class="lp-wrap">
     <header class="lp-hero">
-      <span class="lp-tag reveal">🏀 Lexington, MA · Player-Led Athletic Training</span>
-      <h1 class="lp-h1 reveal">RX<i class="lp-dot">.</i>TRAINING</h1>
-      <div class="lp-role reveal">Train like you play</div>
+      <h1 class="lp-h1 reveal">RX<i class="lp-dot" id="lpBall">🏀</i>TRAINING</h1>
+      <div class="lp-role reveal">${t('Train like you play')}</div>
       <p class="lp-lede reveal">Founded by <b>${co.name||'Raymond Xu'}</b> — an active AAU competitor, not a coach who stopped playing years ago. Every session is built on the <b>love of the game</b>: the dedication, the grind, and the belief that <b>you never give up</b>.</p>
       <div class="lp-cta reveal">
-        <button class="lp-btn solid lp-big" onclick="openAuth('book')">Book a session →</button>
-        <button class="lp-btn line lp-big" onclick="lpGo('lpCoaches')">Meet the coaches</button>
+        <button class="lp-btn solid lp-big" onclick="openAuth('book')">${t('Book a session →')}</button>
+        <button class="lp-btn line lp-big" onclick="lpGo('lpCoaches')">${t('Meet the coaches')}</button>
       </div>
       <div class="lp-stats">
-        <div class="lp-stat reveal"><b>AAU</b><span>COMPETITION LEVEL</span></div>
-        <div class="lp-stat reveal"><b>${done||'100+'}</b><span>SESSIONS COACHED</span></div>
-        <div class="lp-stat reveal"><b>${nCoach}</b><span>COACH${nCoach>1?'ES':''}</span></div>
-        <div class="lp-stat reveal"><b>100%</b><span>PLAYER-LED</span></div>
+        <div class="lp-stat reveal"><b>AAU</b><span>${t('COMPETITION LEVEL')}</span></div>
+        <div class="lp-stat reveal"><b>${done||'100+'}</b><span>${t('SESSIONS COACHED')}</span></div>
+        <div class="lp-stat reveal"><b>${nCoach}</b><span>${nCoach>1?t('COACHES'):t('COACH')}</span></div>
+        <div class="lp-stat reveal"><b>100%</b><span>${t('PLAYER-LED')}</span></div>
       </div>
     </header>
 
     <section class="lp-sec" id="lpAbout">
-      <div class="lp-kicker">Who we are</div>
-      <h2 class="lp-h2">THE RX APPROACH</h2>
+      <div class="lp-kicker">${t('Who we are')}</div>
+      <h2 class="lp-h2">${t('THE RX APPROACH')}</h2>
       <p class="lp-p">RX.TRAINING was founded by <b>${co.name||'Raymond Xu'}</b>, a student-athlete at Lexington High School playing for <b>Middlesex Magic</b> — one of the most competitive AAU programs in Massachusetts. The idea was simple: players learn fastest from people still in the gym competing.</p>
       <p class="lp-p" style="margin-top:12px">That standard now runs across every coach on the roster. Training here isn't cookie-cutter — every session includes <b>live game situations</b>: real reads, real decisions, real pressure. Not just drills. We build athletes who perform when it counts.</p>
       <div class="lp-grid">
-        <div class="lp-card"><div class="lp-ico">⚡</div><h4>Active AAU competitor</h4><p>Currently playing for Middlesex Magic — high-level competitive basketball in the Northeast.</p></div>
-        <div class="lp-card"><div class="lp-ico">🎮</div><h4>Live situation training</h4><p>Every session puts you in real game scenarios — defender on you, clock running, a decision to make.</p></div>
-        <div class="lp-card"><div class="lp-ico">🧠</div><h4>Game IQ first</h4><p>Understanding the game matters as much as the drills. I teach players to read and think on the court.</p></div>
-        <div class="lp-card"><div class="lp-ico">🔥</div><h4>Never give up</h4><p>I bring dedication and toughness to every session — and expect the same from every player I train.</p></div>
+        <div class="lp-card"><div class="lp-ico">⚡</div><h4>${t('Active AAU competitor')}</h4><p>Currently playing for Middlesex Magic — high-level competitive basketball in the Northeast.</p></div>
+        <div class="lp-card"><div class="lp-ico">🎮</div><h4>${t('Live situation training')}</h4><p>Every session puts you in real game scenarios — defender on you, clock running, a decision to make.</p></div>
+        <div class="lp-card"><div class="lp-ico">🧠</div><h4>${t('Game IQ first')}</h4><p>Understanding the game matters as much as the drills. I teach players to read and think on the court.</p></div>
+        <div class="lp-card"><div class="lp-ico">🔥</div><h4>${t('Never give up')}</h4><p>I bring dedication and toughness to every session — and expect the same from every player I train.</p></div>
       </div>
       <div class="lp-quote">
         <p>I'm not only teaching kids basketball. I'm teaching them the <em>love of the game</em> — my dedication, my grind, and the belief that <em>you never give up</em>.</p>
@@ -1476,22 +1648,22 @@ function renderLanding(){
     </section>
 
     <section class="lp-sec" id="lpSessions">
-      <div class="lp-kicker">What I offer</div>
-      <h2 class="lp-h2">SESSIONS</h2>
+      <div class="lp-kicker">${t('What I offer')}</div>
+      <h2 class="lp-h2">${t('SESSIONS')}</h2>
       <div class="lp-price">
         <div class="lp-plan hot">
-          <div class="lp-ico">🎯</div><h3>1-on-1 Training</h3>
-          <div class="lp-cost">${money(r1)} <small>· 1 hour</small></div>
+          <div class="lp-ico">🎯</div><h3>${t('1-on-1 Training')}</h3>
+          <div class="lp-cost">${money(r1)} <small>· ${t('1 hour')}</small></div>
           <p class="lp-p" style="font-size:14px">Fully personalised around your game, including live reps — real defence, real reads, real pressure.</p>
           <ul><li>Ball handling &amp; dribbling</li><li>Shooting form &amp; mechanics</li><li>Footwork &amp; athleticism</li><li>Live 1v1 game situations</li><li>Court vision &amp; decision making</li><li>Mental toughness &amp; confidence</li></ul>
-          <button class="lp-btn solid" style="width:100%;margin-top:18px" onclick="openAuth('book')">Book 1-on-1</button>
+          <button class="lp-btn solid" style="width:100%;margin-top:18px" onclick="openAuth('book')">${t('Book 1-on-1')}</button>
         </div>
         <div class="lp-plan">
-          <div class="lp-ico">👥</div><h3>Group Lessons</h3>
-          <div class="lp-cost">${money(rg)} <small>· per player · 1 hour</small></div>
+          <div class="lp-ico">👥</div><h3>${t('Group Lessons')}</h3>
+          <div class="lp-cost">${money(rg)} <small>· ${t('per player')} · ${t('1 hour')}</small></div>
           <p class="lp-p" style="font-size:14px">Small groups of 2–${MAX_GROUP}. Competition between players creates live-game intensity — learn together, grow together.</p>
           <ul><li>Live situation drills &amp; 1v1 reps</li><li>Competitive game scenarios</li><li>Team concepts &amp; spacing</li><li>On-court communication</li><li>Great value for friends &amp; teammates</li></ul>
-          <button class="lp-btn line" style="width:100%;margin-top:18px" onclick="openAuth('book')">Book a group</button>
+          <button class="lp-btn line" style="width:100%;margin-top:18px" onclick="openAuth('book')">${t('Book a group')}</button>
         </div>
       </div>
       <p class="lp-p" style="margin-top:18px">📍 Available in the <b>Lexington, MA</b> area · flexible scheduling · book and manage everything in the app.</p>
@@ -1500,39 +1672,39 @@ function renderLanding(){
         <h3>${ev.title}</h3>
         <p>${(ev.detail||'').slice(0,240)}${(ev.detail||'').length>240?'…':''}</p>
         <p style="font-weight:800">📅 ${eventWhen(ev)}${ev.location?' · 📍 '+ev.location:''}${ev.price?' · '+money(ev.price):' · Free'}</p>
-        <button class="lp-btn solid" onclick="openAuth('book')">Reserve your spot →</button>
+        <button class="lp-btn solid" onclick="openAuth('book')">${t('Reserve your spot →')}</button>
       </div>`:''}
     </section>
 
     <section class="lp-sec" id="lpCoaches">
-      <div class="lp-kicker">The team</div>
-      <h2 class="lp-h2">YOUR COACHES</h2>
+      <div class="lp-kicker">${t('The team')}</div>
+      <h2 class="lp-h2">${t('YOUR COACHES')}</h2>
       <p class="lp-p">Every coach here still competes. You're not learning from someone who stopped playing years ago.</p>
       <div class="lp-coaches">${lpCoachCards()}</div>
     </section>
 
     <section class="lp-sec" id="lpSports">
-      <div class="lp-kicker">What's next</div>
-      <h2 class="lp-h2">MORE THAN BASKETBALL</h2>
+      <div class="lp-kicker">${t("What's next")}</div>
+      <h2 class="lp-h2">${t('MORE THAN BASKETBALL')}</h2>
       <p class="lp-p">RX is built to grow. Same app, same coaching standard — new sports as we bring the right coaches on.</p>
       <div class="lp-sports">${lpSportChips()}</div>
-      <p class="lp-p" style="margin-top:16px;font-size:14px">Coach in one of these and want to run sessions on RX? <a href="mailto:xuraymond777@gmail.com" style="color:var(--lp-volt-d);font-weight:800">Get in touch →</a></p>
+      <p class="lp-p" style="margin-top:16px;font-size:14px">Coach in one of these and want to run sessions on RX? <a href="mailto:xuraymond777@gmail.com" style="color:var(--lp-volt-d);font-weight:800">${t('Get in touch →')}</a></p>
     </section>
 
     <section class="lp-sec" id="lpFilm">
-      <div class="lp-kicker">See me play</div>
-      <h2 class="lp-h2">AAU HIGHLIGHTS</h2>
+      <div class="lp-kicker">${t('See me play')}</div>
+      <h2 class="lp-h2">${t('AAU HIGHLIGHTS')}</h2>
       <p class="lp-p">Watch me compete at the AAU level with <b>Middlesex Magic</b>. This is the level of play I bring to every training session.</p>
       <div class="lp-vid"><iframe src="https://www.youtube.com/embed/1odU-4Ml2sw" title="AAU highlights" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe></div>
     </section>
 
     <section class="lp-sec" id="lpBook">
-      <div class="lp-kicker">Book a session</div>
-      <h2 class="lp-h2">LET'S WORK</h2>
+      <div class="lp-kicker">${t('Book a session')}</div>
+      <h2 class="lp-h2">${t("LET'S WORK")}</h2>
       <p class="lp-p">Create an account to see live availability, book 1-on-1 or group sessions, track payments, and get video feedback from your coach after every session.</p>
       <div class="lp-cta" style="justify-content:flex-start;margin-top:22px">
-        <button class="lp-btn solid lp-big" onclick="openAuth('signup')">Create your account</button>
-        <button class="lp-btn line lp-big" onclick="openAuth('client')">I already have one</button>
+        <button class="lp-btn solid lp-big" onclick="openAuth('signup')">${t('Create your account')}</button>
+        <button class="lp-btn line lp-big" onclick="openAuth('client')">${t('I already have one')}</button>
       </div>
       <div class="lp-contact">
         <a class="lp-btn line" href="tel:3399270851">📱 (339) 927-0851</a>
@@ -1542,7 +1714,7 @@ function renderLanding(){
 
     <footer class="lp-foot">
       © ${new Date().getFullYear()} RX Training · ${co.name||'Raymond Xu'} · Lexington, MA · Built with 🏀
-      <div style="margin-top:10px"><button class="lp-btn line mini" onclick="openAuth('coach')">Coach sign in</button>
+      <div style="margin-top:10px"><button class="lp-btn line mini" onclick="openAuth('coach')">${t('Coach sign in')}</button>
         <button class="lp-btn line mini" onclick="openAuth('owner')">🔑 Owner</button></div>
     </footer>
   </div>`;
@@ -1553,18 +1725,47 @@ function renderLanding(){
    it isn't, so the page can never end up with invisible content. The CSS honours
    prefers-reduced-motion, so this stays still for anyone who's asked for that. */
 function lpAnimate(){
+  const root=$('#login');
   const els=[...document.querySelectorAll('#lpPage .reveal')];
-  if(!els.length)return;
-  if(!('IntersectionObserver' in window)){ els.forEach(e=>e.classList.add('in')); return; }
-  const io=new IntersectionObserver((entries)=>{
-    entries.forEach(en=>{ if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); } });
-  },{rootMargin:'0px 0px -8% 0px',threshold:.08});
-  els.forEach(e=>io.observe(e));
-  // anything already on screen at load shouldn't wait for a scroll event
-  setTimeout(()=>els.forEach(e=>{
-    const r=e.getBoundingClientRect();
-    if(r.top<window.innerHeight&&r.bottom>0)e.classList.add('in');
-  }),60);
+  if(els.length){
+    if(!('IntersectionObserver' in window)){ els.forEach(e=>e.classList.add('in')); }
+    else{
+      // root must be the scrolling element (#login), not the viewport — the landing page scrolls
+      // inside a fixed container, and with the default root some cards never triggered and stayed
+      // invisible, which looks exactly like the page failing to scroll.
+      const io=new IntersectionObserver((ents)=>{
+        ents.forEach(en=>{ if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); } });
+      },{root:root||null,rootMargin:'0px 0px -6% 0px',threshold:.05});
+      els.forEach(e=>io.observe(e));
+      // whatever is already on screen shouldn't wait for a scroll…
+      setTimeout(()=>els.forEach(e=>{
+        const r=e.getBoundingClientRect();
+        if(r.top<window.innerHeight&&r.bottom>0)e.classList.add('in');
+      }),60);
+      // …and nothing may stay hidden indefinitely, whatever the observer does
+      setTimeout(()=>els.forEach(e=>e.classList.add('in')),1600);
+    }
+  }
+  lpBallCycle();
+}
+/* The brand dot is a bouncing ball that swaps sport every couple of seconds — a small nod to the
+   multi-sport roadmap. Single interval, cleared and restarted on each render so repeated repaints
+   can't stack timers. */
+let lpBallTimer=null;
+const LP_BALLS=['🏀','⚽','🏈','⚾','🎾','⛳','🏐','🏓'];
+function lpBallCycle(){
+  if(lpBallTimer){clearInterval(lpBallTimer);lpBallTimer=null;}
+  const el=document.getElementById('lpBall'); if(!el)return;
+  try{ if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return; }catch(e){}
+  let i=0;
+  lpBallTimer=setInterval(()=>{
+    const node=document.getElementById('lpBall');
+    if(!node){clearInterval(lpBallTimer);lpBallTimer=null;return;}
+    i=(i+1)%LP_BALLS.length;
+    node.classList.add('swap');
+    setTimeout(()=>{ node.textContent=LP_BALLS[i]; },180);   // swap at the midpoint of the flip
+    setTimeout(()=>{ node.classList.remove('swap'); },430);
+  },2200);
 }
 function showLogin(){
   AUTH=null;renderWhoami();
