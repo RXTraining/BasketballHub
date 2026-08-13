@@ -4,46 +4,58 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>RX.TRAINING</title>
-<meta name="theme-color" content="#ff6a00">
+<meta name="theme-color" content="#ffffff">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- "default" (not black-translucent): keeps the web view BELOW the iOS status bar. With
+     black-translucent the page renders under the clock/wifi strip, where iOS swallows taps —
+     the top row of buttons became impossible to press on an installed iPhone app. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="RX.TRAINING">
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link id="appleIcon" rel="apple-touch-icon">
 <link id="favIcon" rel="icon" type="image/png">
 <script>
-/* generate an orange "RX" home-screen icon so the iOS icon isn't a black screenshot */
+/* Draws the home-screen / favicon icon at runtime so iOS never falls back to a screenshot.
+   Electric Court palette — volt field, ink monogram — matching icon-192/512.png and the site. */
 (function(){try{
-  var c=document.createElement('canvas');c.width=c.height=180;var x=c.getContext('2d');
-  var g=x.createLinearGradient(0,0,180,180);g.addColorStop(0,'#0a0a0c');g.addColorStop(1,'#1c1c22');
-  x.fillStyle=g;x.fillRect(0,0,180,180);
-  x.textAlign='center';x.textBaseline='middle';
-  // big white RX up top
-  x.fillStyle='#ffffff';x.font='800 88px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
-  x.shadowColor='rgba(0,0,0,.35)';x.shadowBlur=6;x.shadowOffsetY=2;
-  x.fillText('RX',90,72);
-  x.shadowColor='transparent';x.shadowBlur=0;x.shadowOffsetY=0;
-  // green dot separator
-  x.fillStyle='#39d98a';x.beginPath();x.arc(90,118,6,0,7);x.fill();
-  // TRAINING below, orange, spaced
-  x.fillStyle='#ff6a00';x.font='700 20px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
-  try{x.letterSpacing='3px';}catch(e){}
-  x.fillText('TRAINING',91,146);
-  try{x.letterSpacing='0px';}catch(e){}
-  var url=c.toDataURL('image/png');
-  var a=document.getElementById('appleIcon');if(a)a.href=url;
-  var f=document.getElementById('favIcon');if(f)f.href=url;
+  function draw(px){
+    var c=document.createElement('canvas');c.width=c.height=px;var x=c.getContext('2d');
+    var g=x.createLinearGradient(0,0,0,px);g.addColorStop(0,'#c8ff2e');g.addColorStop(1,'#6bAF00');
+    x.fillStyle=g;x.fillRect(0,0,px,px);
+    x.textAlign='center';x.textBaseline='middle';x.fillStyle='#0f1410';
+    x.font='800 '+Math.round(px*0.46)+'px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
+    x.fillText('RX',px/2,px*0.42);
+    var bw=px*0.26,bh=Math.max(2,px*0.018);
+    x.fillRect(px/2-bw/2,px*0.60-bh/2,bw,bh);
+    x.fillStyle='#1a2608';
+    x.font='800 '+Math.round(px*0.093)+'px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
+    var t='TRAINING',sp=px*0.012,w=0,i;
+    for(i=0;i<t.length;i++)w+=x.measureText(t[i]).width+sp; w-=sp;
+    var cx=px/2-w/2;
+    for(i=0;i<t.length;i++){x.textAlign='left';x.fillText(t[i],cx,px*0.715);cx+=x.measureText(t[i]).width+sp;}
+    return c.toDataURL('image/png');
+  }
+  var a=document.getElementById('appleIcon'); if(a)a.href=draw(180);
+  var f=document.getElementById('favIcon');   if(f)f.href=draw(64);
 }catch(e){}})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
-    --bg:#0a0a0c; --panel:#141418; --panel2:#1c1c22; --line:#2a2a32;
-    --txt:#f3f3f5; --muted:#9a9aa5; --accent:#ff6a00; --accent2:#ff9100;
-    --green:#39d98a; --red:#ff5d6c; --blue:#4aa8ff; --yellow:#ffce4a;
-    --radius:14px; --shadow:0 8px 28px rgba(0,0,0,.45);
+    /* Electric Court (light). Status colours are DEEPER than the old dark-theme ones —
+       #39d98a / #ffce4a glowed on black but are unreadable on white, and they carry real
+       meaning on the Payments and Finance screens. */
+    --bg:#f7faf3; --panel:#ffffff; --panel2:#edf6e2; --line:#dde9cf;
+    --txt:#131a10; --muted:#6b7a63;
+    /* accent is deliberately a deep lime, not the bright volt: #6fb500 measured only 2.5:1 on
+       white, failing as both link text and a white-on-fill button. #4d8000 clears 4.77:1 both
+       ways. Bright volt survives as --accent2 for fills and highlights, where it looks best. */
+    --accent:#4d8000; --accent2:#c8ff2e;
+    --green:#0b7a42; --red:#c41f31; --blue:#125bb0; --yellow:#8a5600;
+    --onaccent:#ffffff;
+    --radius:14px; --shadow:0 8px 24px rgba(24,48,10,.10);
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
@@ -54,7 +66,7 @@
   .wrap{max-width:1720px;margin:0 auto;padding:0 28px 80px}
 
   header.top{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
-    background:rgba(10,10,12,.82);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
+    background:rgba(255,255,255,.90);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
   .topin{max-width:1720px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:12px 28px;flex-wrap:nowrap}
   .logo{font-weight:900;letter-spacing:.5px;font-size:20px;flex:0 0 auto}
   .logo .dot{color:var(--accent)}
@@ -127,7 +139,7 @@
   .stat::after{content:"";position:absolute;right:-20px;top:-20px;width:80px;height:80px;border-radius:50%;
     background:linear-gradient(135deg,var(--accent),transparent);opacity:.12}
 
-  .modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;
+  .modal{position:fixed;inset:0;background:rgba(18,30,12,.42);display:none;align-items:center;justify-content:center;
     z-index:100;padding:18px}
   .modal.show{display:flex}
   .modal .box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
@@ -160,10 +172,10 @@
   .swatch{width:11px;height:11px;border-radius:3px;display:inline-block}
 
   .flash{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(120%);
-    background:var(--green);color:#08130c;font-weight:800;padding:12px 22px;border-radius:12px;
+    background:var(--green);color:#ffffff;font-weight:800;padding:12px 22px;border-radius:12px;
     box-shadow:var(--shadow);z-index:400;transition:.35s;font-size:13.5px;max-width:90vw;text-align:center}
   .flash.show{transform:translateX(-50%) translateY(0)}
-  .flash.warn{background:var(--yellow);color:#211c00}
+  .flash.warn{background:var(--yellow);color:#ffffff}
   .seg{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
   .seg button{background:var(--panel2);border:1px solid var(--line);color:var(--muted);padding:8px 14px;
     border-radius:999px;cursor:pointer;font-weight:600;font-size:13px}
@@ -206,21 +218,22 @@
      the .login class before .login became the public landing page */
   .overlay{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;
     padding:calc(env(safe-area-inset-top,0px) + 64px) 18px 24px;
-    background:radial-gradient(900px 500px at 70% -10%,rgba(255,106,0,.18),transparent 60%),var(--bg)}
+    background:radial-gradient(900px 500px at 70% -10%,rgba(200,255,46,.30),transparent 60%),var(--bg)}
   .overlay.show{display:flex}
   /* ============ PUBLIC LANDING PAGE ============================================
      Own palette ("Electric Court": white + volt + ink), scoped under .login so it can't leak
      into the signed-in app, which stays dark until that's re-themed separately. */
   .login{position:fixed;inset:0;z-index:300;display:none;overflow-y:auto;-webkit-overflow-scrolling:touch;
-    background:var(--lp-bg);color:var(--lp-ink)}
+    background:var(--lp-bg);color:var(--lp-ink);padding-bottom:env(safe-area-inset-bottom,0px)}
   .login.show{display:block}
   :root{
     --lp-bg:#ffffff; --lp-soft:#f4f7f2; --lp-ink:#0f1410; --lp-mut:#5c6b60; --lp-line:#e2e9e0;
-    --lp-volt:#c8ff2e; --lp-volt-d:#6fb500; --lp-orange:#ff6a00;
+    --lp-volt:#c8ff2e; --lp-volt-d:#4d8000; --lp-orange:#ff6a00;
   }
   .lp{font-family:inherit}
-  .lp-nav{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
-    border-bottom:1px solid var(--lp-line);padding:11px 20px;display:flex;align-items:center;gap:18px}
+  .lp-nav{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--lp-line);display:flex;align-items:center;gap:18px;
+    padding:calc(11px + env(safe-area-inset-top,0px)) 20px 11px}
   .lp-logo{font-size:19px;font-weight:900;letter-spacing:.4px;color:var(--lp-ink)}
   .lp-logo i{color:var(--lp-volt-d);font-style:normal}
   .lp-links{display:flex;gap:20px;margin-left:14px}
@@ -276,6 +289,46 @@
   .lp-event p{margin:0 0 14px;font-size:14.5px;line-height:1.6}
   .lp-vid{position:relative;width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;margin-top:22px;background:var(--lp-soft)}
   .lp-vid iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+  /* ---- brand mark: the dot pulses, a small bit of life without being noisy ---- */
+  .lp-dot{font-style:normal;color:var(--lp-volt-d);display:inline-block;animation:lpPulse 2.4s ease-in-out infinite}
+  @keyframes lpPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.25);opacity:.65}}
+  /* ---- scroll-reveal: elements rise in as they enter the viewport ---- */
+  .reveal{opacity:0;transform:translateY(16px)}
+  .reveal.in{animation:lpUp .55s cubic-bezier(.22,.9,.3,1) forwards}
+  @keyframes lpUp{to{opacity:1;transform:none}}
+  @media(prefers-reduced-motion:reduce){
+    .reveal,.reveal.in{opacity:1!important;transform:none!important;animation:none!important}
+    .lp-dot{animation:none}
+  }
+  /* ---- coach roster ---- */
+  .lp-coaches{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:16px;margin-top:26px}
+  .lp-coach{background:#fff;border:1px solid var(--lp-line);border-radius:18px;padding:20px;
+    transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
+  .lp-coach:hover{transform:translateY(-5px);border-color:var(--lp-volt-d);box-shadow:0 14px 34px rgba(20,40,10,.10)}
+  .lp-coach-top{display:flex;gap:13px;align-items:center;margin-bottom:11px}
+  .lp-coach img,.lp-av{width:58px;height:58px;border-radius:15px;object-fit:cover;flex:none}
+  .lp-av{background:linear-gradient(135deg,var(--lp-volt),var(--lp-volt-d));color:#16210a;
+    display:flex;align-items:center;justify-content:center;font-weight:900;font-size:19px}
+  .lp-coach-name{font-size:17px;font-weight:900;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .lp-badge{background:var(--lp-ink);color:var(--lp-volt);font-size:9.5px;font-weight:900;
+    letter-spacing:.9px;padding:3px 8px;border-radius:999px}
+  .lp-coach-sport{font-size:12.5px;color:var(--lp-volt-d);font-weight:800;margin-top:2px}
+  .lp-coach-tag{font-size:13px;color:var(--lp-mut);font-weight:700;margin-bottom:7px}
+  .lp-coach-bio{font-size:13.5px;line-height:1.6;color:var(--lp-mut);margin:0}
+  .lp-coach-rates{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}
+  .lp-coach-rates span{background:var(--lp-soft);border:1px solid var(--lp-line);border-radius:9px;
+    padding:6px 11px;font-size:12.5px;color:var(--lp-mut);font-weight:700}
+  .lp-coach-rates b{color:var(--lp-ink)}
+  /* ---- sports rail ---- */
+  .lp-sports{display:grid;grid-template-columns:repeat(auto-fit,minmax(136px,1fr));gap:12px;margin-top:24px}
+  .lp-sport{background:var(--lp-soft);border:1.5px dashed var(--lp-line);border-radius:16px;padding:18px 12px;
+    text-align:center;transition:transform .2s ease,border-color .2s ease}
+  .lp-sport:hover{transform:translateY(-4px)}
+  .lp-sport.on{background:#fff;border-style:solid;border-color:var(--lp-volt-d)}
+  .lp-sport-ico{font-size:28px;display:block;margin-bottom:7px}
+  .lp-sport b{display:block;font-size:14.5px;font-weight:900}
+  .lp-sport span{font-size:11.5px;font-weight:800;color:var(--lp-mut);letter-spacing:.4px}
+  .lp-sport.on span{color:var(--lp-volt-d)}
   .lp-foot{border-top:1px solid var(--lp-line);padding:26px 0 40px;text-align:center;color:var(--lp-mut);font-size:13px}
   .lp-contact{display:flex;gap:11px;justify-content:center;flex-wrap:wrap;margin-top:20px}
   @media(max-width:720px){.lp-links{display:none}.lp-hero{padding:40px 0 34px}}
@@ -669,6 +722,9 @@ function normalize(d){
   if(d.settings.activitySeenAt===undefined)d.settings.activitySeenAt='';
   if(!d.settings.groupMinPlayers)d.settings.groupMinPlayers=2;
   if(!d.settings.groupFormHours)d.settings.groupFormHours=48;
+  // Sports we advertise. Anything with a coach attached shows as live; the rest as 'coming soon',
+  // so new sports are launched by adding a coach — not by editing code.
+  if(!d.settings.sports)d.settings.sports='Basketball, Soccer, Tennis, Golf, Track';
   if(!d.settings.homeAddress)d.settings.homeAddress='1 Granger Pond Way';
   if(d.settings.mileageRate===undefined||d.settings.mileageRate===null||d.settings.mileageRate==='')d.settings.mileageRate=0.70;
   if(!d.cashEntries)d.cashEntries=[];
@@ -695,6 +751,7 @@ function normalize(d){
   d.coaches.forEach(c=>{if(c.active===undefined)c.active=true;if(!c.pwd)c.pwd='coach';if(c.tagline===undefined)c.tagline='';if(c.bio===undefined)c.bio='';if(c.affiliation===undefined)c.affiliation='';if(c.affiliationSub===undefined)c.affiliationSub='';if(c.photo===undefined)c.photo='';if(c.email===undefined)c.email='';
     // In-house (family) coach: the business keeps 100% of the session and carries its real costs
     // (gas etc.). Partner coaches: the business takes only a cut and carries no session costs.
+    if(!c.sport)c.sport='Basketball';   // multi-sport ready: soccer, golf, tennis, track…
     if(c.family===undefined)c.family=((c.name||'').trim().toLowerCase()==='raymond xu');
     if(c.shareType!=='flat'&&c.shareType!=='pct')c.shareType='pct';
     if(c.shareVal===undefined||c.shareVal===null||c.shareVal==='')c.shareVal=0;
@@ -722,9 +779,9 @@ function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.
 /* ----- relational mapping (separate tables in Supabase) ----- */
 function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts){
   const d={};
-  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',activityPush:(st&&st.activity_push)||'important',activitySeenAt:(st&&st.activity_seen_at)||'',groupMinPlayers:(st&&st.group_min_players)||2,groupFormHours:(st&&st.group_form_hours)||48,homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
+  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',activityPush:(st&&st.activity_push)||'important',activitySeenAt:(st&&st.activity_seen_at)||'',sports:(st&&st.sports)||'Basketball, Soccer, Tennis, Golf, Track',groupMinPlayers:(st&&st.group_min_players)||2,groupFormHours:(st&&st.group_form_hours)||48,homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
   d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',
-    family:(c.family==null?undefined:c.family===true),shareType:(c.share_type||'pct'),shareVal:(c.share_val!=null?Number(c.share_val):0),
+    sport:(c.sport||'Basketball'),family:(c.family==null?undefined:c.family===true),shareType:(c.share_type||'pct'),shareVal:(c.share_val!=null?Number(c.share_val):0),
     rate1on1:(c.rate_1on1!=null?Number(c.rate_1on1):undefined),rateGroup:(c.rate_group!=null?Number(c.rate_group):undefined),
     pending:(c.pending||null),created:c.created||''}));
   d.locations=(loc||[]).map(l=>({id:l.id,name:l.name,address:l.address||'',miles:Number(l.miles)||0}));
@@ -740,7 +797,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts){
   d.activity=(acts||[]).map(a=>({id:a.id,ts:a.ts||'',role:a.role||'',actorId:a.actor_id||'',actorName:a.actor_name||'',action:a.action||'',detail:a.detail||'',refId:a.ref_id||'',notify:a.notify===true}));
   return normalize(d);
 }
-const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),family:c.family===true,share_type:c.shareType||'pct',share_val:(c.shareVal!=null?c.shareVal:0),pending:(c.pending||null),created:c.created||null,last_login:lastLoginOf(c)||null,login_count:loginCountOf(c)});
+const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),sport:c.sport||'Basketball',family:c.family===true,share_type:c.shareType||'pct',share_val:(c.shareVal!=null?c.shareVal:0),pending:(c.pending||null),created:c.created||null,last_login:lastLoginOf(c)||null,login_count:loginCountOf(c)});
 const actRow=a=>({id:a.id,ts:a.ts,role:a.role||'',actor_id:a.actorId||'',actor_name:a.actorName||'',
                   action:a.action||'',detail:a.detail||'',ref_id:a.refId||'',notify:a.notify===true});
 /* Last sign-in, taken as the LATER of the record's own column and the newest 'login' row in the
@@ -1004,7 +1061,7 @@ async function cloudPush(){
     // added yet) can't block everything else — the critical stuff still saves.
     const fails=[];
     const push=async(name,fn)=>{try{await fn();}catch(e){fails.push(name);console.warn('sync failed:',name,e&&e.message);}};
-    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null,zelle_phone:DB.settings.zellePhone||null,activity_push:DB.settings.activityPush||'important',activity_seen_at:DB.settings.activitySeenAt||null,group_min_players:DB.settings.groupMinPlayers||2,group_form_hours:DB.settings.groupFormHours||48,home_address:DB.settings.homeAddress||null,mileage_rate:DB.settings.mileageRate!=null?DB.settings.mileageRate:null});if(error)throw error;});
+    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null,zelle_phone:DB.settings.zellePhone||null,activity_push:DB.settings.activityPush||'important',activity_seen_at:DB.settings.activitySeenAt||null,sports:DB.settings.sports||null,group_min_players:DB.settings.groupMinPlayers||2,group_form_hours:DB.settings.groupFormHours||48,home_address:DB.settings.homeAddress||null,mileage_rate:DB.settings.mileageRate!=null?DB.settings.mileageRate:null});if(error)throw error;});
     await push('coaches',()=>syncTable('coaches',(DB.coaches||[]).map(coachRow)));
     await push('locations',()=>syncTable('locations',DB.locations.map(l=>({id:l.id,name:l.name,address:l.address||'',miles:l.miles||0}))));
     await push('customers',()=>syncTable('customers',DB.customers.map(custRow)));
@@ -1256,7 +1313,7 @@ function approvalsCount(){
   return cp+ap+er+se+nc+jr;
 }
 function renderWhoami(){
-  if(AUTH==='owner'){const n=approvalsCount();const appr=n?`<button class="btn sm" style="background:var(--yellow);color:#211c00;font-weight:800;border:0" onclick="openApprovals()">⏳ ${n} to approve</button>`:'';
+  if(AUTH==='owner'){const n=approvalsCount();const appr=n?`<button class="btn sm" style="background:var(--yellow);color:#fff;font-weight:800;border:0" onclick="openApprovals()">⏳ ${n} to approve</button>`:'';
     $('#whoami').innerHTML=liveHtml()+appr+coachPicker()+'<button class="btn ghost sm" onclick="exportExcel()">⬇ Export</button><span class="pill orange">Owner</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';}
   else if(AUTH==='coach'){const co=coachById(coachAs);$('#whoami').innerHTML=liveHtml()+'<span class="pill green">🏀 Coach '+(co?firstName(co.name):'')+'</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';}
   else if(AUTH==='client'){const c=custById(clientAs);$('#whoami').innerHTML=liveHtml()+langToggleHtml()+'<span class="pill blue">'+(c?c.name:'Client')+'</span><button class="btn ghost sm" onclick="openChangePwd()">'+t('🔑 Change password')+'</button><button class="btn ghost sm" onclick="signOut()">'+t('Sign out')+'</button>';}
@@ -1307,6 +1364,46 @@ function closeAuth(){
   const sp=$('#signupPanel'), cp=$('#clientPanel');
   if(sp&&cp&&!sp.classList.contains('hidden')){ sp.classList.add('hidden'); cp.classList.remove('hidden'); }
 }
+/* Coach roster for the public page. RX.TRAINING is the brand; Raymond is credited as founder and
+   pinned first (sortedCoaches already does that), with every other coach given equal billing so
+   the business doesn't read as one person. Rates and sport come from live records. */
+function lpCoachCards(){
+  const list=activeCoaches();
+  if(!list.length)return '<div class="lp-card">Coaches are being added — check back soon.</div>';
+  return list.map((c,i)=>{
+    const founder=(c.name||'').trim().toLowerCase()==='raymond xu';
+    const initials=(c.name||'?').split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
+    const photo=c.photo&&/^https?:\/\//i.test(c.photo)
+      ? `<img src="${c.photo}" alt="${c.name}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'lp-av',textContent:'${initials}'}))">`
+      : `<div class="lp-av">${initials}</div>`;
+    const bio=(c.bio||'').trim();
+    return `<article class="lp-coach reveal" style="animation-delay:${i*90}ms">
+      <div class="lp-coach-top">
+        ${photo}
+        <div style="min-width:0">
+          <div class="lp-coach-name">${c.name}${founder?'<span class="lp-badge">FOUNDER</span>':''}</div>
+          <div class="lp-coach-sport">${c.sport||'Basketball'}${c.affiliation?' · '+c.affiliation:''}</div>
+        </div>
+      </div>
+      ${c.tagline?`<div class="lp-coach-tag">${c.tagline}</div>`:''}
+      ${bio?`<p class="lp-coach-bio">${bio.length>210?bio.slice(0,210)+'…':bio}</p>`:''}
+      <div class="lp-coach-rates"><span>1:1 <b>${money(coachRate(c.id,'1on1'))}</b>/hr</span><span>Group <b>${money(coachRate(c.id,'group'))}</b>/player</span></div>
+      <button class="lp-btn solid" style="width:100%;margin-top:14px" onclick="openAuth('signup')">Book with ${firstName(c.name)}</button>
+    </article>`;
+  }).join('');
+}
+/* Sports we advertise. Any sport with an active coach is live; the rest read "coming soon" —
+   so launching a sport means adding a coach, never editing this file. */
+function lpSportChips(){
+  const live={}; activeCoaches().forEach(c=>{live[(c.sport||'Basketball').trim().toLowerCase()]=true;});
+  const icon={basketball:'🏀',soccer:'⚽',football:'⚽',tennis:'🎾',golf:'⛳',track:'🏃',baseball:'⚾',volleyball:'🏐',swimming:'🏊'};
+  return (DB.settings.sports||'Basketball').split(',').map(x=>x.trim()).filter(Boolean).map((sp,i)=>{
+    const on=!!live[sp.toLowerCase()];
+    return `<div class="lp-sport ${on?'on':''} reveal" style="animation-delay:${i*70}ms">
+      <span class="lp-sport-ico">${icon[sp.toLowerCase()]||'🏅'}</span>
+      <b>${sp}</b><span>${on?'Now training':'Coming soon'}</span></div>`;
+  }).join('');
+}
 function lpGo(id){const el=document.getElementById(id); if(el)el.scrollIntoView({behavior:'smooth',block:'start'});}
 function renderLanding(){
   const el=$('#lpPage'); if(!el)return;
@@ -1335,27 +1432,27 @@ function renderLanding(){
 
   <div class="lp-wrap">
     <header class="lp-hero">
-      <span class="lp-tag">🏀 Lexington, MA · AAU Level Training</span>
-      <h1 class="lp-h1">${(co.name||'RAYMOND XU').split(' ')[0].toUpperCase()}<span>${(co.name||'Raymond Xu').split(' ').slice(1).join(' ').toUpperCase()}</span></h1>
-      <div class="lp-role">Basketball Trainer</div>
-      <p class="lp-lede">Training isn't just about drills. It's about the <b>love of the game</b> — the dedication, the grind, the mindset that <b>you never give up</b>. That's what every session is built on.</p>
-      <div class="lp-cta">
+      <span class="lp-tag reveal">🏀 Lexington, MA · Player-Led Athletic Training</span>
+      <h1 class="lp-h1 reveal">RX<i class="lp-dot">.</i>TRAINING</h1>
+      <div class="lp-role reveal">Train like you play</div>
+      <p class="lp-lede reveal">Founded by <b>${co.name||'Raymond Xu'}</b> — an active AAU competitor, not a coach who stopped playing years ago. Every session is built on the <b>love of the game</b>: the dedication, the grind, and the belief that <b>you never give up</b>.</p>
+      <div class="lp-cta reveal">
         <button class="lp-btn solid lp-big" onclick="openAuth('signup')">Book a session →</button>
-        <button class="lp-btn line lp-big" onclick="lpGo('lpSessions')">See what I offer</button>
+        <button class="lp-btn line lp-big" onclick="lpGo('lpCoaches')">Meet the coaches</button>
       </div>
       <div class="lp-stats">
-        <div class="lp-stat"><b>AAU</b><span>MIDDLESEX MAGIC</span></div>
-        <div class="lp-stat"><b>${done||'100+'}</b><span>SESSIONS COACHED</span></div>
-        <div class="lp-stat"><b>${nCoach}</b><span>TRAINER${nCoach>1?'S':''}</span></div>
-        <div class="lp-stat"><b>100%</b><span>PLAYER-LED</span></div>
+        <div class="lp-stat reveal"><b>AAU</b><span>COMPETITION LEVEL</span></div>
+        <div class="lp-stat reveal"><b>${done||'100+'}</b><span>SESSIONS COACHED</span></div>
+        <div class="lp-stat reveal"><b>${nCoach}</b><span>COACH${nCoach>1?'ES':''}</span></div>
+        <div class="lp-stat reveal"><b>100%</b><span>PLAYER-LED</span></div>
       </div>
     </header>
 
     <section class="lp-sec" id="lpAbout">
-      <div class="lp-kicker">Who I am</div>
-      <h2 class="lp-h2">THE TRAINER</h2>
-      <p class="lp-p">I'm a student-athlete at Lexington High School and play for <b>Middlesex Magic</b>, one of the most competitive AAU programs in Massachusetts. I know what it takes to compete at a high level because I live it — I'm in the gym grinding every week, and I bring that same energy to training.</p>
-      <p class="lp-p" style="margin-top:12px">My training isn't cookie-cutter. Every session includes <b>live game situations</b> — real reads, real decisions, real pressure. Not just drills. I build players who can actually perform when it counts.</p>
+      <div class="lp-kicker">Who we are</div>
+      <h2 class="lp-h2">THE RX APPROACH</h2>
+      <p class="lp-p">RX.TRAINING was founded by <b>${co.name||'Raymond Xu'}</b>, a student-athlete at Lexington High School playing for <b>Middlesex Magic</b> — one of the most competitive AAU programs in Massachusetts. The idea was simple: players learn fastest from people still in the gym competing.</p>
+      <p class="lp-p" style="margin-top:12px">That standard now runs across every coach on the roster. Training here isn't cookie-cutter — every session includes <b>live game situations</b>: real reads, real decisions, real pressure. Not just drills. We build athletes who perform when it counts.</p>
       <div class="lp-grid">
         <div class="lp-card"><div class="lp-ico">⚡</div><h4>Active AAU competitor</h4><p>Currently playing for Middlesex Magic — high-level competitive basketball in the Northeast.</p></div>
         <div class="lp-card"><div class="lp-ico">🎮</div><h4>Live situation training</h4><p>Every session puts you in real game scenarios — defender on you, clock running, a decision to make.</p></div>
@@ -1364,7 +1461,7 @@ function renderLanding(){
       </div>
       <div class="lp-quote">
         <p>I'm not only teaching kids basketball. I'm teaching them the <em>love of the game</em> — my dedication, my grind, and the belief that <em>you never give up</em>.</p>
-        <cite>— ${co.name||'Raymond Xu'}, Trainer &amp; Middlesex Magic player</cite>
+        <cite>— ${co.name||'Raymond Xu'}, Founder · Middlesex Magic (AAU)</cite>
       </div>
     </section>
 
@@ -1397,6 +1494,21 @@ function renderLanding(){
       </div>`:''}
     </section>
 
+    <section class="lp-sec" id="lpCoaches">
+      <div class="lp-kicker">The team</div>
+      <h2 class="lp-h2">YOUR COACHES</h2>
+      <p class="lp-p">Every coach here still competes. You're not learning from someone who stopped playing years ago.</p>
+      <div class="lp-coaches">${lpCoachCards()}</div>
+    </section>
+
+    <section class="lp-sec" id="lpSports">
+      <div class="lp-kicker">What's next</div>
+      <h2 class="lp-h2">MORE THAN BASKETBALL</h2>
+      <p class="lp-p">RX is built to grow. Same app, same coaching standard — new sports as we bring the right coaches on.</p>
+      <div class="lp-sports">${lpSportChips()}</div>
+      <p class="lp-p" style="margin-top:16px;font-size:14px">Coach in one of these and want to run sessions on RX? <a href="mailto:xuraymond777@gmail.com" style="color:var(--lp-volt-d);font-weight:800">Get in touch →</a></p>
+    </section>
+
     <section class="lp-sec" id="lpFilm">
       <div class="lp-kicker">See me play</div>
       <h2 class="lp-h2">AAU HIGHLIGHTS</h2>
@@ -1425,6 +1537,24 @@ function renderLanding(){
     </footer>
   </div>`;
   try{ set('langLbl',LANG_NAMES[LANG]||'EN'); }catch(e){}
+  lpAnimate();
+}
+/* Reveal-on-scroll. Uses IntersectionObserver where available and simply shows everything where
+   it isn't, so the page can never end up with invisible content. The CSS honours
+   prefers-reduced-motion, so this stays still for anyone who's asked for that. */
+function lpAnimate(){
+  const els=[...document.querySelectorAll('#lpPage .reveal')];
+  if(!els.length)return;
+  if(!('IntersectionObserver' in window)){ els.forEach(e=>e.classList.add('in')); return; }
+  const io=new IntersectionObserver((entries)=>{
+    entries.forEach(en=>{ if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); } });
+  },{rootMargin:'0px 0px -8% 0px',threshold:.08});
+  els.forEach(e=>io.observe(e));
+  // anything already on screen at load shouldn't wait for a scroll event
+  setTimeout(()=>els.forEach(e=>{
+    const r=e.getBoundingClientRect();
+    if(r.top<window.innerHeight&&r.bottom>0)e.classList.add('in');
+  }),60);
 }
 function showLogin(){
   AUTH=null;renderWhoami();
@@ -3500,6 +3630,10 @@ function openCoach(id){
       </div>
       <input id="coPhoto" value="${g('photo')}" placeholder="…or paste a direct image link (ends in .jpg/.png)" style="margin-top:8px">
       <div class="clienttag" style="margin-top:4px">Upload a photo, or paste a <b>direct image link</b>. iCloud/Google Photos <i>share</i> links won't work — they're web pages, not image files.</div></div>
+    ${isCoach?'':`<div class="field"><label class="f">Sport</label>
+      <input id="coSport" list="sportList" value="${(c.sport||'Basketball').replace(/"/g,'&quot;')}" placeholder="Basketball">
+      <datalist id="sportList">${(DB.settings.sports||'Basketball').split(',').map(x=>`<option value="${x.trim()}">`).join('')}</datalist>
+      <div class="clienttag" style="margin-top:4px">Shown on the public home page. Adding a coach in a new sport launches that sport on the site — no code change needed.</div></div>`}
     <div class="panel" style="background:var(--panel2);padding:14px;margin-bottom:14px">
       <b class="small">Hourly rates</b>
       <div class="row" style="margin-top:10px">
@@ -3587,7 +3721,7 @@ function saveCoach(id){
   const dup=(DB.coaches||[]).find(x=>x.id!==id&&(x.name||'').trim().toLowerCase()===name.toLowerCase());
   if(dup)return flash('Another coach already uses that name',true);
   const fam=$('#coFamily')?$('#coFamily').checked:false;
-  const obj={name,tagline:$('#coTag').value,bio:$('#coBio').value,affiliation:$('#coAff').value,affiliationSub:$('#coAffSub').value,photo:$('#coPhoto').value,pwd:($('#coPwd').value||'coach').trim(),active:$('#coActive').checked,phone:($('#coPhone')?$('#coPhone').value:''),carrier:($('#coCarrier')?$('#coCarrier').value:''),email:($('#coEmail')?$('#coEmail').value.trim():''),rate1on1:r1,rateGroup:rG,
+  const obj={name,sport:(($('#coSport')&&$('#coSport').value)||'Basketball').trim()||'Basketball',tagline:$('#coTag').value,bio:$('#coBio').value,affiliation:$('#coAff').value,affiliationSub:$('#coAffSub').value,photo:$('#coPhoto').value,pwd:($('#coPwd').value||'coach').trim(),active:$('#coActive').checked,phone:($('#coPhone')?$('#coPhone').value:''),carrier:($('#coCarrier')?$('#coCarrier').value:''),email:($('#coEmail')?$('#coEmail').value.trim():''),rate1on1:r1,rateGroup:rG,
     family:fam,shareType:($('#coShareType')?$('#coShareType').value:'pct'),shareVal:(fam?0:(+($('#coShareVal')?$('#coShareVal').value:0)||0)),
     created:(($('#coCreated')&&$('#coCreated').value)||todayISO())};
   if(id){Object.assign(coachById(id),obj);}
@@ -4397,7 +4531,7 @@ function chatBubble(m,mine){
   const del=AUTH==='owner'?`<button class="iconbtn" title="Delete this message for both sides" style="padding:2px 7px;align-self:center;margin:0 4px" onclick="delMessage('${m.id}')">✕</button>`:'';
   return `<div style="display:flex;justify-content:${mine?'flex-end':'flex-start'};margin:6px 0">
     ${mine?del:''}
-    <div style="max-width:78%;background:${mine?'var(--accent)':'var(--panel2)'};color:${mine?'#151515':'var(--txt)'};padding:8px 12px;border-radius:14px;word-break:break-word">
+    <div style="max-width:78%;background:${mine?'var(--accent)':'var(--panel2)'};color:${mine?'var(--onaccent)':'var(--txt)'};padding:8px 12px;border-radius:14px;word-break:break-word">
       ${m.text?`<div>${escapeHtml(m.text)}</div>`:''}${media}
       <div style="font-size:10px;opacity:.65;margin-top:3px;text-align:right">${fmtChatTime(m.created)}</div>
     </div>
@@ -5074,13 +5208,13 @@ function drawStackedBars(canvasId,buckets,onClick,selectedKey){
   const totals=buckets.map(b=>b.completed+b.scheduled+b.pending+b.cancelled);
   const max=Math.max(...totals,4);
   const yfor=v=>y1-(v/max)*(y1-y0);
-  ctx.strokeStyle='rgba(255,255,255,.07)';ctx.fillStyle='#9a9aa5';ctx.font='10px sans-serif';ctx.textAlign='start';
+  ctx.strokeStyle='rgba(20,40,10,.10)';ctx.fillStyle='#6b7a63';ctx.font='10px sans-serif';ctx.textAlign='start';
   for(let g=0;g<=4;g++){const v=Math.round(max*g/4);const y=yfor(v);ctx.beginPath();ctx.moveTo(x0,y);ctx.lineTo(x1,y);ctx.stroke();ctx.fillText(String(v),4,y+3);}
   const n=buckets.length,slot=n?(x1-x0)/n:0,bw=Math.min(34,slot*0.62);
   if(!buckets.length){ctx.textAlign='center';ctx.fillText('No sessions in range',W/2,H/2);ctx.textAlign='start';cv.onclick=null;return;}
   const cols={completed:'#39d98a',scheduled:'#4aa8ff',pending:'#ffce4a',cancelled:'#ff5d6c'};
   buckets.forEach((b,i)=>{const cx=x0+slot*(i+0.5);
-    if(selectedKey&&b.key===selectedKey){ctx.fillStyle='rgba(255,255,255,.10)';ctx.fillRect(cx-slot/2+2,y0,slot-4,y1-y0);}
+    if(selectedKey&&b.key===selectedKey){ctx.fillStyle='rgba(111,181,0,.14)';ctx.fillRect(cx-slot/2+2,y0,slot-4,y1-y0);}
     let yTop=y1;['completed','scheduled','pending','cancelled'].forEach(k=>{const val=b[k];if(!val)return;const h=(val/max)*(y1-y0);ctx.fillStyle=cols[k];ctx.fillRect(cx-bw/2,yTop-h,bw,h);yTop-=h;});});
   ctx.fillStyle='#9a9aa5';ctx.textAlign='center';ctx.font='9px sans-serif';
   buckets.forEach((b,i)=>ctx.fillText(b.label,x0+slot*(i+0.5),H-8));
@@ -5104,12 +5238,12 @@ function drawBars(canvasId,items,color,onClick,selectedKey){
   cv.width=W*dpr;cv.height=H*dpr;const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
   const padR=8,padT=12,padB=26,x0=28,x1=W-padR,y0=padT,y1=H-padB;
   const max=Math.max(...items.map(i=>i.value),4);const yfor=v=>y1-(v/max)*(y1-y0);
-  ctx.strokeStyle='rgba(255,255,255,.07)';ctx.fillStyle='#9a9aa5';ctx.font='10px sans-serif';ctx.textAlign='start';
+  ctx.strokeStyle='rgba(20,40,10,.10)';ctx.fillStyle='#6b7a63';ctx.font='10px sans-serif';ctx.textAlign='start';
   for(let g=0;g<=4;g++){const v=Math.round(max*g/4);const y=yfor(v);ctx.beginPath();ctx.moveTo(x0,y);ctx.lineTo(x1,y);ctx.stroke();ctx.fillText(String(v),4,y+3);}
   const n=items.length,slot=n?(x1-x0)/n:0,bw=Math.min(34,slot*0.62);
   if(!items.length){ctx.textAlign='center';ctx.fillText('No data yet',W/2,H/2);ctx.textAlign='start';cv.onclick=null;return;}
   items.forEach((it,i)=>{const cx=x0+slot*(i+0.5),h=(it.value/max)*(y1-y0);
-    if(selectedKey&&it.key===selectedKey){ctx.fillStyle='rgba(255,255,255,.10)';ctx.fillRect(cx-slot/2+2,y0,slot-4,y1-y0);}
+    if(selectedKey&&it.key===selectedKey){ctx.fillStyle='rgba(111,181,0,.14)';ctx.fillRect(cx-slot/2+2,y0,slot-4,y1-y0);}
     ctx.fillStyle=color;ctx.fillRect(cx-bw/2,y1-h,bw,h);});
   ctx.fillStyle='#9a9aa5';ctx.textAlign='center';ctx.font='9px sans-serif';
   items.forEach((it,i)=>ctx.fillText(it.label,x0+slot*(i+0.5),H-8));ctx.textAlign='start';
@@ -5191,7 +5325,7 @@ function drawCashChart(labels,rev,exp,prof){
   const x0=padL,x1=W-padR,y0=padT,y1=H-padB;
   const xfor=i=>x0+(x1-x0)*(labels.length<=1?0.5:i/(labels.length-1));
   const yfor=v=>y1-(v-min)/range*(y1-y0);
-  ctx.strokeStyle='rgba(255,255,255,.07)';ctx.fillStyle='#9a9aa5';ctx.font='10px sans-serif';
+  ctx.strokeStyle='rgba(20,40,10,.10)';ctx.fillStyle='#6b7a63';ctx.font='10px sans-serif';
   for(let g=0;g<=4;g++){const v=min+range*g/4;const y=yfor(v);
     ctx.beginPath();ctx.moveTo(x0,y);ctx.lineTo(x1,y);ctx.stroke();
     ctx.fillText('$'+Math.round(v),4,y+3);}
