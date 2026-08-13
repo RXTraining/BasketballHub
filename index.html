@@ -926,7 +926,43 @@ const JA={
   'Please change your password after your first sign-in.':'初回ログイン後にパスワードを変更してください。','Back to sign in':'ログインに戻る','Approved! You can sign in now.':'承認されました！ログインできます。',
   'Session cancelled':'セッションをキャンセルしました','Registration cancelled':'登録をキャンセルしました'
 };
-const LANGDICT={zh:ZH,ko:KO,ja:JA};
+/* English copy for the landing page. t() falls back to returning the KEY when the current
+   language has no entry — fine when the key IS the English text, but these blocks use short
+   codes, so without this dictionary English visitors saw 'ABOUT_P1' on the page. */
+const EN={
+  'HERO_LEDE':'Founded by <b>{name}</b> — an active AAU competitor, not a coach who stopped playing years ago. Every session is built on the <b>love of the game</b>: the dedication, the grind, and the belief that <b>you never give up</b>.',
+  'ABOUT_P1':'RX.TRAINING was founded by <b>{name}</b>, a student-athlete at Lexington High School playing for <b>Middlesex Magic</b> — one of the most competitive AAU programs in Massachusetts. The idea was simple: players learn fastest from people still in the gym competing.',
+  'ABOUT_P2':'That standard now runs across every coach on the roster. Training here isn\'t cookie-cutter — every session includes <b>live game situations</b>: real reads, real decisions, real pressure. Not just drills. We build athletes who perform when it counts.',
+  'CARD_AAU':'Currently playing for Middlesex Magic — high-level competitive basketball in the Northeast.',
+  'CARD_LIVE':'Every session puts you in real game scenarios — defender on you, clock running, a decision to make.',
+  'CARD_IQ':'Understanding the game matters as much as the drills. We teach players to read and think on the court.',
+  'CARD_GRIT':'We bring dedication and toughness to every session — and expect the same from every player we train.',
+  'QUOTE':'I\'m not only teaching kids basketball. I\'m teaching them the <em>love of the game</em> — my dedication, my grind, and the belief that <em>you never give up</em>.',
+  'COACHES_P':'Every coach here still competes. You\'re not learning from someone who stopped playing years ago.',
+  'SPORTS_P':'RX is built to grow. Same app, same coaching standard — new sports as we bring the right coaches on.',
+  'SPORTS_CTA':'Coach in one of these and want to run sessions on RX?',
+  'PLAN1_DESC':'Fully personalised around your game, including live reps — real defence, real reads, real pressure.',
+  'PLAN2_DESC':'Small groups of 2–{max}. Competition between players creates live-game intensity — learn together, grow together.',
+  'B_BALL':'Ball handling &amp; dribbling',
+  'B_SHOT':'Shooting form &amp; mechanics',
+  'B_FOOT':'Footwork &amp; athleticism',
+  'B_1V1':'Live 1v1 game situations',
+  'B_VISION':'Court vision &amp; decision making',
+  'B_MENTAL':'Mental toughness &amp; confidence',
+  'G_DRILLS':'Live situation drills &amp; 1v1 reps',
+  'G_SCEN':'Competitive game scenarios',
+  'G_TEAM':'Team concepts &amp; spacing',
+  'G_COMM':'On-court communication',
+  'G_VALUE':'Great value for friends &amp; teammates',
+  'AVAIL_LINE':'Available in the <b>Lexington, MA</b> area · flexible scheduling · book and manage everything in the app.',
+  'FILM_P':'Watch us compete at the AAU level with <b>Middlesex Magic</b>. This is the level of play we bring to every training session.',
+  'BOOK_P':'Create an account to see live availability, book 1-on-1 or group sessions, track payments, and get video feedback from your coach after every session.',
+  'NO_COACHES':'Coaches are being added — check back soon.',
+  'FOUNDER':'FOUNDER',
+  'Founder':'Founder',
+  'Built with':'Built with',
+};
+const LANGDICT={en:EN,zh:ZH,ko:KO,ja:JA};
 const LANG_NAMES={en:'EN',zh:'中文',ko:'한국어',ja:'日本語'};
 function nextLang(){const o=['en','zh','ko','ja'];return o[(o.indexOf(LANG)+1)%o.length];}
 function t(s){const d=LANGDICT[LANG];return (d&&d[s])?d[s]:s;}
