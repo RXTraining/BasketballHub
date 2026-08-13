@@ -16,28 +16,67 @@
 <link id="appleIcon" rel="apple-touch-icon">
 <link id="favIcon" rel="icon" type="image/png">
 <script>
-/* Draws the home-screen / favicon icon at runtime so iOS never falls back to a screenshot.
-   Electric Court palette — volt field, ink monogram — matching icon-192/512.png and the site. */
+/* Icon rendering.
+   Two different jobs, because the platforms differ:
+     - apple-touch-icon (installed home screen): MUST be a single static image. iOS and Android
+       render a still PNG; there is no animated-icon support for web apps, so the ball is drawn
+       once, as the dot in RX(ball)TRAINING, matching icon-192/512.png.
+     - favicon (browser tab): repainted on a timer, so the ball really does cycle sports there. */
 (function(){try{
-  function draw(px){
+  var BALLS=['basketball','soccer','tennis','baseball','volleyball'];
+  function ball(x,cx,cy,r,kind){
+    var col={basketball:'#ff7a1a',soccer:'#ffffff',tennis:'#d8f24a',baseball:'#ffffff',volleyball:'#ffffff'}[kind];
+    x.fillStyle=col;x.beginPath();x.arc(cx,cy,r,0,7);x.fill();
+    x.strokeStyle='#0f1410';x.lineWidth=Math.max(1,r*0.13);x.stroke();
+    x.lineWidth=Math.max(1,r*0.11);x.beginPath();
+    if(kind==='basketball'){
+      x.moveTo(cx,cy-r);x.lineTo(cx,cy+r);x.moveTo(cx-r,cy);x.lineTo(cx+r,cy);x.stroke();
+      x.beginPath();x.ellipse(cx,cy,r*0.42,r,0,0,7);x.stroke();
+    }else if(kind==='soccer'){
+      x.beginPath();for(var i=0;i<5;i++){var a=(i/5)*6.283-1.571;
+        x[i?'lineTo':'moveTo'](cx+Math.cos(a)*r*0.42,cy+Math.sin(a)*r*0.42);}
+      x.closePath();x.fillStyle='#0f1410';x.fill();
+    }else if(kind==='tennis'){
+      x.beginPath();x.arc(cx-r*0.75,cy,r*0.95,-0.9,0.9);x.stroke();
+      x.beginPath();x.arc(cx+r*0.75,cy,r*0.95,2.24,4.04);x.stroke();
+    }else if(kind==='baseball'){
+      x.strokeStyle='#d92d3f';
+      x.beginPath();x.arc(cx-r*0.8,cy,r*0.95,-0.85,0.85);x.stroke();
+      x.beginPath();x.arc(cx+r*0.8,cy,r*0.95,2.29,3.99);x.stroke();
+    }else{
+      x.beginPath();x.arc(cx,cy,r*0.55,0,7);x.stroke();
+      x.moveTo(cx-r,cy);x.lineTo(cx+r,cy);x.stroke();
+    }
+  }
+  function draw(px,kind){
+    // Three centred lines — RX / ball / TRAINING — laid out from measured text heights so the
+    // ball can never collide with the X at small sizes. Mirrors icon-192/512.png exactly.
     var c=document.createElement('canvas');c.width=c.height=px;var x=c.getContext('2d');
     var g=x.createLinearGradient(0,0,0,px);g.addColorStop(0,'#c8ff2e');g.addColorStop(1,'#6bAF00');
     x.fillStyle=g;x.fillRect(0,0,px,px);
+    var inner=px*0.80, rxS=Math.round(inner*0.44), tS=Math.round(inner*0.112), r=inner*0.108;
+    var rxH=rxS*0.72, tH=tS*0.72, gap=inner*0.055;
+    var total=rxH+gap+2*r+gap+tH, top=(px-total)/2;
     x.textAlign='center';x.textBaseline='middle';x.fillStyle='#0f1410';
-    x.font='800 '+Math.round(px*0.46)+'px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
-    x.fillText('RX',px/2,px*0.42);
-    var bw=px*0.26,bh=Math.max(2,px*0.018);
-    x.fillRect(px/2-bw/2,px*0.60-bh/2,bw,bh);
+    x.font='800 '+rxS+'px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
+    x.fillText('RX',px/2,top+rxH/2);
+    ball(x,px/2,top+rxH+gap+r,r,kind);
     x.fillStyle='#1a2608';
-    x.font='800 '+Math.round(px*0.093)+'px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
-    var t='TRAINING',sp=px*0.012,w=0,i;
-    for(i=0;i<t.length;i++)w+=x.measureText(t[i]).width+sp; w-=sp;
-    var cx=px/2-w/2;
-    for(i=0;i<t.length;i++){x.textAlign='left';x.fillText(t[i],cx,px*0.715);cx+=x.measureText(t[i]).width+sp;}
+    x.font='800 '+tS+'px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
+    x.fillText('TRAINING',px/2,top+rxH+gap+2*r+gap+tH/2);
     return c.toDataURL('image/png');
   }
-  var a=document.getElementById('appleIcon'); if(a)a.href=draw(180);
-  var f=document.getElementById('favIcon');   if(f)f.href=draw(64);
+  // installed-app icon: static (platform limitation), basketball as the dot
+  var a=document.getElementById('appleIcon'); if(a)a.href=draw(180,'basketball');
+  // browser tab: cycle the ball, unless the visitor asked for reduced motion
+  var f=document.getElementById('favIcon'); if(!f)return;
+  f.href=draw(64,'basketball');
+  var still=false; try{still=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
+  if(still)return;
+  var i=0;
+  setInterval(function(){ i=(i+1)%BALLS.length;
+    try{ f.href=draw(64,BALLS[i]); }catch(e){}
+  },2200);
 }catch(e){}})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
