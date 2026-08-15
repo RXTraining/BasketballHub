@@ -525,7 +525,7 @@
 <body>
 <header class="top">
   <div class="topin">
-    <div class="logo">RX<span class="dot">.</span>TRAINING</div>
+    <div class="logo" onclick="openHome()" style="cursor:pointer" title="Home page">RX<span class="dot">.</span>TRAINING</div>
     <nav class="tabs" id="tabs"></nav>
     <div class="rolewrap" id="whoami"></div>
   </div>
@@ -619,6 +619,7 @@ const DB_KEY = 'rxtraining_v2';
 /* ---------- i18n: English / 中文 (client-facing) ---------- */
 let LANG='en'; try{LANG=localStorage.getItem('rx_lang')||'en';}catch(e){}
 const ZH={
+  'Back to app':'返回应用',
   'HIGHLIGHTS':'精彩集锦',
   'ABOUT_P3':'每一堂课都建立在<b>对篮球的热爱</b>之上：投入、拼搏，以及<b>永不放弃</b>的信念。',
   /* --- landing page prose --- */
@@ -754,6 +755,7 @@ const ZH={
   'Session cancelled':'课程已取消','Registration cancelled':'报名已取消'
 };
 const KO={
+  'Back to app':'앱으로 돌아가기',
   'HIGHLIGHTS':'하이라이트',
   'ABOUT_P3':'모든 세션은 <b>경기에 대한 사랑</b> 위에 세워집니다: 헌신, 노력, 그리고 <b>절대 포기하지 않는</b> 믿음.',
   /* --- landing page prose --- */
@@ -881,6 +883,7 @@ const KO={
   'Session cancelled':'수업이 취소되었습니다','Registration cancelled':'등록이 취소되었습니다'
 };
 const JA={
+  'Back to app':'アプリに戻る',
   'HIGHLIGHTS':'ハイライト',
   'ABOUT_P3':'すべてのセッションは<b>競技への愛</b>の上に成り立っています：献身、努力、そして<b>決して諦めない</b>という信念。',
   /* --- landing page prose --- */
@@ -1011,6 +1014,7 @@ const JA={
    language has no entry — fine when the key IS the English text, but these blocks use short
    codes, so without this dictionary English visitors saw 'ABOUT_P1' on the page. */
 const EN={
+  'Back to app':'Back to app',
   'HIGHLIGHTS':'HIGHLIGHTS',
   'ABOUT_P3':'Every session is built on the <b>love of the game</b>: the dedication, the grind, and the belief that <b>you never give up</b>.',
   'HERO_LEDE':'Founded by <b>{name}</b> — an active AAU competitor, not a coach who stopped playing years ago. Every session is built on the <b>love of the game</b>: the dedication, the grind, and the belief that <b>you never give up</b>.',
@@ -1701,7 +1705,10 @@ function renderTabs(){
   // timeline, so a separate Past Sessions list is redundant for clients.
   if(AUTH==='client') allowed=['booking','journey','skills','money','events','messages'];
   else if(AUTH==='coach') allowed=['about','booking','availability','money','messages'];   // coach chats with owner only
-  else allowed = TABS.map(tb=>tb.id).filter(x=>x!=='past'&&x!=='money');   // owner uses the full Finance tab instead
+  // client-only views ('past','money','journey','skills') read clientAs, which the owner
+  // doesn't have — leaving them in the owner's tab bar produced a bogus "sign in again".
+  // The owner reaches a client's journey/skills from their profile instead.
+  else allowed = TABS.map(tb=>tb.id).filter(x=>!['past','money','journey','skills'].includes(x));
   if(!allowed.includes(TAB)) TAB = 'booking';
   const unread=unreadCount();                 // combined — drives the app-icon badge
   const chatUnread=unreadMessages();          // chat only — the Messages tab pill
@@ -1847,6 +1854,15 @@ function applyLoginLang(){
    live app data — so a rate change in Admin updates the shop window automatically instead of
    quietly leaving a wrong number on the internet.
    ============================================================================ */
+/* Show the public home page over the app WITHOUT signing out — AUTH, the current tab and any
+   unsaved state are untouched, so "Back to app" returns exactly where you were. showLogin() is a
+   different thing entirely: it clears AUTH and is only for signing out. */
+function openHome(){
+  renderLanding();
+  closeAuth();
+  const el=$('#login'); if(el){el.classList.add('show');el.scrollTop=0;}
+}
+function closeHome(){ const el=$('#login'); if(el)el.classList.remove('show'); }
 function openAuth(which){
   const v=$('#authveil'); if(!v)return;
   // 'book' picks the right door: a returning player on this device gets sign-in with their name
@@ -1974,8 +1990,9 @@ function renderLanding(){
     </span>
     <span class="lp-auth">
       <button class="lp-btn line mini" title="Language" onclick="setLang(nextLang())">🌐 <span id="langLbl"></span></button>
-      <button class="lp-btn line" onclick="openAuth('client')">${t('Sign in')}</button>
-      <button class="lp-btn solid" onclick="openAuth('signup')">${t('Create account')}</button>
+      ${AUTH?`<button class="lp-btn solid" onclick="closeHome()">← ${t('Back to app')}</button>`
+            :`<button class="lp-btn line" onclick="openAuth('client')">${t('Sign in')}</button>
+              <button class="lp-btn solid" onclick="openAuth('signup')">${t('Create account')}</button>`}
     </span>
   </nav>
   ${lpTickerHtml()}
@@ -1994,7 +2011,7 @@ function renderLanding(){
       <h1 class="lp-h1 reveal">RX<i class="lp-dot" id="lpBall">🏀</i>TRAINING</h1>
       <div class="lp-role reveal">${t('Train like you play')}</div>
       <div class="lp-cta reveal">
-        <button class="lp-btn solid lp-big" onclick="openAuth('book')">${t('Book a session →')}</button>
+        <button class="lp-btn solid lp-big" onclick="${AUTH?'closeHome()':`openAuth('book')`}">${AUTH?t('Back to app'):t('Book a session →')}</button>
         <button class="lp-btn line lp-big" onclick="lpGo('lpCoaches')">${t('Meet the coaches')}</button>
       </div>
       <div class="lp-stats">
@@ -5147,7 +5164,18 @@ function eventWhen(ev){return ev.date?fmtDT(ev.date,ev.time):t('Date to be confi
 /* An event with no date yet is still UPCOMING, not past. Filtering on `date >= today` treated a
    blank date as older than everything, so a to-be-confirmed event silently vanished from the
    client's Events tab and got a "Past" pill on the owner's. */
-function eventUpcoming(ev){ return !ev||!ev.date ? true : ev.date>=todayISO(); }
+function eventUpcoming(ev){
+  if(!ev||!ev.date)return true;                 // date still to be confirmed — genuinely upcoming
+  const today=todayISO();
+  if(ev.date>today)return true;
+  if(ev.date<today)return false;
+  // same day: compare the actual start time, otherwise a 9am event still advertises itself at 8pm.
+  // A dateless time is treated as end-of-day so it stays visible for the whole day.
+  if(!ev.time)return true;
+  const n=nowBoston();
+  const [h,m]=ev.time.split(':').map(Number);
+  return (h*60+(m||0)) >= (n.getHours()*60+n.getMinutes());
+}
 function eventPast(ev){ return !eventUpcoming(ev); }
 /* undated events sort to the top of the upcoming list rather than the bottom */
 function eventSortKey(ev){ return (ev.date||'0000-00-00')+(ev.time||''); }
