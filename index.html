@@ -2463,11 +2463,29 @@ function renderBooking(){
 function sortSessions(arr){return arr.slice().sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));}
 function typePill(s){return s.type==='1on1'?'<span class="pill blue">1:1</span>':'<span class="pill orange">Group ('+s.customerIds.length+')</span>';}
 
+/* Coaches have no Customers tab — their clients are only reachable through sessions. This strip
+   gives them one tap to any player's skill board, so logging progress never requires opening a
+   session first. */
+function coachPlayersStrip(){
+  if(AUTH!=='coach')return '';
+  const ids=[...new Set(DB.sessions.filter(s=>s.coachId===coachAs&&s.status!=='cancelled')
+    .flatMap(s=>s.customerIds||[]))];
+  const list=ids.map(custById).filter(Boolean).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(!list.length)return '';
+  return `<div class="panel" style="margin-bottom:16px">
+    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3 style="margin:0">🎯 Your players</h3>
+      <span class="clienttag">Tap a player to record skill progress</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:7px">
+      ${list.map(c=>`<button class="btn ghost sm" onclick="openClientSkills('${c.id}')">${c.name}</button>`).join('')}
+    </div></div>`;
+}
 function renderBookingOwner(){
   const scopeLbl = AUTH==='coach' ? 'Your sessions' : (scopeCoach()==='all' ? 'All coaches' : 'Coach: '+coachName(scopeCoach()));
   $('#view-booking').innerHTML=`
     <h1 class="page">Booking & Schedule</h1>
     <div class="sub">${AUTH==='coach'?'Your client arrangements — sessions, check-ins and your calendar.':'Client arrangements — manage sessions, check-ins, packages, locations and your calendar.'} <span class="pill ${scopeCoach()==='all'?'orange':'green'}" style="margin-left:6px">${scopeLbl}</span></div>
+    ${coachPlayersStrip()}
     <div class="row" style="margin-bottom:16px">
       ${AUTH!=='coach'?'<button class="btn" onclick="openSession()">+ New Session</button>':''}
       <button class="btn ghost" onclick="exportAllCal()">📅 Export all upcoming (.ics)</button>
@@ -2649,7 +2667,7 @@ function openCoachStatus(id){
       <div class="clienttag" style="margin-top:4px">Shown to the client with this session. Photos are compressed automatically. Videos up to ${MAX_VIDEO_MB}MB — but a trimmed 1080p clip (~30MB) uploads faster and plays without buffering on a phone.</div></div>
     <p class="muted small">Status, cash payment, feedback and media can be updated here — other session details are managed by the owner. Changes sync to the owner and the client.</p>
   `,`<button class="btn ghost" onclick="closeModal()">Cancel</button>
-     ${s.customerIds.length===1?`<button class="btn ghost" onclick="openSkillLog('${s.customerIds[0]}')">🎯 Log skill progress</button>`:''}
+     ${s.customerIds.map(cid=>`<button class="btn ghost" onclick="openClientSkills('${cid}')">🎯 ${s.customerIds.length>1?firstName(custById(cid)?custById(cid).name:'') + "'s ":''}${t('Skills')}</button>`).join('')}
      <button class="btn" onclick="coachSaveSession('${id}')">Save</button>`);
   renderMediaPrev();
 }
@@ -3248,12 +3266,69 @@ function renderSkills(){
     <div class="sub">${t('Every skill you are working on, and the steps you have made on each. Your coach adds notes, photos and clips as you progress.')}</div>
     ${body||'<div class="panel"><div class="empty">'+t('No skills have been set up yet.')+'</div></div>'}`;
 }
-/* ---- coach / owner: record a step forward on a skill ---------------------- */
-let skillTargetCust=null;
-function openSkillLog(cid,preselect){
+/* ---- coach / owner: a client's whole skill board -------------------------
+   The same grouped view the client sees, but editable: add a step to any skill, edit the wording
+   of an entry, or remove one. Reachable from the customer profile (owner) and from any session
+   the coach is running — so recording progress never depends on opening a session first. */
+function openClientSkills(cid){
   if(AUTH!=='owner'&&AUTH!=='coach')return;
   const c=custById(cid); if(!c)return;
-  skillTargetCust=cid; editMedia=[]; mediaCust=c.name;
+  skillTargetCust=cid;
+  const sports=clientSports(cid);
+  let body='';
+  sports.forEach(sp=>{
+    const list=skillsForSport(sp); if(!list.length)return;
+    const started=list.filter(k=>skillEntries(cid,k.id).length).length;
+    body+=`<div style="margin-bottom:14px">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px">
+        <b>${sportIcon(sp)} ${sp}</b><span class="clienttag">${started}/${list.length} started</span></div>`;
+    body+=list.map(k=>{
+      const ents=skillEntries(cid,k.id);
+      const open=!!skillOpen['b_'+k.id];
+      return `<div class="skrow ${ents.length?'':'todo'}">
+        <div class="skhead">
+          <span class="skmark">${ents.length?'✓':'○'}</span>
+          <span class="skname" onclick="toggleBoardSkill('${k.id}')" style="cursor:pointer;flex:1">${k.name}</span>
+          ${ents.length?`<span class="pill green">${ents.length}</span>`:''}
+          <button class="btn sm" onclick="openSkillLog('${cid}','${k.id}',true)">+ ${t('Add step')}</button>
+          ${ents.length?`<span class="skchev" onclick="toggleBoardSkill('${k.id}')" style="cursor:pointer">${open?'▾':'▸'}</span>`:''}
+        </div>
+        ${open&&ents.length?`<div class="skbody">${ents.map(e=>`
+          <div class="skent">
+            <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px">
+              <div style="min-width:0;flex:1">
+                <div class="clienttag">${fmtChatTime(e.ts)} · ${e.byName||'—'}</div>
+                ${e.note?`<div style="font-size:13px;line-height:1.55;margin-top:2px">${escapeHtml(e.note)}</div>`:''}
+                ${(e.media||[]).length?`<div class="clienttag" style="margin-top:3px">📎 ${(e.media||[]).length} ${t('attachment(s)')}</div>`:''}
+              </div>
+              <div class="actions">
+                <button class="iconbtn" title="Edit note" onclick="editSkillEntry('${e.id}')">Edit</button>
+                <button class="iconbtn" title="Delete" onclick="delSkillLog('${e.id}',true)">✕</button>
+              </div></div>
+          </div>`).join('')}</div>`:''}
+      </div>`;
+    }).join('');
+    body+='</div>';
+  });
+  openModal('🎯 '+t('Skills')+' — '+c.name, body||('<div class="empty">'+t('No skills have been set up yet.')+'</div>'),
+    `${AUTH==='owner'?`<button class="btn ghost" onclick="openSkillAdmin()">Manage skill list</button>`:''}
+     <button class="btn" onclick="closeModal()">Done</button>`);
+}
+function toggleBoardSkill(id){ skillOpen['b_'+id]=!skillOpen['b_'+id]; openClientSkills(skillTargetCust); }
+function editSkillEntry(id){
+  const e=(DB.skillLog||[]).find(x=>x.id===id); if(!e)return;
+  const v=prompt('Update this progress note — the client sees it:', e.note||'');
+  if(v===null)return;
+  e.note=v.trim();
+  save(); pushRows('skill_log',[skillLogRow(e)]);
+  flash('Note updated'); openClientSkills(e.customerId);
+}
+/* ---- coach / owner: record a step forward on a skill ---------------------- */
+let skillTargetCust=null, skillBackToBoard=false;
+function openSkillLog(cid,preselect,backToBoard){
+  if(AUTH!=='owner'&&AUTH!=='coach')return;
+  const c=custById(cid); if(!c)return;
+  skillTargetCust=cid; skillBackToBoard=!!backToBoard; editMedia=[]; mediaCust=c.name;
   const sports=[...new Set((DB.skills||[]).filter(k=>k.active!==false).map(k=>k.sport||'Basketball'))];
   const opts=sports.map(sp=>`<optgroup label="${sportIcon(sp)} ${sp}">`+
       skillsForSport(sp).map(k=>`<option value="${k.id}" ${preselect===k.id?'selected':''}>${k.name}</option>`).join('')+
@@ -3266,7 +3341,7 @@ function openSkillLog(cid,preselect){
       <input type="file" accept="image/*,video/*" multiple onchange="addMediaFiles(this)">
       <div id="sMediaPrev" style="margin-top:8px"></div></div>
     <p class="muted small">Each entry is one step on the timeline for that skill — add a new one each time they move forward, rather than editing the old one.</p>
-  `,`<button class="btn ghost" onclick="closeModal()">Cancel</button>
+  `,`<button class="btn ghost" onclick="${backToBoard?`openClientSkills('${cid}')`:'closeModal()'}">Cancel</button>
      <button class="btn" onclick="saveSkillLog()">Save progress</button>`);
   renderMediaPrev();
 }
@@ -3285,7 +3360,9 @@ function saveSkillLog(){
   const k=skillById(skillId);
   notifySkillProgress(c,k,e);
   logAct('skill_progress',(k?k.name:'skill')+' · '+c.name,cid);
+  const back=skillBackToBoard; skillBackToBoard=false;
   closeModal(); flash('Progress saved 🎯'); refreshOwner();
+  if(back)openClientSkills(cid);
 }
 /* Tell the player (and the owner, if a coach logged it) — otherwise nobody knows it happened. */
 function notifySkillProgress(c,k,e){
@@ -3296,12 +3373,15 @@ function notifySkillProgress(c,k,e){
   msgs.forEach(m=>DB.messages.push(m));
   save(); pushRows('messages',msgs.map(messageRow));
 }
-function delSkillLog(id){
+function delSkillLog(id,backToBoard){
+  const e=(DB.skillLog||[]).find(x=>x.id===id);
   if(!confirm('Delete this progress entry? The client will no longer see it.'))return;
-  DB.skillLog=(DB.skillLog||[]).filter(e=>e.id!==id);
+  const cid=e?e.customerId:null;
+  DB.skillLog=(DB.skillLog||[]).filter(x=>x.id!==id);
   save();
   if(supa&&SUPA_OK)supa.from('skill_log').delete().eq('id',id).then(()=>{},()=>{});
   flash('Entry removed'); refreshOwner();
+  if(backToBoard&&cid)openClientSkills(cid);
 }
 function viewSkillMedia(entryId,i){
   const e=(DB.skillLog||[]).find(x=>x.id===entryId); const m=e&&e.media&&e.media[i]; if(!m)return;
@@ -4137,7 +4217,7 @@ function viewCustomer(id){
     </div>
     <div style="overflow-x:auto"><table><thead><tr><th>When</th><th>Type</th><th>Status</th><th>Pay</th><th class="right">Share</th><th></th></tr></thead><tbody>${hist}</tbody></table></div>
     <p class="muted small" style="margin-top:8px">Editing a session here updates the client's "My Sessions" too.</p>
-  `,`<button class="btn ghost" onclick="copyClientLink('${id}')">🔗 Client link</button><button class="btn ghost" onclick="openSkillLog('${id}')">🎯 Log skill</button><button class="btn ghost" onclick="openCustomer('${id}')">Edit</button><button class="btn" onclick="closeModal()">Close</button>`);
+  `,`<button class="btn ghost" onclick="copyClientLink('${id}')">🔗 Client link</button><button class="btn ghost" onclick="openClientSkills('${id}')">🎯 Skills</button><button class="btn ghost" onclick="openCustomer('${id}')">Edit</button><button class="btn" onclick="closeModal()">Close</button>`);
 }
 function openSellPackage(id){
   const c=id?custById(id):null;
