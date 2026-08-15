@@ -1214,7 +1214,7 @@ function normalize(d){
     ['Crossover','Between the legs','Behind the back','In and out','V dribble','Continuous combo','Right hand layup','Left hand layup','Right hand scoop layup','Left hand scoop layup','Right hand floater','Left hand floater','Low pick up finish','High pick up finish','Catch and shoot jump shot','One dribble pull up jump shot','Step back jump shot','Catch and shoot 3 pointer','Moving 3 pointer','Off the dribble 3 pointer','Trick shots'].forEach((n,i)=>d.skills.push({id:'sk'+(i+1),sport:'Basketball',name:n,ord:i+1,active:true}));
   }
   d.skills.forEach((k,i)=>{if(!k.sport)k.sport='Basketball';if(k.ord==null)k.ord=i+1;if(k.active===undefined)k.active=true;});
-  d.skillLog.forEach(e=>{if(!Array.isArray(e.media))e.media=[];});
+  d.skillLog.forEach(e=>{if(!Array.isArray(e.media))e.media=[];if(e.byId===undefined)e.byId='';if(e.editedBy===undefined)e.editedBy='';});
   (d.customers||[]).forEach(c=>{if(c.lastLogin===undefined)c.lastLogin='';if(c.loginCount===undefined)c.loginCount=0;});
   (d.coaches||[]).forEach(c=>{if(c.lastLogin===undefined)c.lastLogin='';if(c.loginCount===undefined)c.loginCount=0;});
   d.events.forEach(e=>{if(e.active===undefined)e.active=true;if(e.price==null)e.price=0;if(e.capacity==null)e.capacity=0;if(!e.created)e.created=todayISO();if(e.coachId===undefined)e.coachId='';if(!e.detail)e.detail=e.detail||'';if(e.video===undefined)e.video='';});
@@ -1243,14 +1243,14 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
   d.messages=(msgs||[]).map(m=>({id:m.id,peerType:m.peer_type||'client',clientId:m.client_id||'',coachId:m.coach_id||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',readOwner:m.read_owner===true,readClient:m.read_client===true,readCoach:m.read_coach===true}));
   d.skills=(sk||[]).map(k=>({id:k.id,sport:k.sport||'Basketball',name:k.name||'',ord:k.ord||0,active:k.active!==false}));
   d.skillLog=(sl||[]).map(e=>({id:e.id,customerId:e.customer_id||'',skillId:e.skill_id||'',ts:e.ts||'',
-    by:e.by_role||'',byName:e.by_name||'',note:e.note||'',media:e.media||[],level:e.level||''}));
+    by:e.by_role||'',byId:e.by_id||'',byName:e.by_name||'',note:e.note||'',media:e.media||[],level:e.level||'',editedBy:e.edited_by||''}));
   d.activity=(acts||[]).map(a=>({id:a.id,ts:a.ts||'',role:a.role||'',actorId:a.actor_id||'',actorName:a.actor_name||'',action:a.action||'',detail:a.detail||'',refId:a.ref_id||'',notify:a.notify===true}));
   return normalize(d);
 }
 const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),sport:c.sport||'Basketball',family:c.family===true,share_type:c.shareType||'pct',share_val:(c.shareVal!=null?c.shareVal:0),pending:(c.pending||null),created:c.created||null,last_login:lastLoginOf(c)||null,login_count:loginCountOf(c)});
 const skillRow=k=>({id:k.id,sport:k.sport||'Basketball',name:k.name||'',ord:k.ord||0,active:k.active!==false});
 const skillLogRow=e=>({id:e.id,customer_id:e.customerId||'',skill_id:e.skillId||'',ts:e.ts||'',
-  by_role:e.by||'',by_name:e.byName||'',note:e.note||'',media:e.media||[],level:e.level||''});
+  by_role:e.by||'',by_id:e.byId||'',by_name:e.byName||'',note:e.note||'',media:e.media||[],level:e.level||'',edited_by:e.editedBy||''});
 const actRow=a=>({id:a.id,ts:a.ts,role:a.role||'',actor_id:a.actorId||'',actor_name:a.actorName||'',
                   action:a.action||'',detail:a.detail||'',ref_id:a.refId||'',notify:a.notify===true});
 /* Last sign-in, taken as the LATER of the record's own column and the newest 'login' row in the
@@ -3314,31 +3314,90 @@ function openClientSkills(cid){
           <div class="skent">
             <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px">
               <div style="min-width:0;flex:1">
-                <div class="clienttag">${fmtChatTime(e.ts)} · ${e.byName||'—'}</div>
+                <div class="clienttag">${fmtChatTime(e.ts)} · ${e.byName||'—'}${e.editedBy?` · <span style="color:var(--accent)">edited by ${e.editedBy}</span>`:''}</div>
                 ${e.note?`<div style="font-size:13px;line-height:1.55;margin-top:2px">${escapeHtml(e.note)}</div>`:''}
                 ${(e.media||[]).length?`<div class="clienttag" style="margin-top:3px">📎 ${(e.media||[]).length} ${t('attachment(s)')}</div>`:''}
               </div>
-              <div class="actions">
-                <button class="iconbtn" title="Edit note" onclick="editSkillEntry('${e.id}')">Edit</button>
-                <button class="iconbtn" title="Delete" onclick="delSkillLog('${e.id}',true)">✕</button>
+              <div class="actions">${canEditSkillEntry(e)
+                ? `<button class="iconbtn" title="Edit" onclick="editSkillEntry('${e.id}')">Edit</button>
+                   <button class="iconbtn" title="Delete" onclick="delSkillLog('${e.id}',true)">✕</button>`
+                : `<span class="clienttag" title="Only ${e.byName||'the author'} or the owner can change this">locked</span>`}
               </div></div>
           </div>`).join('')}</div>`:''}
       </div>`;
     }).join('');
     body+='</div>';
   });
-  openModal('🎯 '+t('Skills')+' — '+c.name, body||('<div class="empty">'+t('No skills have been set up yet.')+'</div>'),
+  const quick = AUTH==='owner' ? `<div class="row" style="gap:8px;margin-top:4px">
+      <div class="field" style="flex:1;margin-bottom:0"><label class="f">Add a skill to the list</label>
+        <input id="bqSkill" placeholder="e.g. Euro step finish" onkeydown="if(event.key==='Enter')boardAddSkill('${cid}')"></div>
+      <div class="field" style="max-width:160px;margin-bottom:0"><label class="f">Sport</label>
+        <select id="bqSport">${sports.map(x=>`<option>${x}</option>`).join('')}</select></div>
+      <div class="field" style="display:flex;align-items:flex-end;margin-bottom:0">
+        <button class="btn" onclick="boardAddSkill('${cid}')">Add</button></div>
+    </div>` : '';
+  openModal('🎯 '+t('Skills')+' — '+c.name, (body||('<div class="empty">'+t('No skills have been set up yet.')+'</div>'))+quick,
     `${AUTH==='owner'?`<button class="btn ghost" onclick="openSkillAdmin()">Manage skill list</button>`:''}
      <button class="btn" onclick="closeModal()">Done</button>`);
 }
+/* The owner has final say over what a client reads, so they can edit or remove ANY entry,
+   including a coach's. A coach may only change their own — otherwise two coaches (or a coach and
+   the owner) could quietly overwrite each other's assessments of the same player. */
+function canEditSkillEntry(e){
+  if(!e)return false;
+  if(AUTH==='owner')return true;
+  if(AUTH!=='coach')return false;
+  return e.byId ? e.byId===coachAs : (e.by==='coach'&&e.byName===coachName(coachAs));
+}
+/* Owner-only quick add: a new skill appears for every client of that sport, not just this one —
+   the catalogue is shared, which is what keeps everyone's syllabus consistent. */
+function boardAddSkill(cid){
+  if(AUTH!=='owner')return;
+  const el=$('#bqSkill'); const name=(el?el.value:'').trim();
+  if(!name)return flash('Enter a skill name',true);
+  const sport=($('#bqSport')&&$('#bqSport').value)||'Basketball';
+  const max=(DB.skills||[]).filter(k=>(k.sport||'Basketball')===sport).reduce((m,k)=>Math.max(m,k.ord||0),0);
+  DB.skills.push({id:uid(),sport,name,ord:max+1,active:true});
+  save(); flash('Skill added to '+sport+' 🎯'); openClientSkills(cid);
+}
 function toggleBoardSkill(id){ skillOpen['b_'+id]=!skillOpen['b_'+id]; openClientSkills(skillTargetCust); }
+let skillEditId=null;
 function editSkillEntry(id){
   const e=(DB.skillLog||[]).find(x=>x.id===id); if(!e)return;
-  const v=prompt('Update this progress note — the client sees it:', e.note||'');
-  if(v===null)return;
-  e.note=v.trim();
+  if(!canEditSkillEntry(e))return flash('Only '+(e.byName||'the author')+' or the owner can change this entry',true);
+  skillEditId=id; skillTargetCust=e.customerId;
+  editMedia=(e.media||[]).slice();
+  const c=custById(e.customerId); mediaCust=c?c.name:'skills';
+  const k=skillById(e.skillId);
+  const mine=(AUTH==='owner'&&e.by==='coach');
+  openModal('Edit progress — '+(k?k.name:'skill'),`
+    <div class="clienttag" style="margin-bottom:10px">${fmtChatTime(e.ts)} · originally by <b style="color:var(--txt)">${e.byName||'—'}</b>${c?(' · '+c.name):''}</div>
+    ${mine?`<div class="clienttag" style="background:var(--panel2);border-left:3px solid var(--accent);padding:8px 11px;border-radius:0 8px 8px 0;margin-bottom:10px">You're editing a coach's entry as owner. Your change replaces what the client reads, and the entry will be marked as edited by you.</div>`:''}
+    <div class="field"><label class="f">Progress note — the client sees this</label>
+      <textarea id="seNote">${escapeHtml(e.note||'')}</textarea></div>
+    <div class="field"><label class="f">📎 Attachments</label>
+      <input type="file" accept="image/*,video/*" multiple onchange="addMediaFiles(this)">
+      <div id="sMediaPrev" style="margin-top:8px"></div>
+      <div class="clienttag" style="margin-top:4px">Remove an attachment with the ✕ on its thumbnail.</div></div>
+  `,`<button class="btn danger" onclick="delSkillLog('${id}',true)">Delete</button>
+     <button class="btn ghost" onclick="openClientSkills('${e.customerId}')">Cancel</button>
+     <button class="btn" onclick="saveSkillEdit()">Save changes</button>`);
+  renderMediaPrev();
+}
+function saveSkillEdit(){
+  if(blockIfUploading())return;
+  const e=(DB.skillLog||[]).find(x=>x.id===skillEditId); if(!e)return closeModal();
+  if(!canEditSkillEntry(e))return flash('Not allowed',true);
+  const note=($('#seNote').value||'').trim();
+  if(!note&&!editMedia.length)return flash('Add a note or an attachment',true);
+  const changed=(note!==(e.note||''))||(editMedia.length!==(e.media||[]).length);
+  e.note=note; e.media=editMedia.slice();
+  // record an owner override so the coach can see their wording was changed
+  if(changed&&AUTH==='owner'&&e.by==='coach')e.editedBy='Owner';
   save(); pushRows('skill_log',[skillLogRow(e)]);
-  flash('Note updated'); openClientSkills(e.customerId);
+  const cid=e.customerId;
+  skillEditId=null; editMedia=[]; mediaCust=null;
+  flash('Progress updated'); refreshOwner(); openClientSkills(cid);
 }
 /* ---- coach / owner: record a step forward on a skill ---------------------- */
 let skillTargetCust=null, skillBackToBoard=false;
@@ -3369,7 +3428,8 @@ function saveSkillLog(){
   const note=($('#slNote').value||'').trim();
   if(!note&&!editMedia.length)return flash('Add a note or an attachment',true);
   const e={id:uid(),customerId:cid,skillId,ts:new Date().toISOString(),
-    by:AUTH,byName:(AUTH==='coach'?coachName(coachAs):'Raymond'),note,media:editMedia.slice(),level:''};
+    by:AUTH,byId:(AUTH==='coach'?coachAs:'owner'),byName:(AUTH==='coach'?coachName(coachAs):'Raymond'),
+    note,media:editMedia.slice(),level:'',editedBy:''};
   if(!DB.skillLog)DB.skillLog=[];
   DB.skillLog.push(e);
   save(); pushRows('skill_log',[skillLogRow(e)]);
