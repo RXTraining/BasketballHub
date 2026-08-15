@@ -349,8 +349,11 @@
   .lp-event{background:linear-gradient(100deg,var(--lp-volt) 0%,#e9ff9a 100%);border-radius:18px;padding:26px;margin-top:26px;color:#202c06}
   .lp-event h3{margin:4px 0 8px;font-size:21px;font-weight:900}
   .lp-event p{margin:0 0 14px;font-size:14.5px;line-height:1.6}
-  .lp-vid{position:relative;width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;margin-top:22px;background:var(--lp-soft)}
-  .lp-vid iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+  /* no aspect-ratio here: videoHtml() already sizes correctly per media type. Nesting two ratio
+   boxes clipped the player and cropped portrait clips. */
+  .lp-vid{width:100%;border-radius:16px;overflow:hidden;margin-top:22px}
+  .lp-vid>div{margin-top:0!important}
+  .lp-vid video{margin-top:0!important}
   /* ---- brand mark: the dot pulses, a small bit of life without being noisy ---- */
   .lp-dot{font-style:normal;display:inline-block;font-size:.62em;vertical-align:.12em;margin:0 .04em;
     animation:lpBounce 1.1s cubic-bezier(.3,.8,.4,1) infinite}
@@ -580,6 +583,7 @@ const DB_KEY = 'rxtraining_v2';
 /* ---------- i18n: English / 中文 (client-facing) ---------- */
 let LANG='en'; try{LANG=localStorage.getItem('rx_lang')||'en';}catch(e){}
 const ZH={
+  'HIGHLIGHTS':'精彩集锦',
   'ABOUT_P3':'每一堂课都建立在<b>对篮球的热爱</b>之上：投入、拼搏，以及<b>永不放弃</b>的信念。',
   /* --- landing page prose --- */
   'HERO_LEDE':'由 <b>{name}</b> 创办 —— 一名现役 AAU 球员，而非早已退役的教练。每一堂课都建立在<b>对篮球的热爱</b>之上：投入、拼搏，以及<b>永不放弃</b>的信念。',
@@ -714,6 +718,7 @@ const ZH={
   'Session cancelled':'课程已取消','Registration cancelled':'报名已取消'
 };
 const KO={
+  'HIGHLIGHTS':'하이라이트',
   'ABOUT_P3':'모든 세션은 <b>경기에 대한 사랑</b> 위에 세워집니다: 헌신, 노력, 그리고 <b>절대 포기하지 않는</b> 믿음.',
   /* --- landing page prose --- */
   'HERO_LEDE':'<b>{name}</b>이(가) 설립했습니다 — 오래전 은퇴한 코치가 아니라 현역 AAU 선수입니다. 모든 세션은 <b>경기에 대한 사랑</b> 위에 세워집니다: 헌신, 노력, 그리고 <b>절대 포기하지 않는</b> 믿음.',
@@ -840,6 +845,7 @@ const KO={
   'Session cancelled':'수업이 취소되었습니다','Registration cancelled':'등록이 취소되었습니다'
 };
 const JA={
+  'HIGHLIGHTS':'ハイライト',
   'ABOUT_P3':'すべてのセッションは<b>競技への愛</b>の上に成り立っています：献身、努力、そして<b>決して諦めない</b>という信念。',
   /* --- landing page prose --- */
   'HERO_LEDE':'<b>{name}</b> が創設 —— 何年も前に引退したコーチではなく、現役の AAU 選手です。すべてのセッションは<b>競技への愛</b>の上に成り立っています：献身、努力、そして<b>決して諦めない</b>という信念。',
@@ -969,6 +975,7 @@ const JA={
    language has no entry — fine when the key IS the English text, but these blocks use short
    codes, so without this dictionary English visitors saw 'ABOUT_P1' on the page. */
 const EN={
+  'HIGHLIGHTS':'HIGHLIGHTS',
   'ABOUT_P3':'Every session is built on the <b>love of the game</b>: the dedication, the grind, and the belief that <b>you never give up</b>.',
   'HERO_LEDE':'Founded by <b>{name}</b> — an active AAU competitor, not a coach who stopped playing years ago. Every session is built on the <b>love of the game</b>: the dedication, the grind, and the belief that <b>you never give up</b>.',
   'ABOUT_P1':'RX.TRAINING was founded by <b>{name}</b>, a student-athlete at Lexington High School playing for <b>Middlesex Magic</b> — one of the most competitive AAU programs in Massachusetts. The idea was simple: players learn fastest from people still in the gym competing.',
@@ -1113,6 +1120,9 @@ function normalize(d){
   if(!d.settings.sports)d.settings.sports='Basketball, Soccer, Tennis, Golf, Track';
   // video shown in the home page Highlights section; blank falls back to the built-in AAU reel
   if(d.settings.highlightVideo===undefined)d.settings.highlightVideo='';
+  // caption under the Highlights heading — kept separately so it survives the source event
+  // being deleted or edited later
+  if(d.settings.highlightTitle===undefined)d.settings.highlightTitle='';
   if(!d.settings.homeAddress)d.settings.homeAddress='1 Granger Pond Way';
   if(d.settings.mileageRate===undefined||d.settings.mileageRate===null||d.settings.mileageRate==='')d.settings.mileageRate=0.70;
   if(!d.cashEntries)d.cashEntries=[];
@@ -1167,7 +1177,7 @@ function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.
 /* ----- relational mapping (separate tables in Supabase) ----- */
 function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts){
   const d={};
-  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',activityPush:(st&&st.activity_push)||'important',activitySeenAt:(st&&st.activity_seen_at)||'',sports:(st&&st.sports)||'Basketball, Soccer, Tennis, Golf, Track',highlightVideo:(st&&st.highlight_video)||'',groupMinPlayers:(st&&st.group_min_players)||2,groupFormHours:(st&&st.group_form_hours)||48,homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
+  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',activityPush:(st&&st.activity_push)||'important',activitySeenAt:(st&&st.activity_seen_at)||'',sports:(st&&st.sports)||'Basketball, Soccer, Tennis, Golf, Track',highlightVideo:(st&&st.highlight_video)||'',highlightTitle:(st&&st.highlight_title)||'',groupMinPlayers:(st&&st.group_min_players)||2,groupFormHours:(st&&st.group_form_hours)||48,homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
   d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',
     sport:(c.sport||'Basketball'),family:(c.family==null?undefined:c.family===true),shareType:(c.share_type||'pct'),shareVal:(c.share_val!=null?Number(c.share_val):0),
     rate1on1:(c.rate_1on1!=null?Number(c.rate_1on1):undefined),rateGroup:(c.rate_group!=null?Number(c.rate_group):undefined),
@@ -1449,7 +1459,7 @@ async function cloudPush(){
     // added yet) can't block everything else — the critical stuff still saves.
     const fails=[];
     const push=async(name,fn)=>{try{await fn();}catch(e){fails.push(name);console.warn('sync failed:',name,e&&e.message);}};
-    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null,zelle_phone:DB.settings.zellePhone||null,activity_push:DB.settings.activityPush||'important',activity_seen_at:DB.settings.activitySeenAt||null,sports:DB.settings.sports||null,highlight_video:DB.settings.highlightVideo||null,group_min_players:DB.settings.groupMinPlayers||2,group_form_hours:DB.settings.groupFormHours||48,home_address:DB.settings.homeAddress||null,mileage_rate:DB.settings.mileageRate!=null?DB.settings.mileageRate:null});if(error)throw error;});
+    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null,zelle_phone:DB.settings.zellePhone||null,activity_push:DB.settings.activityPush||'important',activity_seen_at:DB.settings.activitySeenAt||null,sports:DB.settings.sports||null,highlight_video:DB.settings.highlightVideo||null,highlight_title:DB.settings.highlightTitle||null,group_min_players:DB.settings.groupMinPlayers||2,group_form_hours:DB.settings.groupFormHours||48,home_address:DB.settings.homeAddress||null,mileage_rate:DB.settings.mileageRate!=null?DB.settings.mileageRate:null});if(error)throw error;});
     await push('coaches',()=>syncTable('coaches',(DB.coaches||[]).map(coachRow)));
     await push('locations',()=>syncTable('locations',DB.locations.map(l=>({id:l.id,name:l.name,address:l.address||'',miles:l.miles||0}))));
     await push('customers',()=>syncTable('customers',DB.customers.map(custRow)));
@@ -1991,8 +2001,8 @@ function renderLanding(){
 
     <section class="lp-sec" id="lpFilm">
       <div class="lp-kicker">${t('See me play')}</div>
-      <h2 class="lp-h2">${t('AAU HIGHLIGHTS')}</h2>
-      <p class="lp-p">${t('FILM_P')}</p>
+      <h2 class="lp-h2">${t('HIGHLIGHTS')}</h2>
+      ${DB.settings.highlightTitle?`<p class="lp-p" style="font-weight:800;color:var(--lp-ink);font-size:17px">${DB.settings.highlightTitle}</p>`:`<p class="lp-p">${t('FILM_P')}</p>`}
       <div class="lp-vid">${videoHtml(DB.settings.highlightVideo||'https://www.youtube.com/embed/1odU-4Ml2sw','100%')||'<iframe src="https://www.youtube.com/embed/1odU-4Ml2sw" title="AAU highlights" allowfullscreen></iframe>'}</div>
     </section>
 
@@ -3436,9 +3446,12 @@ function videoEmbed(url){
 function videoHtml(url,width){
   const e=videoEmbed(url); if(!e)return '';
   const w=width||'100%';
+  // An <iframe> has no intrinsic size, so it needs a 16:9 box. A real <video> DOES know its own
+  // shape — forcing 16:9 on it crops portrait phone footage, so cap the height instead and let
+  // the browser letterbox naturally.
   return e.kind==='iframe'
     ? `<div style="position:relative;width:${w};max-width:100%;aspect-ratio:16/9;margin-top:6px"><iframe src="${e.src}" style="position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:10px" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe></div>`
-    : `<video src="${e.src}" controls preload="metadata" style="width:${w};max-width:100%;border-radius:10px;margin-top:6px"></video>`;
+    : `<video src="${e.src}" controls playsinline preload="metadata" style="display:block;width:${w};max-width:100%;max-height:70vh;height:auto;border-radius:10px;margin:6px auto 0;background:#000"></video>`;
 }
 // Downscale + re-encode a photo before upload to cut storage & (repeated) view egress.
 async function compressImage(file,maxDim=1600,quality=0.8){
@@ -4952,8 +4965,8 @@ function saveEvent(id){
   // an event's video can double as the public Highlights reel
   const hi=$('#evHighlight');
   if(hi){
-    if(hi.checked&&video)DB.settings.highlightVideo=video;
-    else if(!hi.checked&&DB.settings.highlightVideo===video)DB.settings.highlightVideo='';
+    if(hi.checked&&video){DB.settings.highlightVideo=video;DB.settings.highlightTitle=title;}
+    else if(!hi.checked&&DB.settings.highlightVideo===video){DB.settings.highlightVideo='';DB.settings.highlightTitle='';}
   }
   save();closeModal();flash('Event saved 📅');renderEvents();
 }
@@ -5609,6 +5622,8 @@ function renderAdmin(){
       <h3>Home page highlights video</h3>
       <div class="field"><label class="f">Video shown in the <b style="color:var(--txt)">AAU Highlights</b> section of rxtraining.org</label>
         <input id="hiVideo" value="${safeUrl(DB.settings.highlightVideo||'')}" placeholder="Paste a YouTube / Vimeo / Drive link…"></div>
+      <div class="field"><label class="f">Caption shown under the HIGHLIGHTS heading (optional)</label>
+        <input id="hiTitle" value="${(DB.settings.highlightTitle||'').replace(/"/g,'&quot;')}" placeholder="e.g. Summer Showcase vs Middlesex Magic"></div>
       <div class="row" style="gap:8px;align-items:center;margin-top:-4px">
         <label class="btn ghost sm" style="cursor:pointer">⬆ Upload a video<input type="file" accept="video/*" style="display:none" onchange="uploadHighlightVideo(this)"></label>
         <button class="btn ghost sm" onclick="clearHighlightVideo()">Restore default reel</button>
@@ -5630,11 +5645,12 @@ function saveHighlightVideo(){
   const v=safeUrl($('#hiVideo').value||'');
   if(v&&!videoEmbed(v))return flash('That doesn\'t look like a video URL — it should start with https://',true);
   DB.settings.highlightVideo=v;
+  DB.settings.highlightTitle=(($('#hiTitle')&&$('#hiTitle').value)||'').trim();
   save();flash(v?'Highlights video updated 🎬':'Restored the default reel');renderAdmin();
 }
 function clearHighlightVideo(){
   if(!confirm('Restore the built-in AAU highlights reel on the home page?'))return;
-  DB.settings.highlightVideo='';
+  DB.settings.highlightVideo='';DB.settings.highlightTitle='';
   save();flash('Restored the default reel');renderAdmin();
 }
 /* Same upload path as the event video — result is just a URL, so uploads and pasted links are
