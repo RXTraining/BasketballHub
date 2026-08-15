@@ -623,7 +623,8 @@ const ZH={
   '🔑 Change password':'🔑 修改密码','Sign out':'退出',
   // my sessions
   'Welcome,':'欢迎，',
-  'Request a session and manage your upcoming sessions. Past sessions are in the Past Sessions tab.':'预约课程并管理您即将开始的课程。历史课程在“历史课程”标签中。',
+  'Request a session and manage your upcoming sessions. Completed sessions are in My Journey.':'预约课程并管理您即将开始的课程。已完成的课程在“我的历程”中。',
+  'My Journey':'我的历程',
   'Your prepaid sessions':'您的预付课程',
   'No package yet — ask the Owner about prepaid packs.':'暂无套餐 — 可向管理员咨询预付套餐。',
   'Request a session':'预约课程','Session type':'课程类型','Date':'日期','Comment (optional)':'备注（可选）',
@@ -752,7 +753,8 @@ const KO={
   'Coaches: sign in with your name and the password set by the owner.':'코치: 이름과 관리자가 설정한 비밀번호로 로그인하세요.',
   '🔑 Change password':'🔑 비밀번호 변경','Sign out':'로그아웃',
   'Welcome,':'환영합니다,',
-  'Request a session and manage your upcoming sessions. Past sessions are in the Past Sessions tab.':'수업을 예약하고 예정된 수업을 관리하세요. 지난 수업은 "지난 수업" 탭에 있습니다.',
+  'Request a session and manage your upcoming sessions. Completed sessions are in My Journey.':'수업을 예약하고 예정된 수업을 관리하세요. 완료된 수업은 "마이 저니"에 있습니다.',
+  'My Journey':'마이 저니',
   'Your prepaid sessions':'선불 수업',
   'No package yet — ask the Owner about prepaid packs.':'아직 패키지가 없습니다 — 관리자에게 선불 패키지를 문의하세요.',
   'Request a session':'수업 예약','Session type':'수업 유형','Date':'날짜','Comment (optional)':'메모 (선택)',
@@ -876,7 +878,8 @@ const JA={
   'Coaches: sign in with your name and the password set by the owner.':'コーチ：名前と管理者が設定したパスワードでログインしてください。',
   '🔑 Change password':'🔑 パスワード変更','Sign out':'ログアウト',
   'Welcome,':'ようこそ、',
-  'Request a session and manage your upcoming sessions. Past sessions are in the Past Sessions tab.':'セッションを予約し、今後のセッションを管理できます。過去のセッションは「過去のセッション」タブにあります。',
+  'Request a session and manage your upcoming sessions. Completed sessions are in My Journey.':'セッションを予約し、今後のセッションを管理できます。完了したセッションは「マイジャーニー」にあります。',
+  'My Journey':'マイジャーニー',
   'Your prepaid sessions':'プリペイドセッション',
   'No package yet — ask the Owner about prepaid packs.':'パッケージがありません — 管理者にプリペイドパックについてお問い合わせください。',
   'Request a session':'セッション予約','Session type':'セッション種別','Date':'日付','Comment (optional)':'コメント（任意）',
@@ -1616,7 +1619,9 @@ const TABS=[
 
 function renderTabs(){
   let allowed;
-  if(AUTH==='client') allowed=['booking','past','journey','money','events','messages'];
+  // 'past' is intentionally absent: My Journey presents the same completed sessions as a
+  // timeline, so a separate Past Sessions list is redundant for clients.
+  if(AUTH==='client') allowed=['booking','journey','money','events','messages'];
   else if(AUTH==='coach') allowed=['about','booking','availability','money','messages'];   // coach chats with owner only
   else allowed = TABS.map(tb=>tb.id).filter(x=>x!=='past'&&x!=='money');   // owner uses the full Finance tab instead
   if(!allowed.includes(TAB)) TAB = 'booking';
@@ -2645,7 +2650,7 @@ function renderBookingClient(){
 
   $('#view-booking').innerHTML=`
     <h1 class="page">${t('Welcome,')} ${firstName(c.name)} 👋</h1>
-    <div class="sub">${t('Request a session and manage your upcoming sessions. Past sessions are in the Past Sessions tab.')}</div>
+    <div class="sub">${t('Request a session and manage your upcoming sessions. Completed sessions are in My Journey.')}</div>
     <div class="row" style="margin:-6px 0 14px"><button class="btn ghost sm" onclick="openClientProfile()">✎ ${t('Edit my contact info')}</button></div>
     ${clientEventBanner()}
     <div class="panel" style="margin-bottom:16px">
@@ -3061,6 +3066,7 @@ function renderJourney(){
     body+=`<div class="jmonth">${monthName(k)} <span>${byMonth[k].length} ${byMonth[k].length===1?t('session'):t('sessions')}</span></div>`;
     byMonth[k].forEach(s=>{ body+=card(s,idx); idx++; });
   });
+  logFeedbackViews(st.mine);   // moved here from Past Sessions, which clients no longer see
   el.innerHTML=`
     <h1 class="page">${t('My Journey')}</h1>
     <div class="sub">${t('Your training story — every session, note and clip in one place.')}</div>
@@ -3223,7 +3229,7 @@ function notifyMediaAdded(s,prevCount,actor){
     const c=custById(cid);
     msgs.push({id:uid(),peerType:'client',clientId:cid,coachId:'',sender:'owner',
       text:'Hi'+(c?' '+firstName(c.name):'')+'! 🎬 '+who+' added '+what+' to your session on '+when+
-           '. Open Past Sessions in the app to watch.',
+           '. Open My Journey in the app to watch.',
       media:[],created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false});
   });
   // if the OWNER uploaded, let the coach know too (the reverse case reaches the owner via the
