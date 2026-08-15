@@ -1893,6 +1893,12 @@ function renderLanding(){
   const ev=(DB.events||[]).filter(e=>e.active!==false&&eventUpcoming(e))
             .sort((a,b)=>eventSortKey(a).localeCompare(eventSortKey(b)))[0];
   const done=DB.sessions.filter(s=>s.status==='completed').length;
+  // Caption for the Highlights section. Prefer the saved caption, but fall back to the title of
+  // whichever event supplied the video — so a highlight set before captions existed (or set by
+  // someone who left the caption blank) still shows the event name instead of the stock line.
+  const hiVid=DB.settings.highlightVideo||'';
+  const hiEv=hiVid?(DB.events||[]).find(e=>e.video&&e.video===hiVid):null;
+  const hiTitle=(DB.settings.highlightTitle||'').trim()||(hiEv?hiEv.title:'');
   el.innerHTML=`
   <nav class="lp-nav">
     <span class="lp-logo">RX<i>.</i>TRAINING</span>
@@ -2002,7 +2008,7 @@ function renderLanding(){
     <section class="lp-sec" id="lpFilm">
       <div class="lp-kicker">${t('See me play')}</div>
       <h2 class="lp-h2">${t('HIGHLIGHTS')}</h2>
-      ${DB.settings.highlightTitle?`<p class="lp-p" style="font-weight:800;color:var(--lp-ink);font-size:17px">${DB.settings.highlightTitle}</p>`:`<p class="lp-p">${t('FILM_P')}</p>`}
+      ${hiTitle?`<p class="lp-p" style="font-weight:800;color:var(--lp-ink);font-size:17px">${hiTitle}</p>`:`<p class="lp-p">${t('FILM_P')}</p>`}
       <div class="lp-vid">${videoHtml(DB.settings.highlightVideo||'https://www.youtube.com/embed/1odU-4Ml2sw','100%')||'<iframe src="https://www.youtube.com/embed/1odU-4Ml2sw" title="AAU highlights" allowfullscreen></iframe>'}</div>
     </section>
 
