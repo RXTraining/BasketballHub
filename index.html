@@ -1111,6 +1111,8 @@ function normalize(d){
   // Sports we advertise. Anything with a coach attached shows as live; the rest as 'coming soon',
   // so new sports are launched by adding a coach — not by editing code.
   if(!d.settings.sports)d.settings.sports='Basketball, Soccer, Tennis, Golf, Track';
+  // video shown in the home page Highlights section; blank falls back to the built-in AAU reel
+  if(d.settings.highlightVideo===undefined)d.settings.highlightVideo='';
   if(!d.settings.homeAddress)d.settings.homeAddress='1 Granger Pond Way';
   if(d.settings.mileageRate===undefined||d.settings.mileageRate===null||d.settings.mileageRate==='')d.settings.mileageRate=0.70;
   if(!d.cashEntries)d.cashEntries=[];
@@ -1165,7 +1167,7 @@ function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.
 /* ----- relational mapping (separate tables in Supabase) ----- */
 function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts){
   const d={};
-  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',activityPush:(st&&st.activity_push)||'important',activitySeenAt:(st&&st.activity_seen_at)||'',sports:(st&&st.sports)||'Basketball, Soccer, Tennis, Golf, Track',groupMinPlayers:(st&&st.group_min_players)||2,groupFormHours:(st&&st.group_form_hours)||48,homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
+  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',activityPush:(st&&st.activity_push)||'important',activitySeenAt:(st&&st.activity_seen_at)||'',sports:(st&&st.sports)||'Basketball, Soccer, Tennis, Golf, Track',highlightVideo:(st&&st.highlight_video)||'',groupMinPlayers:(st&&st.group_min_players)||2,groupFormHours:(st&&st.group_form_hours)||48,homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
   d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',
     sport:(c.sport||'Basketball'),family:(c.family==null?undefined:c.family===true),shareType:(c.share_type||'pct'),shareVal:(c.share_val!=null?Number(c.share_val):0),
     rate1on1:(c.rate_1on1!=null?Number(c.rate_1on1):undefined),rateGroup:(c.rate_group!=null?Number(c.rate_group):undefined),
@@ -1447,7 +1449,7 @@ async function cloudPush(){
     // added yet) can't block everything else — the critical stuff still saves.
     const fails=[];
     const push=async(name,fn)=>{try{await fn();}catch(e){fails.push(name);console.warn('sync failed:',name,e&&e.message);}};
-    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null,zelle_phone:DB.settings.zellePhone||null,activity_push:DB.settings.activityPush||'important',activity_seen_at:DB.settings.activitySeenAt||null,sports:DB.settings.sports||null,group_min_players:DB.settings.groupMinPlayers||2,group_form_hours:DB.settings.groupFormHours||48,home_address:DB.settings.homeAddress||null,mileage_rate:DB.settings.mileageRate!=null?DB.settings.mileageRate:null});if(error)throw error;});
+    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null,zelle_phone:DB.settings.zellePhone||null,activity_push:DB.settings.activityPush||'important',activity_seen_at:DB.settings.activitySeenAt||null,sports:DB.settings.sports||null,highlight_video:DB.settings.highlightVideo||null,group_min_players:DB.settings.groupMinPlayers||2,group_form_hours:DB.settings.groupFormHours||48,home_address:DB.settings.homeAddress||null,mileage_rate:DB.settings.mileageRate!=null?DB.settings.mileageRate:null});if(error)throw error;});
     await push('coaches',()=>syncTable('coaches',(DB.coaches||[]).map(coachRow)));
     await push('locations',()=>syncTable('locations',DB.locations.map(l=>({id:l.id,name:l.name,address:l.address||'',miles:l.miles||0}))));
     await push('customers',()=>syncTable('customers',DB.customers.map(custRow)));
@@ -1991,7 +1993,7 @@ function renderLanding(){
       <div class="lp-kicker">${t('See me play')}</div>
       <h2 class="lp-h2">${t('AAU HIGHLIGHTS')}</h2>
       <p class="lp-p">${t('FILM_P')}</p>
-      <div class="lp-vid"><iframe src="https://www.youtube.com/embed/1odU-4Ml2sw" title="AAU highlights" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe></div>
+      <div class="lp-vid">${videoHtml(DB.settings.highlightVideo||'https://www.youtube.com/embed/1odU-4Ml2sw','100%')||'<iframe src="https://www.youtube.com/embed/1odU-4Ml2sw" title="AAU highlights" allowfullscreen></iframe>'}</div>
     </section>
 
     <section class="lp-sec" id="lpBook">
@@ -4904,7 +4906,11 @@ function openEvent(id){
         <label class="btn ghost sm" style="cursor:pointer">⬆ …or upload a video<input type="file" accept="video/*" style="display:none" onchange="uploadEventVideo(this)"></label>
         <span class="clienttag">Uploads up to ${MAX_VIDEO_MB}MB. For long footage an (unlisted) YouTube link streams better on phones.</span>
       </div>
-      <div id="evVideoPrev" style="margin-top:8px">${videoHtml(ev.video||'','280px')}</div></div>
+      <div id="evVideoPrev" style="margin-top:8px">${videoHtml(ev.video||'','280px')}</div>
+      <label class="f" style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <input type="checkbox" id="evHighlight" style="width:auto" ${(ev.video&&DB.settings.highlightVideo===ev.video)?'checked':''}>
+        ${t('Also show this video as the Highlights reel on the home page')}</label>
+      <div class="clienttag">Replaces whatever is currently on the public page. Unticking restores the previous default.</div></div>
     <label class="f" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="evActive" ${ev.active!==false?'checked':''} style="width:auto"> Published (visible to clients)</label>
     <p class="muted small" style="margin-top:8px">Uncheck Published to keep it a draft. Use 📣 in the list to email all clients once it's ready.</p>
   `,`
@@ -4943,6 +4949,12 @@ function saveEvent(id){
   const obj={title,detail:$('#evDetail').value,date:$('#evDate').value,time:$('#evTime').value,location:$('#evLoc').value,coachId:$('#evCoach').value||'',price:Math.max(0,+$('#evPrice').value||0),capacity:Math.max(0,Math.round(+$('#evCap').value||0)),active:$('#evActive').checked,video};
   if(id){Object.assign(eventById(id),obj);}
   else{obj.id=uid();obj.created=todayISO();DB.events.push(obj);}
+  // an event's video can double as the public Highlights reel
+  const hi=$('#evHighlight');
+  if(hi){
+    if(hi.checked&&video)DB.settings.highlightVideo=video;
+    else if(!hi.checked&&DB.settings.highlightVideo===video)DB.settings.highlightVideo='';
+  }
   save();closeModal();flash('Event saved 📅');renderEvents();
 }
 function delEvent(id){if(!confirm('Delete this event? Registrations will be removed too.'))return;DB.events=DB.events.filter(e=>e.id!==id);DB.eventRegs=DB.eventRegs.filter(r=>r.eventId!==id);save();closeModal();flash('Event deleted');renderEvents();}
@@ -5592,6 +5604,18 @@ function renderAdmin(){
       </div>
       <div class="clienttag" style="margin:-6px 0 12px">A group request below the minimum is <b style="color:var(--txt)">forming</b> — it does <b style="color:var(--txt)">not</b> block that time from 1:1 requests, so a group nobody joins can't sit on a prime slot. Past the cutoff it appears in your approvals under "Groups that didn't fill", and the client is messaged once offering to keep the time as a 1:1 at the 1:1 rate, or cancel.</div>
       <button class="btn sm" onclick="saveGroupForming()">Save group settings</button>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h3>Home page highlights video</h3>
+      <div class="field"><label class="f">Video shown in the <b style="color:var(--txt)">AAU Highlights</b> section of rxtraining.org</label>
+        <input id="hiVideo" value="${safeUrl(DB.settings.highlightVideo||'')}" placeholder="Paste a YouTube / Vimeo / Drive link…"></div>
+      <div class="row" style="gap:8px;align-items:center;margin-top:-4px">
+        <label class="btn ghost sm" style="cursor:pointer">⬆ Upload a video<input type="file" accept="video/*" style="display:none" onchange="uploadHighlightVideo(this)"></label>
+        <button class="btn ghost sm" onclick="clearHighlightVideo()">Restore default reel</button>
+      </div>
+      <div id="hiPrev" style="margin-top:10px">${videoHtml(DB.settings.highlightVideo||'','320px')}</div>
+      <div class="clienttag" style="margin-top:6px">Leave blank to show the built-in AAU reel. You can also set this from any event — tick <b style="color:var(--txt)">"Also show this video as the Highlights reel"</b> in the event editor.</div>
+      <button class="btn sm" style="margin-top:10px" onclick="saveHighlightVideo()">Save highlights video</button>
     </div>`;
 }
 function saveNotify(){
@@ -5601,6 +5625,41 @@ function saveNotify(){
 function saveZelle(){
   DB.settings.zellePhone=($('#zellePhone').value||'').trim();
   save();flash('Zelle number saved');
+}
+function saveHighlightVideo(){
+  const v=safeUrl($('#hiVideo').value||'');
+  if(v&&!videoEmbed(v))return flash('That doesn\'t look like a video URL — it should start with https://',true);
+  DB.settings.highlightVideo=v;
+  save();flash(v?'Highlights video updated 🎬':'Restored the default reel');renderAdmin();
+}
+function clearHighlightVideo(){
+  if(!confirm('Restore the built-in AAU highlights reel on the home page?'))return;
+  DB.settings.highlightVideo='';
+  save();flash('Restored the default reel');renderAdmin();
+}
+/* Same upload path as the event video — result is just a URL, so uploads and pasted links are
+   interchangeable here too. */
+async function uploadHighlightVideo(input){
+  const f=input.files&&input.files[0];input.value='';
+  if(!f)return;
+  if(f.type.indexOf('video')!==0)return flash('Please choose a video file',true);
+  if(f.size>MAX_VIDEO_MB*1024*1024)return flash('That video is '+Math.round(f.size/1048576)+'MB — the limit is '+MAX_VIDEO_MB+'MB. Trim it or paste a YouTube link instead.',true);
+  flash('Uploading video…');
+  try{
+    let url='';
+    if(useR2()){
+      const r=await fetch(R2_ENDPOINT,{method:'POST',headers:{'content-type':f.type,'x-upload-token':R2_TOKEN,'x-file-name':(f.name||'highlight.mp4'),'x-customer-id':'highlights'},body:f});
+      const j=await r.json();if(!r.ok||!j.url)return flash('Upload failed: '+((j&&j.error)||r.status),true);url=j.url;
+    }else if(supa&&SUPA_OK){
+      const path='media/highlights/'+uid()+'-'+(f.name||'highlight.mp4').replace(/[^a-zA-Z0-9._-]/g,'_');
+      const up=await supa.storage.from(MEDIA_BUCKET).upload(path,f,{upsert:true,contentType:f.type});
+      if(up.error)return flash('Upload failed: '+up.error.message,true);
+      url=supa.storage.from(MEDIA_BUCKET).getPublicUrl(path).data.publicUrl;
+    }else{return flash('Connect Supabase or R2 to upload videos',true);}
+    const inp=$('#hiVideo'); if(inp)inp.value=url;
+    const pv=$('#hiPrev'); if(pv)pv.innerHTML=videoHtml(url,'320px');
+    flash('Uploaded ✅ — press Save highlights video');
+  }catch(e){flash('Upload failed: '+e.message,true);}
 }
 function saveGroupForming(){
   DB.settings.groupMinPlayers=Math.max(2,Math.min(MAX_GROUP,+$('#grpMin').value||2));
