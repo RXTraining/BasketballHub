@@ -157,6 +157,41 @@
   @keyframes mqscroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
   .mq-item{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--txt)}
   .mq-item .btn{padding:4px 11px;font-size:12px}
+  /* ---- cartoon sport picker (replaces a dropdown; friendlier for younger players) ---- */
+  .sportpick{display:flex;gap:9px;flex-wrap:wrap}
+  .sporttile{background:var(--panel2);border:2px solid var(--line);border-radius:15px;
+    padding:11px 14px 9px;min-width:96px;cursor:pointer;font-family:inherit;text-align:center;
+    transition:transform .18s cubic-bezier(.3,.9,.4,1),border-color .18s,background .18s}
+  .sporttile:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .sporttile.on{border-color:var(--accent);background:var(--panel)}
+  .sporttile .ico{display:block;font-size:30px;line-height:1.1;
+    transition:transform .25s cubic-bezier(.3,1.4,.5,1)}
+  .sporttile:hover .ico{transform:scale(1.14) rotate(-8deg)}
+  /* the chosen sport keeps bouncing, so it reads as "this one is live" */
+  .sporttile.on .ico{animation:sportBounce 1.15s cubic-bezier(.3,.8,.4,1) infinite}
+  @keyframes sportBounce{
+    0%,100%{transform:translateY(0) scale(1,1)}
+    28%{transform:translateY(-7px) scale(.94,1.07)}
+    52%{transform:translateY(0) scale(1.09,.92)}
+    72%{transform:translateY(-2px) scale(1,1)}}
+  .sporttile b{display:block;font-size:13px;margin-top:3px;color:var(--txt)}
+  .sporttile .n{display:block;font-size:10.5px;color:var(--muted);font-weight:700;margin-top:1px}
+  .sporttile.on .n{color:var(--accent)}
+  @media(prefers-reduced-motion:reduce){.sporttile .ico,.sporttile.on .ico{animation:none;transition:none}}
+  /* ---- My Skills ---- */
+  .skrow{border:1px solid var(--line);border-radius:11px;margin-bottom:7px;overflow:hidden;background:var(--panel)}
+  .skrow.todo{opacity:.72}
+  .skhead{display:flex;align-items:center;gap:9px;padding:10px 12px;cursor:pointer;font-size:13.5px}
+  .skhead:hover{background:var(--panel2)}
+  .skmark{flex:none;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;font-size:11px;font-weight:900;background:var(--panel2);color:var(--muted)}
+  .skrow:not(.todo) .skmark{background:var(--green);color:#fff}
+  .skname{font-weight:700}
+  .skchev{margin-left:6px;color:var(--muted)}
+  .skhead .clienttag{margin-left:auto}
+  .skbody{padding:2px 12px 12px 41px;border-top:1px solid var(--line)}
+  .skent{padding:9px 0;border-bottom:1px dashed var(--line)}
+  .skent:last-child{border-bottom:0}
   /* ---- My Journey timeline ---- */
   .jline{position:relative;padding-left:6px}
   .jmonth{font-weight:900;font-size:14px;margin:22px 0 12px;display:flex;align-items:center;gap:9px}
@@ -501,6 +536,7 @@
   <section class="view" id="view-booking"></section>
   <section class="view" id="view-past"></section>
   <section class="view" id="view-journey"></section>
+  <section class="view" id="view-skills"></section>
   <section class="view" id="view-money"></section>
   <section class="view" id="view-events"></section>
   <section class="view" id="view-customers"></section>
@@ -1166,6 +1202,15 @@ function normalize(d){
   if(!d.eventRegs)d.eventRegs=[];
   if(!d.messages)d.messages=[];
   if(!d.activity)d.activity=[];
+  // Skill catalogue (owner-managed) and per-client progress entries.
+  if(!Array.isArray(d.skills))d.skills=[];
+  if(!Array.isArray(d.skillLog))d.skillLog=[];
+  if(!d.skills.length){
+    // seed the basketball list; the owner can rename, reorder, delete or add per sport
+    ['Crossover','Between the legs','Behind the back','In and out','V dribble','Continuous combo','Right hand layup','Left hand layup','Right hand scoop layup','Left hand scoop layup','Right hand floater','Left hand floater','Low pick up finish','High pick up finish','Catch and shoot jump shot','One dribble pull up jump shot','Step back jump shot','Catch and shoot 3 pointer','Moving 3 pointer','Off the dribble 3 pointer','Trick shots'].forEach((n,i)=>d.skills.push({id:'sk'+(i+1),sport:'Basketball',name:n,ord:i+1,active:true}));
+  }
+  d.skills.forEach((k,i)=>{if(!k.sport)k.sport='Basketball';if(k.ord==null)k.ord=i+1;if(k.active===undefined)k.active=true;});
+  d.skillLog.forEach(e=>{if(!Array.isArray(e.media))e.media=[];});
   (d.customers||[]).forEach(c=>{if(c.lastLogin===undefined)c.lastLogin='';if(c.loginCount===undefined)c.loginCount=0;});
   (d.coaches||[]).forEach(c=>{if(c.lastLogin===undefined)c.lastLogin='';if(c.loginCount===undefined)c.loginCount=0;});
   d.events.forEach(e=>{if(e.active===undefined)e.active=true;if(e.price==null)e.price=0;if(e.capacity==null)e.capacity=0;if(!e.created)e.created=todayISO();if(e.coachId===undefined)e.coachId='';if(!e.detail)e.detail=e.detail||'';if(e.video===undefined)e.video='';});
@@ -1175,7 +1220,7 @@ function normalize(d){
 function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.parse(r);}catch(e){}return normalize(d);}
 
 /* ----- relational mapping (separate tables in Supabase) ----- */
-function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts){
+function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl){
   const d={};
   d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',activityPush:(st&&st.activity_push)||'important',activitySeenAt:(st&&st.activity_seen_at)||'',sports:(st&&st.sports)||'Basketball, Soccer, Tennis, Golf, Track',highlightVideo:(st&&st.highlight_video)||'',highlightTitle:(st&&st.highlight_title)||'',groupMinPlayers:(st&&st.group_min_players)||2,groupFormHours:(st&&st.group_form_hours)||48,homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
   d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',
@@ -1192,10 +1237,16 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts){
   d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||'',video:e.video||''}));
   d.eventRegs=(regs||[]).map(r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||''}));
   d.messages=(msgs||[]).map(m=>({id:m.id,peerType:m.peer_type||'client',clientId:m.client_id||'',coachId:m.coach_id||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',readOwner:m.read_owner===true,readClient:m.read_client===true,readCoach:m.read_coach===true}));
+  d.skills=(sk||[]).map(k=>({id:k.id,sport:k.sport||'Basketball',name:k.name||'',ord:k.ord||0,active:k.active!==false}));
+  d.skillLog=(sl||[]).map(e=>({id:e.id,customerId:e.customer_id||'',skillId:e.skill_id||'',ts:e.ts||'',
+    by:e.by_role||'',byName:e.by_name||'',note:e.note||'',media:e.media||[],level:e.level||''}));
   d.activity=(acts||[]).map(a=>({id:a.id,ts:a.ts||'',role:a.role||'',actorId:a.actor_id||'',actorName:a.actor_name||'',action:a.action||'',detail:a.detail||'',refId:a.ref_id||'',notify:a.notify===true}));
   return normalize(d);
 }
 const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),sport:c.sport||'Basketball',family:c.family===true,share_type:c.shareType||'pct',share_val:(c.shareVal!=null?c.shareVal:0),pending:(c.pending||null),created:c.created||null,last_login:lastLoginOf(c)||null,login_count:loginCountOf(c)});
+const skillRow=k=>({id:k.id,sport:k.sport||'Basketball',name:k.name||'',ord:k.ord||0,active:k.active!==false});
+const skillLogRow=e=>({id:e.id,customer_id:e.customerId||'',skill_id:e.skillId||'',ts:e.ts||'',
+  by_role:e.by||'',by_name:e.byName||'',note:e.note||'',media:e.media||[],level:e.level||''});
 const actRow=a=>({id:a.id,ts:a.ts,role:a.role||'',actor_id:a.actorId||'',actor_name:a.actorName||'',
                   action:a.action||'',detail:a.detail||'',ref_id:a.refId||'',notify:a.notify===true});
 /* Last sign-in, taken as the LATER of the record's own column and the newest 'login' row in the
@@ -1246,7 +1297,10 @@ async function fetchCloud(){
   let acts={data:[]};
   try{const a1=await supa.from('activity').select('*').order('ts',{ascending:false}).limit(ACT_FETCH_LIMIT);
     if(a1&&!a1.error)acts=a1;}catch(e){}
-  return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data,avail.data,coa.data,evs.data,regs.data,msgs.data,acts.data);
+  let sk={data:[]}, sl={data:[]};
+  try{const k1=await supa.from('skills').select('*'); if(k1&&!k1.error)sk=k1;}catch(e){}
+  try{const l1=await supa.from('skill_log').select('*'); if(l1&&!l1.error)sl=l1;}catch(e){}
+  return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data,avail.data,coa.data,evs.data,regs.data,msgs.data,acts.data,sk.data,sl.data);
 }
 async function bootLoad(){
   const cfg=getSupaCfg();
@@ -1275,6 +1329,8 @@ function dataSig(d){return JSON.stringify({
   msg:(d.messages||[]).map(x=>[x.id,x.readOwner,x.readClient,x.readCoach]),
   // activity must be in the signature or a new log row reads as "no change" and the poll
   // returns early — which silently stopped the badge updating for activity
+  sk:(d.skills||[]).map(x=>[x.id,x.name,x.sport,x.ord,x.active]),
+  sl:(d.skillLog||[]).length+':'+(d.skillLog||[]).reduce((m,e)=>(e.ts||'')>m?(e.ts||''):m,''),
   act:(d.activity||[]).length+':'+(d.activity||[]).reduce((m,a)=>(a.ts||'')>m?(a.ts||''):m,''),
   as:d.settings&&d.settings.activitySeenAt,
   n:d.settings&&d.settings.notifyEmails});}
@@ -1448,6 +1504,9 @@ async function cloudPush(){
       // delete), so a coach can't remove owner-side expense rows; the owner's full sync prunes.
       const myExp=DB.expenses.filter(e=>isAutoExpense(e)&&e.coachId===coachAs).map(expRow);
       if(myExp.length){try{await supa.from('expenses').upsert(myExp);}catch(e){}}
+      // skill progress this coach recorded — upsert only, never delete
+      const mySk=(DB.skillLog||[]).filter(e=>e.by==='coach').map(skillLogRow);
+      if(mySk.length){try{await supa.from('skill_log').upsert(mySk);}catch(e){}}
       const av=(DB.availability||[]).filter(a=>a.coachId===coachAs).map(a=>({id:a.id,coach_id:a.coachId,date:a.date,start_t:a.start,end_t:a.end,slot_min:a.slotMin,location:a.location||'',approved:a.approved!==false}));
       if(av.length){await supa.from('availability').upsert(av);}
       const avids=av.map(a=>a.id);
@@ -1471,6 +1530,8 @@ async function cloudPush(){
     await push('events',()=>syncTable('events',(DB.events||[]).map(eventRow)));
     await push('event_regs',()=>syncTable('event_regs',(DB.eventRegs||[]).map(eventRegRow)));
     await push('messages',()=>syncTable('messages',(DB.messages||[]).map(messageRow)));
+    await push('skills',()=>syncTable('skills',(DB.skills||[]).map(skillRow)));
+    await push('skill_log',()=>syncTable('skill_log',(DB.skillLog||[]).map(skillLogRow)));
     if(fails.length)flash('⚠ These tables need setup — run supabase-setup.sql: '+fails.join(', '),true);
   }catch(e){flash('Cloud save failed — saved on this device',true);}
   finally{pushing=false;}
@@ -1621,6 +1682,7 @@ const TABS=[
   {id:'booking',label:'Booking'},
   {id:'past',label:'Past Sessions'},
   {id:'journey',label:'My Journey'},
+  {id:'skills',label:'My Skills'},
   {id:'money',label:'Payments'},
   {id:'events',label:'Events'},
   {id:'messages',label:'Messages'},
@@ -1637,7 +1699,7 @@ function renderTabs(){
   let allowed;
   // 'past' is intentionally absent: My Journey presents the same completed sessions as a
   // timeline, so a separate Past Sessions list is redundant for clients.
-  if(AUTH==='client') allowed=['booking','journey','money','events','messages'];
+  if(AUTH==='client') allowed=['booking','journey','skills','money','events','messages'];
   else if(AUTH==='coach') allowed=['about','booking','availability','money','messages'];   // coach chats with owner only
   else allowed = TABS.map(tb=>tb.id).filter(x=>x!=='past'&&x!=='money');   // owner uses the full Finance tab instead
   if(!allowed.includes(TAB)) TAB = 'booking';
@@ -1724,7 +1786,7 @@ function switchTab(){
 }
 function saveSess(){try{sessionStorage.setItem('rx_sess',JSON.stringify({auth:AUTH,clientAs,coachAs,mgCoach,pickCoach,pickSport,tab:TAB}));}catch(e){}}
 function refreshOwner(){if(AUTH==='owner')try{alertUnfilledGroups();}catch(e){}
-  const f={about:renderAbout,booking:renderBooking,past:renderPast,journey:renderJourney,money:renderMoney,events:renderEvents,messages:renderMessages,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,activity:renderActivity,admin:renderAdmin}[TAB];if(f)f();if(TAB!=='messages'&&(AUTH==='owner'||AUTH==='client'))renderTabs();if(AUTH==='owner')renderWhoami();}
+  const f={about:renderAbout,booking:renderBooking,past:renderPast,journey:renderJourney,skills:renderSkills,money:renderMoney,events:renderEvents,messages:renderMessages,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,activity:renderActivity,admin:renderAdmin}[TAB];if(f)f();if(TAB!=='messages'&&(AUTH==='owner'||AUTH==='client'))renderTabs();if(AUTH==='owner')renderWhoami();}
 
 /* ---------- Auth ---------- */
 function ensureTokens(){let ch=false;DB.customers.forEach(c=>{if(!c.token){c.token=uid()+uid();ch=true;}});if(ch)save();}
@@ -2586,7 +2648,9 @@ function openCoachStatus(id){
       <div id="sMediaPrev" style="margin-top:8px"></div>
       <div class="clienttag" style="margin-top:4px">Shown to the client with this session. Photos are compressed automatically. Videos up to ${MAX_VIDEO_MB}MB — but a trimmed 1080p clip (~30MB) uploads faster and plays without buffering on a phone.</div></div>
     <p class="muted small">Status, cash payment, feedback and media can be updated here — other session details are managed by the owner. Changes sync to the owner and the client.</p>
-  `,`<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="coachSaveSession('${id}')">Save</button>`);
+  `,`<button class="btn ghost" onclick="closeModal()">Cancel</button>
+     ${s.customerIds.length===1?`<button class="btn ghost" onclick="openSkillLog('${s.customerIds[0]}')">🎯 Log skill progress</button>`:''}
+     <button class="btn" onclick="coachSaveSession('${id}')">Save</button>`);
   renderMediaPrev();
 }
 function coachSaveSession(id){
@@ -2689,8 +2753,14 @@ function renderBookingClient(){
       <div>
         <div class="panel">
           <h3>${t('Request a session')}</h3>
-          ${bookableSports().length>1?`<div class="field"><label class="f">${t('Sport')}</label>
-            <select id="rqSport" onchange="pickSportChange(this.value)">${bookableSports().map(sp=>`<option value="${sp}" ${(pickSport||'').toLowerCase()===sp.toLowerCase()?'selected':''}>${sportIcon(sp)} ${sp}</option>`).join('')}</select></div>`:''}
+          ${bookableSports().length>1?`<div class="field"><label class="f">${t('Pick your sport')}</label>
+            <div class="sportpick">${bookableSports().map(sp=>{
+              const on=(pickSport||'').toLowerCase()===sp.toLowerCase();
+              const n=coachesForSport(sp).length;
+              return `<button type="button" class="sporttile${on?' on':''}" onclick="pickSportChange('${sp.replace(/'/g,"\\'")}')">
+                <span class="ico">${sportIcon(sp)}</span><b>${sp}</b>
+                <span class="n">${n} ${n===1?t('coach'):t('coaches')}</span></button>`;
+            }).join('')}</div></div>`:''}
           <div class="field"><label class="f">${t('Coach')}</label>
             <select id="rqCoach" onchange="pickCoachChange(this.value)">${coachesForSport(pickSport).map(co=>`<option value="${co.id}" ${pickCoach===co.id?'selected':''}>${co.name}</option>`).join('')||'<option value="">No coaches available</option>'}</select></div>
           ${coachMiniProfile(coachById(pickCoach))}
@@ -3104,6 +3174,141 @@ function renderJourney(){
         <div class="d muted">${st.weeks} ${st.weeks===1?t('week'):t('weeks')}</div></div>
     </div>
     <div class="jline">${body}</div>`;
+}
+/* ============================================================================
+   SKILLS — an owner-managed catalogue plus per-client progress entries.
+
+   One client can train several sports, so the page groups by sport rather than having a page per
+   sport. A skill with no entries yet is still listed (greyed) — the list doubles as the syllabus,
+   so a player can see what's ahead, not only what they've done.
+   ============================================================================ */
+const skillById = id => (DB.skills||[]).find(k=>k.id===id);
+function skillsForSport(sp){
+  return (DB.skills||[]).filter(k=>k.active!==false&&(k.sport||'Basketball')===sp)
+    .sort((a,b)=>(a.ord||0)-(b.ord||0)||(a.name||'').localeCompare(b.name||''));
+}
+function skillEntries(cid,skillId){
+  return (DB.skillLog||[]).filter(e=>e.customerId===cid&&e.skillId===skillId)
+    .sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
+}
+/* Which sports to show this client: those they've actually trained (sessions or logged progress),
+   falling back to every sport that has a catalogue, so a brand-new client still sees a syllabus. */
+function clientSports(cid){
+  const out=[];
+  const add=sp=>{ if(sp&&!out.some(x=>x.toLowerCase()===sp.toLowerCase()))out.push(sp); };
+  DB.sessions.filter(s=>s.customerIds.includes(cid)).forEach(s=>{const c=coachById(s.coachId);add(c?c.sport:'Basketball');});
+  (DB.skillLog||[]).filter(e=>e.customerId===cid).forEach(e=>{const k=skillById(e.skillId);if(k)add(k.sport);});
+  if(!out.length)[...new Set((DB.skills||[]).map(k=>k.sport||'Basketball'))].forEach(add);
+  return out;
+}
+let skillOpen={};    // which skill rows are expanded, keyed by skill id
+function toggleSkill(id){ skillOpen[id]=!skillOpen[id]; renderSkills(); }
+function renderSkills(){
+  const el=$('#view-skills'); if(!el)return;
+  const c=custById(clientAs);
+  if(!c){el.innerHTML='<div class="panel"><div class="empty">'+t('Please sign in again.')+'</div></div>';return;}
+  const sports=clientSports(c.id);
+  let body='';
+  sports.forEach(sp=>{
+    const list=skillsForSport(sp);
+    if(!list.length)return;
+    const started=list.filter(k=>skillEntries(c.id,k.id).length).length;
+    const pct=Math.round(started/list.length*100);
+    body+=`<div class="panel" style="margin-bottom:14px">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:4px">
+        <h3 style="margin:0">${sportIcon(sp)} ${sp}</h3>
+        <span class="clienttag">${started}/${list.length} ${t('skills started')}</span>
+      </div>
+      <div class="creditbar"><i style="width:${pct}%"></i></div>
+      <div style="margin-top:12px">${list.map(k=>{
+        const ents=skillEntries(c.id,k.id);
+        const open=!!skillOpen[k.id];
+        const last=ents[0];
+        return `<div class="skrow ${ents.length?'':'todo'}">
+          <div class="skhead" onclick="toggleSkill('${k.id}')">
+            <span class="skmark">${ents.length?'✓':'○'}</span>
+            <span class="skname">${k.name}</span>
+            ${ents.length?`<span class="pill green">${ents.length} ${ents.length===1?t('step'):t('steps')}</span>`:`<span class="clienttag">${t('Not started')}</span>`}
+            ${last?`<span class="clienttag" style="margin-left:auto">${fmtDate((last.ts||'').slice(0,10))}</span>`:''}
+            <span class="skchev">${open?'▾':'▸'}</span>
+          </div>
+          ${open?`<div class="skbody">${ents.length?ents.map(e=>`
+            <div class="skent">
+              <div class="clienttag">${fmtChatTime(e.ts)} · ${e.byName||t('Coach')}</div>
+              ${e.note?`<div style="font-size:13.5px;line-height:1.6;margin-top:3px">${escapeHtml(e.note)}</div>`:''}
+              ${(e.media||[]).length?`<div class="jmedia">${(e.media||[]).map(m=>m.type==='image'
+                ?`<img src="${mUrl(m)}" onclick="viewSkillMedia('${e.id}',${(e.media||[]).indexOf(m)})" style="width:84px;height:84px;object-fit:cover;border-radius:9px;cursor:pointer">`
+                :`<video src="${mUrl(m)}" controls playsinline preload="metadata" style="width:150px;max-width:100%;border-radius:9px"></video>`).join('')}</div>`:''}
+            </div>`).join(''):`<div class="clienttag">${t('No progress recorded yet — your coach will add notes and clips as you work on this.')}</div>`}</div>`:''}
+        </div>`;
+      }).join('')}</div></div>`;
+  });
+  el.innerHTML=`
+    <h1 class="page">${t('My Skills')}</h1>
+    <div class="sub">${t('Every skill you are working on, and the steps you have made on each. Your coach adds notes, photos and clips as you progress.')}</div>
+    ${body||'<div class="panel"><div class="empty">'+t('No skills have been set up yet.')+'</div></div>'}`;
+}
+/* ---- coach / owner: record a step forward on a skill ---------------------- */
+let skillTargetCust=null;
+function openSkillLog(cid,preselect){
+  if(AUTH!=='owner'&&AUTH!=='coach')return;
+  const c=custById(cid); if(!c)return;
+  skillTargetCust=cid; editMedia=[]; mediaCust=c.name;
+  const sports=[...new Set((DB.skills||[]).filter(k=>k.active!==false).map(k=>k.sport||'Basketball'))];
+  const opts=sports.map(sp=>`<optgroup label="${sportIcon(sp)} ${sp}">`+
+      skillsForSport(sp).map(k=>`<option value="${k.id}" ${preselect===k.id?'selected':''}>${k.name}</option>`).join('')+
+    '</optgroup>').join('');
+  openModal('Log skill progress — '+c.name,`
+    <div class="field"><label class="f">Skill</label><select id="slSkill">${opts||'<option value="">No skills set up yet</option>'}</select></div>
+    <div class="field"><label class="f">What did they achieve? — the client sees this</label>
+      <textarea id="slNote" placeholder="e.g. Can now chain crossover into a pull-up off the left hand, 7/10 reps."></textarea></div>
+    <div class="field"><label class="f">📎 Photo / video evidence (optional)</label>
+      <input type="file" accept="image/*,video/*" multiple onchange="addMediaFiles(this)">
+      <div id="sMediaPrev" style="margin-top:8px"></div></div>
+    <p class="muted small">Each entry is one step on the timeline for that skill — add a new one each time they move forward, rather than editing the old one.</p>
+  `,`<button class="btn ghost" onclick="closeModal()">Cancel</button>
+     <button class="btn" onclick="saveSkillLog()">Save progress</button>`);
+  renderMediaPrev();
+}
+function saveSkillLog(){
+  if(blockIfUploading())return;
+  const cid=skillTargetCust; const c=custById(cid); if(!c)return closeModal();
+  const skillId=$('#slSkill')?$('#slSkill').value:''; if(!skillId)return flash('Pick a skill',true);
+  const note=($('#slNote').value||'').trim();
+  if(!note&&!editMedia.length)return flash('Add a note or an attachment',true);
+  const e={id:uid(),customerId:cid,skillId,ts:new Date().toISOString(),
+    by:AUTH,byName:(AUTH==='coach'?coachName(coachAs):'Raymond'),note,media:editMedia.slice(),level:''};
+  if(!DB.skillLog)DB.skillLog=[];
+  DB.skillLog.push(e);
+  save(); pushRows('skill_log',[skillLogRow(e)]);
+  editMedia=[]; mediaCust=null; skillTargetCust=null;
+  const k=skillById(skillId);
+  notifySkillProgress(c,k,e);
+  logAct('skill_progress',(k?k.name:'skill')+' · '+c.name,cid);
+  closeModal(); flash('Progress saved 🎯'); refreshOwner();
+}
+/* Tell the player (and the owner, if a coach logged it) — otherwise nobody knows it happened. */
+function notifySkillProgress(c,k,e){
+  const msgs=[{id:uid(),peerType:'client',clientId:c.id,coachId:'',sender:'owner',
+    text:'Hi '+firstName(c.name)+'! 🎯 New progress logged on <'+(k?k.name:'a skill')+'>: '+
+         (e.note||'see the clip')+' — open My Skills to see it.',
+    media:[],created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false}];
+  msgs.forEach(m=>DB.messages.push(m));
+  save(); pushRows('messages',msgs.map(messageRow));
+}
+function delSkillLog(id){
+  if(!confirm('Delete this progress entry? The client will no longer see it.'))return;
+  DB.skillLog=(DB.skillLog||[]).filter(e=>e.id!==id);
+  save();
+  if(supa&&SUPA_OK)supa.from('skill_log').delete().eq('id',id).then(()=>{},()=>{});
+  flash('Entry removed'); refreshOwner();
+}
+function viewSkillMedia(entryId,i){
+  const e=(DB.skillLog||[]).find(x=>x.id===entryId); const m=e&&e.media&&e.media[i]; if(!m)return;
+  openModal(m.name||'Attachment', m.type==='image'
+    ? `<img src="${mUrl(m)}" style="max-width:100%;border-radius:10px">`
+    : `<video src="${mUrl(m)}" controls autoplay playsinline style="max-width:100%;border-radius:10px"></video>`,
+    `<button class="btn" onclick="closeModal()">Close</button>`);
 }
 function submitRequest(){
   const cid=clientAs;if(!cid)return flash('Please sign in again',true);
@@ -3932,7 +4137,7 @@ function viewCustomer(id){
     </div>
     <div style="overflow-x:auto"><table><thead><tr><th>When</th><th>Type</th><th>Status</th><th>Pay</th><th class="right">Share</th><th></th></tr></thead><tbody>${hist}</tbody></table></div>
     <p class="muted small" style="margin-top:8px">Editing a session here updates the client's "My Sessions" too.</p>
-  `,`<button class="btn ghost" onclick="copyClientLink('${id}')">🔗 Client link</button><button class="btn ghost" onclick="openCustomer('${id}')">Edit</button><button class="btn" onclick="closeModal()">Close</button>`);
+  `,`<button class="btn ghost" onclick="copyClientLink('${id}')">🔗 Client link</button><button class="btn ghost" onclick="openSkillLog('${id}')">🎯 Log skill</button><button class="btn ghost" onclick="openCustomer('${id}')">Edit</button><button class="btn" onclick="closeModal()">Close</button>`);
 }
 function openSellPackage(id){
   const c=id?custById(id):null;
@@ -5625,6 +5830,11 @@ function renderAdmin(){
       <button class="btn sm" onclick="saveGroupForming()">Save group settings</button>
     </div>
     <div class="panel" style="margin-top:16px">
+      <h3>Skills</h3>
+      <div class="clienttag" style="margin-bottom:10px">The syllabus clients see on their <b style="color:var(--txt)">My Skills</b> page. Skills are per sport — add a sport's list once and every client training that sport gets it.</div>
+      <button class="btn sm" onclick="openSkillAdmin()">Manage skills</button>
+    </div>
+    <div class="panel" style="margin-top:16px">
       <h3>Home page highlights video</h3>
       <div class="field"><label class="f">Video shown in the <b style="color:var(--txt)">AAU Highlights</b> section of rxtraining.org</label>
         <input id="hiVideo" value="${safeUrl(DB.settings.highlightVideo||'')}" placeholder="Paste a YouTube / Vimeo / Drive link…"></div>
@@ -5682,6 +5892,63 @@ async function uploadHighlightVideo(input){
     const pv=$('#hiPrev'); if(pv)pv.innerHTML=videoHtml(url,'320px');
     flash('Uploaded ✅ — press Save highlights video');
   }catch(e){flash('Upload failed: '+e.message,true);}
+}
+/* Owner-managed skill catalogue. Skills are per-sport, so adding a sport's syllabus is just
+   adding rows here — the client's My Skills page groups automatically. */
+function openSkillAdmin(sport){
+  const sports=[...new Set(((DB.skills||[]).map(k=>k.sport||'Basketball'))
+                 .concat(bookableSports()).concat((DB.settings.sports||'').split(',').map(x=>x.trim())))]
+                 .filter(Boolean);
+  const sp=sport||sports[0]||'Basketball';
+  const list=skillsForSport(sp);
+  const rows=list.map((k,i)=>`<tr>
+      <td style="width:34px" class="muted">${i+1}</td>
+      <td><input value="${(k.name||'').replace(/"/g,'&quot;')}" onchange="renameSkill('${k.id}',this.value)"></td>
+      <td style="width:96px" class="right"><div class="actions">
+        <button class="iconbtn" title="Move up" onclick="moveSkill('${k.id}',-1)">↑</button>
+        <button class="iconbtn" title="Move down" onclick="moveSkill('${k.id}',1)">↓</button>
+        <button class="iconbtn" title="Remove" onclick="delSkill('${k.id}')">✕</button>
+      </div></td></tr>`).join('')
+    ||'<tr><td colspan="3"><div class="empty">No skills for this sport yet — add the first one below.</div></td></tr>';
+  openModal('Skills — '+sp,`
+    <div class="field"><label class="f">Sport</label>
+      <select onchange="openSkillAdmin(this.value)">${sports.map(x=>`<option ${x===sp?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div style="overflow-x:auto;max-height:46vh;overflow-y:auto"><table><tbody>${rows}</tbody></table></div>
+    <div class="row" style="margin-top:12px;gap:8px">
+      <div class="field" style="flex:1;margin-bottom:0"><label class="f">Add a skill</label>
+        <input id="newSkill" placeholder="e.g. Euro step finish" onkeydown="if(event.key==='Enter')addSkill('${sp}')"></div>
+      <div class="field" style="display:flex;align-items:flex-end;margin-bottom:0">
+        <button class="btn" onclick="addSkill('${sp}')">Add</button></div>
+    </div>
+    <p class="muted small" style="margin-top:8px">Renaming keeps every client's recorded progress. Removing a skill hides it from clients but keeps their history.</p>
+  `,`<button class="btn" onclick="closeModal()">Done</button>`);
+}
+function addSkill(sport){
+  const el=$('#newSkill'); const name=(el?el.value:'').trim();
+  if(!name)return flash('Enter a skill name',true);
+  const max=(DB.skills||[]).filter(k=>(k.sport||'Basketball')===sport).reduce((m,k)=>Math.max(m,k.ord||0),0);
+  DB.skills.push({id:uid(),sport,name,ord:max+1,active:true});
+  save(); flash('Skill added'); openSkillAdmin(sport);
+}
+function renameSkill(id,name){
+  const k=skillById(id); if(!k)return;
+  const v=(name||'').trim(); if(!v)return;
+  k.name=v; save();
+}
+function moveSkill(id,dir){
+  const k=skillById(id); if(!k)return;
+  const list=skillsForSport(k.sport);
+  const i=list.findIndex(x=>x.id===id), j=i+dir;
+  if(i<0||j<0||j>=list.length)return;
+  const a=list[i], b=list[j]; const t2=a.ord; a.ord=b.ord; b.ord=t2;
+  save(); openSkillAdmin(k.sport);
+}
+function delSkill(id){
+  const k=skillById(id); if(!k)return;
+  const used=(DB.skillLog||[]).filter(e=>e.skillId===id).length;
+  if(!confirm('Remove "'+k.name+'" from the skills list?'+(used?('\n\n'+used+' recorded progress entr'+(used===1?'y':'ies')+' will be kept but hidden.'):'')))return;
+  k.active=false;              // soft-delete so client history isn't orphaned
+  save(); flash('Skill removed'); openSkillAdmin(k.sport);
 }
 function saveGroupForming(){
   DB.settings.groupMinPlayers=Math.max(2,Math.min(MAX_GROUP,+$('#grpMin').value||2));
