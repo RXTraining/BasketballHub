@@ -5049,9 +5049,11 @@ function addEventToCalendar(eid){
 }
 /* scrolling events reminder shown on the client's My Sessions page */
 function clientEventBanner(){
-  const now=todayISO();
-  const evs=(DB.events||[]).filter(e=>e.active!==false&&e.date>=now&&!myEventReg(e.id,clientAs)&&eventSpotsLeft(e)>0)
-    .sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
+  // eventUpcoming() rather than `date >= today` — a blank date sorts below every real date, so
+  // the old test silently dropped to-be-confirmed events from this banner even though they
+  // showed on the Events tab.
+  const evs=(DB.events||[]).filter(e=>e.active!==false&&eventUpcoming(e)&&!myEventReg(e.id,clientAs)&&eventSpotsLeft(e)>0)
+    .sort((a,b)=>eventSortKey(a).localeCompare(eventSortKey(b)));
   if(!evs.length)return '';
   const item=ev=>`<span class="mq-item">📣 <b>${ev.title}</b> · ${eventWhen(ev)} · ${ev.price?money(ev.price):t('Free')} <button class="btn sm" onclick="event.stopPropagation();registerEvent('${ev.id}')">${t('Register')}</button></span>`;
   const items=evs.map(item).join('');
