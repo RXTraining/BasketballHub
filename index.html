@@ -580,6 +580,7 @@ const DB_KEY = 'rxtraining_v2';
 /* ---------- i18n: English / 中文 (client-facing) ---------- */
 let LANG='en'; try{LANG=localStorage.getItem('rx_lang')||'en';}catch(e){}
 const ZH={
+  'ABOUT_P3':'每一堂课都建立在<b>对篮球的热爱</b>之上：投入、拼搏，以及<b>永不放弃</b>的信念。',
   /* --- landing page prose --- */
   'HERO_LEDE':'由 <b>{name}</b> 创办 —— 一名现役 AAU 球员，而非早已退役的教练。每一堂课都建立在<b>对篮球的热爱</b>之上：投入、拼搏，以及<b>永不放弃</b>的信念。',
   'ABOUT_P1':'RX.TRAINING 由 <b>{name}</b> 创办。他是列克星敦高中的学生运动员，效力于马萨诸塞州最具竞争力的 AAU 球队之一 <b>Middlesex Magic</b>。理念很简单：球员向仍在场上竞技的人学习，进步最快。',
@@ -713,6 +714,7 @@ const ZH={
   'Session cancelled':'课程已取消','Registration cancelled':'报名已取消'
 };
 const KO={
+  'ABOUT_P3':'모든 세션은 <b>경기에 대한 사랑</b> 위에 세워집니다: 헌신, 노력, 그리고 <b>절대 포기하지 않는</b> 믿음.',
   /* --- landing page prose --- */
   'HERO_LEDE':'<b>{name}</b>이(가) 설립했습니다 — 오래전 은퇴한 코치가 아니라 현역 AAU 선수입니다. 모든 세션은 <b>경기에 대한 사랑</b> 위에 세워집니다: 헌신, 노력, 그리고 <b>절대 포기하지 않는</b> 믿음.',
   'ABOUT_P1':'RX.TRAINING은 렉싱턴 고등학교 학생 선수이자 매사추세츠에서 가장 경쟁이 치열한 AAU 프로그램 중 하나인 <b>Middlesex Magic</b>에서 뛰는 <b>{name}</b>이(가) 설립했습니다. 발상은 단순합니다 — 선수는 지금도 코트에서 경쟁하는 사람에게 가장 빠르게 배웁니다.',
@@ -838,6 +840,7 @@ const KO={
   'Session cancelled':'수업이 취소되었습니다','Registration cancelled':'등록이 취소되었습니다'
 };
 const JA={
+  'ABOUT_P3':'すべてのセッションは<b>競技への愛</b>の上に成り立っています：献身、努力、そして<b>決して諦めない</b>という信念。',
   /* --- landing page prose --- */
   'HERO_LEDE':'<b>{name}</b> が創設 —— 何年も前に引退したコーチではなく、現役の AAU 選手です。すべてのセッションは<b>競技への愛</b>の上に成り立っています：献身、努力、そして<b>決して諦めない</b>という信念。',
   'ABOUT_P1':'RX.TRAINING は、レキシントン高校の学生アスリートで、マサチューセッツ州で最も競争の激しい AAU プログラムのひとつ <b>Middlesex Magic</b> でプレーする <b>{name}</b> が創設しました。考え方はシンプルです —— 選手は 今もコートで戦っている人から最も速く学びます。',
@@ -966,6 +969,7 @@ const JA={
    language has no entry — fine when the key IS the English text, but these blocks use short
    codes, so without this dictionary English visitors saw 'ABOUT_P1' on the page. */
 const EN={
+  'ABOUT_P3':'Every session is built on the <b>love of the game</b>: the dedication, the grind, and the belief that <b>you never give up</b>.',
   'HERO_LEDE':'Founded by <b>{name}</b> — an active AAU competitor, not a coach who stopped playing years ago. Every session is built on the <b>love of the game</b>: the dedication, the grind, and the belief that <b>you never give up</b>.',
   'ABOUT_P1':'RX.TRAINING was founded by <b>{name}</b>, a student-athlete at Lexington High School playing for <b>Middlesex Magic</b> — one of the most competitive AAU programs in Massachusetts. The idea was simple: players learn fastest from people still in the gym competing.',
   'ABOUT_P2':'That standard now runs across every coach on the roster. Training here isn\'t cookie-cutter — every session includes <b>live game situations</b>: real reads, real decisions, real pressure. Not just drills. We build athletes who perform when it counts.',
@@ -1909,7 +1913,6 @@ function renderLanding(){
     <header class="lp-hero">
       <h1 class="lp-h1 reveal">RX<i class="lp-dot" id="lpBall">🏀</i>TRAINING</h1>
       <div class="lp-role reveal">${t('Train like you play')}</div>
-      <p class="lp-lede reveal">${tf('HERO_LEDE',{name:co.name||'Raymond Xu'})}</p>
       <div class="lp-cta reveal">
         <button class="lp-btn solid lp-big" onclick="openAuth('book')">${t('Book a session →')}</button>
         <button class="lp-btn line lp-big" onclick="lpGo('lpCoaches')">${t('Meet the coaches')}</button>
@@ -1927,6 +1930,7 @@ function renderLanding(){
       <h2 class="lp-h2">${t('THE RX APPROACH')}</h2>
       <p class="lp-p">${tf('ABOUT_P1',{name:co.name||'Raymond Xu'})}</p>
       <p class="lp-p" style="margin-top:12px">${t('ABOUT_P2')}</p>
+      <p class="lp-p" style="margin-top:12px">${t('ABOUT_P3')}</p>
       <div class="lp-grid">
         <div class="lp-card"><div class="lp-ico">⚡</div><h4>${t('Active AAU competitor')}</h4><p>${t('CARD_AAU')}</p></div>
         <div class="lp-card"><div class="lp-ico">🎮</div><h4>${t('Live situation training')}</h4><p>${t('CARD_LIVE')}</p></div>
