@@ -157,6 +157,23 @@
   @keyframes mqscroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
   .mq-item{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--txt)}
   .mq-item .btn{padding:4px 11px;font-size:12px}
+  /* ---- My Journey timeline ---- */
+  .jline{position:relative;padding-left:6px}
+  .jmonth{font-weight:900;font-size:14px;margin:22px 0 12px;display:flex;align-items:center;gap:9px}
+  .jmonth span{font-weight:700;font-size:12px;color:var(--muted);background:var(--panel2);
+    border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+  .jrow{display:flex;gap:14px;position:relative;padding-bottom:16px}
+  /* the connecting spine, drawn behind the markers */
+  .jrow:before{content:"";position:absolute;left:15px;top:32px;bottom:0;width:2px;background:var(--line)}
+  .jrow:last-child:before{display:none}
+  .jdot{flex:none;width:32px;height:32px;border-radius:50%;background:var(--accent);color:var(--onaccent);
+    font-weight:900;font-size:12.5px;display:flex;align-items:center;justify-content:center;z-index:1}
+  .jcard{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:13px 15px}
+  .jfb{margin-top:9px;background:var(--panel2);border-left:3px solid var(--accent2);
+    border-radius:0 8px 8px 0;padding:9px 12px;font-size:13.5px;line-height:1.6}
+  .jmedia{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  @media(max-width:640px){.jdot{width:26px;height:26px;font-size:11px}.jrow:before{left:12px}}
   table{width:100%;border-collapse:collapse;font-size:13.5px}
   th{text-align:left;color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;
     letter-spacing:.5px;padding:10px 10px;border-bottom:1px solid var(--line)}
@@ -345,12 +362,27 @@
     100% {transform:translateY(0)      scale(1,1)}}
   .lp-dot.swap{animation:lpSwap .42s ease}
   @keyframes lpSwap{0%{transform:scale(1) rotate(0)}45%{transform:scale(.35) rotate(180deg);opacity:.25}100%{transform:scale(1) rotate(360deg);opacity:1}}
+  /* rolling events ticker, pinned under the nav so visitors see what's on without scrolling */
+  .lp-tick{background:var(--lp-ink);color:#fff;overflow:hidden;position:sticky;
+    top:var(--lp-navh,52px);z-index:18;display:flex;align-items:center;gap:10px;padding:8px 14px}
+  .lp-tick .lab{flex:0 0 auto;background:var(--lp-volt);color:#20310a;font-weight:900;font-size:11px;
+    letter-spacing:.6px;padding:3px 9px;border-radius:999px}
+  .lp-tick .win{flex:1;overflow:hidden;min-width:0}
+  .lp-tick .trk{display:inline-flex;gap:34px;white-space:nowrap;animation:lpTick linear infinite;will-change:transform}
+  .lp-tick:hover .trk,.lp-tick.paused .trk{animation-play-state:paused}
+  @keyframes lpTick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  .lp-tick .it{display:inline-flex;align-items:center;gap:8px;font-size:13px}
+  .lp-tick .it b{color:var(--lp-volt)}
+  .lp-tick .it span{color:#c9d6c2}
+  .lp-tick .go{background:var(--lp-volt);color:#20310a;border:0;border-radius:999px;font-weight:800;
+    font-size:11.5px;padding:4px 11px;cursor:pointer;font-family:inherit}
+  @media(prefers-reduced-motion:reduce){.lp-tick .trk{animation:none}}
   /* mobile-only section jumper — the text nav is hidden below 720px */
   .lp-jump{display:none;gap:7px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:9px 14px;
     border-bottom:1px solid var(--lp-line);background:var(--lp-soft);position:sticky;
     /* --lp-navh is measured at runtime; a hardcoded offset drifts with the safe-area inset and
        leaves the rail tucked half-under the nav */
-    top:var(--lp-navh,52px);z-index:19;scrollbar-width:none}
+    top:calc(var(--lp-navh,52px) + var(--lp-tickh,0px));z-index:19;scrollbar-width:none}
   .lp-jump::-webkit-scrollbar{display:none}
   .lp-jump button{flex:none;background:#fff;border:1.5px solid var(--lp-line);color:var(--lp-ink);
     font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:999px;cursor:pointer;font-family:inherit}
@@ -465,6 +497,7 @@
   <section class="view active" id="view-about"></section>
   <section class="view" id="view-booking"></section>
   <section class="view" id="view-past"></section>
+  <section class="view" id="view-journey"></section>
   <section class="view" id="view-money"></section>
   <section class="view" id="view-events"></section>
   <section class="view" id="view-customers"></section>
@@ -1511,6 +1544,39 @@ function sortedCoaches(list){
   });
 }
 function activeCoaches(){return sortedCoaches(DB.coaches).filter(c=>c.active!==false);}
+/* Sports that actually have an active coach — the only ones a client can book. The advertised
+   list in settings may include sports that are still "coming soon"; those must not appear as
+   bookable or a client picks a sport with no availability behind it. */
+function bookableSports(){
+  const seen=[]; activeCoaches().forEach(c=>{const sp=(c.sport||'Basketball').trim();
+    if(sp&&!seen.some(x=>x.toLowerCase()===sp.toLowerCase()))seen.push(sp);});
+  return seen;
+}
+function coachesForSport(sp){
+  if(!sp)return activeCoaches();
+  return activeCoaches().filter(c=>(c.sport||'Basketball').trim().toLowerCase()===sp.trim().toLowerCase());
+}
+function sportIcon(sp){
+  return {basketball:'🏀',soccer:'⚽',football:'🏈',tennis:'🎾',golf:'⛳',track:'🏃',
+          baseball:'⚾',volleyball:'🏐',swimming:'🏊'}[(sp||'').trim().toLowerCase()]||'🏅';
+}
+/* Keeps sport and coach consistent: default the sport from the chosen coach, and if the sport
+   changes, move to a coach who actually teaches it. */
+function syncSportCoach(){
+  const sports=bookableSports();
+  if(!sports.length)return;
+  if(!pickSport||!sports.some(x=>x.toLowerCase()===pickSport.toLowerCase())){
+    const cur=coachById(pickCoach);
+    pickSport=(cur&&cur.sport)?cur.sport:sports[0];
+  }
+  const list=coachesForSport(pickSport);
+  if(!list.length){ pickSport=sports[0]; }
+  if(!coachesForSport(pickSport).some(c=>c.id===pickCoach)){
+    const first=coachesForSport(pickSport)[0];
+    pickCoach=first?first.id:pickCoach;
+  }
+}
+function pickSportChange(v){ pickSport=v; reqSel=[]; syncSportCoach(); saveSess(); renderBookingClient(); }
 function defaultCoachId(){const a=activeCoaches();return (a[0]||(DB.coaches&&DB.coaches[0])||{}).id||'rx1';}
 /* which coach is in scope for the current view */
 function scopeCoach(){
@@ -1529,12 +1595,13 @@ function coachSelectOptions(sel,includeAll,includeOwner){
 }
 
 let AUTH=null, ROLE='owner', TAB='about';
-let clientAs=null, coachAs=null, mgCoach=null, pickCoach=null, pendingClient=null, sessionReturnCust=null, editMedia=[], mediaCust=null;
+let clientAs=null, coachAs=null, mgCoach=null, pickCoach=null, pickSport=null, pendingClient=null, sessionReturnCust=null, editMedia=[], mediaCust=null;
 let calY, calM; {const n=nowBoston();calY=n.getFullYear();calM=n.getMonth();}
 const TABS=[
   {id:'about',label:'About'},
   {id:'booking',label:'Booking'},
   {id:'past',label:'Past Sessions'},
+  {id:'journey',label:'My Journey'},
   {id:'money',label:'Payments'},
   {id:'events',label:'Events'},
   {id:'messages',label:'Messages'},
@@ -1549,7 +1616,7 @@ const TABS=[
 
 function renderTabs(){
   let allowed;
-  if(AUTH==='client') allowed=['booking','past','money','events','messages'];
+  if(AUTH==='client') allowed=['booking','past','journey','money','events','messages'];
   else if(AUTH==='coach') allowed=['about','booking','availability','money','messages'];   // coach chats with owner only
   else allowed = TABS.map(tb=>tb.id).filter(x=>x!=='past'&&x!=='money');   // owner uses the full Finance tab instead
   if(!allowed.includes(TAB)) TAB = 'booking';
@@ -1634,9 +1701,9 @@ function switchTab(){
   refreshOwner();
   saveSess();
 }
-function saveSess(){try{sessionStorage.setItem('rx_sess',JSON.stringify({auth:AUTH,clientAs,coachAs,mgCoach,pickCoach,tab:TAB}));}catch(e){}}
+function saveSess(){try{sessionStorage.setItem('rx_sess',JSON.stringify({auth:AUTH,clientAs,coachAs,mgCoach,pickCoach,pickSport,tab:TAB}));}catch(e){}}
 function refreshOwner(){if(AUTH==='owner')try{alertUnfilledGroups();}catch(e){}
-  const f={about:renderAbout,booking:renderBooking,past:renderPast,money:renderMoney,events:renderEvents,messages:renderMessages,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,activity:renderActivity,admin:renderAdmin}[TAB];if(f)f();if(TAB!=='messages'&&(AUTH==='owner'||AUTH==='client'))renderTabs();if(AUTH==='owner')renderWhoami();}
+  const f={about:renderAbout,booking:renderBooking,past:renderPast,journey:renderJourney,money:renderMoney,events:renderEvents,messages:renderMessages,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,activity:renderActivity,admin:renderAdmin}[TAB];if(f)f();if(TAB!=='messages'&&(AUTH==='owner'||AUTH==='client'))renderTabs();if(AUTH==='owner')renderWhoami();}
 
 /* ---------- Auth ---------- */
 function ensureTokens(){let ch=false;DB.customers.forEach(c=>{if(!c.token){c.token=uid()+uid();ch=true;}});if(ch)save();}
@@ -1672,7 +1739,7 @@ function initAuth(){
   let ss=null;try{ss=JSON.parse(sessionStorage.getItem('rx_sess'));}catch(e){}
   if(ss&&ss.auth==='owner'){AUTH='owner';ROLE='owner';mgCoach=ss.mgCoach||'all';TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();return;}
   if(ss&&ss.auth==='coach'&&coachById(ss.coachAs)){AUTH='coach';ROLE='coach';coachAs=ss.coachAs;TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();return;}
-  if(ss&&ss.auth==='client'&&custById(ss.clientAs)){AUTH='client';ROLE='client';clientAs=ss.clientAs;pickCoach=ss.pickCoach||defaultCoachId();TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();return;}
+  if(ss&&ss.auth==='client'&&custById(ss.clientAs)){AUTH='client';ROLE='client';clientAs=ss.clientAs;pickCoach=ss.pickCoach||defaultCoachId();pickSport=ss.pickSport||null;syncSportCoach();TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();return;}
   let sg=null;try{sg=JSON.parse(localStorage.getItem('rx_signup'));}catch(e){}
   if(sg&&sg.id){showLogin();showSignupStatus();return;}
   showLogin();
@@ -1721,6 +1788,22 @@ function closeAuth(){
 /* Coach roster for the public page. RX.TRAINING is the brand; Raymond is credited as founder and
    pinned first (sortedCoaches already does that), with every other coach given equal billing so
    the business doesn't read as one person. Rates and sport come from live records. */
+/* Upcoming events as a marquee. Undated ("to be confirmed") events are included — they're the
+   ones most worth advertising early. Falls back to nothing when there are no events, so the
+   strip never shows an empty bar. */
+function lpTickerHtml(){
+  const evs=(DB.events||[]).filter(e=>e.active!==false&&eventUpcoming(e))
+    .sort((a,b)=>eventSortKey(a).localeCompare(eventSortKey(b))).slice(0,6);
+  if(!evs.length)return '';
+  const one=e=>`<span class="it"><b>${e.title}</b><span>${eventWhen(e)}${e.location?' · '+e.location:''}${e.price?' · '+money(e.price):' · '+t('Free')}</span>`+
+              `<button class="go" onclick="openAuth('book')">${t('Register')}</button></span>`;
+  const row=evs.map(one).join('');
+  const secs=Math.max(18,evs.length*9);
+  return `<div class="lp-tick" onclick="this.classList.toggle('paused')" title="${t('Tap to pause')}">
+    <span class="lab">${t('EVENTS')}</span>
+    <span class="win"><span class="trk" style="animation-duration:${secs}s">${row}${row}</span></span>
+  </div>`;
+}
 function lpCoachCards(){
   const list=activeCoaches();
   if(!list.length)return '<div class="lp-card">'+t('NO_COACHES')+'</div>';
@@ -1762,12 +1845,14 @@ function lpSportChips(){
    sticky offset and the scroll target use the same real numbers. */
 function lpMeasureBars(){
   const page=$('#lpPage'); if(!page)return {nav:0,rail:0};
-  const nav=page.querySelector('.lp-nav'), rail=page.querySelector('.lp-jump');
+  const nav=page.querySelector('.lp-nav'), rail=page.querySelector('.lp-jump'), tick=page.querySelector('.lp-tick');
   const nh=nav?Math.round(nav.getBoundingClientRect().height):0;
+  const th=tick?Math.round(tick.getBoundingClientRect().height):0;
   const rh=(rail&&getComputedStyle(rail).display!=='none')?Math.round(rail.getBoundingClientRect().height):0;
   page.style.setProperty('--lp-navh',nh+'px');
+  page.style.setProperty('--lp-tickh',th+'px');
   page.style.setProperty('--lp-railh',rh+'px');
-  return {nav:nh,rail:rh};
+  return {nav:nh+th,rail:rh};
 }
 /* scrollIntoView({block:'start'}) parks the section under the sticky bars — offset by their
    combined height so the heading (and the rail itself) stay visible. */
@@ -1784,8 +1869,8 @@ function renderLanding(){
   const r1=coachRate(co.id,'1on1'), rg=coachRate(co.id,'group');
   const nCoach=activeCoaches().length;
   // next published, upcoming event doubles as the "special event" banner
-  const ev=(DB.events||[]).filter(e=>e.active!==false&&e.date>=todayISO())
-            .sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')))[0];
+  const ev=(DB.events||[]).filter(e=>e.active!==false&&eventUpcoming(e))
+            .sort((a,b)=>eventSortKey(a).localeCompare(eventSortKey(b)))[0];
   const done=DB.sessions.filter(s=>s.status==='completed').length;
   el.innerHTML=`
   <nav class="lp-nav">
@@ -1804,6 +1889,7 @@ function renderLanding(){
       <button class="lp-btn solid" onclick="openAuth('signup')">${t('Create account')}</button>
     </span>
   </nav>
+  ${lpTickerHtml()}
   <!-- portrait phones hide the text nav, so give them a scrollable jump rail instead -->
   <div class="lp-jump">
     <button onclick="lpGo('lpAbout')">${t('About')}</button>
@@ -2536,14 +2622,15 @@ function coachMiniProfile(co){
   return `<div class="panel" style="background:var(--panel2);padding:12px;margin-bottom:12px">
     <div class="row" style="align-items:center;gap:10px">
       ${co.photo?`<img src="${co.photo}" style="width:44px;height:44px;object-fit:cover;border-radius:10px">`:`<span class="av">${initials(co.name)}</span>`}
-      <div><b>${co.name}</b><div class="clienttag">${co.tagline||''}${co.affiliation?' · '+co.affiliation:''}</div></div>
+      <div><b>${co.name}</b> <span class="pill">${sportIcon(co.sport)} ${co.sport||'Basketball'}</span><div class="clienttag">${co.tagline||''}${co.affiliation?' · '+co.affiliation:''}</div></div>
     </div>
     ${co.bio?`<div class="small muted" style="margin-top:8px;line-height:1.6">${co.bio}</div>`:''}
   </div>`;
 }
 let reqSel=[];   // array of {date,time,loc} — clients can tap several open times to request them all at once
-function pickCoachChange(v){pickCoach=v;reqSel=[];saveSess();renderBookingClient();}
+function pickCoachChange(v){pickCoach=v;reqSel=[];const c=coachById(v);if(c&&c.sport)pickSport=c.sport;saveSess();renderBookingClient();}
 function renderBookingClient(){
+  syncSportCoach();
   const now=todayISO();
   const c=custById(clientAs);
   if(!c){$('#view-booking').innerHTML='<div class="panel"><div class="empty">Profile not found. Please sign in again.</div></div>';return;}
@@ -2575,8 +2662,10 @@ function renderBookingClient(){
       <div>
         <div class="panel">
           <h3>${t('Request a session')}</h3>
+          ${bookableSports().length>1?`<div class="field"><label class="f">${t('Sport')}</label>
+            <select id="rqSport" onchange="pickSportChange(this.value)">${bookableSports().map(sp=>`<option value="${sp}" ${(pickSport||'').toLowerCase()===sp.toLowerCase()?'selected':''}>${sportIcon(sp)} ${sp}</option>`).join('')}</select></div>`:''}
           <div class="field"><label class="f">${t('Coach')}</label>
-            <select id="rqCoach" onchange="pickCoachChange(this.value)">${activeCoaches().map(co=>`<option value="${co.id}" ${pickCoach===co.id?'selected':''}>${co.name}</option>`).join('')||'<option value="">No coaches available</option>'}</select></div>
+            <select id="rqCoach" onchange="pickCoachChange(this.value)">${coachesForSport(pickSport).map(co=>`<option value="${co.id}" ${pickCoach===co.id?'selected':''}>${co.name}</option>`).join('')||'<option value="">No coaches available</option>'}</select></div>
           ${coachMiniProfile(coachById(pickCoach))}
           <div class="field"><label class="f">${t('Session type')}</label>
             <select id="rqType" onchange="reqSel=[];renderOpenSlots()"><option value="1on1">1:1 (${money(coachRate(pickCoach,'1on1'))}/hr)</option><option value="group">${t('Group')} (${money(coachRate(pickCoach,'group'))}/hr)</option></select></div>
@@ -2623,7 +2712,7 @@ function clientStatusHtml(c){
   const today=sortSessions(mine.filter(s=>s.date===now && (s.status==='scheduled'||s.status==='pending')));
   const pending=sortSessions(mine.filter(s=>s.date>=now && s.status==='pending'));
   const upcoming=sortSessions(mine.filter(s=>s.date>=now && s.status==='scheduled'));
-  const myEvents=(DB.eventRegs||[]).filter(r=>r.customerId===c.id&&r.status!=='cancelled').map(r=>({r,ev:eventById(r.eventId)})).filter(x=>x.ev&&x.ev.date>=now).sort((a,b)=>((a.ev.date||'')+(a.ev.time||'')).localeCompare((b.ev.date||'')+(b.ev.time||'')));
+  const myEvents=(DB.eventRegs||[]).filter(r=>r.customerId===c.id&&r.status!=='cancelled').map(r=>({r,ev:eventById(r.eventId)})).filter(x=>x.ev&&eventUpcoming(x.ev)).sort((a,b)=>eventSortKey(a.ev).localeCompare(eventSortKey(b.ev)));
   const evCard=x=>`<div class="panel" style="margin-bottom:12px">
       <div class="row" style="justify-content:space-between;align-items:center;gap:10px">
         <div style="flex:1;min-width:180px"><b>🎉 ${x.ev.title}</b> ${x.r.status==='pending'?'<span class="pill yellow">'+t('⏳ Pending approval')+'</span>':'<span class="pill green">'+t('✓ Registered')+'</span>'} ${x.r.paid?'<span class="pill green">'+t('Paid')+'</span>':(x.ev.price?'<span class="pill orange">'+money(x.ev.price)+'</span>':'<span class="pill green">'+t('Free')+'</span>')}
@@ -2913,6 +3002,80 @@ function alertUnfilledGroups(){
     s.formAlerted=true;
   });
   if(msgs.length){ msgs.forEach(m=>DB.messages.push(m)); save(); pushRows('messages',msgs.map(messageRow)); }
+}
+/* ============================================================================
+   MY JOURNEY — the player's development story, newest first.
+
+   Same source data as Past Sessions, but framed as a timeline rather than a list: milestones,
+   totals, and every piece of coach feedback and media in one scroll. This is the page a parent
+   actually wants to look at, and the reason coaches bother recording video.
+   ============================================================================ */
+function journeyStats(c){
+  const mine=DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status==='completed')
+                        .sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+  const media=mine.reduce((n,s)=>n+((s.media||[]).length),0);
+  const notes=mine.filter(s=>(s.feedback||'').trim()).length;
+  const coaches=[...new Set(mine.map(s=>s.coachId))].filter(Boolean);
+  const first=mine[0], last=mine[mine.length-1];
+  let hours=Math.round(mine.reduce((n,s)=>n+((s.dur||60)/60),0));
+  let weeks=0;
+  if(first&&last){ weeks=Math.max(1,Math.round((new Date(last.date)-new Date(first.date))/6048e5)); }
+  return {mine,media,notes,coaches,first,last,hours,weeks};
+}
+function renderJourney(){
+  const el=$('#view-journey'); if(!el)return;
+  const c=custById(clientAs);
+  if(!c){el.innerHTML='<div class="panel"><div class="empty">'+t('Please sign in again.')+'</div></div>';return;}
+  const st=journeyStats(c);
+  if(!st.mine.length){
+    el.innerHTML=`<h1 class="page">${t('My Journey')}</h1>
+      <div class="sub">${t('Your training story — every session, note and clip in one place.')}</div>
+      <div class="panel"><div class="empty">${t('Your journey starts with your first completed session. Book one and it will appear here.')}</div></div>`;
+    return;
+  }
+  // group by month so the timeline reads as chapters rather than an endless list
+  const byMonth={};
+  st.mine.slice().reverse().forEach(s=>{ (byMonth[s.date.slice(0,7)]=byMonth[s.date.slice(0,7)]||[]).push(s); });
+  const monthName=k=>{const [y,m]=k.split('-');
+    return new Date(y,+m-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});};
+  const total=st.mine.length;
+  const card=(s,idx)=>{
+    const media=(s.media||[]).map((m,i)=>m.type==='image'
+      ? `<img src="${mUrl(m)}" onclick="viewMedia('${s.id}',${i})" style="width:92px;height:92px;object-fit:cover;border-radius:10px;cursor:pointer">`
+      : `<video src="${mUrl(m)}" controls preload="metadata" style="width:150px;border-radius:10px"></video>`).join('');
+    return `<div class="jrow">
+      <div class="jdot">${total-idx}</div>
+      <div class="jcard">
+        <div class="row" style="justify-content:space-between;align-items:center;gap:8px">
+          <div><b>${fmtDT(s.date,s.time)}</b> ${typePill(s)}
+            <span class="pill">🏀 ${coachName(s.coachId)}</span></div>
+          <span class="clienttag">${s.dur} ${t('min')} · 📍 ${s.location||''}</span>
+        </div>
+        ${(s.feedback||'').trim()?`<div class="jfb"><b>📣 ${t('Coach feedback:')}</b> ${escapeHtml(s.feedback)}</div>`:''}
+        ${media?`<div class="jmedia">${media}</div>`:''}
+        ${!(s.feedback||'').trim()&&!media?`<div class="clienttag" style="margin-top:6px">${t('Session completed.')}</div>`:''}
+      </div></div>`;
+  };
+  let idx=0, body='';
+  Object.keys(byMonth).sort().reverse().forEach(k=>{
+    body+=`<div class="jmonth">${monthName(k)} <span>${byMonth[k].length} ${byMonth[k].length===1?t('session'):t('sessions')}</span></div>`;
+    byMonth[k].forEach(s=>{ body+=card(s,idx); idx++; });
+  });
+  el.innerHTML=`
+    <h1 class="page">${t('My Journey')}</h1>
+    <div class="sub">${t('Your training story — every session, note and clip in one place.')}</div>
+    <div class="stats" style="margin-bottom:16px">
+      <div class="stat"><div class="k">${t('Sessions completed')}</div><div class="v">${total}</div>
+        <div class="d muted">${st.hours} ${t('hours on court')}</div></div>
+      <div class="stat"><div class="k">${t('Coach notes')}</div><div class="v">${st.notes}</div>
+        <div class="d muted">${t('written for you')}</div></div>
+      <div class="stat"><div class="k">${t('Photos & videos')}</div><div class="v">${st.media}</div>
+        <div class="d muted">${t('captured in training')}</div></div>
+      <div class="stat"><div class="k">${t('Training since')}</div>
+        <div class="v" style="font-size:20px">${fmtDate(st.first.date)}</div>
+        <div class="d muted">${st.weeks} ${st.weeks===1?t('week'):t('weeks')}</div></div>
+    </div>
+    <div class="jline">${body}</div>`;
 }
 function submitRequest(){
   const cid=clientAs;if(!cid)return flash('Please sign in again',true);
@@ -3630,6 +3793,7 @@ const CUST_COLS=[
 ];
 const COACH_COLS=[
   {id:'name',label:'Coach',get:c=>c.name||''},
+  {id:'sport',label:'Sport',get:c=>c.sport||'Basketball'},
   {id:'aff',label:'Affiliation',get:c=>c.affiliation||''},
   {id:'rate',label:'Rates ($/hr)',num:true,get:c=>coachRate(c.id,'1on1')},
   {id:'status',label:'Status',num:true,get:c=>c.active!==false?1:0},
@@ -3879,6 +4043,7 @@ function renderCoaches(){
     const st=coachStats(c.id);
     return `<tr>
       <td><div class="nameceil"><span class="av">${initials(c.name)}</span><div><b>${c.name}</b><div class="clienttag">${c.tagline||'—'}</div></div></div></td>
+      <td>${sportIcon(c.sport)} ${c.sport||'Basketball'}</td>
       <td>${c.affiliation||'—'}<div class="clienttag">${c.affiliationSub||''}</div></td>
       <td>1:1 ${money(coachRate(c.id,'1on1'))}<div class="clienttag">Group ${money(coachRate(c.id,'group'))}/player</div></td>
       <td>${c.active!==false?'<span class="pill green">Active</span>':'<span class="pill red">Inactive</span>'}${c.pending?' <span class="pill yellow">⏳ Pending</span>':''}</td>
@@ -3891,7 +4056,7 @@ function renderCoaches(){
         <button class="iconbtn" title="Manage this coach" onclick="setMgCoach('${c.id}');flash('Now managing ${c.name.replace(/'/g,'')}')">Manage</button>
         <button class="iconbtn" onclick="openCoach('${c.id}')">Edit</button>
       </div></td></tr>`;
-  }).join('')||'<tr><td colspan="9"><div class="empty">No coaches yet — add your first coach.</div></td></tr>';
+  }).join('')||'<tr><td colspan="10"><div class="empty">No coaches yet — add your first coach.</div></td></tr>';
   $('#view-coaches').innerHTML=`
     <h1 class="page">Coaches</h1>
     <div class="sub">Every coach's profile, rates, sign-in and status. Use <b>Manage</b> (or the selector top-right) to work inside one coach's Booking, Availability and Finance. ${pendCount?`<span class="pill yellow" style="margin-left:6px">⏳ ${pendCount} awaiting approval</span>`:''}</div>
@@ -4662,7 +4827,14 @@ function eventRegsFor(eid){return (DB.eventRegs||[]).filter(r=>r.eventId===eid&&
 function eventSpotsLeft(ev){if(!ev.capacity)return Infinity;return Math.max(0,ev.capacity-eventRegsFor(ev.id).length);}
 function eventRevenue(ev){return eventRegsFor(ev.id).filter(r=>r.paid).length*(ev.price||0);}
 function myEventReg(eid,cid){return (DB.eventRegs||[]).find(r=>r.eventId===eid&&r.customerId===cid&&r.status!=='cancelled');}
-function eventWhen(ev){return ev.date?fmtDT(ev.date,ev.time):'Date TBD';}
+function eventWhen(ev){return ev.date?fmtDT(ev.date,ev.time):t('Date to be confirmed');}
+/* An event with no date yet is still UPCOMING, not past. Filtering on `date >= today` treated a
+   blank date as older than everything, so a to-be-confirmed event silently vanished from the
+   client's Events tab and got a "Past" pill on the owner's. */
+function eventUpcoming(ev){ return !ev||!ev.date ? true : ev.date>=todayISO(); }
+function eventPast(ev){ return !eventUpcoming(ev); }
+/* undated events sort to the top of the upcoming list rather than the bottom */
+function eventSortKey(ev){ return (ev.date||'0000-00-00')+(ev.time||''); }
 function eventPendingRegs(){return (DB.eventRegs||[]).filter(r=>r.status==='pending'&&(eventById(r.eventId)));}
 function eventRegApprove(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;r.status='registered';save();flash('Registration approved ✅');viewEventRegs(r.eventId);}
 
@@ -4674,7 +4846,7 @@ function renderEventsOwner(){
   const rows=evs.map(ev=>{
     const regs=eventRegsFor(ev.id);const paid=regs.filter(r=>r.paid).length;const pend=regs.filter(r=>r.status==='pending').length;const conf=regs.length-pend;
     const cap=ev.capacity?('/'+ev.capacity):'';
-    const st=ev.active===false?'<span class="pill">Draft</span>':(ev.date<now?'<span class="pill">Past</span>':'<span class="pill green">Published</span>');
+    const st=ev.active===false?'<span class="pill">Draft</span>':(!ev.date?'<span class="pill yellow">⏳ Date TBC</span>':(eventPast(ev)?'<span class="pill">Past</span>':'<span class="pill green">Published</span>'));
     return `<tr>
       <td><b>${ev.title||'(untitled)'}</b>${ev.video?' <span class="pill blue" title="Has a video">🎬</span>':''}<div class="clienttag">${(ev.detail||'').slice(0,60)}${(ev.detail||'').length>60?'…':''}</div></td>
       <td>${eventWhen(ev)}<div class="clienttag">📍 ${ev.location||'TBD'}</div></td>
@@ -4811,7 +4983,7 @@ function eventRegRemove(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)
 /* ---- client view ---- */
 function renderEventsClient(){
   const now=todayISO();
-  const evs=(DB.events||[]).filter(e=>e.active!==false&&e.date>=now).sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
+  const evs=(DB.events||[]).filter(e=>e.active!==false&&eventUpcoming(e)).sort((a,b)=>eventSortKey(a).localeCompare(eventSortKey(b)));
   const mine=(DB.eventRegs||[]).filter(r=>r.customerId===clientAs&&r.status!=='cancelled');
   const card=ev=>{
     const reg=myEventReg(ev.id,clientAs);const left=eventSpotsLeft(ev);const full=left<=0;
