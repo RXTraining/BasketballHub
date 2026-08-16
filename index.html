@@ -1717,6 +1717,7 @@ function renderTabs(){
     let label=tb.label;
     if(tb.id==='booking'&&AUTH==='client')label='My Sessions';
     if(tb.id==='about'&&AUTH==='coach')label='My Profile';
+    if(tb.id==='about'&&AUTH==='owner')label='Release notes';
     if(tb.id==='money')label=AUTH==='coach'?'Earnings':'Payments';
     let lab=t(label);
     if(tb.id==='messages'&&chatUnread>0)lab+=` <span class="pill red" style="padding:1px 7px">${chatUnread}</span>`;
@@ -2421,7 +2422,87 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
 /* ============================================================
    ABOUT
    ============================================================ */
+/* ============================================================================
+   RELEASE HISTORY — what changed in the app and when.
+
+   Newest first. Keep this list honest: it's the only record of why something behaves the way it
+   does, and several entries below exist because a bug was found in production. When you ship a
+   change, add an entry here rather than relying on memory.
+   ============================================================================ */
+const CHANGELOG=[
+ {v:'1.9', d:'2026-08-14', t:'Skills tracking', items:[
+   'New <b>My Skills</b> page for clients: every skill grouped by sport, with the progress steps recorded against each one.',
+   'Owner-managed skill catalogue (Admin → Skills), seeded with 21 basketball skills. Skills are per sport, so adding a sport\'s syllabus is just adding rows.',
+   'Coaches and owner record progress with a note plus photos/video, from a client\'s skill board or from a session.',
+   'Owner can edit or delete <b>any</b> entry including a coach\'s; coaches may only change their own. Owner overrides are marked "edited by Owner".',
+   'Clients get a chat message whenever new progress is logged.',
+ ]},
+ {v:'1.8', d:'2026-08-13', t:'Public site & multi-sport', items:[
+   'rxtraining.org now opens on a marketing home page instead of a login box, with Sign in / Create account top right.',
+   'Coaches roster, per-sport sections, rolling events ticker and an owner-replaceable Highlights video.',
+   'Whole home page translated into 中文 / 한국어 / 日本語.',
+   'Sport is now a property of each coach; clients pick a sport first (cartoon tiles) and the coach list filters to match.',
+   'New light "Electric Court" theme across the app. Status colours were deepened — the old ones glowed on black but failed contrast on white.',
+   '<b>Fix:</b> iOS status-bar overlap made the top row of buttons untappable on installed phones (<code>black-translucent</code> → <code>default</code>).',
+ ]},
+ {v:'1.7', d:'2026-08-12', t:'My Journey & activity', items:[
+   'Client <b>My Journey</b> timeline: milestones, hours on court, and every piece of coach feedback and media in one scroll. Past Sessions is now folded into it.',
+   'Owner <b>Activity</b> tab logging logins, bookings, cancellations, check-ins, payments, profile edits and whether a client actually read their feedback.',
+   'Last-seen and dormant-client tracking on the Customers table.',
+   'Configurable push alerts for client activity (off / key events / everything).',
+   '<b>Fix:</b> a stale owner tab could overwrite everyone\'s "last seen" back to never, because the bulk customer sync re-uploaded old values.',
+   '<b>Fix:</b> new activity did not trigger a refresh, so the app-icon badge never updated.',
+ ]},
+ {v:'1.6', d:'2026-08-10', t:'Group booking', items:[
+   'Clients can discover and ask to join a group that has spare places, seeing only how many spots are left — never the other players\' names.',
+   'Requesting a group time creates an open group others can join, so the first player is never stuck waiting alone.',
+   'A group below the minimum headcount no longer blocks that slot from 1:1 requests, and conflicting requests are flagged in the approvals queue.',
+   'Groups that never fill surface at a cutoff, and the client is offered a standard 60-minute 1:1 instead of being silently cancelled or re-priced.',
+ ]},
+ {v:'1.5', d:'2026-08-08', t:'Money & coach economics', items:[
+   'Per-player payment tracking for group sessions — one member can use a package credit while another still owes cash.',
+   'Coaches are either in-house (business keeps 100%, gas mileage logged) or partner (their share auto-logs as a Coach payout expense once money is collected).',
+   'Automatic gas-mileage expense per completed session, from per-venue mileage × a $/mile rate.',
+   '<b>Fix:</b> one client\'s package credit could mark an entire group session paid.',
+   '<b>Fix:</b> cash payments were labelled "Prepaid" regardless of method.',
+ ]},
+ {v:'1.4', d:'2026-08-06', t:'Communication', items:[
+   'Zelle payment request posted to the client automatically when a session completes, with a ✅ confirmation once marked paid.',
+   'Broadcast a message or video to selected clients — each gets a private copy, so replies stay 1:1.',
+   'Owner can delete individual messages or a whole conversation.',
+   'Video uploads raised to 90MB, with YouTube/Vimeo/Drive links supported everywhere.',
+   '<b>Fix:</b> saving mid-upload silently discarded the attachment — the upload is now blocked until the file lands.',
+ ]},
+ {v:'1.3', d:'2026-08-04', t:'Scheduling', items:[
+   'Availability windows expand into per-slot chips showing booked vs open, with quick-book straight into the schedule.',
+   'Clients can select several open times and request them in one go; owner can repeat a session across weekdays.',
+   'Every delete and cancel action now asks for confirmation first.',
+ ]},
+];
+function renderChangelog(){
+  const el=$('#view-about'); if(!el)return;
+  const cur=CHANGELOG[0];
+  el.innerHTML=`
+    <h1 class="page">Release history</h1>
+    <div class="sub">What changed in RX.TRAINING and when. Entries marked <b>Fix</b> came out of something found in production — worth reading before changing that area again.</div>
+    <div class="stats" style="margin-bottom:16px">
+      <div class="stat"><div class="k">Current version</div><div class="v">${cur.v}</div><div class="d muted">${cur.t}</div></div>
+      <div class="stat"><div class="k">Released</div><div class="v" style="font-size:20px">${fmtDate(cur.d)}</div><div class="d muted">${CHANGELOG.length} releases logged</div></div>
+      <div class="stat"><div class="k">Changes recorded</div><div class="v">${CHANGELOG.reduce((n,r)=>n+r.items.length,0)}</div><div class="d muted">across all versions</div></div>
+      <div class="stat"><div class="k">Fixes</div><div class="v">${CHANGELOG.reduce((n,r)=>n+r.items.filter(i=>/<b>Fix/.test(i)).length,0)}</div><div class="d muted">from live issues</div></div>
+    </div>
+    ${CHANGELOG.map((r,i)=>`<div class="panel" style="margin-bottom:12px">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px">
+        <h3 style="margin:0">v${r.v} — ${r.t} ${i===0?'<span class="pill green">current</span>':''}</h3>
+        <span class="clienttag">${fmtDate(r.d)}</span></div>
+      <ul style="margin:6px 0 0;padding-left:18px">
+        ${r.items.map(x=>`<li style="font-size:13.5px;line-height:1.65;margin-bottom:5px;color:var(--muted)">${x}</li>`).join('')}
+      </ul></div>`).join('')}
+    <p class="muted small">Add a new entry at the top of <code>CHANGELOG</code> in index.html when you ship a change.</p>`;
+}
 function renderAbout(){
+  // Owner sees the release history here; coaches keep their own profile page.
+  if(AUTH==='owner')return renderChangelog();
   const co=coachById(scopeCoach())||(DB.coaches||[])[0]||{name:'Coach',tagline:'',bio:'',affiliation:'',affiliationSub:''};
   const upcoming = DB.sessions.filter(s=>s.coachId===co.id&&s.status==='scheduled').length;
   const editBtn = AUTH==='coach'?`<button class="btn ghost" onclick="openCoach('${co.id}')">✎ Edit my profile</button>`:'';
