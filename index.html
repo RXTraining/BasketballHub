@@ -463,6 +463,14 @@
   .lp-sport b{display:block;font-size:14.5px;font-weight:900}
   .lp-sport span{font-size:11.5px;font-weight:800;color:var(--lp-mut);letter-spacing:.4px}
   .lp-sport.on span{color:var(--lp-volt-d)}
+  .lp-hichips{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .lp-hichip{background:#fff;border:1.5px solid var(--lp-line);border-radius:12px;padding:8px 13px;
+    cursor:pointer;font-family:inherit;text-align:left;transition:transform .18s,border-color .18s}
+  .lp-hichip:hover{transform:translateY(-2px);border-color:var(--lp-volt-d)}
+  .lp-hichip.on{border-color:var(--lp-volt-d);background:var(--lp-soft)}
+  .lp-hichip b{display:block;font-size:13px;color:var(--lp-ink)}
+  .lp-hichip span{display:block;font-size:11.5px;color:var(--lp-mut);font-weight:700;margin-top:1px}
+  .lp-hichip.on span{color:var(--lp-volt-d)}
   .lp-foot{border-top:1px solid var(--lp-line);padding:26px 0 40px;text-align:center;color:var(--lp-mut);font-size:13px}
   .lp-contact{display:flex;gap:11px;justify-content:center;flex-wrap:wrap;margin-top:20px}
   /* six nav links plus two auth buttons stop fitting well below ~980px — swap the text nav for
@@ -1207,6 +1215,14 @@ function normalize(d){
   if(!d.messages)d.messages=[];
   if(!d.activity)d.activity=[];
   // Skill catalogue (owner-managed) and per-client progress entries.
+  // Highlight reels shown on the public home page, newest first. Migrates the old single-video
+  // setting so an existing highlight isn't lost when this list takes over.
+  if(!Array.isArray(d.highlights))d.highlights=[];
+  if(d.settings&&d.settings.highlightVideo&&!d.highlights.some(h=>h.url===d.settings.highlightVideo)){
+    d.highlights.push({id:'hl-migrated',url:d.settings.highlightVideo,
+      title:d.settings.highlightTitle||'Highlights',date:todayISO(),active:true});
+  }
+  d.highlights.forEach(h=>{if(!h.date)h.date=todayISO();if(h.active===undefined)h.active=true;});
   if(!Array.isArray(d.skills))d.skills=[];
   if(!Array.isArray(d.skillLog))d.skillLog=[];
   if(!d.skills.length){
@@ -1224,7 +1240,7 @@ function normalize(d){
 function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.parse(r);}catch(e){}return normalize(d);}
 
 /* ----- relational mapping (separate tables in Supabase) ----- */
-function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl){
+function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl,hl){
   const d={};
   d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',activityPush:(st&&st.activity_push)||'important',activitySeenAt:(st&&st.activity_seen_at)||'',sports:(st&&st.sports)||'Basketball, Soccer, Tennis, Golf, Track',highlightVideo:(st&&st.highlight_video)||'',highlightTitle:(st&&st.highlight_title)||'',groupMinPlayers:(st&&st.group_min_players)||2,groupFormHours:(st&&st.group_form_hours)||48,homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
   d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',
@@ -1241,6 +1257,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
   d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||'',video:e.video||''}));
   d.eventRegs=(regs||[]).map(r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||''}));
   d.messages=(msgs||[]).map(m=>({id:m.id,peerType:m.peer_type||'client',clientId:m.client_id||'',coachId:m.coach_id||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',readOwner:m.read_owner===true,readClient:m.read_client===true,readCoach:m.read_coach===true}));
+  d.highlights=(hl||[]).map(h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',active:h.active!==false}));
   d.skills=(sk||[]).map(k=>({id:k.id,sport:k.sport||'Basketball',name:k.name||'',ord:k.ord||0,active:k.active!==false}));
   d.skillLog=(sl||[]).map(e=>({id:e.id,customerId:e.customer_id||'',skillId:e.skill_id||'',ts:e.ts||'',
     by:e.by_role||'',byId:e.by_id||'',byName:e.by_name||'',note:e.note||'',media:e.media||[],level:e.level||'',editedBy:e.edited_by||''}));
@@ -1248,6 +1265,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
   return normalize(d);
 }
 const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),sport:c.sport||'Basketball',family:c.family===true,share_type:c.shareType||'pct',share_val:(c.shareVal!=null?c.shareVal:0),pending:(c.pending||null),created:c.created||null,last_login:lastLoginOf(c)||null,login_count:loginCountOf(c)});
+const highlightRow=h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',active:h.active!==false});
 const skillRow=k=>({id:k.id,sport:k.sport||'Basketball',name:k.name||'',ord:k.ord||0,active:k.active!==false});
 const skillLogRow=e=>({id:e.id,customer_id:e.customerId||'',skill_id:e.skillId||'',ts:e.ts||'',
   by_role:e.by||'',by_id:e.byId||'',by_name:e.byName||'',note:e.note||'',media:e.media||[],level:e.level||'',edited_by:e.editedBy||''});
@@ -1304,7 +1322,9 @@ async function fetchCloud(){
   let sk={data:[]}, sl={data:[]};
   try{const k1=await supa.from('skills').select('*'); if(k1&&!k1.error)sk=k1;}catch(e){}
   try{const l1=await supa.from('skill_log').select('*'); if(l1&&!l1.error)sl=l1;}catch(e){}
-  return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data,avail.data,coa.data,evs.data,regs.data,msgs.data,acts.data,sk.data,sl.data);
+  let hl={data:[]};
+  try{const h1=await supa.from('highlights').select('*'); if(h1&&!h1.error)hl=h1;}catch(e){}
+  return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data,avail.data,coa.data,evs.data,regs.data,msgs.data,acts.data,sk.data,sl.data,hl.data);
 }
 async function bootLoad(){
   const cfg=getSupaCfg();
@@ -1333,6 +1353,7 @@ function dataSig(d){return JSON.stringify({
   msg:(d.messages||[]).map(x=>[x.id,x.readOwner,x.readClient,x.readCoach]),
   // activity must be in the signature or a new log row reads as "no change" and the poll
   // returns early — which silently stopped the badge updating for activity
+  hl:(d.highlights||[]).map(x=>[x.id,x.url,x.title,x.date,x.active]),
   sk:(d.skills||[]).map(x=>[x.id,x.name,x.sport,x.ord,x.active]),
   sl:(d.skillLog||[]).length+':'+(d.skillLog||[]).reduce((m,e)=>(e.ts||'')>m?(e.ts||''):m,''),
   act:(d.activity||[]).length+':'+(d.activity||[]).reduce((m,a)=>(a.ts||'')>m?(a.ts||''):m,''),
@@ -1534,6 +1555,7 @@ async function cloudPush(){
     await push('events',()=>syncTable('events',(DB.events||[]).map(eventRow)));
     await push('event_regs',()=>syncTable('event_regs',(DB.eventRegs||[]).map(eventRegRow)));
     await push('messages',()=>syncTable('messages',(DB.messages||[]).map(messageRow)));
+    await push('highlights',()=>syncTable('highlights',(DB.highlights||[]).map(highlightRow)));
     await push('skills',()=>syncTable('skills',(DB.skills||[]).map(skillRow)));
     await push('skill_log',()=>syncTable('skill_log',(DB.skillLog||[]).map(skillLogRow)));
     if(fails.length)flash('⚠ These tables need setup — run supabase-setup.sql: '+fails.join(', '),true);
@@ -1904,6 +1926,50 @@ function lpTickerHtml(){
     <span class="win"><span class="trk" style="animation-duration:${secs}s">${row}${row}</span></span>
   </div>`;
 }
+/* Highlight reels, newest first, with a date switcher. lpHiPick is the id currently showing;
+   it survives a re-render so switching language or resizing doesn't bounce you back to the
+   newest clip. */
+let lpHiPick=null;
+function lpHighlights(){
+  return (DB.highlights||[]).filter(h=>h.active!==false&&h.url)
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+}
+function lpHighlightsHtml(){
+  const list=lpHighlights();
+  if(!list.length){
+    // nothing uploaded yet — keep the original reel so the section is never empty
+    return `<p class="lp-p">${t('FILM_P')}</p>
+      <div class="lp-vid">${videoHtml('https://www.youtube.com/embed/1odU-4Ml2sw','100%')}</div>`;
+  }
+  const cur=list.find(h=>h.id===lpHiPick)||list[0];
+  const chips=list.length>1?`<div class="lp-hichips">${list.map((h,i)=>`
+      <button class="lp-hichip${h.id===cur.id?' on':''}" onclick="lpPickHighlight('${h.id}')">
+        <b>${h.title||t('Highlights')}</b>
+        <span>${h.date?fmtDate(h.date):''}${i===0?' · '+t('Latest'):''}</span>
+      </button>`).join('')}</div>`:'';
+  return `${cur.title?`<p class="lp-p" style="font-weight:800;color:var(--lp-ink);font-size:17px">${cur.title}
+      ${cur.date?`<span style="font-weight:700;color:var(--lp-mut);font-size:14px"> · ${fmtDate(cur.date)}</span>`:''}</p>`
+      :`<p class="lp-p">${t('FILM_P')}</p>`}
+    <div class="lp-vid" id="lpVid">${videoHtml(cur.url,'100%')}</div>
+    ${chips}`;
+}
+function lpPickHighlight(id){
+  lpHiPick=id;
+  const list=lpHighlights(); const h=list.find(x=>x.id===id)||list[0]; if(!h)return;
+  // swap just the player + chips, so the page doesn't scroll back to the top on every switch
+  const vid=document.getElementById('lpVid');
+  if(vid){
+    vid.innerHTML=videoHtml(h.url,'100%');
+    const cap=vid.previousElementSibling;
+    if(cap&&cap.classList.contains('lp-p'))
+      cap.innerHTML=(h.title||'')+(h.date?` <span style="font-weight:700;color:var(--lp-mut);font-size:14px"> · ${fmtDate(h.date)}</span>`:'');
+    const wrap=vid.nextElementSibling;
+    if(wrap&&wrap.classList.contains('lp-hichips'))
+      [...wrap.children].forEach(b=>b.classList.toggle('on',b.getAttribute('onclick').includes("'"+h.id+"'")));
+    return;
+  }
+  renderLanding();
+}
 function lpCoachCards(){
   const list=activeCoaches();
   if(!list.length)return '<div class="lp-card">'+t('NO_COACHES')+'</div>';
@@ -2088,8 +2154,7 @@ function renderLanding(){
     <section class="lp-sec" id="lpFilm">
       <div class="lp-kicker">${t('See me play')}</div>
       <h2 class="lp-h2">${t('HIGHLIGHTS')}</h2>
-      ${hiTitle?`<p class="lp-p" style="font-weight:800;color:var(--lp-ink);font-size:17px">${hiTitle}</p>`:`<p class="lp-p">${t('FILM_P')}</p>`}
-      <div class="lp-vid">${videoHtml(DB.settings.highlightVideo||'https://www.youtube.com/embed/1odU-4Ml2sw','100%')||'<iframe src="https://www.youtube.com/embed/1odU-4Ml2sw" title="AAU highlights" allowfullscreen></iframe>'}</div>
+      ${lpHighlightsHtml()}
     </section>
 
     <section class="lp-sec" id="lpBook">
@@ -6085,18 +6150,31 @@ function renderAdmin(){
       <button class="btn sm" onclick="openSkillAdmin()">Manage skills</button>
     </div>
     <div class="panel" style="margin-top:16px">
-      <h3>Home page highlights video</h3>
-      <div class="field"><label class="f">Video shown in the <b style="color:var(--txt)">AAU Highlights</b> section of rxtraining.org</label>
-        <input id="hiVideo" value="${safeUrl(DB.settings.highlightVideo||'')}" placeholder="Paste a YouTube / Vimeo / Drive link…"></div>
-      <div class="field"><label class="f">Caption shown under the HIGHLIGHTS heading (optional)</label>
-        <input id="hiTitle" value="${(DB.settings.highlightTitle||'').replace(/"/g,'&quot;')}" placeholder="e.g. Summer Showcase vs Middlesex Magic"></div>
+      <h3>Home page highlights</h3>
+      <div class="clienttag" style="margin-bottom:10px">Reels shown in the <b style="color:var(--txt)">HIGHLIGHTS</b> section of rxtraining.org. Visitors see the newest first and can switch to older ones by date. Leave the list empty to show the built-in AAU reel.</div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Title</th><th>Date</th><th>Video</th><th></th></tr></thead><tbody>
+        ${(DB.highlights||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map((h,i)=>`<tr>
+          <td><input value="${(h.title||'').replace(/"/g,'&quot;')}" onchange="updHighlight('${h.id}','title',this.value)"></td>
+          <td style="width:150px"><input type="date" value="${h.date||''}" onchange="updHighlight('${h.id}','date',this.value)"></td>
+          <td class="muted" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${i===0?'<span class="pill green">latest</span> ':''}${safeUrl(h.url).slice(0,44)}…</td>
+          <td class="right"><div class="actions">
+            <button class="iconbtn" title="Preview" onclick="previewHighlight('${h.id}')">▶</button>
+            <button class="iconbtn" title="Remove" onclick="delHighlight('${h.id}')">✕</button>
+          </div></td></tr>`).join('')||'<tr><td colspan="4"><div class="empty">No highlight reels yet — add one below.</div></td></tr>'}
+      </tbody></table></div>
+      <div class="row" style="margin-top:12px;gap:8px;align-items:flex-end">
+        <div class="field" style="flex:1;min-width:180px;margin-bottom:0"><label class="f">Title</label>
+          <input id="nhTitle" placeholder="e.g. Summer Showcase 2026"></div>
+        <div class="field" style="max-width:160px;margin-bottom:0"><label class="f">Date</label>
+          <input type="date" id="nhDate" value="${todayISO()}"></div>
+      </div>
+      <div class="field" style="margin-top:10px"><label class="f">Video link</label>
+        <input id="nhUrl" placeholder="Paste a YouTube / Vimeo / Drive link…"></div>
       <div class="row" style="gap:8px;align-items:center;margin-top:-4px">
         <label class="btn ghost sm" style="cursor:pointer">⬆ Upload a video<input type="file" accept="video/*" style="display:none" onchange="uploadHighlightVideo(this)"></label>
-        <button class="btn ghost sm" onclick="clearHighlightVideo()">Restore default reel</button>
+        <button class="btn sm" onclick="addHighlight()">+ Add highlight</button>
       </div>
-      <div id="hiPrev" style="margin-top:10px">${videoHtml(DB.settings.highlightVideo||'','320px')}</div>
-      <div class="clienttag" style="margin-top:6px">Leave blank to show the built-in AAU reel. You can also set this from any event — tick <b style="color:var(--txt)">"Also show this video as the Highlights reel"</b> in the event editor.</div>
-      <button class="btn sm" style="margin-top:10px" onclick="saveHighlightVideo()">Save highlights video</button>
+      <div id="hiPrev" style="margin-top:10px"></div>
     </div>`;
 }
 function saveNotify(){
@@ -6107,20 +6185,38 @@ function saveZelle(){
   DB.settings.zellePhone=($('#zellePhone').value||'').trim();
   save();flash('Zelle number saved');
 }
-function saveHighlightVideo(){
-  const v=safeUrl($('#hiVideo').value||'');
-  if(v&&!videoEmbed(v))return flash('That doesn\'t look like a video URL — it should start with https://',true);
-  DB.settings.highlightVideo=v;
-  DB.settings.highlightTitle=(($('#hiTitle')&&$('#hiTitle').value)||'').trim();
-  save();flash(v?'Highlights video updated 🎬':'Restored the default reel');renderAdmin();
+/* Highlight reels are a list now, newest first by date. The old single-setting version is kept
+   only as a migration source in normalize(). */
+function addHighlight(){
+  const url=safeUrl($('#nhUrl').value||'');
+  if(!url)return flash('Paste a link or upload a video first',true);
+  if(!videoEmbed(url))return flash('That doesn\'t look like a video URL — it should start with https://',true);
+  const title=($('#nhTitle').value||'').trim()||'Highlights';
+  const date=$('#nhDate').value||todayISO();
+  if(!DB.highlights)DB.highlights=[];
+  DB.highlights.push({id:uid(),url,title,date,active:true});
+  save(); flash('Highlight added 🎬'); renderAdmin();
 }
-function clearHighlightVideo(){
-  if(!confirm('Restore the built-in AAU highlights reel on the home page?'))return;
-  DB.settings.highlightVideo='';DB.settings.highlightTitle='';
-  save();flash('Restored the default reel');renderAdmin();
+function updHighlight(id,field,val){
+  const h=(DB.highlights||[]).find(x=>x.id===id); if(!h)return;
+  h[field]=(val||'').trim();
+  save();
+  if(field==='date')renderAdmin();   // re-sort so "latest" stays accurate
 }
-/* Same upload path as the event video — result is just a URL, so uploads and pasted links are
-   interchangeable here too. */
+function delHighlight(id){
+  const h=(DB.highlights||[]).find(x=>x.id===id); if(!h)return;
+  if(!confirm('Remove "'+(h.title||'this highlight')+'" from the home page?'))return;
+  DB.highlights=(DB.highlights||[]).filter(x=>x.id!==id);
+  save(); flash('Highlight removed'); renderAdmin();
+}
+function previewHighlight(id){
+  const h=(DB.highlights||[]).find(x=>x.id===id); if(!h)return;
+  openModal(h.title||'Highlight', videoHtml(h.url,'100%')||'<div class="empty">Could not load that video.</div>',
+    `<button class="btn" onclick="closeModal()">Close</button>`);
+}
+/* Upload path shared with events — the result is a URL, so uploads and pasted links behave
+   identically from here on. Fills the "new highlight" form rather than saving directly, so the
+   owner still sets a title and date before it goes public. */
 async function uploadHighlightVideo(input){
   const f=input.files&&input.files[0];input.value='';
   if(!f)return;
@@ -6138,67 +6234,10 @@ async function uploadHighlightVideo(input){
       if(up.error)return flash('Upload failed: '+up.error.message,true);
       url=supa.storage.from(MEDIA_BUCKET).getPublicUrl(path).data.publicUrl;
     }else{return flash('Connect Supabase or R2 to upload videos',true);}
-    const inp=$('#hiVideo'); if(inp)inp.value=url;
+    const inp=$('#nhUrl'); if(inp)inp.value=url;
     const pv=$('#hiPrev'); if(pv)pv.innerHTML=videoHtml(url,'320px');
-    flash('Uploaded ✅ — press Save highlights video');
+    flash('Uploaded ✅ — add a title and date, then press Add highlight');
   }catch(e){flash('Upload failed: '+e.message,true);}
-}
-/* Owner-managed skill catalogue. Skills are per-sport, so adding a sport's syllabus is just
-   adding rows here — the client's My Skills page groups automatically. */
-function openSkillAdmin(sport){
-  const sports=[...new Set(((DB.skills||[]).map(k=>k.sport||'Basketball'))
-                 .concat(bookableSports()).concat((DB.settings.sports||'').split(',').map(x=>x.trim())))]
-                 .filter(Boolean);
-  const sp=sport||sports[0]||'Basketball';
-  const list=skillsForSport(sp);
-  const rows=list.map((k,i)=>`<tr>
-      <td style="width:34px" class="muted">${i+1}</td>
-      <td><input value="${(k.name||'').replace(/"/g,'&quot;')}" onchange="renameSkill('${k.id}',this.value)"></td>
-      <td style="width:96px" class="right"><div class="actions">
-        <button class="iconbtn" title="Move up" onclick="moveSkill('${k.id}',-1)">↑</button>
-        <button class="iconbtn" title="Move down" onclick="moveSkill('${k.id}',1)">↓</button>
-        <button class="iconbtn" title="Remove" onclick="delSkill('${k.id}')">✕</button>
-      </div></td></tr>`).join('')
-    ||'<tr><td colspan="3"><div class="empty">No skills for this sport yet — add the first one below.</div></td></tr>';
-  openModal('Skills — '+sp,`
-    <div class="field"><label class="f">Sport</label>
-      <select onchange="openSkillAdmin(this.value)">${sports.map(x=>`<option ${x===sp?'selected':''}>${x}</option>`).join('')}</select></div>
-    <div style="overflow-x:auto;max-height:46vh;overflow-y:auto"><table><tbody>${rows}</tbody></table></div>
-    <div class="row" style="margin-top:12px;gap:8px">
-      <div class="field" style="flex:1;margin-bottom:0"><label class="f">Add a skill</label>
-        <input id="newSkill" placeholder="e.g. Euro step finish" onkeydown="if(event.key==='Enter')addSkill('${sp}')"></div>
-      <div class="field" style="display:flex;align-items:flex-end;margin-bottom:0">
-        <button class="btn" onclick="addSkill('${sp}')">Add</button></div>
-    </div>
-    <p class="muted small" style="margin-top:8px">Renaming keeps every client's recorded progress. Removing a skill hides it from clients but keeps their history.</p>
-  `,`<button class="btn" onclick="closeModal()">Done</button>`);
-}
-function addSkill(sport){
-  const el=$('#newSkill'); const name=(el?el.value:'').trim();
-  if(!name)return flash('Enter a skill name',true);
-  const max=(DB.skills||[]).filter(k=>(k.sport||'Basketball')===sport).reduce((m,k)=>Math.max(m,k.ord||0),0);
-  DB.skills.push({id:uid(),sport,name,ord:max+1,active:true});
-  save(); flash('Skill added'); openSkillAdmin(sport);
-}
-function renameSkill(id,name){
-  const k=skillById(id); if(!k)return;
-  const v=(name||'').trim(); if(!v)return;
-  k.name=v; save();
-}
-function moveSkill(id,dir){
-  const k=skillById(id); if(!k)return;
-  const list=skillsForSport(k.sport);
-  const i=list.findIndex(x=>x.id===id), j=i+dir;
-  if(i<0||j<0||j>=list.length)return;
-  const a=list[i], b=list[j]; const t2=a.ord; a.ord=b.ord; b.ord=t2;
-  save(); openSkillAdmin(k.sport);
-}
-function delSkill(id){
-  const k=skillById(id); if(!k)return;
-  const used=(DB.skillLog||[]).filter(e=>e.skillId===id).length;
-  if(!confirm('Remove "'+k.name+'" from the skills list?'+(used?('\n\n'+used+' recorded progress entr'+(used===1?'y':'ies')+' will be kept but hidden.'):'')))return;
-  k.active=false;              // soft-delete so client history isn't orphaned
-  save(); flash('Skill removed'); openSkillAdmin(k.sport);
 }
 function saveGroupForming(){
   DB.settings.groupMinPlayers=Math.max(2,Math.min(MAX_GROUP,+$('#grpMin').value||2));
