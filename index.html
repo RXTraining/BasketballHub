@@ -2495,6 +2495,19 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    change, add an entry here rather than relying on memory.
    ============================================================================ */
 const CHANGELOG=[
+ {v:'2.0', d:'2026-08-14', t:'Highlights, navigation & fixes', items:[
+   '<b>Multiple highlight reels</b> on the home page, each with a date. Visitors see the newest first and can switch to older ones with the date chips; the player swaps in place rather than jumping the page.',
+   'Owner manages the reels in Admin → Home page highlights: add by link or upload, edit title and date inline, preview, remove. Any previously set single video is migrated into the list.',
+   'Owner <b>About</b> page replaced with this release history. Coaches keep their own profile page there.',
+   'Header logo now opens the public home page from any role <b>without signing out</b>, with "Back to app" to return exactly where you were.',
+   'Quick 🎯 button on every row of the Customers table, so a client\'s skill board is one click from the list.',
+   '<b>Fix:</b> My Journey and My Skills appeared in the owner\'s tab bar. They read the signed-in client, so the owner saw a bogus "Please sign in again".',
+   '<b>Fix:</b> events stayed advertised all day after they had already started — the check compared date only, now it compares the start time too.',
+   '<b>Fix:</b> the Highlights caption showed the stock line instead of the event title; it now falls back to the source event\'s name when no caption is set.',
+   '<b>Fix:</b> videos were forced into a 16:9 box, cropping portrait phone clips. Uploaded video now keeps its own shape (capped at 70% screen height); only embeds get a fixed ratio.',
+   '<b>Fix:</b> session-plan bullets rendered as "\\2713" instead of a tick, from a double-escaped CSS content value.',
+   '<b>Fix:</b> the events ticker on the client page still hid to-be-confirmed events.',
+ ]},
  {v:'1.9', d:'2026-08-14', t:'Skills tracking', items:[
    'New <b>My Skills</b> page for clients: every skill grouped by sport, with the progress steps recorded against each one.',
    'Owner-managed skill catalogue (Admin → Skills), seeded with 21 basketball skills. Skills are per sport, so adding a sport\'s syllabus is just adding rows.',
@@ -2563,7 +2576,7 @@ function renderChangelog(){
       <ul style="margin:6px 0 0;padding-left:18px">
         ${r.items.map(x=>`<li style="font-size:13.5px;line-height:1.65;margin-bottom:5px;color:var(--muted)">${x}</li>`).join('')}
       </ul></div>`).join('')}
-    <p class="muted small">Add a new entry at the top of <code>CHANGELOG</code> in index.html when you ship a change.</p>`;
+    <p class="muted small">Add a new entry at the top of <code>CHANGELOG</code> in index.html when you ship a change — this page is only as accurate as the last person to update it.</p>`;
 }
 function renderAbout(){
   // Owner sees the release history here; coaches keep their own profile page.
@@ -3462,7 +3475,9 @@ function openClientSkills(cid){
               <div style="min-width:0;flex:1">
                 <div class="clienttag">${fmtChatTime(e.ts)} · ${e.byName||'—'}${e.editedBy?` · <span style="color:var(--accent)">edited by ${e.editedBy}</span>`:''}</div>
                 ${e.note?`<div style="font-size:13px;line-height:1.55;margin-top:2px">${escapeHtml(e.note)}</div>`:''}
-                ${(e.media||[]).length?`<div class="clienttag" style="margin-top:3px">📎 ${(e.media||[]).length} ${t('attachment(s)')}</div>`:''}
+                ${(e.media||[]).length?`<div class="jmedia">${(e.media||[]).map((m,mi)=>m.type==='image'
+                  ? `<img src="${mUrl(m)}" onclick="viewSkillMedia('${e.id}',${mi},'${cid}')" style="width:76px;height:76px;object-fit:cover;border-radius:9px;cursor:pointer" title="Tap to enlarge">`
+                  : `<video src="${mUrl(m)}" controls playsinline preload="metadata" style="width:150px;max-width:100%;border-radius:9px"></video>`).join('')}</div>`:''}
               </div>
               <div class="actions">${canEditSkillEntry(e)
                 ? `<button class="iconbtn" title="Edit" onclick="editSkillEntry('${e.id}')">Edit</button>
@@ -3606,12 +3621,15 @@ function delSkillLog(id,backToBoard){
   flash('Entry removed'); refreshOwner();
   if(backToBoard&&cid)openClientSkills(cid);
 }
-function viewSkillMedia(entryId,i){
+/* backCid: opening this from the owner/coach skill board replaces that modal, so Close has to
+   put the board back rather than dropping the user onto whatever was behind it. */
+function viewSkillMedia(entryId,i,backCid){
   const e=(DB.skillLog||[]).find(x=>x.id===entryId); const m=e&&e.media&&e.media[i]; if(!m)return;
+  const back=backCid?`openClientSkills('${backCid}')`:'closeModal()';
   openModal(m.name||'Attachment', m.type==='image'
     ? `<img src="${mUrl(m)}" style="max-width:100%;border-radius:10px">`
     : `<video src="${mUrl(m)}" controls autoplay playsinline style="max-width:100%;border-radius:10px"></video>`,
-    `<button class="btn" onclick="closeModal()">Close</button>`);
+    `<button class="btn" onclick="${back}">${backCid?'← Back to skills':'Close'}</button>`);
 }
 function submitRequest(){
   const cid=clientAs;if(!cid)return flash('Please sign in again',true);
