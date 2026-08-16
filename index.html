@@ -448,7 +448,16 @@
     letter-spacing:.9px;padding:3px 8px;border-radius:999px}
   .lp-coach-sport{font-size:12.5px;color:var(--lp-volt-d);font-weight:800;margin-top:2px}
   .lp-coach-tag{font-size:13px;color:var(--lp-mut);font-weight:700;margin-bottom:7px}
-  .lp-coach-bio{font-size:13.5px;line-height:1.6;color:var(--lp-mut);margin:0}
+  /* Clamp the bio visually rather than truncating the string — the full text stays in the page
+     (and for search engines), and "Read more" simply removes the clamp. Cutting at a character
+     count chopped Raymond's introduction mid-sentence. */
+  .lp-coach-bio{font-size:13.5px;line-height:1.6;color:var(--lp-mut);margin:0;
+    display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
+  .lp-coach-bio.open{-webkit-line-clamp:unset;display:block}
+  .lp-bio-wrap{margin-top:2px}
+  .lp-more{background:none;border:0;padding:4px 0 0;cursor:pointer;font-family:inherit;
+    font-weight:800;font-size:12.5px;color:var(--lp-volt-d)}
+  .lp-more:hover{text-decoration:underline}
   .lp-coach-rates{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}
   .lp-coach-rates span{background:var(--lp-soft);border:1px solid var(--lp-line);border-radius:9px;
     padding:6px 11px;font-size:12.5px;color:var(--lp-mut);font-weight:700}
@@ -627,6 +636,8 @@ const DB_KEY = 'rxtraining_v2';
 /* ---------- i18n: English / 中文 (client-facing) ---------- */
 let LANG='en'; try{LANG=localStorage.getItem('rx_lang')||'en';}catch(e){}
 const ZH={
+  'Read more':'展开全文',
+  'Show less':'收起',
   'Back to app':'返回应用',
   'HIGHLIGHTS':'精彩集锦',
   'ABOUT_P3':'每一堂课都建立在<b>对篮球的热爱</b>之上：投入、拼搏，以及<b>永不放弃</b>的信念。',
@@ -763,6 +774,8 @@ const ZH={
   'Session cancelled':'课程已取消','Registration cancelled':'报名已取消'
 };
 const KO={
+  'Read more':'더 보기',
+  'Show less':'접기',
   'Back to app':'앱으로 돌아가기',
   'HIGHLIGHTS':'하이라이트',
   'ABOUT_P3':'모든 세션은 <b>경기에 대한 사랑</b> 위에 세워집니다: 헌신, 노력, 그리고 <b>절대 포기하지 않는</b> 믿음.',
@@ -891,6 +904,8 @@ const KO={
   'Session cancelled':'수업이 취소되었습니다','Registration cancelled':'등록이 취소되었습니다'
 };
 const JA={
+  'Read more':'続きを読む',
+  'Show less':'閉じる',
   'Back to app':'アプリに戻る',
   'HIGHLIGHTS':'ハイライト',
   'ABOUT_P3':'すべてのセッションは<b>競技への愛</b>の上に成り立っています：献身、努力、そして<b>決して諦めない</b>という信念。',
@@ -1022,6 +1037,8 @@ const JA={
    language has no entry — fine when the key IS the English text, but these blocks use short
    codes, so without this dictionary English visitors saw 'ABOUT_P1' on the page. */
 const EN={
+  'Read more':'Read more',
+  'Show less':'Show less',
   'Back to app':'Back to app',
   'HIGHLIGHTS':'HIGHLIGHTS',
   'ABOUT_P3':'Every session is built on the <b>love of the game</b>: the dedication, the grind, and the belief that <b>you never give up</b>.',
@@ -1953,6 +1970,11 @@ function lpHighlightsHtml(){
     <div class="lp-vid" id="lpVid">${videoHtml(cur.url,'100%')}</div>
     ${chips}`;
 }
+function lpMoreBio(id,btn){
+  const el=document.getElementById('bio_'+id); if(!el)return;
+  const open=el.classList.toggle('open');
+  btn.innerHTML=(open?t('Show less')+' ▴':t('Read more')+' ▾');
+}
 function lpPickHighlight(id){
   lpHiPick=id;
   const list=lpHighlights(); const h=list.find(x=>x.id===id)||list[0]; if(!h)return;
@@ -1989,7 +2011,10 @@ function lpCoachCards(){
         </div>
       </div>
       ${c.tagline?`<div class="lp-coach-tag">${c.tagline}</div>`:''}
-      ${bio?`<p class="lp-coach-bio">${bio.length>210?bio.slice(0,210)+'…':bio}</p>`:''}
+      ${bio?`<div class="lp-bio-wrap">
+        <p class="lp-coach-bio" id="bio_${c.id}">${bio}</p>
+        ${bio.length>190?`<button class="lp-more" onclick="lpMoreBio('${c.id}',this)">${t('Read more')} ▾</button>`:''}
+      </div>`:''}
       <div class="lp-coach-rates"><span>1:1 <b>${money(coachRate(c.id,'1on1'))}</b>/hr</span><span>Group <b>${money(coachRate(c.id,'group'))}</b>/player</span></div>
       <button class="lp-btn solid" style="width:100%;margin-top:14px" onclick="openAuth('book')">${t('Book with')} ${firstName(c.name)}</button>
     </article>`;
