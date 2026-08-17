@@ -472,14 +472,34 @@
   .lp-sport b{display:block;font-size:14.5px;font-weight:900}
   .lp-sport span{font-size:11.5px;font-weight:800;color:var(--lp-mut);letter-spacing:.4px}
   .lp-sport.on span{color:var(--lp-volt-d)}
-  .lp-hichips{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-  .lp-hichip{background:#fff;border:1.5px solid var(--lp-line);border-radius:12px;padding:8px 13px;
-    cursor:pointer;font-family:inherit;text-align:left;transition:transform .18s,border-color .18s}
-  .lp-hichip:hover{transform:translateY(-2px);border-color:var(--lp-volt-d)}
-  .lp-hichip.on{border-color:var(--lp-volt-d);background:var(--lp-soft)}
-  .lp-hichip b{display:block;font-size:13px;color:var(--lp-ink)}
-  .lp-hichip span{display:block;font-size:11.5px;color:var(--lp-mut);font-weight:700;margin-top:1px}
-  .lp-hichip.on span{color:var(--lp-volt-d)}
+  /* ---- highlights gallery: month tabs + auto-advancing stage ---- */
+  .lp-months{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 14px}
+  .lp-month{background:#fff;border:1.5px solid var(--lp-line);border-radius:999px;padding:7px 14px;
+    cursor:pointer;font-family:inherit;font-weight:800;font-size:13px;color:var(--lp-ink);
+    display:flex;align-items:center;gap:7px;transition:border-color .18s,transform .18s}
+  .lp-month:hover{transform:translateY(-2px);border-color:var(--lp-volt-d)}
+  .lp-month.on{border-color:var(--lp-volt-d);background:var(--lp-soft);color:var(--lp-volt-d)}
+  .lp-month span{background:var(--lp-soft);border-radius:999px;padding:1px 7px;font-size:11px;color:var(--lp-mut)}
+  .lp-month.on span{background:var(--lp-volt-d);color:#fff}
+  .lp-galstage{position:relative;width:100%;background:#0d120a;border-radius:16px;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;min-height:220px}
+  .lp-galstage>div{width:100%}
+  .lp-galmedia{display:block;width:100%;max-height:70vh;height:auto;object-fit:contain;margin:0 auto}
+  .lp-galstage video{max-height:70vh}
+  .lp-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:2;border:0;cursor:pointer;
+    width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.86);color:#0d120a;
+    font-size:22px;line-height:1;font-family:inherit;font-weight:800}
+  .lp-arrow:hover{background:#fff}
+  .lp-arrow.l{left:10px} .lp-arrow.r{right:10px}
+  .lp-galbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px}
+  .lp-galbar b{font-size:15.5px;color:var(--lp-ink)}
+  .lp-galdate{display:block;font-size:12.5px;color:var(--lp-mut);font-weight:700;margin-top:1px}
+  .lp-play{background:var(--lp-soft);border:1.5px solid var(--lp-line);border-radius:999px;
+    width:34px;height:34px;cursor:pointer;font-size:12px;font-family:inherit;color:var(--lp-ink);flex:none}
+  .lp-dots{display:flex;gap:6px;justify-content:center;margin-top:10px;flex-wrap:wrap}
+  .lp-dot{width:8px;height:8px;border-radius:50%;border:0;padding:0;cursor:pointer;
+    background:var(--lp-line);transition:background .2s,transform .2s}
+  .lp-dot.on{background:var(--lp-volt-d);transform:scale(1.35)}
   .lp-foot{border-top:1px solid var(--lp-line);padding:26px 0 40px;text-align:center;color:var(--lp-mut);font-size:13px}
   .lp-contact{display:flex;gap:11px;justify-content:center;flex-wrap:wrap;margin-top:20px}
   /* six nav links plus two auth buttons stop fitting well below ~980px — swap the text nav for
@@ -1239,7 +1259,8 @@ function normalize(d){
     d.highlights.push({id:'hl-migrated',url:d.settings.highlightVideo,
       title:d.settings.highlightTitle||'Highlights',date:todayISO(),active:true});
   }
-  d.highlights.forEach(h=>{if(!h.date)h.date=todayISO();if(h.active===undefined)h.active=true;});
+  d.highlights.forEach(h=>{if(!h.date)h.date=todayISO();if(h.active===undefined)h.active=true;
+    if(!h.type)h.type=/\.(jpe?g|png|gif|webp|heic|avif)(\?|$)/i.test(h.url||'')?'image':'video';});
   if(!Array.isArray(d.skills))d.skills=[];
   if(!Array.isArray(d.skillLog))d.skillLog=[];
   if(!d.skills.length){
@@ -1274,7 +1295,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
   d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||'',video:e.video||''}));
   d.eventRegs=(regs||[]).map(r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||''}));
   d.messages=(msgs||[]).map(m=>({id:m.id,peerType:m.peer_type||'client',clientId:m.client_id||'',coachId:m.coach_id||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',readOwner:m.read_owner===true,readClient:m.read_client===true,readCoach:m.read_coach===true}));
-  d.highlights=(hl||[]).map(h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',active:h.active!==false}));
+  d.highlights=(hl||[]).map(h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',active:h.active!==false,type:h.type||''}));
   d.skills=(sk||[]).map(k=>({id:k.id,sport:k.sport||'Basketball',name:k.name||'',ord:k.ord||0,active:k.active!==false}));
   d.skillLog=(sl||[]).map(e=>({id:e.id,customerId:e.customer_id||'',skillId:e.skill_id||'',ts:e.ts||'',
     by:e.by_role||'',byId:e.by_id||'',byName:e.by_name||'',note:e.note||'',media:e.media||[],level:e.level||'',editedBy:e.edited_by||''}));
@@ -1282,7 +1303,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
   return normalize(d);
 }
 const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),sport:c.sport||'Basketball',family:c.family===true,share_type:c.shareType||'pct',share_val:(c.shareVal!=null?c.shareVal:0),pending:(c.pending||null),created:c.created||null,last_login:lastLoginOf(c)||null,login_count:loginCountOf(c)});
-const highlightRow=h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',active:h.active!==false});
+const highlightRow=h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',active:h.active!==false,type:h.type||'video'});
 const skillRow=k=>({id:k.id,sport:k.sport||'Basketball',name:k.name||'',ord:k.ord||0,active:k.active!==false});
 const skillLogRow=e=>({id:e.id,customer_id:e.customerId||'',skill_id:e.skillId||'',ts:e.ts||'',
   by_role:e.by||'',by_id:e.byId||'',by_name:e.byName||'',note:e.note||'',media:e.media||[],level:e.level||'',edited_by:e.editedBy||''});
@@ -1370,7 +1391,7 @@ function dataSig(d){return JSON.stringify({
   msg:(d.messages||[]).map(x=>[x.id,x.readOwner,x.readClient,x.readCoach]),
   // activity must be in the signature or a new log row reads as "no change" and the poll
   // returns early — which silently stopped the badge updating for activity
-  hl:(d.highlights||[]).map(x=>[x.id,x.url,x.title,x.date,x.active]),
+  hl:(d.highlights||[]).map(x=>[x.id,x.url,x.title,x.date,x.active,x.type]),
   sk:(d.skills||[]).map(x=>[x.id,x.name,x.sport,x.ord,x.active]),
   sl:(d.skillLog||[]).length+':'+(d.skillLog||[]).reduce((m,e)=>(e.ts||'')>m?(e.ts||''):m,''),
   act:(d.activity||[]).length+':'+(d.activity||[]).reduce((m,a)=>(a.ts||'')>m?(a.ts||''):m,''),
@@ -1943,54 +1964,110 @@ function lpTickerHtml(){
     <span class="win"><span class="trk" style="animation-duration:${secs}s">${row}${row}</span></span>
   </div>`;
 }
-/* Highlight reels, newest first, with a date switcher. lpHiPick is the id currently showing;
-   it survives a re-render so switching language or resizing doesn't bounce you back to the
-   newest clip. */
-let lpHiPick=null;
+/* ============================================================================
+   HIGHLIGHTS GALLERY — photos and video grouped into month tabs, auto-advancing.
+
+   Auto-advance rules differ by media type on purpose:
+     • photo         — fixed dwell, then next
+     • uploaded video — advances when the clip actually ENDS (with a cap, in case metadata is
+                        missing), so a long clip is never cut off mid-play
+     • YouTube/Vimeo  — NOT auto-advanced. We can't know an embed's length or when it finishes
+                        without loading their player API, and guessing a duration would cut
+                        someone off mid-video. Manual arrows only.
+   ============================================================================ */
+let lpGalMonth=null, lpGalIdx=0, lpGalTimer=null, lpGalPaused=false;
+const LP_PHOTO_MS=4500, LP_VIDEO_CAP_MS=90000;
 function lpHighlights(){
   return (DB.highlights||[]).filter(h=>h.active!==false&&h.url)
     .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 }
+function lpMonthKey(d){ return (d||'').slice(0,7); }
+function lpMonthLabel(k){
+  if(!k)return '';
+  const [y,m]=k.split('-');
+  try{ return new Date(+y,+m-1,1).toLocaleDateString('en-US',{month:'short',year:'numeric'}); }
+  catch(e){ return k; }
+}
+function lpGalMonths(){
+  const seen=[];
+  lpHighlights().forEach(h=>{const k=lpMonthKey(h.date); if(k&&!seen.includes(k))seen.push(k);});
+  return seen;                                   // already newest-first from lpHighlights()
+}
+function lpGalItems(month){ return lpHighlights().filter(h=>lpMonthKey(h.date)===month); }
 function lpHighlightsHtml(){
-  const list=lpHighlights();
-  if(!list.length){
-    // nothing uploaded yet — keep the original reel so the section is never empty
+  const months=lpGalMonths();
+  if(!months.length){
     return `<p class="lp-p">${t('FILM_P')}</p>
       <div class="lp-vid">${videoHtml('https://www.youtube.com/embed/1odU-4Ml2sw','100%')}</div>`;
   }
-  const cur=list.find(h=>h.id===lpHiPick)||list[0];
-  const chips=list.length>1?`<div class="lp-hichips">${list.map((h,i)=>`
-      <button class="lp-hichip${h.id===cur.id?' on':''}" onclick="lpPickHighlight('${h.id}')">
-        <b>${h.title||t('Highlights')}</b>
-        <span>${h.date?fmtDate(h.date):''}${i===0?' · '+t('Latest'):''}</span>
-      </button>`).join('')}</div>`:'';
-  return `${cur.title?`<p class="lp-p" style="font-weight:800;color:var(--lp-ink);font-size:17px">${cur.title}
-      ${cur.date?`<span style="font-weight:700;color:var(--lp-mut);font-size:14px"> · ${fmtDate(cur.date)}</span>`:''}</p>`
-      :`<p class="lp-p">${t('FILM_P')}</p>`}
-    <div class="lp-vid" id="lpVid">${videoHtml(cur.url,'100%')}</div>
-    ${chips}`;
+  if(!lpGalMonth||!months.includes(lpGalMonth)){ lpGalMonth=months[0]; lpGalIdx=0; }
+  const items=lpGalItems(lpGalMonth);
+  const tabs=`<div class="lp-months">${months.map(k=>`
+    <button class="lp-month${k===lpGalMonth?' on':''}" onclick="lpGalPick('${k}')">
+      ${lpMonthLabel(k)}<span>${lpGalItems(k).length}</span></button>`).join('')}</div>`;
+  return `${tabs}<div class="lp-gal" id="lpGal">${lpGalSlideHtml(items,lpGalIdx)}</div>`;
+}
+function lpGalSlideHtml(items,i){
+  if(!items.length)return `<div class="empty">${t('Nothing here yet.')}</div>`;
+  i=Math.max(0,Math.min(i,items.length-1));
+  const h=items[i];
+  const isImg=(h.type==='image');
+  const media=isImg
+    ? `<img class="lp-galmedia" src="${safeUrl(h.url)}" alt="${(h.title||'').replace(/"/g,'&quot;')}">`
+    : videoHtml(h.url,'100%');
+  const dots=items.length>1?`<div class="lp-dots">${items.map((_,n)=>
+      `<button class="lp-dot${n===i?' on':''}" onclick="lpGalGo(${n})" aria-label="${n+1}"></button>`).join('')}</div>`:'';
+  const nav=items.length>1?`
+      <button class="lp-arrow l" onclick="lpGalStep(-1)" aria-label="Previous">‹</button>
+      <button class="lp-arrow r" onclick="lpGalStep(1)" aria-label="Next">›</button>`:'';
+  return `<div class="lp-galstage">${media}${nav}</div>
+    <div class="lp-galbar">
+      <div><b>${h.title||t('Highlights')}</b>
+        <span class="lp-galdate">${h.date?fmtDate(h.date):''} · ${i+1}/${items.length}</span></div>
+      ${items.length>1?`<button class="lp-play" onclick="lpGalToggle(this)">${lpGalPaused?'▶':'❙❙'}</button>`:''}
+    </div>${dots}`;
+}
+function lpGalRender(){
+  const box=document.getElementById('lpGal'); if(!box)return;
+  const items=lpGalItems(lpGalMonth);
+  box.innerHTML=lpGalSlideHtml(items,lpGalIdx);
+  lpGalSchedule();
+}
+function lpGalPick(k){ lpGalMonth=k; lpGalIdx=0; renderLanding(); }
+function lpGalGo(n){ lpGalIdx=n; lpGalRender(); }
+function lpGalStep(d){
+  const items=lpGalItems(lpGalMonth); if(!items.length)return;
+  lpGalIdx=(lpGalIdx+d+items.length)%items.length;
+  lpGalRender();
+}
+function lpGalToggle(btn){
+  lpGalPaused=!lpGalPaused;
+  if(btn)btn.textContent=lpGalPaused?'▶':'❙❙';
+  lpGalSchedule();
+}
+/* One timer, always cleared first — re-rendering the page must never leave a second timer
+   running, or the gallery starts skipping two at a time. */
+function lpGalSchedule(){
+  if(lpGalTimer){clearTimeout(lpGalTimer);lpGalTimer=null;}
+  if(lpGalPaused)return;
+  const items=lpGalItems(lpGalMonth);
+  if(items.length<2)return;
+  const h=items[lpGalIdx]; if(!h)return;
+  const box=document.getElementById('lpGal'); if(!box)return;
+  const vid=box.querySelector('video');
+  if(h.type==='image'){
+    lpGalTimer=setTimeout(()=>lpGalStep(1),LP_PHOTO_MS);
+  }else if(vid){
+    vid.onended=()=>lpGalStep(1);
+    lpGalTimer=setTimeout(()=>lpGalStep(1),LP_VIDEO_CAP_MS);   // safety net only
+    const play=vid.play(); if(play&&play.catch)play.catch(()=>{});
+  }
+  // embeds (YouTube/Vimeo): deliberately no timer — see the note at the top
 }
 function lpMoreBio(id,btn){
   const el=document.getElementById('bio_'+id); if(!el)return;
   const open=el.classList.toggle('open');
   btn.innerHTML=(open?t('Show less')+' ▴':t('Read more')+' ▾');
-}
-function lpPickHighlight(id){
-  lpHiPick=id;
-  const list=lpHighlights(); const h=list.find(x=>x.id===id)||list[0]; if(!h)return;
-  // swap just the player + chips, so the page doesn't scroll back to the top on every switch
-  const vid=document.getElementById('lpVid');
-  if(vid){
-    vid.innerHTML=videoHtml(h.url,'100%');
-    const cap=vid.previousElementSibling;
-    if(cap&&cap.classList.contains('lp-p'))
-      cap.innerHTML=(h.title||'')+(h.date?` <span style="font-weight:700;color:var(--lp-mut);font-size:14px"> · ${fmtDate(h.date)}</span>`:'');
-    const wrap=vid.nextElementSibling;
-    if(wrap&&wrap.classList.contains('lp-hichips'))
-      [...wrap.children].forEach(b=>b.classList.toggle('on',b.getAttribute('onclick').includes("'"+h.id+"'")));
-    return;
-  }
-  renderLanding();
 }
 function lpCoachCards(){
   const list=activeCoaches();
@@ -2231,6 +2308,7 @@ function lpAnimate(){
     }
   }
   lpBallCycle();
+  lpGalSchedule();
   lpMeasureBars();
   if(!window.__lpResize){
     window.__lpResize=true;
@@ -6194,12 +6272,12 @@ function renderAdmin(){
     </div>
     <div class="panel" style="margin-top:16px">
       <h3>Home page highlights</h3>
-      <div class="clienttag" style="margin-bottom:10px">Reels shown in the <b style="color:var(--txt)">HIGHLIGHTS</b> section of rxtraining.org. Visitors see the newest first and can switch to older ones by date. Leave the list empty to show the built-in AAU reel.</div>
+      <div class="clienttag" style="margin-bottom:10px">Photos and videos shown in the <b style="color:var(--txt)">HIGHLIGHTS</b> gallery on rxtraining.org. They're grouped into month tabs by date and play automatically one after another. Leave the list empty to show the built-in AAU reel.<br>Uploading several files at once adds them all — give each a title and date afterwards.</div>
       <div style="overflow-x:auto"><table><thead><tr><th>Title</th><th>Date</th><th>Video</th><th></th></tr></thead><tbody>
         ${(DB.highlights||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map((h,i)=>`<tr>
           <td><input value="${(h.title||'').replace(/"/g,'&quot;')}" onchange="updHighlight('${h.id}','title',this.value)"></td>
           <td style="width:150px"><input type="date" value="${h.date||''}" onchange="updHighlight('${h.id}','date',this.value)"></td>
-          <td class="muted" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${i===0?'<span class="pill green">latest</span> ':''}${safeUrl(h.url).slice(0,44)}…</td>
+          <td class="muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${i===0?'<span class="pill green">latest</span> ':''}<span class="pill">${h.type==='image'?'📷 photo':'🎬 video'}</span> ${safeUrl(h.url).slice(0,30)}…</td>
           <td class="right"><div class="actions">
             <button class="iconbtn" title="Preview" onclick="previewHighlight('${h.id}')">▶</button>
             <button class="iconbtn" title="Remove" onclick="delHighlight('${h.id}')">✕</button>
@@ -6214,7 +6292,7 @@ function renderAdmin(){
       <div class="field" style="margin-top:10px"><label class="f">Video link</label>
         <input id="nhUrl" placeholder="Paste a YouTube / Vimeo / Drive link…"></div>
       <div class="row" style="gap:8px;align-items:center;margin-top:-4px">
-        <label class="btn ghost sm" style="cursor:pointer">⬆ Upload a video<input type="file" accept="video/*" style="display:none" onchange="uploadHighlightVideo(this)"></label>
+        <label class="btn ghost sm" style="cursor:pointer">⬆ Upload photo or video<input type="file" accept="image/*,video/*" multiple style="display:none" onchange="uploadHighlightVideo(this)"></label>
         <button class="btn sm" onclick="addHighlight()">+ Add highlight</button>
       </div>
       <div id="hiPrev" style="margin-top:10px"></div>
@@ -6237,7 +6315,8 @@ function addHighlight(){
   const title=($('#nhTitle').value||'').trim()||'Highlights';
   const date=$('#nhDate').value||todayISO();
   if(!DB.highlights)DB.highlights=[];
-  DB.highlights.push({id:uid(),url,title,date,active:true});
+  const type=/\.(jpe?g|png|gif|webp|heic|avif)(\?|$)/i.test(url)?'image':'video';
+  DB.highlights.push({id:uid(),url,title,date,active:true,type});
   save(); flash('Highlight added 🎬'); renderAdmin();
 }
 function updHighlight(id,field,val){
@@ -6260,27 +6339,41 @@ function previewHighlight(id){
 /* Upload path shared with events — the result is a URL, so uploads and pasted links behave
    identically from here on. Fills the "new highlight" form rather than saving directly, so the
    owner still sets a title and date before it goes public. */
+/* Accepts photos and videos, one or many. Each uploaded file is added to the list immediately
+   (title defaults to the filename) — with multiple files there's no single form to fill in, and
+   titles/dates are editable in the table right above. */
 async function uploadHighlightVideo(input){
-  const f=input.files&&input.files[0];input.value='';
-  if(!f)return;
-  if(f.type.indexOf('video')!==0)return flash('Please choose a video file',true);
-  if(f.size>MAX_VIDEO_MB*1024*1024)return flash('That video is '+Math.round(f.size/1048576)+'MB — the limit is '+MAX_VIDEO_MB+'MB. Trim it or paste a YouTube link instead.',true);
-  flash('Uploading video…');
-  try{
-    let url='';
-    if(useR2()){
-      const r=await fetch(R2_ENDPOINT,{method:'POST',headers:{'content-type':f.type,'x-upload-token':R2_TOKEN,'x-file-name':(f.name||'highlight.mp4'),'x-customer-id':'highlights'},body:f});
-      const j=await r.json();if(!r.ok||!j.url)return flash('Upload failed: '+((j&&j.error)||r.status),true);url=j.url;
-    }else if(supa&&SUPA_OK){
-      const path='media/highlights/'+uid()+'-'+(f.name||'highlight.mp4').replace(/[^a-zA-Z0-9._-]/g,'_');
-      const up=await supa.storage.from(MEDIA_BUCKET).upload(path,f,{upsert:true,contentType:f.type});
-      if(up.error)return flash('Upload failed: '+up.error.message,true);
-      url=supa.storage.from(MEDIA_BUCKET).getPublicUrl(path).data.publicUrl;
-    }else{return flash('Connect Supabase or R2 to upload videos',true);}
-    const inp=$('#nhUrl'); if(inp)inp.value=url;
-    const pv=$('#hiPrev'); if(pv)pv.innerHTML=videoHtml(url,'320px');
-    flash('Uploaded ✅ — add a title and date, then press Add highlight');
-  }catch(e){flash('Upload failed: '+e.message,true);}
+  const files=[...input.files]; input.value='';
+  if(!files.length)return;
+  const date=$('#nhDate')&&$('#nhDate').value||todayISO();
+  const baseTitle=($('#nhTitle')&&$('#nhTitle').value||'').trim();
+  let added=0;
+  for(const f of files){
+    const isImg=f.type.indexOf('image')===0;
+    if(!isImg&&f.type.indexOf('video')!==0){flash(f.name+' is not a photo or video',true);continue;}
+    if(!isImg&&f.size>MAX_VIDEO_MB*1024*1024){
+      flash(f.name+' is '+Math.round(f.size/1048576)+'MB — over the '+MAX_VIDEO_MB+'MB limit. Trim it or paste a YouTube link.',true);continue;}
+    let up=f, ctype=f.type, name=f.name||(isImg?'photo.jpg':'clip.mp4');
+    if(isImg){const c=await compressImage(f,1800,0.86); if(c){up=c;ctype='image/jpeg';name=name.replace(/\.[^.]+$/,'')+'.jpg';}}
+    flash('Uploading '+name+'…');
+    try{
+      let url='';
+      if(useR2()){
+        const r=await fetch(R2_ENDPOINT,{method:'POST',headers:{'content-type':ctype,'x-upload-token':R2_TOKEN,'x-file-name':name,'x-customer-id':'highlights'},body:up});
+        const j=await r.json(); if(!r.ok||!j.url){flash('Upload failed: '+((j&&j.error)||r.status),true);continue;} url=j.url;
+      }else if(supa&&SUPA_OK){
+        const path='media/highlights/'+uid()+'-'+name.replace(/[^a-zA-Z0-9._-]/g,'_');
+        const u=await supa.storage.from(MEDIA_BUCKET).upload(path,up,{upsert:true,contentType:ctype});
+        if(u.error){flash('Upload failed: '+u.error.message,true);continue;}
+        url=supa.storage.from(MEDIA_BUCKET).getPublicUrl(path).data.publicUrl;
+      }else{return flash('Connect Supabase or R2 to upload media',true);}
+      if(!DB.highlights)DB.highlights=[];
+      DB.highlights.push({id:uid(),url,date,active:true,type:isImg?'image':'video',
+        title:baseTitle||name.replace(/\.[^.]+$/,'')});
+      added++;
+    }catch(e){flash('Upload failed: '+e.message,true);}
+  }
+  if(added){ save(); flash(added+' item'+(added>1?'s':'')+' added 🎬'); renderAdmin(); }
 }
 function saveGroupForming(){
   DB.settings.groupMinPlayers=Math.max(2,Math.min(MAX_GROUP,+$('#grpMin').value||2));
