@@ -490,6 +490,9 @@
   .lp-galstage{position:relative;width:100%;background:#0d120a;border-radius:16px;overflow:hidden;
     display:flex;align-items:center;justify-content:center;min-height:220px}
   .lp-galstage>div{width:100%}
+  /* let the player fill the stage width and keep its own ratio — a stretched box was making
+     letterboxing look like a black frame */
+  .lp-galstage video{width:100%;height:auto;display:block;object-fit:contain}
   .lp-galmedia{display:block;width:100%;max-height:70vh;height:auto;object-fit:contain;margin:0 auto}
   .lp-galstage video{max-height:70vh}
   .lp-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:2;border:0;cursor:pointer;
@@ -6279,7 +6282,7 @@ function renderAdmin(){
     <div class="panel" style="margin-top:16px">
       <h3>Home page highlights</h3>
       <div class="clienttag" style="margin-bottom:10px">Photos and videos shown in the <b style="color:var(--txt)">HIGHLIGHTS</b> gallery on rxtraining.org. They're grouped into month tabs by date and play automatically one after another. Leave the list empty to show the built-in AAU reel.<br>Uploading several files at once adds them all — give each a title and date afterwards.</div>
-      <div style="overflow-x:auto"><table><thead><tr><th>Title</th><th>Date</th><th>Video</th><th></th></tr></thead><tbody>
+      <div style="overflow-x:auto"><table><thead><tr><th>Title</th><th>Date</th><th>Media</th><th>Status</th><th></th></tr></thead><tbody>
         ${(DB.highlights||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map((h,i)=>`<tr>
           <td><input value="${(h.title||'').replace(/"/g,'&quot;')}" onchange="updHighlight('${h.id}','title',this.value)"></td>
           <td style="width:150px"><input type="date" value="${h.date||''}" onchange="updHighlight('${h.id}','date',this.value)"></td>
@@ -6294,13 +6297,16 @@ function renderAdmin(){
               </div>
               <div style="min-width:0">
                 <span class="pill">${h.type==='image'?'📷':'🎬'}</span>
-                ${i===0?'<div class="clienttag" style="color:var(--green)">latest</div>':''}
               </div>
             </div></td>
+          <td style="width:110px">${h.active!==false
+            ? '<span class="pill green">Published</span>'
+            : '<span class="pill yellow">Draft</span>'}</td>
           <td class="right"><div class="actions">
             <button class="iconbtn" title="Preview" onclick="previewHighlight('${h.id}')">▶</button>
+            <button class="btn sm ${h.active!==false?'ghost':''}" title="${h.active!==false?'Hide from the home page':'Show on the home page'}" onclick="pubHighlight('${h.id}')">${h.active!==false?'Unpublish':'Publish'}</button>
             <button class="iconbtn" title="Remove" onclick="delHighlight('${h.id}')">✕</button>
-          </div></td></tr>`).join('')||'<tr><td colspan="4"><div class="empty">No highlight reels yet — add one below.</div></td></tr>'}
+          </div></td></tr>`).join('')||'<tr><td colspan="5"><div class="empty">No highlights yet — add one below.</div></td></tr>'}
       </tbody></table></div>
       <div class="row" style="margin-top:12px;gap:8px;align-items:flex-end">
         <div class="field" style="flex:1;min-width:180px;margin-bottom:0"><label class="f">Title</label>
@@ -6335,14 +6341,21 @@ function addHighlight(){
   const date=$('#nhDate').value||todayISO();
   if(!DB.highlights)DB.highlights=[];
   const type=/\.(jpe?g|png|gif|webp|heic|avif)(\?|$)/i.test(url)?'image':'video';
-  DB.highlights.push({id:uid(),url,title,date,active:true,type});
-  save(); flash('Highlight added 🎬'); renderAdmin();
+  DB.highlights.push({id:uid(),url,title,date,active:false,type});   // draft until published
+  save(); flash('Added as a draft — press Publish to show it on the home page'); renderAdmin();
 }
 function updHighlight(id,field,val){
   const h=(DB.highlights||[]).find(x=>x.id===id); if(!h)return;
   h[field]=(val||'').trim();
   save();
   if(field==='date')renderAdmin();   // re-sort so "latest" stays accurate
+}
+function pubHighlight(id){
+  const h=(DB.highlights||[]).find(x=>x.id===id); if(!h)return;
+  h.active=(h.active===false);
+  save();
+  flash(h.active?'Published to the home page 🎬':'Hidden from the home page');
+  renderAdmin();
 }
 function delHighlight(id){
   const h=(DB.highlights||[]).find(x=>x.id===id); if(!h)return;
@@ -6377,6 +6390,15 @@ async function uploadHighlightVideo(input){
     if(!isImg&&f.type.indexOf('video')!==0){flash(f.name+' is not a photo or video',true);continue;}
     if(!isImg&&f.size>MAX_VIDEO_MB*1024*1024){
       flash(f.name+' is '+Math.round(f.size/1048576)+'MB — over the '+MAX_VIDEO_MB+'MB limit. Trim it or paste a YouTube link.',true);continue;}
+    // iPhone records HEVC/H.265 in .mov by default. Chrome and Firefox can play its AUDIO but
+    // not its video track, which shows up as a black picture with working sound — exactly the
+    // symptom, and nothing the app can fix after the fact since we can't transcode in-browser.
+    if(!isImg && /\.(mov|hevc|m4v)$/i.test(f.name||'')){
+      if(!confirm(f.name+'\n\nThis looks like an iPhone .mov (HEVC) file. Many browsers play its '+
+         'sound but show a BLACK picture, because they can\'t decode H.265.\n\n'+
+         'Recommended: on iPhone go to Settings → Camera → Formats → "Most Compatible" and '+
+         're-record, or export/convert to MP4 (H.264) first.\n\nUpload it anyway?'))continue;
+    }
     let up=f, ctype=f.type, name=f.name||(isImg?'photo.jpg':'clip.mp4');
     if(isImg){const c=await compressImage(f,1800,0.86); if(c){up=c;ctype='image/jpeg';name=name.replace(/\.[^.]+$/,'')+'.jpg';}}
     flash('Uploading '+name+'…');
@@ -6392,12 +6414,13 @@ async function uploadHighlightVideo(input){
         url=supa.storage.from(MEDIA_BUCKET).getPublicUrl(path).data.publicUrl;
       }else{return flash('Connect Supabase or R2 to upload media',true);}
       if(!DB.highlights)DB.highlights=[];
-      DB.highlights.push({id:uid(),url,date,active:true,type:isImg?'image':'video',
+      // uploads start as DRAFTS — nothing reaches the public page until it's published
+      DB.highlights.push({id:uid(),url,date,active:false,type:isImg?'image':'video',
         title:baseTitle||name.replace(/\.[^.]+$/,'')});
       added++;
     }catch(e){flash('Upload failed: '+e.message,true);}
   }
-  if(added){ save(); flash(added+' item'+(added>1?'s':'')+' added 🎬'); renderAdmin(); }
+  if(added){ save(); flash(added+' item'+(added>1?'s':'')+' added as draft — press Publish when ready'); renderAdmin(); }
 }
 function saveGroupForming(){
   DB.settings.groupMinPlayers=Math.max(2,Math.min(MAX_GROUP,+$('#grpMin').value||2));
