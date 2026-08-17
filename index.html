@@ -472,6 +472,12 @@
   .lp-sport b{display:block;font-size:14.5px;font-weight:900}
   .lp-sport span{font-size:11.5px;font-weight:800;color:var(--lp-mut);letter-spacing:.4px}
   .lp-sport.on span{color:var(--lp-volt-d)}
+  /* admin thumbnails for the highlights table */
+  .hlthumb{width:56px;height:42px;border-radius:8px;overflow:hidden;background:var(--panel2);
+    border:1px solid var(--line);flex:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .hlthumb img,.hlthumb video{width:100%;height:100%;object-fit:cover;display:block}
+  .hlthumb .ply{font-size:16px;color:var(--muted)}
+  .hlthumb:hover{border-color:var(--accent)}
   /* ---- highlights gallery: month tabs + auto-advancing stage ---- */
   .lp-months{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 14px}
   .lp-month{background:#fff;border:1.5px solid var(--lp-line);border-radius:999px;padding:7px 14px;
@@ -6277,7 +6283,20 @@ function renderAdmin(){
         ${(DB.highlights||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map((h,i)=>`<tr>
           <td><input value="${(h.title||'').replace(/"/g,'&quot;')}" onchange="updHighlight('${h.id}','title',this.value)"></td>
           <td style="width:150px"><input type="date" value="${h.date||''}" onchange="updHighlight('${h.id}','date',this.value)"></td>
-          <td class="muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${i===0?'<span class="pill green">latest</span> ':''}<span class="pill">${h.type==='image'?'📷 photo':'🎬 video'}</span> ${safeUrl(h.url).slice(0,30)}…</td>
+          <td style="width:150px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="hlthumb" onclick="previewHighlight('${h.id}')" title="Preview">
+                ${h.type==='image'
+                  ? `<img src="${safeUrl(h.url)}" alt="">`
+                  : (videoEmbed(h.url)&&videoEmbed(h.url).kind==='video'
+                      ? `<video src="${safeUrl(h.url)}" preload="metadata" muted></video>`
+                      : `<span class="ply">▶</span>`)}
+              </div>
+              <div style="min-width:0">
+                <span class="pill">${h.type==='image'?'📷':'🎬'}</span>
+                ${i===0?'<div class="clienttag" style="color:var(--green)">latest</div>':''}
+              </div>
+            </div></td>
           <td class="right"><div class="actions">
             <button class="iconbtn" title="Preview" onclick="previewHighlight('${h.id}')">▶</button>
             <button class="iconbtn" title="Remove" onclick="delHighlight('${h.id}')">✕</button>
@@ -6331,9 +6350,14 @@ function delHighlight(id){
   DB.highlights=(DB.highlights||[]).filter(x=>x.id!==id);
   save(); flash('Highlight removed'); renderAdmin();
 }
+/* Preview works for either media type — videoHtml() returns nothing for an image, so a photo
+   previewed through it showed an empty box. */
 function previewHighlight(id){
   const h=(DB.highlights||[]).find(x=>x.id===id); if(!h)return;
-  openModal(h.title||'Highlight', videoHtml(h.url,'100%')||'<div class="empty">Could not load that video.</div>',
+  const body = h.type==='image'
+    ? `<img src="${safeUrl(h.url)}" style="display:block;max-width:100%;max-height:70vh;margin:0 auto;border-radius:10px">`
+    : (videoHtml(h.url,'100%')||'<div class="empty">Could not load that media.</div>');
+  openModal((h.title||'Highlight')+(h.date?' · '+fmtDate(h.date):''), body,
     `<button class="btn" onclick="closeModal()">Close</button>`);
 }
 /* Upload path shared with events — the result is a URL, so uploads and pasted links behave
