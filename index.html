@@ -1275,6 +1275,11 @@ function normalize(d){
   }
   d.highlights.forEach(h=>{if(!h.date)h.date=todayISO();if(h.active===undefined)h.active=true;
     if(!h.type)h.type=/\.(jpe?g|png|gif|webp|heic|avif)(\?|$)/i.test(h.url||'')?'image':'video';});
+  // display order within a month; back-fill by date so existing items keep their current order
+  const _needOrd=d.highlights.filter(h=>h.ord==null);
+  if(_needOrd.length){ _needOrd.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    let _n=d.highlights.reduce((m,h)=>Math.max(m,h.ord||0),0);
+    _needOrd.forEach(h=>{h.ord=++_n;}); }
   if(!Array.isArray(d.skills))d.skills=[];
   if(!Array.isArray(d.skillLog))d.skillLog=[];
   if(!d.skills.length){
@@ -1309,7 +1314,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
   d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||'',video:e.video||''}));
   d.eventRegs=(regs||[]).map(r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||''}));
   d.messages=(msgs||[]).map(m=>({id:m.id,peerType:m.peer_type||'client',clientId:m.client_id||'',coachId:m.coach_id||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',readOwner:m.read_owner===true,readClient:m.read_client===true,readCoach:m.read_coach===true}));
-  d.highlights=(hl||[]).map(h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',active:h.active!==false,type:h.type||''}));
+  d.highlights=(hl||[]).map(h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',active:h.active!==false,type:h.type||'',ord:(h.ord!=null?h.ord:null)}));
   d.skills=(sk||[]).map(k=>({id:k.id,sport:k.sport||'Basketball',name:k.name||'',ord:k.ord||0,active:k.active!==false}));
   d.skillLog=(sl||[]).map(e=>({id:e.id,customerId:e.customer_id||'',skillId:e.skill_id||'',ts:e.ts||'',
     by:e.by_role||'',byId:e.by_id||'',byName:e.by_name||'',note:e.note||'',media:e.media||[],level:e.level||'',editedBy:e.edited_by||''}));
@@ -1317,7 +1322,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
   return normalize(d);
 }
 const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),sport:c.sport||'Basketball',family:c.family===true,share_type:c.shareType||'pct',share_val:(c.shareVal!=null?c.shareVal:0),pending:(c.pending||null),created:c.created||null,last_login:lastLoginOf(c)||null,login_count:loginCountOf(c)});
-const highlightRow=h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',active:h.active!==false,type:h.type||'video'});
+const highlightRow=h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',active:h.active!==false,type:h.type||'video',ord:h.ord||0});
 const skillRow=k=>({id:k.id,sport:k.sport||'Basketball',name:k.name||'',ord:k.ord||0,active:k.active!==false});
 const skillLogRow=e=>({id:e.id,customer_id:e.customerId||'',skill_id:e.skillId||'',ts:e.ts||'',
   by_role:e.by||'',by_id:e.byId||'',by_name:e.byName||'',note:e.note||'',media:e.media||[],level:e.level||'',edited_by:e.editedBy||''});
@@ -1405,7 +1410,7 @@ function dataSig(d){return JSON.stringify({
   msg:(d.messages||[]).map(x=>[x.id,x.readOwner,x.readClient,x.readCoach]),
   // activity must be in the signature or a new log row reads as "no change" and the poll
   // returns early — which silently stopped the badge updating for activity
-  hl:(d.highlights||[]).map(x=>[x.id,x.url,x.title,x.date,x.active,x.type]),
+  hl:(d.highlights||[]).map(x=>[x.id,x.url,x.title,x.date,x.active,x.type,x.ord]),
   sk:(d.skills||[]).map(x=>[x.id,x.name,x.sport,x.ord,x.active]),
   sl:(d.skillLog||[]).length+':'+(d.skillLog||[]).reduce((m,e)=>(e.ts||'')>m?(e.ts||''):m,''),
   act:(d.activity||[]).length+':'+(d.activity||[]).reduce((m,a)=>(a.ts||'')>m?(a.ts||''):m,''),
@@ -2007,7 +2012,11 @@ function lpGalMonths(){
   lpHighlights().forEach(h=>{const k=lpMonthKey(h.date); if(k&&!seen.includes(k))seen.push(k);});
   return seen;                                   // already newest-first from lpHighlights()
 }
-function lpGalItems(month){ return lpHighlights().filter(h=>lpMonthKey(h.date)===month); }
+function lpGalItems(month){
+  // manual order first (owner-controlled), newest date as the tie-break
+  return lpHighlights().filter(h=>lpMonthKey(h.date)===month)
+    .sort((a,b)=>((a.ord||0)-(b.ord||0))||((b.date||'').localeCompare(a.date||'')));
+}
 function lpHighlightsHtml(){
   const months=lpGalMonths();
   if(!months.length){
@@ -6319,7 +6328,7 @@ function renderAdmin(){
       <h3>Home page highlights</h3>
       <div class="clienttag" style="margin-bottom:10px">Photos and videos shown in the <b style="color:var(--txt)">HIGHLIGHTS</b> gallery on rxtraining.org. They're grouped into month tabs by date and play automatically one after another. Leave the list empty to show the built-in AAU reel.<br>Uploading several files at once adds them all — give each a title and date afterwards.</div>
       <div style="overflow-x:auto"><table><thead><tr><th>Title</th><th>Date</th><th>Media</th><th>Status</th><th></th></tr></thead><tbody>
-        ${(DB.highlights||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map((h,i)=>`<tr>
+        ${hlAdminOrder().map((h,i)=>`<tr>
           <td><input value="${(h.title||'').replace(/"/g,'&quot;')}" onchange="updHighlight('${h.id}','title',this.value)"></td>
           <td style="width:150px"><input type="date" value="${h.date||''}" onchange="updHighlight('${h.id}','date',this.value)"></td>
           <td style="width:150px">
@@ -6339,6 +6348,8 @@ function renderAdmin(){
             ? '<span class="pill green">Published</span>'
             : '<span class="pill yellow">Draft</span>'}</td>
           <td class="right"><div class="actions">
+            <button class="iconbtn" title="Move up" onclick="moveHighlight('${h.id}',-1)">↑</button>
+            <button class="iconbtn" title="Move down" onclick="moveHighlight('${h.id}',1)">↓</button>
             <button class="iconbtn" title="Preview" onclick="previewHighlight('${h.id}')">▶</button>
             <button class="btn sm ${h.active!==false?'ghost':''}" title="${h.active!==false?'Hide from the home page':'Show on the home page'}" onclick="pubHighlight('${h.id}')">${h.active!==false?'Unpublish':'Publish'}</button>
             <button class="iconbtn" title="Remove" onclick="delHighlight('${h.id}')">✕</button>
@@ -6377,7 +6388,8 @@ function addHighlight(){
   const date=$('#nhDate').value||todayISO();
   if(!DB.highlights)DB.highlights=[];
   const type=/\.(jpe?g|png|gif|webp|heic|avif)(\?|$)/i.test(url)?'image':'video';
-  DB.highlights.push({id:uid(),url,title,date,active:false,type});   // draft until published
+  const ord=(DB.highlights||[]).reduce((m,x)=>Math.max(m,x.ord||0),0)+1;
+  DB.highlights.push({id:uid(),url,title,date,active:false,type,ord});   // draft until published
   save(); flash('Added as a draft — press Publish to show it on the home page'); renderAdmin();
 }
 function updHighlight(id,field,val){
@@ -6385,6 +6397,27 @@ function updHighlight(id,field,val){
   h[field]=(val||'').trim();
   save();
   if(field==='date')renderAdmin();   // re-sort so "latest" stays accurate
+}
+/* Admin list in the same order the public gallery uses: newest month first, then the owner's
+   manual order inside each month. Anything else would make ↑/↓ feel random. */
+function hlAdminOrder(){
+  return (DB.highlights||[]).slice().sort((a,b)=>{
+    const ma=(a.date||'').slice(0,7), mb=(b.date||'').slice(0,7);
+    if(ma!==mb)return mb.localeCompare(ma);
+    return ((a.ord||0)-(b.ord||0))||((b.date||'').localeCompare(a.date||''));
+  });
+}
+/* Swaps with the neighbour IN THE SAME MONTH — moving an item past a month boundary would be
+   meaningless, since months are derived from the date field. */
+function moveHighlight(id,dir){
+  const h=(DB.highlights||[]).find(x=>x.id===id); if(!h)return;
+  const month=(h.date||'').slice(0,7);
+  const sibs=hlAdminOrder().filter(x=>(x.date||'').slice(0,7)===month);
+  const i=sibs.findIndex(x=>x.id===id), j=i+dir;
+  if(i<0||j<0||j>=sibs.length)return flash(dir<0?'Already first in '+lpMonthLabel(month):'Already last in '+lpMonthLabel(month));
+  const a=sibs[i], b=sibs[j], t2=a.ord||0; a.ord=b.ord||0; b.ord=t2;
+  if(a.ord===b.ord){ a.ord=(dir<0?b.ord-1:b.ord+1); }   // guard against equal legacy values
+  save(); renderAdmin();
 }
 function pubHighlight(id){
   const h=(DB.highlights||[]).find(x=>x.id===id); if(!h)return;
@@ -6452,7 +6485,8 @@ async function uploadHighlightVideo(input){
       }else{return flash('Connect Supabase or R2 to upload media',true);}
       if(!DB.highlights)DB.highlights=[];
       // uploads start as DRAFTS — nothing reaches the public page until it's published
-      DB.highlights.push({id:uid(),url,date,active:false,type:isImg?'image':'video',
+      const ord=(DB.highlights||[]).reduce((m,x)=>Math.max(m,x.ord||0),0)+1;
+      DB.highlights.push({id:uid(),url,date,active:false,type:isImg?'image':'video',ord,
         title:baseTitle||name.replace(/\.[^.]+$/,'')});
       added++;
     }catch(e){flash('Upload failed: '+e.message,true);}
