@@ -472,6 +472,11 @@
   .lp-sport b{display:block;font-size:14.5px;font-weight:900}
   .lp-sport span{font-size:11.5px;font-weight:800;color:var(--lp-mut);letter-spacing:.4px}
   .lp-sport.on span{color:var(--lp-volt-d)}
+  .codecwarn{background:#2a1d05;color:#ffdca8;border:1px solid #6b4a10;border-radius:10px;
+    padding:12px 14px;display:flex;flex-direction:column;gap:5px;font-size:13px;line-height:1.5}
+  .codecwarn b{color:#ffcf70;font-size:13.5px}
+  .codecwarn a{color:#ffcf70;font-weight:800}
+  .codecwarn .fixit{color:#c9a86a;font-size:12px}
   /* admin thumbnails for the highlights table */
   .hlthumb{width:56px;height:42px;border-radius:8px;overflow:hidden;background:var(--panel2);
     border:1px solid var(--line);flex:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
@@ -2036,10 +2041,40 @@ function lpGalSlideHtml(items,i){
       ${items.length>1?`<button class="lp-play" onclick="lpGalToggle(this)">${lpGalPaused?'▶':'❙❙'}</button>`:''}
     </div>${dots}`;
 }
+/* A video whose AUDIO plays but whose picture stays black has an undecodable video track —
+   almost always HEVC/H.265 from an iPhone .mov. The browser reports videoWidth===0 once metadata
+   loads, which is a reliable signal. Rather than leave a silent black rectangle, say what's wrong
+   and give a way to open the file directly (Safari and iOS can play it). */
+function attachCodecCheck(root){
+  const box=(typeof root==='string')?document.getElementById(root):root;
+  if(!box)return;
+  box.querySelectorAll('video').forEach(v=>{
+    if(v.dataset.codecChecked)return;
+    v.dataset.codecChecked='1';
+    const check=()=>{
+      if(v.readyState<1)return;
+      if(v.videoWidth===0){                       // audio-only decode = unplayable picture here
+        const url=v.getAttribute('src')||'';
+        const note=document.createElement('div');
+        note.className='codecwarn';
+        note.innerHTML='<b>This video won\'t display in this browser</b>'+
+          '<span>It looks like an iPhone HEVC (.mov) recording. Chrome, Edge and Firefox can play '+
+          'its sound but not its picture. It plays fine on iPhone and in Safari.</span>'+
+          (url?'<a href="'+url+'" target="_blank" rel="noopener">Open the file directly →</a>':'')+
+          '<span class="fixit">Fix: re-upload it as MP4 (H.264), or set iPhone → Settings → Camera → Formats → “Most Compatible”.</span>';
+        if(v.parentNode)v.parentNode.insertBefore(note,v.nextSibling);
+        v.style.display='none';
+      }
+    };
+    v.addEventListener('loadedmetadata',check);
+    if(v.readyState>=1)check();
+  });
+}
 function lpGalRender(){
   const box=document.getElementById('lpGal'); if(!box)return;
   const items=lpGalItems(lpGalMonth);
   box.innerHTML=lpGalSlideHtml(items,lpGalIdx);
+  attachCodecCheck(box);
   lpGalSchedule();
 }
 function lpGalPick(k){ lpGalMonth=k; lpGalIdx=0; renderLanding(); }
@@ -2317,6 +2352,7 @@ function lpAnimate(){
     }
   }
   lpBallCycle();
+  attachCodecCheck($('#lpGal'));
   lpGalSchedule();
   lpMeasureBars();
   if(!window.__lpResize){
@@ -6372,6 +6408,7 @@ function previewHighlight(id){
     : (videoHtml(h.url,'100%')||'<div class="empty">Could not load that media.</div>');
   openModal((h.title||'Highlight')+(h.date?' · '+fmtDate(h.date):''), body,
     `<button class="btn" onclick="closeModal()">Close</button>`);
+  setTimeout(()=>attachCodecCheck($('#mBody')),60);
 }
 /* Upload path shared with events — the result is a URL, so uploads and pasted links behave
    identically from here on. Fills the "new highlight" form rather than saving directly, so the
