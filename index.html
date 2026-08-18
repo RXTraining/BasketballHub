@@ -493,6 +493,9 @@
   .codecwarn b{color:#ffcf70;font-size:13.5px}
   .codecwarn a{color:#ffcf70;font-weight:800}
   .codecwarn .fixit{color:#c9a86a;font-size:12px}
+  .grab{cursor:grab;user-select:none;font-size:16px;text-align:center}
+  tr.dragging{opacity:.45}
+  tr.dragover td{border-top:2px solid var(--accent)}
   /* admin thumbnails for the highlights table */
   .hlthumb{width:56px;height:42px;border-radius:8px;overflow:hidden;background:var(--panel2);
     border:1px solid var(--line);flex:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
@@ -6384,9 +6387,13 @@ function renderAdmin(){
     </div>
     <div class="panel" style="margin-top:16px">
       <h3>Home page highlights</h3>
-      <div class="clienttag" style="margin-bottom:10px">Photos and videos shown in the <b style="color:var(--txt)">HIGHLIGHTS</b> gallery on rxtraining.org. They're grouped into month tabs by date and play automatically one after another. Leave the list empty to show the built-in AAU reel.<br>Uploading several files at once adds them all — give each a title and date afterwards.</div>
-      <div style="overflow-x:auto"><table><thead><tr><th>Title</th><th>Date</th><th>Media</th><th>Status</th><th></th></tr></thead><tbody>
-        ${hlAdminOrder().map((h,i)=>`<tr>
+      <div class="clienttag" style="margin-bottom:10px">Drag a row by the ⠿ handle to reorder within its month, or use ↑ ↓ on a touch screen.<br>Photos and videos shown in the <b style="color:var(--txt)">HIGHLIGHTS</b> gallery on rxtraining.org. They're grouped into month tabs by date and play automatically one after another. Leave the list empty to show the built-in AAU reel.<br>Uploading several files at once adds them all — give each a title and date afterwards.</div>
+      <div style="overflow-x:auto"><table><thead><tr><th></th><th>Title</th><th>Date</th><th>Media</th><th>Status</th><th></th></tr></thead><tbody>
+        ${hlAdminOrder().map((h,i)=>`<tr draggable="true"
+          ondragstart="dragStart(event,'${h.id}','highlight')" ondragend="dragEnd(event)"
+          ondragover="dragOver(event,'highlight')" ondragleave="dragLeave(event)"
+          ondrop="dropOnHighlight(event,'${h.id}')">
+          <td style="width:26px" class="muted grab" title="Drag to reorder">⠿</td>
           <td><input value="${(h.title||'').replace(/"/g,'&quot;')}" onchange="updHighlight('${h.id}','title',this.value)"></td>
           <td style="width:150px"><input type="date" value="${h.date||''}" onchange="updHighlight('${h.id}','date',this.value)"></td>
           <td style="width:150px">
@@ -6411,7 +6418,7 @@ function renderAdmin(){
             <button class="iconbtn" title="Preview" onclick="previewHighlight('${h.id}')">▶</button>
             <button class="btn sm ${h.active!==false?'ghost':''}" title="${h.active!==false?'Hide from the home page':'Show on the home page'}" onclick="pubHighlight('${h.id}')">${h.active!==false?'Unpublish':'Publish'}</button>
             <button class="iconbtn" title="Remove" onclick="delHighlight('${h.id}')">✕</button>
-          </div></td></tr>`).join('')||'<tr><td colspan="5"><div class="empty">No highlights yet — add one below.</div></td></tr>'}
+          </div></td></tr>`).join('')||'<tr><td colspan="6"><div class="empty">No highlights yet — add one below.</div></td></tr>'}
       </tbody></table></div>
       <div class="row" style="margin-top:12px;gap:8px;align-items:flex-end">
         <div class="field" style="flex:1;min-width:180px;margin-bottom:0"><label class="f">Title</label>
@@ -6550,6 +6557,124 @@ async function uploadHighlightVideo(input){
     }catch(e){flash('Upload failed: '+e.message,true);}
   }
   if(added){ save(); flash(added+' item'+(added>1?'s':'')+' added as draft — press Publish when ready'); renderAdmin(); }
+}
+
+/* ============================================================================
+   DRAG-TO-REORDER — shared by the skills catalogue and the highlights gallery.
+
+   HTML5 drag-and-drop doesn't fire on touch screens, so the ↑/↓ buttons stay as the fallback.
+   Reordering rewrites the whole run of `ord` values rather than swapping two, which keeps the
+   sequence dense and avoids ties that make later drags behave unpredictably.
+   ============================================================================ */
+let dragSrc=null;
+function dragStart(ev,id,kind){
+  dragSrc={id,kind};
+  try{ev.dataTransfer.effectAllowed='move';ev.dataTransfer.setData('text/plain',id);}catch(e){}
+  const tr=ev.currentTarget; if(tr)tr.classList.add('dragging');
+}
+function dragEnd(ev){ const tr=ev.currentTarget; if(tr)tr.classList.remove('dragging');
+  document.querySelectorAll('.dragover').forEach(x=>x.classList.remove('dragover')); dragSrc=null; }
+function dragOver(ev,kind){
+  if(!dragSrc||dragSrc.kind!==kind)return;
+  ev.preventDefault(); try{ev.dataTransfer.dropEffect='move';}catch(e){}
+  const tr=ev.currentTarget; if(tr)tr.classList.add('dragover');
+}
+function dragLeave(ev){ const tr=ev.currentTarget; if(tr)tr.classList.remove('dragover'); }
+/* Move `srcId` to the position of `dstId` within `list`, then renumber ord 1..n. */
+function reorderInto(list,srcId,dstId){
+  const from=list.findIndex(x=>x.id===srcId), to=list.findIndex(x=>x.id===dstId);
+  if(from<0||to<0||from===to)return false;
+  const [item]=list.splice(from,1);
+  list.splice(to,0,item);
+  list.forEach((x,i)=>{x.ord=i+1;});
+  return true;
+}
+function dropOnSkill(ev,dstId){
+  ev.preventDefault(); dragLeave(ev);
+  if(!dragSrc||dragSrc.kind!=='skill')return;
+  const k=skillById(dragSrc.id); if(!k)return;
+  const list=skillsForSport(k.sport);
+  if(reorderInto(list,dragSrc.id,dstId)){ save(); openSkillAdmin(k.sport); }
+  dragSrc=null;
+}
+function dropOnHighlight(ev,dstId){
+  ev.preventDefault(); dragLeave(ev);
+  if(!dragSrc||dragSrc.kind!=='highlight')return;
+  const h=(DB.highlights||[]).find(x=>x.id===dragSrc.id),
+        d=(DB.highlights||[]).find(x=>x.id===dstId);
+  if(!h||!d)return;
+  // only meaningful inside one month — months come from the date field
+  if((h.date||'').slice(0,7)!==(d.date||'').slice(0,7)){
+    flash('Drag within the same month — change the date to move it to another month',true); dragSrc=null; return;
+  }
+  const list=hlAdminOrder().filter(x=>(x.date||'').slice(0,7)===(h.date||'').slice(0,7));
+  if(reorderInto(list,dragSrc.id,dstId)){ save(); renderAdmin(); }
+  dragSrc=null;
+}
+
+/* ---- owner: the skill catalogue -------------------------------------------
+   Rebuilt after an earlier edit accidentally removed these along with the old
+   single-highlight functions that shared the same block. */
+function openSkillAdmin(sport){
+  const sports=[...new Set(((DB.skills||[]).map(k=>k.sport||'Basketball'))
+                 .concat(bookableSports())
+                 .concat((DB.settings.sports||'').split(',').map(x=>x.trim())))].filter(Boolean);
+  const sp=sport||sports[0]||'Basketball';
+  const list=skillsForSport(sp);
+  const rows=list.map((k,i)=>`<tr draggable="true"
+      ondragstart="dragStart(event,'${k.id}','skill')" ondragend="dragEnd(event)"
+      ondragover="dragOver(event,'skill')" ondragleave="dragLeave(event)"
+      ondrop="dropOnSkill(event,'${k.id}')">
+      <td style="width:30px" class="muted grab" title="Drag to reorder">⠿</td>
+      <td style="width:26px" class="muted">${i+1}</td>
+      <td><input value="${(k.name||'').replace(/"/g,'&quot;')}" onchange="renameSkill('${k.id}',this.value)"></td>
+      <td style="width:92px" class="right"><div class="actions">
+        <button class="iconbtn" title="Move up" onclick="moveSkill('${k.id}',-1)">↑</button>
+        <button class="iconbtn" title="Move down" onclick="moveSkill('${k.id}',1)">↓</button>
+        <button class="iconbtn" title="Remove" onclick="delSkill('${k.id}')">✕</button>
+      </div></td></tr>`).join('')
+    ||'<tr><td colspan="4"><div class="empty">No skills for this sport yet — add the first one below.</div></td></tr>';
+  openModal('Skills — '+sp,`
+    <div class="field"><label class="f">Sport</label>
+      <select onchange="openSkillAdmin(this.value)">${sports.map(x=>`<option ${x===sp?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="clienttag" style="margin-bottom:8px">Drag a row by the ⠿ handle to reorder, or use ↑ ↓ on a touch screen.</div>
+    <div style="overflow-x:auto;max-height:44vh;overflow-y:auto"><table><tbody>${rows}</tbody></table></div>
+    <div class="row" style="margin-top:12px;gap:8px">
+      <div class="field" style="flex:1;margin-bottom:0"><label class="f">Add a skill</label>
+        <input id="newSkill" placeholder="e.g. Euro step finish" onkeydown="if(event.key==='Enter')addSkill('${sp}')"></div>
+      <div class="field" style="display:flex;align-items:flex-end;margin-bottom:0">
+        <button class="btn" onclick="addSkill('${sp}')">Add</button></div>
+    </div>
+    <p class="muted small" style="margin-top:8px">Renaming keeps every client's recorded progress. Removing hides the skill from clients but keeps their history.</p>
+  `,`<button class="btn" onclick="closeModal()">Done</button>`);
+}
+function addSkill(sport){
+  const el=$('#newSkill'); const name=(el?el.value:'').trim();
+  if(!name)return flash('Enter a skill name',true);
+  const max=(DB.skills||[]).filter(k=>(k.sport||'Basketball')===sport).reduce((m,k)=>Math.max(m,k.ord||0),0);
+  DB.skills.push({id:uid(),sport,name,ord:max+1,active:true});
+  save(); flash('Skill added'); openSkillAdmin(sport);
+}
+function renameSkill(id,name){
+  const k=skillById(id); if(!k)return;
+  const v=(name||'').trim(); if(!v)return;
+  k.name=v; save();
+}
+function moveSkill(id,dir){
+  const k=skillById(id); if(!k)return;
+  const list=skillsForSport(k.sport);
+  const i=list.findIndex(x=>x.id===id), j=i+dir;
+  if(i<0||j<0||j>=list.length)return;
+  const [item]=list.splice(i,1); list.splice(j,0,item);
+  list.forEach((x,n)=>{x.ord=n+1;});
+  save(); openSkillAdmin(k.sport);
+}
+function delSkill(id){
+  const k=skillById(id); if(!k)return;
+  const used=(DB.skillLog||[]).filter(e=>e.skillId===id).length;
+  if(!confirm('Remove "'+k.name+'" from the skills list?'+(used?('\n\n'+used+' recorded progress entr'+(used===1?'y':'ies')+' will be kept but hidden.'):'')))return;
+  k.active=false;                       // soft delete: client history stays intact
+  save(); flash('Skill removed'); openSkillAdmin(k.sport);
 }
 function saveGroupForming(){
   DB.settings.groupMinPlayers=Math.max(2,Math.min(MAX_GROUP,+$('#grpMin').value||2));
