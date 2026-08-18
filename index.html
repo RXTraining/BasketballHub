@@ -369,7 +369,14 @@
   .lp-h2{font-size:clamp(28px,5vw,44px);font-weight:900;letter-spacing:-.8px;margin:0 0 18px}
   .lp-p{font-size:15.5px;line-height:1.7;color:var(--lp-mut);max-width:720px}
   .lp-p b{color:var(--lp-ink)}
-  .lp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:26px}
+  /* Fixed 3-up rather than auto-fit: with six cards, auto-fit produced a lopsided 4 + 2.
+     Three per row gives 2 clean rows, and still works for 7+ cards (3 + 3 + 1). */
+  .lp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:26px;align-items:stretch}
+  .lp-grid .lp-card{display:flex;flex-direction:column;gap:6px}
+  .lp-grid .lp-card h4{min-height:2.6em;display:flex;align-items:flex-end}
+  @media(max-width:900px){.lp-grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.lp-grid{grid-template-columns:1fr}
+    .lp-grid .lp-card h4{min-height:0}}
   .lp-card{background:var(--lp-soft);border:1px solid var(--lp-line);border-radius:16px;padding:20px}
   .lp-card h4{margin:8px 0 6px;font-size:15.5px;font-weight:800}
   .lp-card p{margin:0;font-size:13.5px;line-height:1.6;color:var(--lp-mut)}
@@ -456,9 +463,6 @@
      Decorative layers are aria-hidden and pointer-events:none, so they never get in the way of
      reading or a screen reader. */
   .lp-about{position:relative;overflow:hidden}
-  .lp-ghost{position:absolute;right:-.05em;top:-.14em;z-index:0;pointer-events:none;user-select:none;
-    font-size:clamp(110px,19vw,230px);font-weight:900;line-height:.78;letter-spacing:-.04em;
-    color:transparent;-webkit-text-stroke:2px var(--lp-line);opacity:.75}
   .lp-about>*{position:relative;z-index:1}
   .lp-h2-mark{position:relative;display:inline-block;padding-bottom:12px}
   .lp-h2-mark::after{content:"";position:absolute;left:0;bottom:0;width:78px;height:5px;border-radius:3px;
@@ -486,7 +490,6 @@
   .lp-quote::before{content:"\201C";position:absolute;right:16px;top:-30px;font-size:180px;line-height:1;
     font-weight:900;color:rgba(200,255,46,.14);pointer-events:none;user-select:none}
   @media(max-width:640px){
-    .lp-ghost{font-size:92px;opacity:.5}
     .lp-lead>p:first-child{font-size:17px}
     .lp-lead>p:first-child::first-letter{font-size:2.9em}
     .lp-quote::before{font-size:120px;top:-20px}
@@ -1295,7 +1298,10 @@ function normalize(d){
   if(!d.settings.groupFormHours)d.settings.groupFormHours=48;
   // Sports we advertise. Anything with a coach attached shows as live; the rest as 'coming soon',
   // so new sports are launched by adding a coach — not by editing code.
-  if(!d.settings.sports)d.settings.sports='Basketball, Soccer, Tennis, Golf, Track';
+  // Widened the advertised list. The second test upgrades installs still carrying the original
+  // five-sport default; anything the owner has edited is left alone.
+  if(!d.settings.sports||d.settings.sports.trim()==='Basketball, Soccer, Tennis, Golf, Track')
+    d.settings.sports=DEFAULT_SPORTS;
   // video shown in the home page Highlights section; blank falls back to the built-in AAU reel
   if(d.settings.highlightVideo===undefined)d.settings.highlightVideo='';
   // caption under the Highlights heading — kept separately so it survives the source event
@@ -1797,16 +1803,61 @@ function activeCoaches(){return sortedCoaches(DB.coaches).filter(c=>c.active!==f
    bookable or a client picks a sport with no availability behind it. */
 function bookableSports(){
   const seen=[]; activeCoaches().forEach(c=>{const sp=(c.sport||'Basketball').trim();
-    if(sp&&!seen.some(x=>x.toLowerCase()===sp.toLowerCase()))seen.push(sp);});
+    if(sp&&!seen.some(x=>sportKey(x)===sportKey(sp)))seen.push(sportLabel(sp)||sp);});
   return seen;
 }
 function coachesForSport(sp){
   if(!sp)return activeCoaches();
-  return activeCoaches().filter(c=>(c.sport||'Basketball').trim().toLowerCase()===sp.trim().toLowerCase());
+  return activeCoaches().filter(c=>sportKey(c.sport)===sportKey(sp));
+}
+/* ---- One sport vocabulary for the whole app -------------------------------
+   A coach typed "Running", the advertised list said "Track", and the two were
+   compared as raw strings — so the sport read as "coming soon" on the home page
+   and fell through to the generic 🏅 medal on the client's sport picker.
+   sportKey() squashes spelling ("Track & Field", "track and field", "XC",
+   "Running") down to one canonical key, and every comparison and icon lookup
+   now goes through it. Add a sport by adding a row here, nothing else. */
+const SPORT_CATALOG=[
+  ['basketball','Basketball','🏀'], ['soccer','Soccer','⚽'],       ['baseball','Baseball','⚾'],
+  ['softball','Softball','🥎'],     ['football','Football','🏈'],   ['track','Track & Field','🏃'],
+  ['tennis','Tennis','🎾'],         ['golf','Golf','⛳'],           ['volleyball','Volleyball','🏐'],
+  ['swimming','Swimming','🏊'],     ['lacrosse','Lacrosse','🥍'],   ['hockey','Ice Hockey','🏒'],
+  ['fieldhockey','Field Hockey','🏑'], ['wrestling','Wrestling','🤼'], ['badminton','Badminton','🏸'],
+  ['tabletennis','Table Tennis','🏓'], ['boxing','Boxing','🥊'],      ['martialarts','Martial Arts','🥋'],
+  ['gymnastics','Gymnastics','🤸'], ['cycling','Cycling','🚴'],    ['skating','Skating','⛸️'],
+  ['skiing','Skiing','⛷️'],           ['climbing','Climbing','🧗'],   ['rowing','Rowing','🚣'],
+  ['fitness','Strength & Conditioning','🏋️'], ['cricket','Cricket','🏏'], ['rugby','Rugby','🏉'],
+  ['archery','Archery','🏹'],       ['dance','Dance','🩰'],        ['surfing','Surfing','🏄'],
+  ['fencing','Fencing','🤺'],       ['waterpolo','Water Polo','🤽'], ['ultimate','Ultimate','🥏'],
+  ['skateboarding','Skateboarding','🛹'], ['pickleball','Pickleball','🏓']
+];
+const DEFAULT_SPORTS='Basketball, Soccer, Baseball, Football, Track & Field, Tennis, Golf, Volleyball, Swimming, Lacrosse';
+/* alternate spellings the owner or a coach might actually type -> canonical key */
+const SPORT_ALIAS={
+  running:'track', run:'track', trackandfield:'track', trackfield:'track', crosscountry:'track',
+  xc:'track', sprints:'track', sprinting:'track', distance:'track', athletics:'track', jogging:'track',
+  futbol:'soccer', americanfootball:'football', flagfootball:'football',
+  swim:'swimming', swimminganddiving:'swimming', diving:'swimming',
+  pingpong:'tabletennis', tabletennis:'tabletennis', karate:'martialarts', taekwondo:'martialarts',
+  judo:'martialarts', jiujitsu:'martialarts', bjj:'martialarts', mma:'martialarts',
+  icehockey:'hockey', fieldhockey:'fieldhockey', strength:'fitness', conditioning:'fitness',
+  weightlifting:'fitness', weighttraining:'fitness', gym:'fitness', strengthandconditioning:'fitness',
+  frisbee:'ultimate', ultimatefrisbee:'ultimate', skateboard:'skateboarding', skating:'skating',
+  bike:'cycling', biking:'cycling', figureskating:'skating', iceskating:'skating',
+  hoops:'basketball', bball:'basketball', vball:'volleyball', crew:'rowing'
+};
+function sportKey(sp){
+  const k=(sp||'').toString().toLowerCase().replace(/&/g,' and ').replace(/[^a-z]+/g,'');
+  return SPORT_ALIAS[k]||k||'basketball';
+}
+/* the tidy display name for a key, if we know one — otherwise keep what was typed */
+function sportLabel(sp){
+  const k=sportKey(sp), row=SPORT_CATALOG.find(r=>r[0]===k);
+  return row?row[1]:(sp||'').toString().trim();
 }
 function sportIcon(sp){
-  return {basketball:'🏀',soccer:'⚽',football:'🏈',tennis:'🎾',golf:'⛳',track:'🏃',
-          baseball:'⚾',volleyball:'🏐',swimming:'🏊'}[(sp||'').trim().toLowerCase()]||'🏅';
+  const k=sportKey(sp), row=SPORT_CATALOG.find(r=>r[0]===k);
+  return row?row[2]:'🏅';
 }
 /* Keeps sport and coach consistent: default the sport from the chosen coach, and if the sport
    changes, move to a coach who actually teaches it. */
@@ -2301,12 +2352,11 @@ function lpCoachCards(){
 /* Sports we advertise. Any sport with an active coach is live; the rest read "coming soon" —
    so launching a sport means adding a coach, never editing this file. */
 function lpSportChips(){
-  const live={}; activeCoaches().forEach(c=>{live[(c.sport||'Basketball').trim().toLowerCase()]=true;});
-  const icon={basketball:'🏀',soccer:'⚽',football:'⚽',tennis:'🎾',golf:'⛳',track:'🏃',baseball:'⚾',volleyball:'🏐',swimming:'🏊'};
+  const live={}; activeCoaches().forEach(c=>{live[sportKey(c.sport)]=true;});
   return (DB.settings.sports||'Basketball').split(',').map(x=>x.trim()).filter(Boolean).map((sp,i)=>{
-    const on=!!live[sp.toLowerCase()];
+    const on=!!live[sportKey(sp)];
     return `<div class="lp-sport ${on?'on':''} reveal" style="animation-delay:${i*70}ms">
-      <span class="lp-sport-ico">${icon[sp.toLowerCase()]||'🏅'}</span>
+      <span class="lp-sport-ico">${sportIcon(sp)}</span>
       <b>${sp}</b><span>${on?t('Now training'):t('Coming soon')}</span></div>`;
   }).join('');
 }
@@ -2395,7 +2445,6 @@ function renderLanding(){
     </header>
 
     <section class="lp-sec lp-about" id="lpAbout">
-      <span class="lp-ghost" aria-hidden="true">RX</span>
       <div class="lp-kicker">${t('Who we are')}</div>
       <h2 class="lp-h2 lp-h2-mark">${t('THE RX APPROACH')}</h2>
       <div class="lp-lead">${aboutParas(co)}</div>
@@ -2510,18 +2559,35 @@ function lpAnimate(){
    multi-sport roadmap. Single interval, cleared and restarted on each render so repeated repaints
    can't stack timers. */
 let lpBallTimer=null;
-const LP_BALLS=['🏀','⚽','🏈','⚾','🎾','⛳','🏐','🏓'];
+/* What the dot cycles through. It used to be a hardcoded list of balls, which meant the brand
+   advertised table tennis we don't coach and never showed the runner for Track. Now it mirrors
+   reality: the sports with an active coach, in the order the sports list advertises them. If no
+   coach is set up yet it falls back to the advertised list so the dot still moves. */
+function lpBallSet(){
+  const advertised=(DB.settings.sports||'').split(',').map(x=>x.trim()).filter(Boolean);
+  const live=bookableSports();
+  // keep the advertised order, but only for sports we actually run
+  let use=advertised.filter(sp=>live.some(l=>sportKey(l)===sportKey(sp)));
+  live.forEach(l=>{ if(!use.some(u=>sportKey(u)===sportKey(l)))use.push(l); });   // coached but unlisted
+  if(!use.length)use=advertised;
+  const out=[]; use.forEach(sp=>{const ic=sportIcon(sp); if(ic&&out.indexOf(ic)<0)out.push(ic);});
+  return out.length?out:['🏀'];
+}
 function lpBallCycle(){
   if(lpBallTimer){clearInterval(lpBallTimer);lpBallTimer=null;}
   const el=document.getElementById('lpBall'); if(!el)return;
+  const balls=lpBallSet();
+  el.setAttribute('data-ball',balls[0]);          // start on a sport we really coach
+  // one sport = nothing to cycle; flipping a card to reveal the same face just looks broken
+  if(balls.length<2)return;
   try{ if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return; }catch(e){}
   let i=0;
   lpBallTimer=setInterval(()=>{
     const node=document.getElementById('lpBall');
     if(!node){clearInterval(lpBallTimer);lpBallTimer=null;return;}
-    i=(i+1)%LP_BALLS.length;
+    i=(i+1)%balls.length;
     node.classList.add('swap');
-    setTimeout(()=>{ node.setAttribute('data-ball',LP_BALLS[i]); },180);   // swap at the flip midpoint
+    setTimeout(()=>{ node.setAttribute('data-ball',balls[i]); },180);   // swap at the flip midpoint
     setTimeout(()=>{ node.classList.remove('swap'); },430);
   },2200);
 }
@@ -2788,6 +2854,15 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    change, add an entry here rather than relying on memory.
    ============================================================================ */
 const CHANGELOG=[
+ {v:'2.1', d:'2026-08-17', t:'Multi-sport & home page layout', items:[
+   '<b>Sports catalogue widened to 35</b> — Baseball, Football, Lacrosse, Volleyball, Swimming, Wrestling, Field Hockey, Fencing, Water Polo, Pickleball and more, each with its own icon. The home page now advertises ten sports instead of five.',
+   'The advertised list is editable in <b>Admin → Home page — sports we advertise</b>, with a live preview showing which read "Now training" and which read "Coming soon".',
+   'Sport names are now <b>spelling-forgiving</b>: "Running", "Track", "Track &amp; Field", "Cross Country" and "XC" are one sport everywhere — one tile in the client picker, one chip on the home page, one icon.',
+   'The bouncing dot between RX and TRAINING now <b>cycles only the sports we actually coach</b>, in the order the home page lists them, instead of a fixed set of balls. With a single sport it holds still rather than flipping to itself.',
+   '<b>Fix:</b> a coach set to "Running" showed the generic \u{1F3C5} medal in the client sport picker and left Track reading "coming soon" on the home page, because sports were compared as raw text.',
+   '<b>Fix:</b> the six feature cards on the home page wrapped 4 + 2. They now lay out three per row (two on tablet, one on phone), with card titles sharing a baseline so the paragraphs line up.',
+   '<b>Fix:</b> removed the oversized ghosted "RX" watermark behind the About heading.',
+ ]},
  {v:'2.0', d:'2026-08-14', t:'Highlights, navigation & fixes', items:[
    '<b>Multiple highlight reels</b> on the home page, each with a date. Visitors see the newest first and can switch to older ones with the date chips; the player swaps in place rather than jumping the page.',
    'Owner manages the reels in Admin → Home page highlights: add by link or upload, edit title and date inline, preview, remove. Any previously set single video is migrated into the list.',
@@ -3671,7 +3746,7 @@ function renderJourney(){
    ============================================================================ */
 const skillById = id => (DB.skills||[]).find(k=>k.id===id);
 function skillsForSport(sp){
-  return (DB.skills||[]).filter(k=>k.active!==false&&(k.sport||'Basketball')===sp)
+  return (DB.skills||[]).filter(k=>k.active!==false&&sportKey(k.sport)===sportKey(sp))
     .sort((a,b)=>(a.ord||0)-(b.ord||0)||(a.name||'').localeCompare(b.name||''));
 }
 function skillEntries(cid,skillId){
@@ -3682,10 +3757,10 @@ function skillEntries(cid,skillId){
    falling back to every sport that has a catalogue, so a brand-new client still sees a syllabus. */
 function clientSports(cid){
   const out=[];
-  const add=sp=>{ if(sp&&!out.some(x=>x.toLowerCase()===sp.toLowerCase()))out.push(sp); };
+  const add=sp=>{ if(sp&&!out.some(x=>sportKey(x)===sportKey(sp)))out.push(sportLabel(sp)||sp); };
   DB.sessions.filter(s=>s.customerIds.includes(cid)).forEach(s=>{const c=coachById(s.coachId);add(c?c.sport:'Basketball');});
   (DB.skillLog||[]).filter(e=>e.customerId===cid).forEach(e=>{const k=skillById(e.skillId);if(k)add(k.sport);});
-  if(!out.length)[...new Set((DB.skills||[]).map(k=>k.sport||'Basketball'))].forEach(add);
+  if(!out.length)(DB.skills||[]).map(k=>k.sport||'Basketball').forEach(add);
   return out;
 }
 let skillOpen={};    // which skill rows are expanded, keyed by skill id
@@ -3809,8 +3884,9 @@ function boardAddSkill(cid){
   if(AUTH!=='owner')return;
   const el=$('#bqSkill'); const name=(el?el.value:'').trim();
   if(!name)return flash('Enter a skill name',true);
-  const sport=($('#bqSport')&&$('#bqSport').value)||'Basketball';
-  const max=(DB.skills||[]).filter(k=>(k.sport||'Basketball')===sport).reduce((m,k)=>Math.max(m,k.ord||0),0);
+  const raw=($('#bqSport')&&$('#bqSport').value)||'Basketball';
+  const sport=sportLabel(raw)||raw;
+  const max=(DB.skills||[]).filter(k=>sportKey(k.sport)===sportKey(sport)).reduce((m,k)=>Math.max(m,k.ord||0),0);
   DB.skills.push({id:uid(),sport,name,ord:max+1,active:true});
   save(); flash('Skill added to '+sport+' 🎯'); openClientSkills(cid);
 }
@@ -5068,7 +5144,8 @@ function openCoach(id){
       <div class="clienttag" style="margin-top:4px">Upload a photo, or paste a <b>direct image link</b>. iCloud/Google Photos <i>share</i> links won't work — they're web pages, not image files.</div></div>
     ${isCoach?'':`<div class="field"><label class="f">Sport</label>
       <input id="coSport" list="sportList" value="${(c.sport||'Basketball').replace(/"/g,'&quot;')}" placeholder="Basketball">
-      <datalist id="sportList">${(DB.settings.sports||'Basketball').split(',').map(x=>`<option value="${x.trim()}">`).join('')}</datalist>
+      <datalist id="sportList">${[...new Set((DB.settings.sports||'Basketball').split(',').map(x=>x.trim()).filter(Boolean)
+          .concat(SPORT_CATALOG.map(r=>r[1])))].map(x=>`<option value="${x}">`).join('')}</datalist>
       <div class="clienttag" style="margin-top:4px">Shown on the public home page. Adding a coach in a new sport launches that sport on the site — no code change needed.</div></div>`}
     <div class="panel" style="background:var(--panel2);padding:14px;margin-bottom:14px">
       <b class="small">Hourly rates</b>
@@ -6458,6 +6535,18 @@ function renderAdmin(){
       <button class="btn sm" onclick="saveGroupForming()">Save group settings</button>
     </div>
     <div class="panel" style="margin-top:16px">
+      <h3>Home page — sports we advertise</h3>
+      <div class="clienttag" style="margin-bottom:8px">Comma-separated. A sport shows as <b style="color:var(--txt)">Now training</b> the moment an active coach is set to it — everything else reads <b style="color:var(--txt)">Coming soon</b>, so launching a sport means adding a coach, not editing this list. Spelling is forgiving: <b style="color:var(--txt)">Running</b>, <b style="color:var(--txt)">Track &amp; Field</b> and <b style="color:var(--txt)">Cross Country</b> are all the same sport.</div>
+      <div class="field"><input id="adSports" value="${(DB.settings.sports||'').replace(/"/g,'&quot;')}" placeholder="${DEFAULT_SPORTS}"></div>
+      <div class="clienttag" style="margin:-4px 0 12px">Preview: ${(DB.settings.sports||DEFAULT_SPORTS).split(',').map(x=>x.trim()).filter(Boolean).map(sp=>{
+        const on=activeCoaches().some(c=>sportKey(c.sport)===sportKey(sp));
+        return `<span class="pill" style="margin:2px 4px 2px 0${on?'':';opacity:.55'}">${sportIcon(sp)} ${sp}${on?'':' · soon'}</span>`;}).join('')}</div>
+      <div class="row" style="gap:8px">
+        <button class="btn sm" onclick="saveSportsList()">Save sports</button>
+        <button class="btn ghost sm" onclick="clearSportsList()">Restore default list</button>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:16px">
       <h3>Home page — “The RX approach” text</h3>
       <div class="clienttag" style="margin-bottom:8px">The About section on rxtraining.org. Leave blank to use the built-in wording (which is translated into 中文 / 한국어 / 日本語). Anything you write here is shown exactly as typed, in every language.<br>Separate paragraphs with a <b style="color:var(--txt)">blank line</b>. Basic HTML like &lt;b&gt;bold&lt;/b&gt; works.</div>
       <div class="field"><textarea id="aboutTxt" rows="10" placeholder="Leave blank to use the default wording…">${(DB.settings.aboutText||'').replace(/</g,'&lt;')}</textarea></div>
@@ -6723,9 +6812,11 @@ function dropOnHighlight(ev,dstId){
    Rebuilt after an earlier edit accidentally removed these along with the old
    single-highlight functions that shared the same block. */
 function openSkillAdmin(sport){
-  const sports=[...new Set(((DB.skills||[]).map(k=>k.sport||'Basketball'))
-                 .concat(bookableSports())
-                 .concat((DB.settings.sports||'').split(',').map(x=>x.trim())))].filter(Boolean);
+  const sports=[]; ((DB.skills||[]).map(k=>k.sport||'Basketball'))
+      .concat(bookableSports())
+      .concat((DB.settings.sports||'').split(',').map(x=>x.trim()))
+      .filter(Boolean)
+      .forEach(sp=>{ if(!sports.some(x=>sportKey(x)===sportKey(sp)))sports.push(sportLabel(sp)||sp); });
   const sp=sport||sports[0]||'Basketball';
   const list=skillsForSport(sp);
   const rows=list.map((k,i)=>`<tr draggable="true"
@@ -6758,9 +6849,10 @@ function openSkillAdmin(sport){
 function addSkill(sport){
   const el=$('#newSkill'); const name=(el?el.value:'').trim();
   if(!name)return flash('Enter a skill name',true);
-  const max=(DB.skills||[]).filter(k=>(k.sport||'Basketball')===sport).reduce((m,k)=>Math.max(m,k.ord||0),0);
-  DB.skills.push({id:uid(),sport,name,ord:max+1,active:true});
-  save(); flash('Skill added'); openSkillAdmin(sport);
+  const sp=sportLabel(sport)||sport;
+  const max=(DB.skills||[]).filter(k=>sportKey(k.sport)===sportKey(sp)).reduce((m,k)=>Math.max(m,k.ord||0),0);
+  DB.skills.push({id:uid(),sport:sp,name,ord:max+1,active:true});
+  save(); flash('Skill added'); openSkillAdmin(sp);
 }
 function renameSkill(id,name){
   const k=skillById(id); if(!k)return;
@@ -6782,6 +6874,16 @@ function delSkill(id){
   if(!confirm('Remove "'+k.name+'" from the skills list?'+(used?('\n\n'+used+' recorded progress entr'+(used===1?'y':'ies')+' will be kept but hidden.'):'')))return;
   k.active=false;                       // soft delete: client history stays intact
   save(); flash('Skill removed'); openSkillAdmin(k.sport);
+}
+function saveSportsList(){
+  const v=($('#adSports').value||'').trim();
+  DB.settings.sports=v||DEFAULT_SPORTS;
+  save(); flash('Sports list saved'); renderAdmin();
+}
+function clearSportsList(){
+  if(!confirm('Restore the default sports list? Your custom list will be discarded.'))return;
+  DB.settings.sports=DEFAULT_SPORTS;
+  save(); flash('Default sports restored'); renderAdmin();
 }
 function saveAboutText(){
   DB.settings.aboutText=($('#aboutTxt').value||'').trim();
