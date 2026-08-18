@@ -101,7 +101,7 @@
      browsers scroll, which leaves the content shifted with dead space down one side */
   html{-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow-x:hidden;width:100%;max-width:100%}
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    background:radial-gradient(1200px 600px at 80% -10%,rgba(255,106,0,.12),transparent 60%),var(--bg);
+    background:radial-gradient(1200px 600px at 80% -10%,rgba(200,255,46,.30),transparent 60%),var(--bg);
     color:var(--txt);min-height:100vh;-webkit-font-smoothing:antialiased;
     overflow-x:hidden;width:100%;max-width:100%}
   a{color:inherit}
@@ -122,7 +122,7 @@
   nav.tabs button{background:transparent;border:0;color:var(--muted);font-weight:600;white-space:nowrap;
     padding:9px 11px;border-radius:10px;cursor:pointer;font-size:13.5px;transition:.15s}
   nav.tabs button:hover{color:var(--txt);background:var(--panel)}
-  nav.tabs button.active{color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2))}
+  nav.tabs button.active{color:#fff;background:var(--accent)}
   .rolewrap{flex:0 0 auto;display:flex;align-items:center;gap:10px}
 
   section.view{display:none;padding-top:26px;animation:fade .25s ease}
@@ -139,26 +139,28 @@
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
   textarea{resize:vertical;min-height:70px}
   .field{flex:1;min-width:160px;margin-bottom:14px}
-  .btn{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#111;border:0;font-weight:800;
+  /* Matches .lp-btn.solid on the public site: solid deep lime, white ink. The old
+     accent->volt gradient put near-black text over a #c8ff2e end that only reached 1.9:1. */
+  .btn{background:var(--accent);color:#fff;border:0;font-weight:800;
     padding:11px 18px;border-radius:10px;cursor:pointer;font-size:14px;transition:.15s}
-  .btn:hover{filter:brightness(1.08)}
+  .btn:hover{background:#3f6a00}   /* darker, not lighter — white ink needs the contrast */
   .btn.ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
   .btn.sm{padding:7px 12px;font-size:12.5px}
   .btn.danger{background:var(--panel2);color:var(--red);border:1px solid var(--line)}
   .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;
     padding:4px 10px;border-radius:999px;background:var(--panel2);border:1px solid var(--line)}
-  .pill.green{color:var(--green);border-color:rgba(57,217,138,.35)}
-  .pill.red{color:var(--red);border-color:rgba(255,93,108,.35)}
-  .pill.blue{color:var(--blue);border-color:rgba(74,168,255,.35)}
-  .pill.yellow{color:var(--yellow);border-color:rgba(255,206,74,.35)}
-  .pill.orange{color:var(--accent2);border-color:rgba(255,145,0,.35)}
+  .pill.green{color:var(--green);background:#e8f6ee;border-color:rgba(11,122,66,.3)}
+  .pill.red{color:var(--red);background:#fdecee;border-color:rgba(196,31,49,.3)}
+  .pill.blue{color:var(--blue);background:#e9f1fb;border-color:rgba(18,91,176,.3)}
+  .pill.yellow{color:var(--yellow);background:#fdf4e3;border-color:rgba(138,86,0,.3)}
+  .pill.orange{color:var(--yellow);background:#fdf4e3;border-color:rgba(138,86,0,.35)}
   .coachsel{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;max-width:170px}
   .slotlist{max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--panel2)}
   .slotchip{background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:7px 11px;font-size:12.5px;cursor:pointer;font-weight:600}
-  .slotchip:hover{border-color:var(--accent);color:#fff}
-  .slotchip.sel{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#111;border-color:transparent}
-  .evbanner{background:linear-gradient(135deg,rgba(255,106,0,.18),rgba(255,145,0,.05));border:1px solid rgba(255,145,0,.4);border-radius:12px;overflow:hidden;margin-bottom:16px;display:flex;align-items:center;gap:10px;padding:8px 10px}
-  .evbanner .tag{flex:0 0 auto;font-weight:800;color:var(--accent2);font-size:12.5px;display:flex;align-items:center;gap:6px}
+  .slotchip:hover{border-color:var(--accent);color:var(--accent)}
+  .slotchip.sel{background:var(--accent);color:#fff;border-color:transparent}
+  .evbanner{background:linear-gradient(135deg,rgba(200,255,46,.34),rgba(200,255,46,.08));border:1px solid #cfe89a;border-radius:12px;overflow:hidden;margin-bottom:16px;display:flex;align-items:center;gap:10px;padding:8px 10px}
+  .evbanner .tag{flex:0 0 auto;font-weight:800;color:#3f6a00;font-size:12.5px;display:flex;align-items:center;gap:6px}
   .evbanner .mq{flex:1;overflow:hidden;position:relative;min-width:0}
   .mq-track{display:inline-flex;gap:28px;white-space:nowrap;animation:mqscroll linear infinite;will-change:transform}
   .evbanner:hover .mq-track,.evbanner.paused .mq-track{animation-play-state:paused}
@@ -249,13 +251,18 @@
   .modal .foot{padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
   .x{background:transparent;border:0;color:var(--muted);font-size:22px;cursor:pointer;line-height:1}
 
-  .hero{background:linear-gradient(135deg,rgba(255,106,0,.15),rgba(255,145,0,.04)),var(--panel);
-    border:1px solid var(--line);border-radius:18px;padding:34px;margin-bottom:18px}
-  .hero .badge{display:inline-block;font-size:12px;font-weight:700;color:var(--accent2);
-    border:1px solid rgba(255,145,0,.35);border-radius:999px;padding:5px 12px;margin-bottom:14px}
-  .hero h2{font-size:34px;font-weight:900;line-height:1.1;margin-bottom:12px}
-  .hero p{color:#d9d9de;max-width:640px;line-height:1.6}
-  .hl{color:var(--accent2);font-weight:700}
+  /* Was an orange wash with #d9d9de body text — near-white copy on a near-white panel,
+     about 1.1:1. Now a volt-tinted card with a volt edge, in the public site's palette. */
+  .hero{background:linear-gradient(135deg,rgba(200,255,46,.30),rgba(200,255,46,.05)),var(--panel);
+    border:1px solid #d8eab0;border-radius:18px;padding:34px;margin-bottom:18px;
+    position:relative;overflow:hidden}
+  .hero::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;
+    background:linear-gradient(180deg,var(--accent2),var(--accent))}
+  .hero .badge{display:inline-block;font-size:12px;font-weight:800;color:#24310a;
+    background:var(--accent2);border:0;border-radius:999px;padding:5px 12px;margin-bottom:14px}
+  .hero h2{font-size:34px;font-weight:900;line-height:1.1;margin-bottom:12px;color:var(--txt)}
+  .hero p{color:#556352;max-width:640px;line-height:1.6}   /* --muted is 4.36:1 on the volt tint */
+  .hl{color:var(--accent);font-weight:700}
 
   .cards3{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
   .feat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
@@ -280,8 +287,8 @@
     border-radius:999px;cursor:pointer;font-weight:600;font-size:13px}
   .seg button.active{background:var(--accent);color:#111;border-color:transparent}
   .small{font-size:12px}
-  .av{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));
-    display:inline-flex;align-items:center;justify-content:center;font-weight:800;color:#111;font-size:13px}
+  .av{width:34px;height:34px;border-radius:50%;background:var(--accent);
+    display:inline-flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:13px}
   .nameceil{display:flex;align-items:center;gap:10px}
   .twocol{display:grid;grid-template-columns:1.3fr 1fr;gap:16px}
   @media(max-width:820px){.twocol{grid-template-columns:1fr}}
@@ -292,7 +299,7 @@
   .barrow .val{width:92px;flex:0 0 auto;text-align:right;font-size:12.5px;font-weight:700;white-space:nowrap}
   .clienttag{font-size:11px;color:var(--muted)}
   .hidden{display:none!important}
-  .credit{display:inline-block;font-size:11px;font-weight:800;color:#111;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  .credit{display:inline-block;font-size:11px;font-weight:800;color:#24310a;background:var(--accent2);
     padding:3px 9px;border-radius:999px}
   .creditbar{height:8px;background:var(--panel2);border-radius:5px;overflow:hidden;margin-top:6px}
   .creditbar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
@@ -305,11 +312,13 @@
   .calcell.today{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
   .caldate{font-size:11px;color:var(--muted);font-weight:700}
   .calcell.today .caldate{color:var(--accent)}
+  /* Calendar chips carried pastel text (#bfe0ff / #ffd9a8 / #dcc9ff) meant for a black
+     calendar. On white they were barely visible; each now uses a deep ink on a light tint. */
   .cchip{font-size:10.5px;font-weight:700;padding:3px 6px;border-radius:6px;cursor:pointer;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
-  .cchip.t1on1{background:rgba(74,168,255,.22);border:1px solid rgba(74,168,255,.4);color:#bfe0ff}
-  .cchip.tgroup{background:rgba(255,145,0,.2);border:1px solid rgba(255,145,0,.4);color:#ffd9a8}
-  .cchip.tevent{background:rgba(169,112,255,.22);border:1px solid rgba(169,112,255,.45);color:#dcc9ff}
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--txt)}
+  .cchip.t1on1{background:rgba(18,91,176,.13);border:1px solid rgba(18,91,176,.38);color:#0d4a80}
+  .cchip.tgroup{background:rgba(138,86,0,.13);border:1px solid rgba(138,86,0,.38);color:#6b4300}
+  .cchip.tevent{background:rgba(122,60,190,.13);border:1px solid rgba(122,60,190,.38);color:#5b2ca0}
   .cchip.done{opacity:.55}
   @media(max-width:640px){.calcell{min-height:70px}.cchip{font-size:9px}}
 
@@ -372,14 +381,23 @@
   /* Fixed 3-up rather than auto-fit: with six cards, auto-fit produced a lopsided 4 + 2.
      Three per row gives 2 clean rows, and still works for 7+ cards (3 + 3 + 1). */
   .lp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:26px;align-items:stretch}
-  .lp-grid .lp-card{display:flex;flex-direction:column;gap:6px}
-  .lp-grid .lp-card h4{min-height:2.6em;display:flex;align-items:flex-end}
+  /* Icon and title share one row, so a two-line title no longer opens a gap under the icon and
+     every card's body copy starts at the same height without a min-height fudge. */
+  .lp-grid .lp-card{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto 1fr;
+    column-gap:13px;row-gap:9px;align-items:start}
+  /* icon and title centre against each other in row 1; the paragraph stays top-aligned so a
+     short card's copy sits under its title instead of floating in the middle of the card */
+  .lp-grid .lp-card .lp-ico{grid-column:1;grid-row:1;align-self:center}
+  .lp-grid .lp-card h4{grid-column:2;grid-row:1;margin:0;align-self:center}
+  .lp-grid .lp-card p{grid-column:1/-1;grid-row:2}
   @media(max-width:900px){.lp-grid{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:560px){.lp-grid{grid-template-columns:1fr}
-    .lp-grid .lp-card h4{min-height:0}}
+    /* narrow phones: the title needs the full width, so it drops under the icon again */
+    .lp-grid .lp-card{grid-template-columns:1fr;row-gap:7px}
+    .lp-grid .lp-card .lp-ico,.lp-grid .lp-card h4,.lp-grid .lp-card p{grid-column:1;grid-row:auto}}
   .lp-card{background:var(--lp-soft);border:1px solid var(--lp-line);border-radius:16px;padding:20px}
-  .lp-card h4{margin:8px 0 6px;font-size:15.5px;font-weight:800}
-  .lp-card p{margin:0;font-size:13.5px;line-height:1.6;color:var(--lp-mut)}
+  .lp-card h4{margin:8px 0 6px;font-size:16.5px;font-weight:800;line-height:1.3}
+  .lp-card p{margin:0;font-size:15px;line-height:1.62;color:var(--lp-mut)}
   .lp-ico{font-size:24px}
   .lp-quote{background:var(--lp-ink);color:#fff;border-radius:20px;padding:34px;margin-top:30px}
   .lp-quote p{font-size:clamp(17px,2.6vw,23px);line-height:1.5;font-weight:700;margin:0 0 12px}
@@ -687,7 +705,7 @@
     <div class="logo" style="font-size:30px;margin-bottom:4px">RX<span class="dot">.</span>TRAINING</div>
     <div id="clientPanel">
       <div class="seg" style="margin-bottom:16px">
-        <button id="roleTabPlayer" class="active" onclick="showLoginTab('client')">🏀 <span id="roleTabPlayerLbl">Player</span></button>
+        <button id="roleTabPlayer" class="active" onclick="showLoginTab('client')">👤 <span id="roleTabPlayerLbl">Player</span></button>
         <button id="roleTabCoach" onclick="showLoginTab('coach')">📋 <span id="roleTabCoachLbl">Coach</span></button>
       </div>
       <div id="playerLogin">
@@ -1855,6 +1873,12 @@ function sportLabel(sp){
   const k=sportKey(sp), row=SPORT_CATALOG.find(r=>r[0]===k);
   return row?row[1]:(sp||'').toString().trim();
 }
+/* A coach's marker in lists and pills. Was a hardcoded 🏀 everywhere, which mislabels every
+   coach who doesn't train basketball. */
+function coachIcon(id){
+  const c=(typeof id==='object'&&id)?id:coachById(id);
+  return c?sportIcon(c.sport):'🏅';
+}
 function sportIcon(sp){
   const k=sportKey(sp), row=SPORT_CATALOG.find(r=>r[0]===k);
   return row?row[2]:'🏅';
@@ -2034,7 +2058,7 @@ function approvalsCount(){
 function renderWhoami(){
   if(AUTH==='owner'){const n=approvalsCount();const appr=n?`<button class="btn sm" style="background:var(--yellow);color:#fff;font-weight:800;border:0" onclick="openApprovals()">⏳ ${n} to approve</button>`:'';
     $('#whoami').innerHTML=liveHtml()+appr+coachPicker()+'<button class="btn ghost sm" onclick="exportExcel()">⬇ Export</button><span class="pill orange">Owner</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';}
-  else if(AUTH==='coach'){const co=coachById(coachAs);$('#whoami').innerHTML=liveHtml()+'<span class="pill green">🏀 Coach '+(co?firstName(co.name):'')+'</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';}
+  else if(AUTH==='coach'){const co=coachById(coachAs);$('#whoami').innerHTML=liveHtml()+'<span class="pill green">'+coachIcon(co)+' Coach '+(co?firstName(co.name):'')+'</span><button class="btn ghost sm" onclick="signOut()">Sign out</button>';}
   else if(AUTH==='client'){const c=custById(clientAs);$('#whoami').innerHTML=liveHtml()+langToggleHtml()+'<span class="pill blue">'+(c?c.name:'Client')+'</span><button class="btn ghost sm" onclick="openChangePwd()">'+t('🔑 Change password')+'</button><button class="btn ghost sm" onclick="signOut()">'+t('Sign out')+'</button>';}
   else $('#whoami').innerHTML='';
 }
@@ -2512,8 +2536,10 @@ function renderLanding(){
     </section>
 
     <footer class="lp-foot">
-      © ${new Date().getFullYear()} RX Training · ${co.name||'Raymond Xu'} · Lexington, MA · ${t('Built with')} 🏀
-      <div style="margin-top:10px"><button class="lp-btn line mini" onclick="openAuth('coach')">${t('Coach sign in')}</button>
+      © ${new Date().getFullYear()} RX Training · Lexington, MA
+      <!-- No coach sign-in button here: coaches use the Coach tab inside the sign-in panel,
+           so the footer stays clean without locking anyone out. -->
+      <div style="margin-top:10px">
         <button class="lp-btn line mini" onclick="openAuth('owner')">🔑 Owner</button></div>
     </footer>
   </div>`;
@@ -2859,6 +2885,13 @@ const CHANGELOG=[
    'The advertised list is editable in <b>Admin → Home page — sports we advertise</b>, with a live preview showing which read "Now training" and which read "Coming soon".',
    'Sport names are now <b>spelling-forgiving</b>: "Running", "Track", "Track &amp; Field", "Cross Country" and "XC" are one sport everywhere — one tile in the client picker, one chip on the home page, one icon.',
    'The bouncing dot between RX and TRAINING now <b>cycles only the sports we actually coach</b>, in the order the home page lists them, instead of a fixed set of balls. With a single sport it holds still rather than flipping to itself.',
+   'Player and coach markers follow the sport: a Running coach shows \u{1F3C3}, a soccer coach \u{26BD}. The <b>Player</b> sign-in tab is now a person rather than a basketball, and a coach\'s profile header reads their own sport instead of "Basketball Training".',
+   'Session completion and group messages sent to clients sign off with their sport, not always \u{1F3C0}.',
+   '<b>Fix:</b> a coach saving their own profile was silently reset to Basketball. The Sport field is owner-only, so the save read an empty box and fell back to the default instead of keeping the coach\'s existing sport.',
+   'Home page feature cards: icon and title now share a row, with larger body copy.',
+   '<b>Fix:</b> the in-app theme still carried leftovers from the old dark orange skin. The coach profile header had near-white body text on a white panel (about 1.1:1 — effectively invisible), calendar chips used pastel ink meant for a black background, the volt green was used as text where it measured 1.7:1, and hovering a time slot turned its label white on white. Every colour pair in the app now measures at or above WCAG AA (4.5:1).',
+   'App buttons, tabs, pills and the events ticker now use the same palette as the public site — solid deep lime with white text, volt reserved for fills.',
+   'Home page footer trimmed to the copyright line; the coach sign-in shortcut is gone (coaches use the Coach tab in the sign-in panel).',
    '<b>Fix:</b> a coach set to "Running" showed the generic \u{1F3C5} medal in the client sport picker and left Track reading "coming soon" on the home page, because sports were compared as raw text.',
    '<b>Fix:</b> the six feature cards on the home page wrapped 4 + 2. They now lay out three per row (two on tablet, one on phone), with card titles sharing a baseline so the paragraphs line up.',
    '<b>Fix:</b> removed the oversized ghosted "RX" watermark behind the About heading.',
@@ -2955,9 +2988,9 @@ function renderAbout(){
   const photoBlock = co.photo?`<img src="${co.photo}" alt="${co.name}" style="width:96px;height:96px;object-fit:cover;border-radius:16px;margin-bottom:14px">`:'';
   $('#view-about').innerHTML = `
    <div class="hero">
-     <span class="badge">🏀 ${co.tagline||'Basketball Training'}</span>
+     <span class="badge">${sportIcon(co.sport)} ${co.tagline||((sportLabel(co.sport)||'Basketball')+' Training')}</span>
      ${photoBlock}
-     <h2>${co.name}<br>Basketball Training</h2>
+     <h2>${co.name}<br>${sportLabel(co.sport)||'Basketball'} Training</h2>
      <p>${co.bio||''}</p>
      <div class="row" style="margin-top:22px">
        <button class="btn" onclick="TAB='booking';switchTab()">📱 ${AUTH==='coach'?'My Bookings':'Book a Session'}</button>
@@ -3081,7 +3114,7 @@ function renderBookingTable(){
     return `<tr>
       <td><b>${fmtDT(s.date,s.time)}</b><div class="clienttag">${s.dur} min · ${s.location||''}</div></td>
       <td>${custNames(s.customerIds)}<div class="clienttag">${typePill(s)}</div></td>
-      ${showCoach?`<td>🏀 ${coachName(s.coachId)}</td>`:''}
+      ${showCoach?`<td>${coachIcon(s.coachId)} ${coachName(s.coachId)}</td>`:''}
       <td>${statusPill}</td>
       <td>${checkCell}</td>
       <td>${payCell}</td>
@@ -3253,7 +3286,7 @@ function clientCard(s){
   return `<div class="panel" style="margin-bottom:12px">
     <div class="row" style="justify-content:space-between;align-items:center">
       <div>
-        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} <span class="pill">🏀 ${coachName(s.coachId)}</span> ${my.paid?'<span class="pill green">'+(my.paidVia==='package'?t('Prepaid'):t('Paid'))+'</span>':'<span class="pill red">'+t('Unpaid')+'</span>'} ${s.status==='pending'?'<span class="pill yellow">'+t('Pending')+'</span>':s.status==='scheduled'?'<span class="pill blue">'+t('Booked')+'</span>':s.status==='completed'?'<span class="pill green">'+t('Completed')+'</span>':s.status==='cancelled'?cancelledByLabel(s):''}
+        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} <span class="pill">${coachIcon(s.coachId)} ${coachName(s.coachId)}</span> ${my.paid?'<span class="pill green">'+(my.paidVia==='package'?t('Prepaid'):t('Paid'))+'</span>':'<span class="pill red">'+t('Unpaid')+'</span>'} ${s.status==='pending'?'<span class="pill yellow">'+t('Pending')+'</span>':s.status==='scheduled'?'<span class="pill blue">'+t('Booked')+'</span>':s.status==='completed'?'<span class="pill green">'+t('Completed')+'</span>':s.status==='cancelled'?cancelledByLabel(s):''}
         <div class="clienttag" style="margin-top:4px">${s.dur} min · 📍 ${s.location||'TBD'}${others>0?' · with '+others+' other player'+(others>1?'s':''):''}</div>
       </div>
       <div class="actions">
@@ -3265,7 +3298,7 @@ function clientCard(s){
     </div>
     ${unfilledNoticeHtml(s)}
     ${(s.feedback||(s.media&&s.media.length))?`<div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
-      ${s.feedback?`<div class="small"><b style="color:var(--accent2)">📣 ${t('Coach feedback:')}</b> ${s.feedback}</div>`:''}
+      ${s.feedback?`<div class="small"><b style="color:var(--accent)">📣 ${t('Coach feedback:')}</b> ${s.feedback}</div>`:''}
       ${mediaThumbs(s)?`<div style="margin-top:4px">${mediaThumbs(s)}</div>`:''}
     </div>`:''}
   </div>`;
@@ -3294,7 +3327,7 @@ function renderBookingClient(){
   const upcoming=sortSessions(mine.filter(s=>s.date>=now && s.status==='scheduled'));
   const t1=totalFor(c,'1on1'),u1=usedFor(c,'1on1'),tG=totalFor(c,'group'),uG=usedFor(c,'group');
   const pkgHist=c.packages.length?c.packages.slice().reverse().map(p=>`<div class="clienttag">• ${p.qty}× ${p.type==='1on1'?'1:1':'Group'} package — ${money(p.amount)} · ${fmtDate(p.date)}</div>`).join(''):'<div class="clienttag">No packages yet.</div>';
-  const balLine=(lab,tot,used)=>tot>0?`<div class="small" style="margin-top:6px"><b>${lab}: ${used}/${tot} used</b> · <span style="color:var(--accent2)">${tot-used} left</span><div class="creditbar"><i style="width:${tot?used/tot*100:0}%"></i></div></div>`:'';
+  const balLine=(lab,tot,used)=>tot>0?`<div class="small" style="margin-top:6px"><b>${lab}: ${used}/${tot} used</b> · <span style="color:var(--accent)">${tot-used} left</span><div class="creditbar"><i style="width:${tot?used/tot*100:0}%"></i></div></div>`:'';
 
   $('#view-booking').innerHTML=`
     <h1 class="page">${t('Welcome,')} ${firstName(c.name)} 👋</h1>
@@ -3570,7 +3603,7 @@ function openGroupsHtml(){
     </div>`;
   }).join('');
   return `<div class="panel" style="margin-top:16px">
-    <h3>${t('Join a group')} — 🏀 ${coachName(cid)}</h3>
+    <h3>${t('Join a group')} — ${coachIcon(cid)} ${coachName(cid)}</h3>
     <div class="clienttag" style="margin-bottom:6px">${t('Groups with room for more players. You keep your own payment and credits — you only share the session.')}</div>
     ${rows}
     <p class="muted small" style="margin-top:10px">${t('Player names are private — you’ll only see how many spots are left.')}</p></div>`;
@@ -3655,7 +3688,7 @@ function alertUnfilledGroups(){
       msgs.push({id:uid(),peerType:'client',clientId:cid,coachId:'',sender:'owner',
         text:'Hi'+(c?' '+firstName(c.name):'')+'! Not enough players joined your group session on '+
              fmtDT(s.date,s.time)+'. You can keep the time as a standard '+SOLO_DUR+'-minute 1:1 at '+
-             money(solo)+', or cancel and pick another slot — open My Sessions to choose. 🏀',
+             money(solo)+', or cancel and pick another slot — open My Sessions to choose. '+coachIcon(s.coachId),
         media:[],created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false});
     });
     s.formAlerted=true;
@@ -3707,7 +3740,7 @@ function renderJourney(){
       <div class="jcard">
         <div class="row" style="justify-content:space-between;align-items:center;gap:8px">
           <div><b>${fmtDT(s.date,s.time)}</b> ${typePill(s)}
-            <span class="pill">🏀 ${coachName(s.coachId)}</span></div>
+            <span class="pill">${coachIcon(s.coachId)} ${coachName(s.coachId)}</span></div>
           <span class="clienttag">${s.dur} ${t('min')} · 📍 ${s.location||''}</span>
         </div>
         ${(s.feedback||'').trim()?`<div class="jfb"><b>📣 ${t('Coach feedback:')}</b> ${escapeHtml(s.feedback)}</div>`:''}
@@ -4091,8 +4124,8 @@ function requestPaymentZelle(s){
       if(p.paid||p.requested)return;
       const c=custById(cid);
       const text=zelle
-        ? 'Hi'+(c?' '+firstName(c.name):'')+'! Your group session on '+fmtDT(s.date,s.time)+' with '+coachName(s.coachId)+' is complete. Your share: '+share+'. Please Zelle payment to Raymond at '+zelle+'. Thanks! 🏀'
-        : 'Hi'+(c?' '+firstName(c.name):'')+'! Your group session on '+fmtDT(s.date,s.time)+' with '+coachName(s.coachId)+' is complete. Your share: '+share+'. Please arrange payment with Raymond — thanks! 🏀';
+        ? 'Hi'+(c?' '+firstName(c.name):'')+'! Your group session on '+fmtDT(s.date,s.time)+' with '+coachName(s.coachId)+' is complete. Your share: '+share+'. Please Zelle payment to Raymond at '+zelle+'. Thanks! '+coachIcon(s.coachId)
+        : 'Hi'+(c?' '+firstName(c.name):'')+'! Your group session on '+fmtDT(s.date,s.time)+' with '+coachName(s.coachId)+' is complete. Your share: '+share+'. Please arrange payment with Raymond — thanks! '+coachIcon(s.coachId);
       const m={id:uid(),peerType:'client',clientId:cid,coachId:'',sender:'owner',
         text,media:[],created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false};
       DB.messages.push(m); newMsgs.push(m);
@@ -4106,8 +4139,8 @@ function requestPaymentZelle(s){
   const c=custById(s.customerIds[0]);
   const label='1:1 session on '+fmtDT(s.date,s.time);
   const text=zelle
-    ? 'Hi'+(c?' '+firstName(c.name):'')+'! Your '+label+' with '+coachName(s.coachId)+' is complete. Amount due: '+money(s.price)+'. Please Zelle payment to Raymond at '+zelle+'. Thanks! 🏀'
-    : 'Hi'+(c?' '+firstName(c.name):'')+'! Your '+label+' with '+coachName(s.coachId)+' is complete. Amount due: '+money(s.price)+'. Please arrange payment with Raymond — thanks! 🏀';
+    ? 'Hi'+(c?' '+firstName(c.name):'')+'! Your '+label+' with '+coachName(s.coachId)+' is complete. Amount due: '+money(s.price)+'. Please Zelle payment to Raymond at '+zelle+'. Thanks! '+coachIcon(s.coachId)
+    : 'Hi'+(c?' '+firstName(c.name):'')+'! Your '+label+' with '+coachName(s.coachId)+' is complete. Amount due: '+money(s.price)+'. Please arrange payment with Raymond — thanks! '+coachIcon(s.coachId);
   const m={id:uid(),peerType:'client',clientId:s.customerIds[0]||'',coachId:'',sender:'owner',
     text,media:[],created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false};
   DB.messages.push(m);
@@ -4788,7 +4821,7 @@ function viewCustomer(id){
     <td class="right">${money(s.price/s.customerIds.length)}</td>
     <td class="right"><button class="iconbtn" onclick="openSession('${s.id}','${id}')">Edit</button></td></tr>`;}).join('')||'<tr><td colspan="6"><div class="empty">No sessions yet.</div></td></tr>';
   const pkgs=c.packages.length?c.packages.slice().reverse().map(p=>`<tr><td>${fmtDate(p.date)}</td><td>${p.qty}× ${p.type==='1on1'?'1:1':'Group'}</td><td class="right">${money(p.amount)}</td><td class="right"><button class="iconbtn" onclick="openPackage('${id}','${p.id}')">Edit</button></td></tr>`).join(''):'<tr><td colspan="4"><div class="empty">No packages.</div></td></tr>';
-  const credLine=(lab,t)=>totalFor(c,t)>0?`<div class="small" style="margin-top:4px">${lab}: <b>${usedFor(c,t)}/${totalFor(c,t)} used</b> · <span style="color:var(--accent2)">${creditsFor(c,t)} left</span></div>`:'';
+  const credLine=(lab,t)=>totalFor(c,t)>0?`<div class="small" style="margin-top:4px">${lab}: <b>${usedFor(c,t)}/${totalFor(c,t)} used</b> · <span style="color:var(--accent)">${creditsFor(c,t)} left</span></div>`:'';
   openModal(c.name,`
     <div class="row" style="margin-bottom:8px">
       <div class="field"><label class="f">Phone</label><div>${c.phone||'—'}</div></div>
@@ -5001,7 +5034,7 @@ function renderCoaches(){
 }
 function pendingSummary(c){
   const p=c.pending||{};const out=[];
-  const cmp=(lab,cur,nv)=>{if(nv!=null&&String(nv)!==String(cur==null?'':cur))out.push('<div style="margin-top:4px">• <b>'+lab+'</b>: <span class="muted">'+(cur==null||cur===''?'—':cur)+'</span> → <span style="color:var(--accent2)">'+nv+'</span></div>');};
+  const cmp=(lab,cur,nv)=>{if(nv!=null&&String(nv)!==String(cur==null?'':cur))out.push('<div style="margin-top:4px">• <b>'+lab+'</b>: <span class="muted">'+(cur==null||cur===''?'—':cur)+'</span> → <span style="color:var(--accent)">'+nv+'</span></div>');};
   cmp('Tagline',c.tagline,p.tagline);
   cmp('Affiliation',c.affiliation,p.affiliation);
   cmp('Affiliation detail',c.affiliationSub,p.affiliationSub);
@@ -5063,7 +5096,7 @@ function openApprovals(){
     }
     if(coaches.length){
       body+='<h3 style="margin:4px 0 8px">Profile & rate changes</h3>'+coaches.map(c=>`<div class="panel" style="background:var(--panel2);margin-bottom:10px">
-        <b>🏀 ${c.name}</b><div class="small" style="margin-top:4px">${pendingSummary(c)}</div>
+        <b>${coachIcon(c)} ${c.name}</b><div class="small" style="margin-top:4px">${pendingSummary(c)}</div>
         <div class="row" style="margin-top:10px"><button class="btn sm" onclick="doApproveCoach('${c.id}')">✓ Approve</button><button class="btn sm ghost" onclick="doRejectCoach('${c.id}')">Reject</button></div></div>`).join('');
     }
     if(avail.length){
@@ -5234,12 +5267,16 @@ function saveCoach(id){
   const dup=(DB.coaches||[]).find(x=>x.id!==id&&(x.name||'').trim().toLowerCase()===name.toLowerCase());
   if(dup)return flash('Another coach already uses that name',true);
   const fam=$('#coFamily')?$('#coFamily').checked:false;
-  const obj={name,sport:(($('#coSport')&&$('#coSport').value)||'Basketball').trim()||'Basketball',tagline:$('#coTag').value,bio:$('#coBio').value,affiliation:$('#coAff').value,affiliationSub:$('#coAffSub').value,photo:$('#coPhoto').value,pwd:($('#coPwd').value||'coach').trim(),active:$('#coActive').checked,phone:($('#coPhone')?$('#coPhone').value:''),carrier:($('#coCarrier')?$('#coCarrier').value:''),email:($('#coEmail')?$('#coEmail').value.trim():''),rate1on1:r1,rateGroup:rG,
+  const prevSport=(id&&coachById(id)&&coachById(id).sport)||'Basketball';
+  // Fall back to what the coach already is, never to Basketball — the Sport input is hidden
+  // when a coach edits their own profile, so a hard default would quietly reset their sport.
+  const rawSport=($('#coSport')?$('#coSport').value:'').trim()||prevSport;
+  const obj={name,sport:sportLabel(rawSport)||rawSport,tagline:$('#coTag').value,bio:$('#coBio').value,affiliation:$('#coAff').value,affiliationSub:$('#coAffSub').value,photo:$('#coPhoto').value,pwd:($('#coPwd').value||'coach').trim(),active:$('#coActive').checked,phone:($('#coPhone')?$('#coPhone').value:''),carrier:($('#coCarrier')?$('#coCarrier').value:''),email:($('#coEmail')?$('#coEmail').value.trim():''),rate1on1:r1,rateGroup:rG,
     family:fam,shareType:($('#coShareType')?$('#coShareType').value:'pct'),shareVal:(fam?0:(+($('#coShareVal')?$('#coShareVal').value:0)||0)),
     created:(($('#coCreated')&&$('#coCreated').value)||todayISO())};
   if(id){Object.assign(coachById(id),obj);}
   else{obj.id=uid();obj.pending=null;DB.coaches.push(obj);}
-  save();closeModal();flash('Coach saved 🏀');renderCoaches(); // save() re-derives gas/payout expenses under the new deal
+  save();closeModal();flash('Coach saved '+sportIcon(obj.sport));renderCoaches(); // save() re-derives gas/payout expenses under the new deal
 }
 function delCoach(id){
   const co=coachById(id);if(!co)return;
@@ -5286,7 +5323,7 @@ function renderActivity(){
   const kinds=[...new Set((DB.activity||[]).map(a=>a.action))].sort();
   const people=[...new Map((DB.activity||[]).filter(a=>a.actorId).map(a=>[a.actorId,a.actorName||a.actorId])).entries()]
     .sort((a,b)=>String(a[1]).localeCompare(String(b[1])));
-  const icon=a=>a.role==='client'?'👤':a.role==='coach'?'🏀':'🏢';
+  const icon=a=>a.role==='client'?'👤':a.role==='coach'?'🏅':'🏢';
   const body=shown.map(a=>`<tr>
       <td style="white-space:nowrap">${actAgo(a.ts)}<div class="clienttag">${a.ts?fmtChatTime(a.ts):''}</div></td>
       <td>${icon(a)} <b>${a.actorName||'—'}</b><div class="clienttag">${a.role||''}</div></td>
@@ -5436,7 +5473,7 @@ function renderAvailability(){
   const upcoming=rules.filter(a=>a.date>=now);
   const pending=upcoming.filter(a=>a.approved===false);
   const rows=upcoming.map(a=>`<tr>
-    <td><b>${fmtDate(a.date)}</b><div class="clienttag">${DOW[new Date(a.date+'T00:00').getDay()]}</div></td>${showCoach?`<td>🏀 ${coachName(a.coachId)}</td>`:''}<td>${fmtT(a.start)} – ${fmtT(a.end)}<div style="margin-top:6px;display:flex;flex-wrap:wrap">${slotChipsHtml(a)}</div></td><td>${a.slotMin} min</td><td>${a.location||'—'}</td>
+    <td><b>${fmtDate(a.date)}</b><div class="clienttag">${DOW[new Date(a.date+'T00:00').getDay()]}</div></td>${showCoach?`<td>${coachIcon(a.coachId)} ${coachName(a.coachId)}</td>`:''}<td>${fmtT(a.start)} – ${fmtT(a.end)}<div style="margin-top:6px;display:flex;flex-wrap:wrap">${slotChipsHtml(a)}</div></td><td>${a.slotMin} min</td><td>${a.location||'—'}</td>
     <td>${a.approved!==false?'<span class="pill green">Open</span>':'<span class="pill yellow">⏳ Pending</span>'}</td>
     <td class="right"><div class="actions">${(AUTH==='owner'&&a.approved===false)?`<button class="btn sm" onclick="approveAvailability('${a.id}')">Approve</button>`:''}<button class="iconbtn" onclick="delAvailability('${a.id}')">✕</button></div></td></tr>`).join('')
     ||`<tr><td colspan="${showCoach?7:6}"><div class="empty">No upcoming availability — add a date below.</div></td></tr>`;
@@ -5450,7 +5487,7 @@ function renderAvailability(){
   const pendingPanel=(AUTH==='owner'&&pending.length)?`<div class="panel" style="border-color:var(--yellow);margin-bottom:16px">
       <div class="row" style="justify-content:space-between;align-items:center"><h3 style="margin:0">⏳ Pending approval (${pending.length})</h3><button class="btn sm" onclick="approveAllAvailability()">Approve all</button></div>
       <div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Coach</th><th>Window</th><th>Slot</th><th>Location</th><th></th></tr></thead>
-      <tbody>${pending.map(a=>`<tr><td>${fmtDate(a.date)}</td><td>🏀 ${coachName(a.coachId)}</td><td>${fmtT(a.start)} – ${fmtT(a.end)}</td><td>${a.slotMin} min</td><td>${a.location||'—'}</td>
+      <tbody>${pending.map(a=>`<tr><td>${fmtDate(a.date)}</td><td>${coachIcon(a.coachId)} ${coachName(a.coachId)}</td><td>${fmtT(a.start)} – ${fmtT(a.end)}</td><td>${a.slotMin} min</td><td>${a.location||'—'}</td>
         <td class="right"><div class="actions"><button class="btn sm" onclick="approveAvailability('${a.id}')">Approve</button><button class="iconbtn" title="Reject" onclick="delAvailability('${a.id}')">✕</button></div></td></tr>`).join('')}</tbody></table></div>
     </div>`:'';
   $('#view-availability').innerHTML=`
@@ -5789,7 +5826,7 @@ function renderEventsOwner(){
     return `<tr>
       <td><b>${ev.title||'(untitled)'}</b>${ev.featured?' <span class="pill orange" title="Featured on the home page">⭐</span>':''}${ev.video?' <span class="pill blue" title="Has a video">🎬</span>':''}<div class="clienttag">${(ev.detail||'').slice(0,60)}${(ev.detail||'').length>60?'…':''}</div></td>
       <td>${eventWhen(ev)}<div class="clienttag">📍 ${ev.location||'TBD'}</div></td>
-      <td>${ev.coachId?('🏀 '+coachName(ev.coachId)):'<span class="muted">General</span>'}</td>
+      <td>${ev.coachId?(coachIcon(ev.coachId)+' '+coachName(ev.coachId)):'<span class="muted">General</span>'}</td>
       <td>${ev.price?money(ev.price):'Free'}</td>
       <td>${conf}${cap}<div class="clienttag">${pend?('⏳ '+pend+' pending · '):''}${paid} paid</div></td>
       <td class="right">${money(eventRevenue(ev))}</td>
@@ -5941,7 +5978,7 @@ function renderEventsClient(){
     return `<div class="panel" style="margin-bottom:12px">
       <div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px">
         <div style="flex:1;min-width:200px">
-          <b style="font-size:15px">${ev.title}</b> ${ev.coachId?`<span class="pill">🏀 ${coachName(ev.coachId)}</span>`:''} ${ev.price?`<span class="pill orange">${money(ev.price)}</span>`:'<span class="pill green">'+t('Free')+'</span>'}
+          <b style="font-size:15px">${ev.title}</b> ${ev.coachId?`<span class="pill">${coachIcon(ev.coachId)} ${coachName(ev.coachId)}</span>`:''} ${ev.price?`<span class="pill orange">${money(ev.price)}</span>`:'<span class="pill green">'+t('Free')+'</span>'}
           <div class="clienttag" style="margin-top:4px">📅 ${eventWhen(ev)} · 📍 ${ev.location||'TBD'}${ev.capacity?` · ${left} ${t('left')}`:''}</div>
           ${ev.detail?`<div class="small muted" style="margin-top:8px;line-height:1.6">${ev.detail}</div>`:''}
           ${videoHtml(ev.video,'340px')}
@@ -6107,7 +6144,7 @@ function clearThread(type,id){
 function chatThreadHtml(type,id){
   const msgs=threadMsgs(type,id);
   const list=msgs.length?msgs.map(m=>chatBubble(m,m.sender===AUTH)).join(''):'<div class="empty">No messages yet — say hello! 👋</div>';
-  const who=AUTH==='owner'?('Chat with '+(type==='coach'?'🏀 ':'')+peerName(type,id)):t('Messages');
+  const who=AUTH==='owner'?('Chat with '+(type==='coach'?coachIcon(id)+' ':'')+peerName(type,id)):t('Messages');
   const sub=AUTH==='owner'?'Messages sync live. Boston (ET).':t('Chat directly with the RX.TRAINING owner. Boston (ET).');
   return `<h1 class="page">${who}</h1><div class="sub">${sub}</div>
     ${(AUTH==='owner'&&msgs.length)?`<div style="margin-bottom:8px"><button class="btn ghost sm" onclick="clearThread('${type}','${id}')">🗑 Delete whole conversation</button></div>`:''}
@@ -6126,7 +6163,7 @@ function ownerInboxHtml(){
     if(!lastMap[k]||(m.created||'')>(lastMap[k].created||''))lastMap[k]=m;
     if(m.sender!=='owner'&&!m.readOwner)unreadMap[k]=(unreadMap[k]||0)+1;});
   const entries=[];
-  (DB.coaches||[]).forEach(co=>entries.push({type:'coach',id:co.id,name:'🏀 '+co.name}));
+  (DB.coaches||[]).forEach(co=>entries.push({type:'coach',id:co.id,name:coachIcon(co)+' '+co.name}));
   DB.customers.forEach(c=>entries.push({type:'client',id:c.id,name:c.name}));
   entries.forEach(e=>{e.key=e.type+':'+e.id;e.lm=lastMap[e.key];e.u=unreadMap[e.key]||0;});
   const withM=entries.filter(e=>e.lm).sort((a,b)=>(b.lm.created||'').localeCompare(a.lm.created||''));
@@ -6319,7 +6356,7 @@ function renderFinance(){
   const maxType=Math.max(byType['1on1'],byType['group'],1);
 
   const expRows=EX.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>`<tr>
-    <td>${fmtDate(e.date)}${(e.freq&&e.freq!=='once')?` <span class="pill blue">↻ ${FREQ_LABEL[e.freq]}</span>`:''}</td><td>${e.coachId==='owner'?'🏢':'🏀'} ${coachName(e.coachId)}</td><td>${e.cat}${isAutoExpense(e)?' <span class="pill blue">auto</span>':''}</td><td class="muted">${e.note||''}</td>
+    <td>${fmtDate(e.date)}${(e.freq&&e.freq!=='once')?` <span class="pill blue">↻ ${FREQ_LABEL[e.freq]}</span>`:''}</td><td>${e.coachId==='owner'?'🏢':coachIcon(e.coachId)} ${coachName(e.coachId)}</td><td>${e.cat}${isAutoExpense(e)?' <span class="pill blue">auto</span>':''}</td><td class="muted">${e.note||''}</td>
     <td class="right">${money(e.amount)}${(e.freq&&e.freq!=='once')?`<div class="clienttag">/${e.freq==='monthly'?'mo':'yr'}</div>`:''}</td>
     <td class="right">${isAutoExpense(e)
       ? '<span class="clienttag" title="Calculated from the session — change the session, the venue mileage, or the coach\'s deal to update it">from session</span>'
@@ -6340,13 +6377,13 @@ function renderFinance(){
           const p=custPay(s,cid); if(p.paid)return;
           const c=custById(cid);
           out.push({date:s.date,html:`<tr>
-            <td>${fmtDate(s.date)}</td><td>🏀 ${coachName(s.coachId)}</td><td>${c?c.name:'—'}<div class="clienttag">Group w/ ${custNames(s.customerIds.filter(x=>x!==cid))}</div></td>
+            <td>${fmtDate(s.date)}</td><td>${coachIcon(s.coachId)} ${coachName(s.coachId)}</td><td>${c?c.name:'—'}<div class="clienttag">Group w/ ${custNames(s.customerIds.filter(x=>x!==cid))}</div></td>
             <td>Group</td><td class="right">${money(s.price/s.customerIds.length)}</td>
             <td class="right"><div class="actions">${c&&creditsFor(c,s.type)>0?`<button class="btn sm ghost" onclick="setGroupPay('${s.id}','${cid}',true,'package')">Credit</button>`:''}<button class="btn sm" onclick="setGroupPay('${s.id}','${cid}',true,'cash')">Cash</button></div></td></tr>`});
         });
       } else if(!s.paid){
         out.push({date:s.date,html:`<tr>
-          <td>${fmtDate(s.date)}</td><td>🏀 ${coachName(s.coachId)}</td><td>${custNames(s.customerIds)}</td>
+          <td>${fmtDate(s.date)}</td><td>${coachIcon(s.coachId)} ${coachName(s.coachId)}</td><td>${custNames(s.customerIds)}</td>
           <td>${s.type==='1on1'?'1:1':'Group'}</td><td class="right">${money(s.price)}</td>
           <td class="right"><div class="actions">${sessionHasCredit(s)?`<button class="btn sm ghost" onclick="payCredit('${s.id}')">Credit</button>`:''}<button class="btn sm" onclick="payCash('${s.id}')">Cash</button></div></td></tr>`});
       }
@@ -6356,14 +6393,14 @@ function renderFinance(){
   })();
 
   const manualRows=CE.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>{const cn=e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in';return `<tr>
-    <td>${fmtDate(e.date)}</td><td>🏀 ${coachName(e.coachId)}</td><td>${cn}</td><td class="muted">${e.qty||1}× ${e.type==='group'?'Group':'1:1'} (cash)${e.note?' · '+e.note:''}</td><td class="right">${money(e.amount)}</td>
+    <td>${fmtDate(e.date)}</td><td>${coachIcon(e.coachId)} ${coachName(e.coachId)}</td><td>${cn}</td><td class="muted">${e.qty||1}× ${e.type==='group'?'Group':'1:1'} (cash)${e.note?' · '+e.note:''}</td><td class="right">${money(e.amount)}</td>
     <td class="right"><div class="actions"><button class="iconbtn" onclick="openCashEntry('${e.id}')">Edit</button><button class="iconbtn" onclick="delCashEntry('${e.id}')">✕</button></div></td></tr>`}).join('');
   const cashSessRows=cashSess.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(s=>`<tr>
-    <td>${fmtDate(s.date)}</td><td>🏀 ${coachName(s.coachId)}</td><td>${custNames(s.customerIds)}</td><td class="muted">${s.type==='1on1'?'1:1':'Group'} session${s.type==='group'&&!sessionFullyPaid(s)?' · partial':''}</td><td class="right">${money(sessionCashAmt(s))}</td>
+    <td>${fmtDate(s.date)}</td><td>${coachIcon(s.coachId)} ${coachName(s.coachId)}</td><td>${custNames(s.customerIds)}</td><td class="muted">${s.type==='1on1'?'1:1':'Group'} session${s.type==='group'&&!sessionFullyPaid(s)?' · partial':''}</td><td class="right">${money(sessionCashAmt(s))}</td>
     <td class="right"><button class="iconbtn" onclick="${s.type==='group'&&s.customerIds.length>1?`openGroupPay('${s.id}')`:`openSession('${s.id}')`}">Edit</button></td></tr>`).join('');
   const cashRows=(manualRows+cashSessRows)||'<tr><td colspan="6"><div class="empty">No cash income yet.</div></td></tr>';
 
-  const pkgRows=allPkgs.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>`<tr><td>${fmtDate(p.date)}</td><td>🏀 ${coachName(p.coachId)}</td><td>${p.cust}</td><td class="muted">${p.qty}× ${p.type==='1on1'?'1:1':'Group'}</td><td class="right">${money(p.amount)}</td>
+  const pkgRows=allPkgs.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>`<tr><td>${fmtDate(p.date)}</td><td>${coachIcon(p.coachId)} ${coachName(p.coachId)}</td><td>${p.cust}</td><td class="muted">${p.qty}× ${p.type==='1on1'?'1:1':'Group'}</td><td class="right">${money(p.amount)}</td>
     <td class="right"><button class="iconbtn" onclick="openPackage('${p.custId}','${p.id}')">Edit</button></td></tr>`).join('')||'<tr><td colspan="6"><div class="empty">No packages sold.</div></td></tr>';
 
   // per-coach comparison (only in the "All coaches" view)
