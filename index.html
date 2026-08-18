@@ -696,6 +696,8 @@ const DB_KEY = 'rxtraining_v2';
 /* ---------- i18n: English / 中文 (client-facing) ---------- */
 let LANG='en'; try{LANG=localStorage.getItem('rx_lang')||'en';}catch(e){}
 const ZH={
+  'Coming up':'即将开始',
+  'FEATURED':'精选活动',
   'Read more':'展开全文',
   'Show less':'收起',
   'Back to app':'返回应用',
@@ -834,6 +836,8 @@ const ZH={
   'Session cancelled':'课程已取消','Registration cancelled':'报名已取消'
 };
 const KO={
+  'Coming up':'다가오는 일정',
+  'FEATURED':'추천 이벤트',
   'Read more':'더 보기',
   'Show less':'접기',
   'Back to app':'앱으로 돌아가기',
@@ -964,6 +968,8 @@ const KO={
   'Session cancelled':'수업이 취소되었습니다','Registration cancelled':'등록이 취소되었습니다'
 };
 const JA={
+  'Coming up':'近日開催',
+  'FEATURED':'注目イベント',
   'Read more':'続きを読む',
   'Show less':'閉じる',
   'Back to app':'アプリに戻る',
@@ -1097,6 +1103,8 @@ const JA={
    language has no entry — fine when the key IS the English text, but these blocks use short
    codes, so without this dictionary English visitors saw 'ABOUT_P1' on the page. */
 const EN={
+  'Coming up':'Coming up',
+  'FEATURED':'FEATURED',
   'Read more':'Read more',
   'Show less':'Show less',
   'Back to app':'Back to app',
@@ -1316,7 +1324,7 @@ function normalize(d){
   d.skillLog.forEach(e=>{if(!Array.isArray(e.media))e.media=[];if(e.byId===undefined)e.byId='';if(e.editedBy===undefined)e.editedBy='';});
   (d.customers||[]).forEach(c=>{if(c.lastLogin===undefined)c.lastLogin='';if(c.loginCount===undefined)c.loginCount=0;});
   (d.coaches||[]).forEach(c=>{if(c.lastLogin===undefined)c.lastLogin='';if(c.loginCount===undefined)c.loginCount=0;});
-  d.events.forEach(e=>{if(e.active===undefined)e.active=true;if(e.price==null)e.price=0;if(e.capacity==null)e.capacity=0;if(!e.created)e.created=todayISO();if(e.coachId===undefined)e.coachId='';if(!e.detail)e.detail=e.detail||'';if(e.video===undefined)e.video='';});
+  d.events.forEach(e=>{if(e.active===undefined)e.active=true;if(e.price==null)e.price=0;if(e.capacity==null)e.capacity=0;if(!e.created)e.created=todayISO();if(e.coachId===undefined)e.coachId='';if(!e.detail)e.detail=e.detail||'';if(e.video===undefined)e.video='';if(e.featured===undefined)e.featured=false;});
   d.eventRegs.forEach(r=>{if(!r.status)r.status='registered';if(r.paid===undefined)r.paid=false;if(r.paidVia===undefined)r.paidVia='';if(r.checkedIn===undefined)r.checkedIn=false;});
   return d;
 }
@@ -1337,7 +1345,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
   d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:Number(s.price),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||'',paymentRequested:!!s.payment_requested,pay:(s.pay&&typeof s.pay==='object')?s.pay:{},joinReq:Array.isArray(s.join_req)?s.join_req:[],formAlerted:!!s.form_alerted}));
   d.expenses=(exp||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||'',freq:e.freq||'once'}));
   d.cashEntries=(cash||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,amount:Number(e.amount),note:e.note||'',customerId:e.customer_id||'',type:e.type||'1on1',qty:e.qty||1}));
-  d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||'',video:e.video||''}));
+  d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||'',video:e.video||'',featured:e.featured===true}));
   d.eventRegs=(regs||[]).map(r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||''}));
   d.messages=(msgs||[]).map(m=>({id:m.id,peerType:m.peer_type||'client',clientId:m.client_id||'',coachId:m.coach_id||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',readOwner:m.read_owner===true,readClient:m.read_client===true,readCoach:m.read_coach===true}));
   d.highlights=(hl||[]).map(h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',active:h.active!==false,type:h.type||'',ord:(h.ord!=null?h.ord:null)}));
@@ -1377,7 +1385,7 @@ function loginCountOf(c){
 const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,approved:c.approved!==false,suspended:c.suspended===true,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',last_login:lastLoginOf(c)||null,login_count:loginCountOf(c)});
 const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,payment_requested:!!s.paymentRequested,pay:s.pay||{},join_req:s.joinReq||[],form_alerted:!!s.formAlerted});
 const expRow=e=>({id:e.id,coach_id:e.coachId||null,date:e.date,cat:e.cat,amount:e.amount,note:e.note||'',freq:e.freq||'once'});
-const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:e.coachId||null,price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||'',video:e.video||''});
+const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:e.coachId||null,price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||'',video:e.video||'',featured:e.featured===true});
 const eventRegRow=r=>({id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||''});
 const messageRow=m=>({id:m.id,peer_type:m.peerType||'client',client_id:m.clientId||'',coach_id:m.coachId||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',read_owner:m.readOwner===true,read_client:m.readClient===true,read_coach:m.readCoach===true});
 async function migrateSource(){
@@ -1431,7 +1439,7 @@ function dataSig(d){return JSON.stringify({
   a:(d.availability||[]).map(x=>[x.id,x.coachId,x.date,x.start,x.end,x.location]),
   co:(d.coaches||[]).map(x=>[x.id,x.name,x.active,x.tagline,x.bio,x.affiliation,x.rate1on1,x.rateGroup,x.pending]),
   e:(d.expenses||[]).length, k:(d.cashEntries||[]).length,
-  ev:(d.events||[]).map(x=>[x.id,x.title,x.date,x.time,x.price,x.capacity,x.active,x.location]),
+  ev:(d.events||[]).map(x=>[x.id,x.title,x.date,x.time,x.price,x.capacity,x.active,x.location,x.featured]),
   er:(d.eventRegs||[]).map(x=>[x.id,x.eventId,x.customerId,x.status,x.paid,x.checkedIn]),
   msg:(d.messages||[]).map(x=>[x.id,x.readOwner,x.readClient,x.readCoach]),
   // activity must be in the signature or a new log row reads as "no change" and the poll
@@ -2148,6 +2156,31 @@ function lpMoreBio(id,btn){
   const open=el.classList.toggle('open');
   btn.innerHTML=(open?t('Show less')+' ▴':t('Read more')+' ▾');
 }
+/* Events the owner has starred for the home page. Falls back to the next upcoming event when
+   nothing is starred, so the section never silently empties after an event passes — but an
+   explicit pick always wins. */
+function lpFeaturedEvents(){
+  const up=(DB.events||[]).filter(e=>e.active!==false&&eventUpcoming(e));
+  const starred=up.filter(e=>e.featured);
+  const list=starred.length?starred:up.slice(0,1);
+  return list.sort((a,b)=>eventSortKey(a).localeCompare(eventSortKey(b)));
+}
+function lpFeaturedHtml(){
+  const list=lpFeaturedEvents();
+  if(!list.length)return '';
+  return `<section class="lp-sec" id="lpEvent">
+    <div class="lp-kicker">${t('Coming up')}</div>
+    <h2 class="lp-h2">${t('FEATURED')}</h2>
+    ${list.map(ev=>`<div class="lp-event reveal">
+      <div class="lp-ico">🌟</div>
+      <h3>${ev.title}</h3>
+      ${ev.detail?`<p>${(ev.detail||'').slice(0,300)}${(ev.detail||'').length>300?'…':''}</p>`:''}
+      <p style="font-weight:800">📅 ${eventWhen(ev)}${ev.location?' · 📍 '+ev.location:''}${ev.price?' · '+money(ev.price):' · '+t('Free')}${ev.capacity?' · '+eventSpotsLeft(ev)+' '+t('left'):''}</p>
+      ${ev.video?`<div style="margin:12px 0">${videoHtml(ev.video,'100%')}</div>`:''}
+      <button class="lp-btn solid" onclick="openAuth('book')">${t('Reserve your spot →')}</button>
+    </div>`).join('')}
+  </section>`;
+}
 function lpCoachCards(){
   const list=activeCoaches();
   if(!list.length)return '<div class="lp-card">'+t('NO_COACHES')+'</div>';
@@ -2231,6 +2264,7 @@ function renderLanding(){
     <span class="lp-links">
       <a href="#" onclick="lpGo('lpAbout');return false">${t('About')}</a>
       <a href="#" onclick="lpGo('lpFilm');return false">${t('Highlights')}</a>
+      <a href="#" onclick="lpGo('lpEvent');return false">${t('Coming up')}</a>
       <a href="#" onclick="lpGo('lpSessions');return false">${t('Sessions')}</a>
       <a href="#" onclick="lpGo('lpCoaches');return false">${t('Meet the coaches')}</a>
       <a href="#" onclick="lpGo('lpSports');return false">${t('Sports')}</a>
@@ -2248,6 +2282,7 @@ function renderLanding(){
   <div class="lp-jump">
     <button onclick="lpGo('lpAbout')">${t('About')}</button>
     <button onclick="lpGo('lpFilm')">${t('Highlights')}</button>
+    <button onclick="lpGo('lpEvent')">${t('Coming up')}</button>
     <button onclick="lpGo('lpSessions')">${t('Sessions')}</button>
     <button onclick="lpGo('lpCoaches')">${t('Meet the coaches')}</button>
     <button onclick="lpGo('lpSports')">${t('Sports')}</button>
@@ -2294,6 +2329,8 @@ function renderLanding(){
       ${lpHighlightsHtml()}
     </section>
 
+    ${lpFeaturedHtml()}
+
     <section class="lp-sec" id="lpSessions">
       <div class="lp-kicker">${t('What we offer')}</div>
       <h2 class="lp-h2">${t('SESSIONS')}</h2>
@@ -2314,13 +2351,6 @@ function renderLanding(){
         </div>
       </div>
       <p class="lp-p" style="margin-top:18px">📍 ${t('AVAIL_LINE')}</p>
-      ${ev?`<div class="lp-event">
-        <div class="lp-ico">🌟</div>
-        <h3>${ev.title}</h3>
-        <p>${(ev.detail||'').slice(0,240)}${(ev.detail||'').length>240?'…':''}</p>
-        <p style="font-weight:800">📅 ${eventWhen(ev)}${ev.location?' · 📍 '+ev.location:''}${ev.price?' · '+money(ev.price):' · Free'}</p>
-        <button class="lp-btn solid" onclick="openAuth('book')">${t('Reserve your spot →')}</button>
-      </div>`:''}
     </section>
 
     <section class="lp-sec" id="lpCoaches">
@@ -5600,7 +5630,7 @@ function renderEventsOwner(){
     const cap=ev.capacity?('/'+ev.capacity):'';
     const st=ev.active===false?'<span class="pill">Draft</span>':(!ev.date?'<span class="pill yellow">⏳ Date TBC</span>':(eventPast(ev)?'<span class="pill">Past</span>':'<span class="pill green">Published</span>'));
     return `<tr>
-      <td><b>${ev.title||'(untitled)'}</b>${ev.video?' <span class="pill blue" title="Has a video">🎬</span>':''}<div class="clienttag">${(ev.detail||'').slice(0,60)}${(ev.detail||'').length>60?'…':''}</div></td>
+      <td><b>${ev.title||'(untitled)'}</b>${ev.featured?' <span class="pill orange" title="Featured on the home page">⭐</span>':''}${ev.video?' <span class="pill blue" title="Has a video">🎬</span>':''}<div class="clienttag">${(ev.detail||'').slice(0,60)}${(ev.detail||'').length>60?'…':''}</div></td>
       <td>${eventWhen(ev)}<div class="clienttag">📍 ${ev.location||'TBD'}</div></td>
       <td>${ev.coachId?('🏀 '+coachName(ev.coachId)):'<span class="muted">General</span>'}</td>
       <td>${ev.price?money(ev.price):'Free'}</td>
@@ -5652,6 +5682,8 @@ function openEvent(id){
         ${t('Also show this video as the Highlights reel on the home page')}</label>
       <div class="clienttag">Replaces whatever is currently on the public page. Unticking restores the previous default.</div></div>
     <label class="f" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="evActive" ${ev.active!==false?'checked':''} style="width:auto"> Published (visible to clients)</label>
+    <label class="f" style="display:flex;align-items:center;gap:8px;margin-top:6px"><input type="checkbox" id="evFeatured" ${ev.featured?'checked':''} style="width:auto"> ⭐ Feature on the public home page</label>
+    <div class="clienttag" style="margin:-2px 0 8px">Featured events get their own banner on rxtraining.org, between Highlights and Sessions — as well as appearing in the scrolling events bar.</div>
     <p class="muted small" style="margin-top:8px">Uncheck Published to keep it a draft. Use 📣 in the list to email all clients once it's ready.</p>
   `,`
     ${id?`<button class="btn danger" onclick="delEvent('${id}')">Delete</button>`:''}
@@ -5686,7 +5718,7 @@ function saveEvent(id){
   const title=($('#evTitle').value||'').trim();if(!title)return flash('Title is required',true);
   const video=safeUrl($('#evVideo')?$('#evVideo').value:'');
   if(video&&!videoEmbed(video))return flash('That video link doesn\'t look like a URL — it should start with https://',true);
-  const obj={title,detail:$('#evDetail').value,date:$('#evDate').value,time:$('#evTime').value,location:$('#evLoc').value,coachId:$('#evCoach').value||'',price:Math.max(0,+$('#evPrice').value||0),capacity:Math.max(0,Math.round(+$('#evCap').value||0)),active:$('#evActive').checked,video};
+  const obj={title,detail:$('#evDetail').value,date:$('#evDate').value,time:$('#evTime').value,location:$('#evLoc').value,coachId:$('#evCoach').value||'',price:Math.max(0,+$('#evPrice').value||0),capacity:Math.max(0,Math.round(+$('#evCap').value||0)),active:$('#evActive').checked,featured:!!($('#evFeatured')&&$('#evFeatured').checked),video};
   if(id){Object.assign(eventById(id),obj);}
   else{obj.id=uid();obj.created=todayISO();DB.events.push(obj);}
   // an event's video can double as the public Highlights reel
