@@ -402,7 +402,9 @@
      element itself made it grow past its own box on the squash frames, so it collided with the
      R and the T on either side. The reserved gap also stops the letters shifting as it bounces. */
   .lp-dot{font-style:normal;display:inline-block;position:relative;
-    width:.92em;height:1em;margin:0 .18em;vertical-align:baseline;overflow:visible}
+    /* wider box + bigger side margins so the ball has clear air either side of RX / TRAINING —
+       the glyph itself is centred in this box, so both together set the visual gap */
+    width:1.06em;height:1em;margin:0 .34em;vertical-align:baseline;overflow:visible}
   .lp-dot::after{content:attr(data-ball);position:absolute;left:50%;bottom:.02em;
     transform-origin:50% 100%;font-size:.80em;line-height:1;
     animation:lpBounce 1.1s cubic-bezier(.3,.8,.4,1) infinite}
@@ -560,8 +562,15 @@
     .logo{font-size:18px}
     nav.tabs{order:3;flex-basis:100%;margin-left:0;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
     nav.tabs button{padding:8px 10px;font-size:13px}
-    .rolewrap{margin-left:auto;flex-wrap:wrap;justify-content:flex-end;gap:6px}
-    .coachsel{max-width:140px}
+    /* The owner header carries six controls (live pill, approvals, coach picker, Export, role
+       pill, Sign out). Sharing row 1 with the logo left no room and pushed Sign out off-screen,
+       so give the whole group its own full-width row that can wrap freely. */
+    .rolewrap{order:2;flex-basis:100%;width:100%;margin-left:0;
+      flex-wrap:wrap;justify-content:flex-start;gap:6px}
+    .rolewrap .btn{padding:7px 11px;font-size:12.5px}
+    .coachsel{max-width:150px;flex:0 1 auto;min-width:0}
+    /* sign out is the one control that must never be the thing that gets cut */
+    .rolewrap .btn:last-child{margin-left:auto}
   }
   @media(max-width:600px){
     .wrap{padding:0 12px 70px}
