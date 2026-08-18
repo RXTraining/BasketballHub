@@ -829,9 +829,12 @@ const ZH={
   'Sports':'项目',
   'Highlights':'精彩集锦',
   'Book':'预约',
-  'COMPETITION LEVEL':'竞技水平',
   'SESSIONS COACHED':'已完成课程',
-  'PLAYER-LED':'球员主导',
+  'SPORT':'个运动项目',
+  'SPORTS':'个运动项目',
+  'ATHLETE TRAINED':'名学员',
+  'ATHLETES TRAINED':'名学员',
+  'SKILLS TRACKED':'项技能追踪',
   'COACH':'教练',
   'COACHES':'教练',
   'Who we are':'关于我们',
@@ -966,9 +969,12 @@ const KO={
   'Sports':'종목',
   'Highlights':'하이라이트',
   'Book':'예약',
-  'COMPETITION LEVEL':'경쟁 수준',
   'SESSIONS COACHED':'진행한 세션',
-  'PLAYER-LED':'선수 주도',
+  'SPORT':'개 종목',
+  'SPORTS':'개 종목',
+  'ATHLETE TRAINED':'명 훈련',
+  'ATHLETES TRAINED':'명 훈련',
+  'SKILLS TRACKED':'개 기술 관리',
   'COACH':'코치',
   'COACHES':'코치',
   'Who we are':'우리는',
@@ -1098,9 +1104,12 @@ const JA={
   'Sports':'競技',
   'Highlights':'ハイライト',
   'Book':'予約',
-  'COMPETITION LEVEL':'競技レベル',
   'SESSIONS COACHED':'実施セッション',
-  'PLAYER-LED':'選手主導',
+  'SPORT':'競技',
+  'SPORTS':'競技',
+  'ATHLETE TRAINED':'名を指導',
+  'ATHLETES TRAINED':'名を指導',
+  'SKILLS TRACKED':'スキル記録',
   'COACH':'コーチ',
   'COACHES':'コーチ',
   'Who we are':'私たちについて',
@@ -2415,6 +2424,20 @@ function renderLanding(){
   const ev=(DB.events||[]).filter(e=>e.active!==false&&eventUpcoming(e))
             .sort((a,b)=>eventSortKey(a).localeCompare(eventSortKey(b)))[0];
   const done=DB.sessions.filter(s=>s.status==='completed').length;
+  /* Header stats. "AAU" and "100% PLAYER-LED" were fixed claims that never moved and read as
+     basketball-only; these four all grow on their own as the business does, and a tile with a
+     zero simply drops out rather than advertising an empty number. */
+  const nSport=bookableSports().length;
+  const nAthlete=new Set(DB.sessions.filter(s=>s.status==='completed')
+                    .reduce((a,s)=>a.concat(s.customerIds||[]),[])).size;
+  const nSkill=(DB.skills||[]).filter(k=>k.active!==false).length;
+  const statTiles=[
+    [nSport,   nSport===1?t('SPORT'):t('SPORTS')],
+    [done||0,  t('SESSIONS COACHED')],
+    [nAthlete, nAthlete===1?t('ATHLETE TRAINED'):t('ATHLETES TRAINED')],
+    [nCoach,   nCoach===1?t('COACH'):t('COACHES')],
+    [nSkill,   t('SKILLS TRACKED')]
+  ].filter(x=>x[0]>0).slice(0,4);
   // Caption for the Highlights section. Prefer the saved caption, but fall back to the title of
   // whichever event supplied the video — so a highlight set before captions existed (or set by
   // someone who left the caption blank) still shows the event name instead of the stock line.
@@ -2461,10 +2484,7 @@ function renderLanding(){
         <button class="lp-btn line lp-big" onclick="lpGo('lpCoaches')">${t('Meet the coaches')}</button>
       </div>
       <div class="lp-stats">
-        <div class="lp-stat reveal"><b>AAU</b><span>${t('COMPETITION LEVEL')}</span></div>
-        <div class="lp-stat reveal"><b>${done||'100+'}</b><span>${t('SESSIONS COACHED')}</span></div>
-        <div class="lp-stat reveal"><b>${nCoach}</b><span>${nCoach>1?t('COACHES'):t('COACH')}</span></div>
-        <div class="lp-stat reveal"><b>100%</b><span>${t('PLAYER-LED')}</span></div>
+        ${statTiles.map(([v,l])=>`<div class="lp-stat reveal"><b>${v}</b><span>${l}</span></div>`).join('')}
       </div>
     </header>
 
@@ -2892,6 +2912,8 @@ const CHANGELOG=[
    '<b>Fix:</b> the in-app theme still carried leftovers from the old dark orange skin. The coach profile header had near-white body text on a white panel (about 1.1:1 — effectively invisible), calendar chips used pastel ink meant for a black background, the volt green was used as text where it measured 1.7:1, and hovering a time slot turned its label white on white. Every colour pair in the app now measures at or above WCAG AA (4.5:1).',
    'App buttons, tabs, pills and the events ticker now use the same palette as the public site — solid deep lime with white text, volt reserved for fills.',
    'Home page footer trimmed to the copyright line; the coach sign-in shortcut is gone (coaches use the Coach tab in the sign-in panel).',
+   'Home page stats replaced. <b>AAU</b> and <b>100% Player-Led</b> were fixed claims that never moved and read as basketball-only; the header now shows <b>sports coached, sessions coached, athletes trained</b> and <b>coaches</b> — all live numbers that grow on their own. A tile showing zero drops out instead of advertising an empty figure, and a fifth (<b>skills tracked</b>) fills any gap.',
+   'The coach profile page swapped its fixed "100% Player-Led" tile for that coach\'s own completed session count.',
    '<b>Fix:</b> a coach set to "Running" showed the generic \u{1F3C5} medal in the client sport picker and left Track reading "coming soon" on the home page, because sports were compared as raw text.',
    '<b>Fix:</b> the six feature cards on the home page wrapped 4 + 2. They now lay out three per row (two on tablet, one on phone), with card titles sharing a baseline so the paragraphs line up.',
    '<b>Fix:</b> removed the oversized ghosted "RX" watermark behind the About heading.',
@@ -2984,6 +3006,8 @@ function renderAbout(){
   if(AUTH==='owner')return renderChangelog();
   const co=coachById(scopeCoach())||(DB.coaches||[])[0]||{name:'Coach',tagline:'',bio:'',affiliation:'',affiliationSub:''};
   const upcoming = DB.sessions.filter(s=>s.coachId===co.id&&s.status==='scheduled').length;
+  // replaces the fixed "100% Player-Led" tile — a real number that grows with the coach
+  const coachDone = DB.sessions.filter(s=>s.coachId===co.id&&s.status==='completed').length;
   const editBtn = AUTH==='coach'?`<button class="btn ghost" onclick="openCoach('${co.id}')">✎ Edit my profile</button>`:'';
   const photoBlock = co.photo?`<img src="${co.photo}" alt="${co.name}" style="width:96px;height:96px;object-fit:cover;border-radius:16px;margin-bottom:14px">`:'';
   $('#view-about').innerHTML = `
@@ -3004,7 +3028,7 @@ function renderAbout(){
    <div class="stats">
      <div class="stat"><div class="k">Affiliation</div><div class="v">${co.affiliation||'—'}</div><div class="d muted">${co.affiliationSub||''}</div></div>
      <div class="stat"><div class="k">Session Types</div><div class="v">2</div><div class="d muted">1:1 & Group</div></div>
-     <div class="stat"><div class="k">Player-Led Training</div><div class="v">100%</div><div class="d muted">Built around you</div></div>
+     <div class="stat"><div class="k">Sessions Coached</div><div class="v">${coachDone}</div><div class="d muted">Completed to date</div></div>
      <div class="stat"><div class="k">Upcoming Sessions</div><div class="v">${upcoming}</div><div class="d muted">On the schedule</div></div>
    </div>
 
