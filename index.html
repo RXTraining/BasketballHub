@@ -1259,6 +1259,12 @@ function normalize(d){
   // caption under the Highlights heading — kept separately so it survives the source event
   // being deleted or edited later
   if(d.settings.highlightTitle===undefined)d.settings.highlightTitle='';
+  // owner-written 'About' copy for the home page. Blank = use the built-in, translated text.
+  if(d.settings.aboutText===undefined)d.settings.aboutText='';
+  // feature cards: one per line, "icon | title | text". Quote + attribution likewise.
+  if(d.settings.aboutCards===undefined)d.settings.aboutCards='';
+  if(d.settings.quoteText===undefined)d.settings.quoteText='';
+  if(d.settings.quoteBy===undefined)d.settings.quoteBy='';
   if(!d.settings.homeAddress)d.settings.homeAddress='1 Granger Pond Way';
   if(d.settings.mileageRate===undefined||d.settings.mileageRate===null||d.settings.mileageRate==='')d.settings.mileageRate=0.70;
   if(!d.cashEntries)d.cashEntries=[];
@@ -1336,7 +1342,7 @@ function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.
 /* ----- relational mapping (separate tables in Supabase) ----- */
 function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl,hl){
   const d={};
-  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',activityPush:(st&&st.activity_push)||'important',activitySeenAt:(st&&st.activity_seen_at)||'',sports:(st&&st.sports)||'Basketball, Soccer, Tennis, Golf, Track',highlightVideo:(st&&st.highlight_video)||'',highlightTitle:(st&&st.highlight_title)||'',groupMinPlayers:(st&&st.group_min_players)||2,groupFormHours:(st&&st.group_form_hours)||48,homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
+  d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',activityPush:(st&&st.activity_push)||'important',activitySeenAt:(st&&st.activity_seen_at)||'',sports:(st&&st.sports)||'Basketball, Soccer, Tennis, Golf, Track',highlightVideo:(st&&st.highlight_video)||'',highlightTitle:(st&&st.highlight_title)||'',aboutText:(st&&st.about_text)||'',aboutCards:(st&&st.about_cards)||'',quoteText:(st&&st.quote_text)||'',quoteBy:(st&&st.quote_by)||'',groupMinPlayers:(st&&st.group_min_players)||2,groupFormHours:(st&&st.group_form_hours)||48,homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
   d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',
     sport:(c.sport||'Basketball'),family:(c.family==null?undefined:c.family===true),shareType:(c.share_type||'pct'),shareVal:(c.share_val!=null?Number(c.share_val):0),
     rate1on1:(c.rate_1on1!=null?Number(c.rate_1on1):undefined),rateGroup:(c.rate_group!=null?Number(c.rate_group):undefined),
@@ -1637,7 +1643,7 @@ async function cloudPush(){
     // added yet) can't block everything else — the critical stuff still saves.
     const fails=[];
     const push=async(name,fn)=>{try{await fn();}catch(e){fails.push(name);console.warn('sync failed:',name,e&&e.message);}};
-    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null,zelle_phone:DB.settings.zellePhone||null,activity_push:DB.settings.activityPush||'important',activity_seen_at:DB.settings.activitySeenAt||null,sports:DB.settings.sports||null,highlight_video:DB.settings.highlightVideo||null,highlight_title:DB.settings.highlightTitle||null,group_min_players:DB.settings.groupMinPlayers||2,group_form_hours:DB.settings.groupFormHours||48,home_address:DB.settings.homeAddress||null,mileage_rate:DB.settings.mileageRate!=null?DB.settings.mileageRate:null});if(error)throw error;});
+    await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null,zelle_phone:DB.settings.zellePhone||null,activity_push:DB.settings.activityPush||'important',activity_seen_at:DB.settings.activitySeenAt||null,sports:DB.settings.sports||null,highlight_video:DB.settings.highlightVideo||null,highlight_title:DB.settings.highlightTitle||null,about_text:DB.settings.aboutText||null,about_cards:DB.settings.aboutCards||null,quote_text:DB.settings.quoteText||null,quote_by:DB.settings.quoteBy||null,group_min_players:DB.settings.groupMinPlayers||2,group_form_hours:DB.settings.groupFormHours||48,home_address:DB.settings.homeAddress||null,mileage_rate:DB.settings.mileageRate!=null?DB.settings.mileageRate:null});if(error)throw error;});
     await push('coaches',()=>syncTable('coaches',(DB.coaches||[]).map(coachRow)));
     await push('locations',()=>syncTable('locations',DB.locations.map(l=>({id:l.id,name:l.name,address:l.address||'',miles:l.miles||0}))));
     await push('customers',()=>syncTable('customers',DB.customers.map(custRow)));
@@ -2184,6 +2190,44 @@ function lpFeaturedHtml(){
     </div>`).join('')}
   </section>`;
 }
+/* About copy. If the owner has written their own, use it verbatim (blank line = new paragraph);
+   otherwise fall back to the built-in text, which IS translated. Custom copy is shown as written
+   in every language — there's nowhere to put four versions of a free-text field, and silently
+   translating someone's own words would be worse. */
+/* Feature cards. Custom format is one card per line: "icon | title | body". Anything the owner
+   writes is shown as typed in every language, same trade-off as the About copy. */
+function aboutCardsHtml(){
+  const custom=(DB.settings.aboutCards||'').trim();
+  if(custom){
+    return custom.split(/\n/).map(l=>l.trim()).filter(Boolean).map(line=>{
+      const p=line.split('|').map(x=>x.trim());
+      const ico=p.length>2?p[0]:'🏀', title=p.length>2?p[1]:p[0], body=p.length>2?p.slice(2).join(' | '):(p[1]||'');
+      return `<div class="lp-card"><div class="lp-ico">${ico}</div><h4>${title}</h4><p>${body}</p></div>`;
+    }).join('');
+  }
+  return `<div class="lp-card"><div class="lp-ico">⚡</div><h4>${t('Active AAU competitor')}</h4><p>${t('CARD_AAU')}</p></div>
+        <div class="lp-card"><div class="lp-ico">🎮</div><h4>${t('Live situation training')}</h4><p>${t('CARD_LIVE')}</p></div>
+        <div class="lp-card"><div class="lp-ico">🧠</div><h4>${t('Game IQ first')}</h4><p>${t('CARD_IQ')}</p></div>
+        <div class="lp-card"><div class="lp-ico">🔥</div><h4>${t('Never give up')}</h4><p>${t('CARD_GRIT')}</p></div>`;
+}
+function aboutQuoteHtml(co){
+  const q=(DB.settings.quoteText||'').trim();
+  const by=(DB.settings.quoteBy||'').trim();
+  return `<div class="lp-quote">
+        <p>${q||t('QUOTE')}</p>
+        <cite>— ${by||((co.name||'Raymond Xu')+', '+t('Founder')+' · Middlesex Magic (AAU)')}</cite>
+      </div>`;
+}
+function aboutParas(co){
+  const custom=(DB.settings.aboutText||'').trim();
+  if(custom){
+    return custom.split(/\n\s*\n/).map((para,i)=>
+      `<p class="lp-p"${i?' style="margin-top:12px"':''}>${para.trim().replace(/\n/g,'<br>')}</p>`).join('');
+  }
+  return `<p class="lp-p">${tf('ABOUT_P1',{name:co.name||'Raymond Xu'})}</p>
+      <p class="lp-p" style="margin-top:12px">${t('ABOUT_P2')}</p>
+      <p class="lp-p" style="margin-top:12px">${t('ABOUT_P3')}</p>`;
+}
 function lpCoachCards(){
   const list=activeCoaches();
   if(!list.length)return '<div class="lp-card">'+t('NO_COACHES')+'</div>';
@@ -2311,19 +2355,9 @@ function renderLanding(){
     <section class="lp-sec" id="lpAbout">
       <div class="lp-kicker">${t('Who we are')}</div>
       <h2 class="lp-h2">${t('THE RX APPROACH')}</h2>
-      <p class="lp-p">${tf('ABOUT_P1',{name:co.name||'Raymond Xu'})}</p>
-      <p class="lp-p" style="margin-top:12px">${t('ABOUT_P2')}</p>
-      <p class="lp-p" style="margin-top:12px">${t('ABOUT_P3')}</p>
-      <div class="lp-grid">
-        <div class="lp-card"><div class="lp-ico">⚡</div><h4>${t('Active AAU competitor')}</h4><p>${t('CARD_AAU')}</p></div>
-        <div class="lp-card"><div class="lp-ico">🎮</div><h4>${t('Live situation training')}</h4><p>${t('CARD_LIVE')}</p></div>
-        <div class="lp-card"><div class="lp-ico">🧠</div><h4>${t('Game IQ first')}</h4><p>${t('CARD_IQ')}</p></div>
-        <div class="lp-card"><div class="lp-ico">🔥</div><h4>${t('Never give up')}</h4><p>${t('CARD_GRIT')}</p></div>
-      </div>
-      <div class="lp-quote">
-        <p>${t('QUOTE')}</p>
-        <cite>— ${co.name||'Raymond Xu'}, ${t('Founder')} · Middlesex Magic (AAU)</cite>
-      </div>
+${aboutParas(co)}
+      <div class="lp-grid">${aboutCardsHtml()}</div>
+      ${aboutQuoteHtml(co)}
     </section>
 
     <section class="lp-sec" id="lpFilm">
@@ -6381,6 +6415,36 @@ function renderAdmin(){
       <button class="btn sm" onclick="saveGroupForming()">Save group settings</button>
     </div>
     <div class="panel" style="margin-top:16px">
+      <h3>Home page — “The RX approach” text</h3>
+      <div class="clienttag" style="margin-bottom:8px">The About section on rxtraining.org. Leave blank to use the built-in wording (which is translated into 中文 / 한국어 / 日本語). Anything you write here is shown exactly as typed, in every language.<br>Separate paragraphs with a <b style="color:var(--txt)">blank line</b>. Basic HTML like &lt;b&gt;bold&lt;/b&gt; works.</div>
+      <div class="field"><textarea id="aboutTxt" rows="10" placeholder="Leave blank to use the default wording…">${(DB.settings.aboutText||'').replace(/</g,'&lt;')}</textarea></div>
+      <div class="row" style="gap:8px">
+        <button class="btn sm" onclick="saveAboutText()">Save About text</button>
+        <button class="btn ghost sm" onclick="loadDefaultAbout()">Load the default wording</button>
+        <button class="btn ghost sm" onclick="clearAboutText()">Restore default</button>
+      </div>
+
+      <h3 style="margin-top:22px">Home page — feature cards</h3>
+      <div class="clienttag" style="margin-bottom:8px">The four cards under the About text. <b style="color:var(--txt)">One card per line</b>, written as <b style="color:var(--txt)">icon | title | text</b>. Add or remove lines to change how many cards appear. Blank = built-in (translated) cards.</div>
+      <div class="field"><textarea id="aboutCards" rows="6" placeholder="⚡ | Active AAU competitor | Our coaches still compete…">${(DB.settings.aboutCards||'').replace(/</g,'&lt;')}</textarea></div>
+      <div class="row" style="gap:8px">
+        <button class="btn sm" onclick="saveAboutCards()">Save cards</button>
+        <button class="btn ghost sm" onclick="loadDefaultCards()">Load the default cards</button>
+        <button class="btn ghost sm" onclick="clearAboutCards()">Restore default</button>
+      </div>
+
+      <h3 style="margin-top:22px">Home page — quote</h3>
+      <div class="clienttag" style="margin-bottom:8px">The dark quote panel. Wrap words in <b style="color:var(--txt)">&lt;em&gt;…&lt;/em&gt;</b> to highlight them in green. Blank = built-in (translated) quote.</div>
+      <div class="field"><textarea id="quoteTxt" rows="4" placeholder="We're not only teaching kids basketball…">${(DB.settings.quoteText||'').replace(/</g,'&lt;')}</textarea></div>
+      <div class="field"><label class="f">Attribution</label>
+        <input id="quoteBy" value="${(DB.settings.quoteBy||'').replace(/"/g,'&quot;')}" placeholder="Raymond Xu, Founder · Middlesex Magic (AAU)"></div>
+      <div class="row" style="gap:8px">
+        <button class="btn sm" onclick="saveQuote()">Save quote</button>
+        <button class="btn ghost sm" onclick="loadDefaultQuote()">Load the default quote</button>
+        <button class="btn ghost sm" onclick="clearQuote()">Restore default</button>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:16px">
       <h3>Skills</h3>
       <div class="clienttag" style="margin-bottom:10px">The syllabus clients see on their <b style="color:var(--txt)">My Skills</b> page. Skills are per sport — add a sport's list once and every client training that sport gets it.</div>
       <button class="btn sm" onclick="openSkillAdmin()">Manage skills</button>
@@ -6675,6 +6739,59 @@ function delSkill(id){
   if(!confirm('Remove "'+k.name+'" from the skills list?'+(used?('\n\n'+used+' recorded progress entr'+(used===1?'y':'ies')+' will be kept but hidden.'):'')))return;
   k.active=false;                       // soft delete: client history stays intact
   save(); flash('Skill removed'); openSkillAdmin(k.sport);
+}
+function saveAboutText(){
+  DB.settings.aboutText=($('#aboutTxt').value||'').trim();
+  save();
+  flash(DB.settings.aboutText?'About text saved':'Using the built-in wording again');
+  renderAdmin();
+}
+/* Drops the shipped English copy into the box so the owner edits from it rather than starting
+   with an empty field and losing the original wording. */
+function loadDefaultAbout(){
+  const co=(activeCoaches()[0])||{};
+  const def=[tf('ABOUT_P1',{name:co.name||'Raymond Xu'}),t('ABOUT_P2'),t('ABOUT_P3')]
+    .join('\n\n').replace(/<\/?b>/g,'');
+  const el=$('#aboutTxt'); if(el){el.value=def;el.focus();}
+  flash('Default wording loaded — edit it, then press Save');
+}
+function clearAboutText(){
+  if(!confirm('Restore the built-in About wording? Your custom text will be discarded.'))return;
+  DB.settings.aboutText='';
+  save(); flash('Restored the built-in wording'); renderAdmin();
+}
+function saveAboutCards(){
+  DB.settings.aboutCards=($('#aboutCards').value||'').trim();
+  save(); flash(DB.settings.aboutCards?'Cards saved':'Using the built-in cards again'); renderAdmin();
+}
+function loadDefaultCards(){
+  const def=[['⚡',t('Active AAU competitor'),t('CARD_AAU')],
+             ['🎮',t('Live situation training'),t('CARD_LIVE')],
+             ['🧠',t('Game IQ first'),t('CARD_IQ')],
+             ['🔥',t('Never give up'),t('CARD_GRIT')]]
+    .map(r=>r.join(' | ')).join('\n');
+  const el=$('#aboutCards'); if(el){el.value=def;el.focus();}
+  flash('Default cards loaded — edit them, then press Save');
+}
+function clearAboutCards(){
+  if(!confirm('Restore the built-in feature cards? Your custom cards will be discarded.'))return;
+  DB.settings.aboutCards=''; save(); flash('Restored the built-in cards'); renderAdmin();
+}
+function saveQuote(){
+  DB.settings.quoteText=($('#quoteTxt').value||'').trim();
+  DB.settings.quoteBy=($('#quoteBy').value||'').trim();
+  save(); flash(DB.settings.quoteText?'Quote saved':'Using the built-in quote again'); renderAdmin();
+}
+function loadDefaultQuote(){
+  const co=(activeCoaches()[0])||{};
+  const q=$('#quoteTxt'); if(q){q.value=t('QUOTE');q.focus();}
+  const b=$('#quoteBy'); if(b)b.value=(co.name||'Raymond Xu')+', '+t('Founder')+' · Middlesex Magic (AAU)';
+  flash('Default quote loaded — edit it, then press Save');
+}
+function clearQuote(){
+  if(!confirm('Restore the built-in quote?'))return;
+  DB.settings.quoteText=''; DB.settings.quoteBy='';
+  save(); flash('Restored the built-in quote'); renderAdmin();
 }
 function saveGroupForming(){
   DB.settings.groupMinPlayers=Math.max(2,Math.min(MAX_GROUP,+$('#grpMin').value||2));
