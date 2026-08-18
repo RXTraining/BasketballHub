@@ -450,6 +450,48 @@
     .reveal,.reveal.in{opacity:1!important;transform:none!important;animation:none!important}
     .lp-dot::after{animation:none;transform:translate(-50%,0)}
   }
+  /* ---- About: styled to hold the eye -----------------------------------------
+     Everything here is CSS on the wrapper, so it applies to whatever copy the owner writes in
+     Admin — not just the shipped text. Bold any phrase and it picks up the highlighter sweep.
+     Decorative layers are aria-hidden and pointer-events:none, so they never get in the way of
+     reading or a screen reader. */
+  .lp-about{position:relative;overflow:hidden}
+  .lp-ghost{position:absolute;right:-.05em;top:-.14em;z-index:0;pointer-events:none;user-select:none;
+    font-size:clamp(110px,19vw,230px);font-weight:900;line-height:.78;letter-spacing:-.04em;
+    color:transparent;-webkit-text-stroke:2px var(--lp-line);opacity:.75}
+  .lp-about>*{position:relative;z-index:1}
+  .lp-h2-mark{position:relative;display:inline-block;padding-bottom:12px}
+  .lp-h2-mark::after{content:"";position:absolute;left:0;bottom:0;width:78px;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--lp-volt-d),var(--lp-volt))}
+  /* the opening line carries the weight, with a drop cap to pull the eye in */
+  .lp-lead>p:first-child{font-size:19px;line-height:1.62;color:var(--lp-ink);max-width:760px}
+  .lp-lead>p:first-child::first-letter{float:left;font-size:3.4em;line-height:.78;font-weight:900;
+    margin:.04em .1em -.04em 0;color:var(--lp-volt-d)}
+  .lp-lead>p+p{font-size:16px;max-width:760px}
+  /* bolded phrases get a marker sweep rather than plain bold — works on custom copy too */
+  .lp-lead b{font-weight:800;color:var(--lp-ink);border-radius:2px;padding:0 3px;
+    background:linear-gradient(180deg,transparent 58%,rgba(200,255,46,.8) 58%)}
+  /* feature cards: tinted icon chip, gradient edge on hover, lift */
+  .lp-card{position:relative;overflow:hidden;
+    transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
+  .lp-card::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;opacity:0;
+    background:linear-gradient(90deg,var(--lp-volt-d),var(--lp-volt));transition:opacity .22s}
+  .lp-card:hover{transform:translateY(-5px);border-color:var(--lp-volt-d);
+    box-shadow:0 14px 32px rgba(20,40,10,.10)}
+  .lp-card:hover::before{opacity:1}
+  .lp-card .lp-ico{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;
+    justify-content:center;background:linear-gradient(135deg,var(--lp-volt),#e8ff9e);font-size:23px}
+  /* quote panel: oversized mark + accent edge */
+  .lp-quote{position:relative;overflow:hidden;border-left:6px solid var(--lp-volt)}
+  .lp-quote::before{content:"\201C";position:absolute;right:16px;top:-30px;font-size:180px;line-height:1;
+    font-weight:900;color:rgba(200,255,46,.14);pointer-events:none;user-select:none}
+  @media(max-width:640px){
+    .lp-ghost{font-size:92px;opacity:.5}
+    .lp-lead>p:first-child{font-size:17px}
+    .lp-lead>p:first-child::first-letter{font-size:2.9em}
+    .lp-quote::before{font-size:120px;top:-20px}
+  }
+  @media(prefers-reduced-motion:reduce){.lp-card{transition:none}.lp-card:hover{transform:none}}
   /* ---- coach roster ---- */
   .lp-coaches{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:16px;margin-top:26px}
   .lp-coach{background:#fff;border:1px solid var(--lp-line);border-radius:18px;padding:20px;
@@ -705,11 +747,11 @@ const ZH={
   'Show less':'收起',
   'Back to app':'返回应用',
   'HIGHLIGHTS':'精彩集锦',
-  'ABOUT_P3':'每一堂课都建立在<b>对篮球的热爱</b>之上：投入、拼搏，以及<b>永不放弃</b>的信念。',
+  'ABOUT_P3':'我们在打造一个<b>循环</b>：今天我们培养的孩子，就是明天带下一批孩子的导师。',
   /* --- landing page prose --- */
   'HERO_LEDE':'由 <b>{name}</b> 创办 —— 一名现役 AAU 球员，而非早已退役的教练。每一堂课都建立在<b>对篮球的热爱</b>之上：投入、拼搏，以及<b>永不放弃</b>的信念。',
-  'ABOUT_P1':'RX.TRAINING 由 <b>{name}</b> 创办。他是列克星敦高中的学生运动员，效力于马萨诸塞州最具竞争力的 AAU 球队之一 <b>Middlesex Magic</b>。理念很简单：球员向仍在场上竞技的人学习，进步最快。',
-  'ABOUT_P2':'如今这一标准适用于团队中的每一位教练。我们的训练绝非千篇一律 —— 每堂课都包含<b>实战情境</b>：真实的判断、真实的决策、真实的压力，而不只是机械练习。我们培养的是关键时刻能打出来的运动员。',
+  'ABOUT_P1':'RX Training 是一个<b>青少年体育社群</b> —— 由优秀的学生运动员来指导下一代。',
+  'ABOUT_P2':'我们的导师<b>年龄相近</b>，孩子们真心想成为他们那样的人；同时<b>水平过硬</b>，能教出真本事。',
   'CARD_AAU':'我们的教练仍效力于 Middlesex Magic —— 美国东北部高水平竞技篮球。',
   'CARD_LIVE':'每堂课都置身真实比赛场景 —— 有防守人、有比赛时间、需要做出决策。',
   'CARD_IQ':'理解比赛与技术训练同样重要。我们教球员在场上观察与思考。',
@@ -845,11 +887,11 @@ const KO={
   'Show less':'접기',
   'Back to app':'앱으로 돌아가기',
   'HIGHLIGHTS':'하이라이트',
-  'ABOUT_P3':'모든 세션은 <b>경기에 대한 사랑</b> 위에 세워집니다: 헌신, 노력, 그리고 <b>절대 포기하지 않는</b> 믿음.',
+  'ABOUT_P3':'우리는 <b>순환하는 구조</b>를 만들고 있습니다. 오늘 우리가 가르친 아이가 내일 다음 그룹을 가르치는 멘토가 됩니다.',
   /* --- landing page prose --- */
   'HERO_LEDE':'<b>{name}</b>이(가) 설립했습니다 — 오래전 은퇴한 코치가 아니라 현역 AAU 선수입니다. 모든 세션은 <b>경기에 대한 사랑</b> 위에 세워집니다: 헌신, 노력, 그리고 <b>절대 포기하지 않는</b> 믿음.',
-  'ABOUT_P1':'RX.TRAINING은 렉싱턴 고등학교 학생 선수이자 매사추세츠에서 가장 경쟁이 치열한 AAU 프로그램 중 하나인 <b>Middlesex Magic</b>에서 뛰는 <b>{name}</b>이(가) 설립했습니다. 발상은 단순합니다 — 선수는 지금도 코트에서 경쟁하는 사람에게 가장 빠르게 배웁니다.',
-  'ABOUT_P2':'이 기준은 이제 모든 코치에게 적용됩니다. 이곳의 훈련은 획일적이지 않습니다 — 모든 세션에 <b>실전 상황</b>이 포함됩니다: 실제 판단, 실제 결정, 실제 압박. 단순 반복 훈련이 아닙니다. 중요한 순간에 해내는 선수를 만듭니다.',
+  'ABOUT_P1':'RX Training은 뛰어난 학생 선수들이 다음 세대를 가르치는 <b>유소년 스포츠 커뮤니티</b>입니다.',
+  'ABOUT_P2':'우리 멘토들은 <b>나이가 가깝기에</b> 아이들이 닮고 싶어 하고, 동시에 <b>실력이 충분해</b> 진짜 기술을 가르칩니다.',
   'CARD_AAU':'우리 코치진은 지금도 Middlesex Magic에서 뜁니다 — 미 북동부의 높은 수준의 경쟁 농구.',
   'CARD_LIVE':'모든 세션이 실제 경기 상황입니다 — 수비수가 붙고, 시계가 돌아가고, 결정을 내려야 합니다.',
   'CARD_IQ':'경기를 이해하는 것은 훈련만큼 중요합니다. 코트에서 읽고 생각하는 법을 가르칩니다.',
@@ -977,11 +1019,11 @@ const JA={
   'Show less':'閉じる',
   'Back to app':'アプリに戻る',
   'HIGHLIGHTS':'ハイライト',
-  'ABOUT_P3':'すべてのセッションは<b>競技への愛</b>の上に成り立っています：献身、努力、そして<b>決して諦めない</b>という信念。',
+  'ABOUT_P3':'私たちは<b>循環する仕組み</b>をつくっています。今日教えた子どもが、明日は次のグループを教えるメンターになります。',
   /* --- landing page prose --- */
   'HERO_LEDE':'<b>{name}</b> が創設 —— 何年も前に引退したコーチではなく、現役の AAU 選手です。すべてのセッションは<b>競技への愛</b>の上に成り立っています：献身、努力、そして<b>決して諦めない</b>という信念。',
-  'ABOUT_P1':'RX.TRAINING は、レキシントン高校の学生アスリートで、マサチューセッツ州で最も競争の激しい AAU プログラムのひとつ <b>Middlesex Magic</b> でプレーする <b>{name}</b> が創設しました。考え方はシンプルです —— 選手は 今もコートで戦っている人から最も速く学びます。',
-  'ABOUT_P2':'その基準は今、すべてのコーチに共有されています。ここでのトレーニングは型どおりではありません —— すべてのセッションに<b>実戦状況</b>が含まれます：本物の判断、本物の決断、本物のプレッシャー。単なるドリルではありません。ここぞという場面で力を出せる選手を育てます。',
+  'ABOUT_P1':'RX Training は、優れた学生アスリートが次の世代を指導する<b>ユーススポーツ・コミュニティ</b>です。',
+  'ABOUT_P2':'メンターは<b>年齢が近い</b>から子どもたちが憧れ、しかも<b>実力があるから</b>本物の技術を教えられます。',
   'CARD_AAU':'コーチ陣は今も Middlesex Magic でプレー —— 米国北東部のハイレベルな競技バスケットボール。',
   'CARD_LIVE':'すべてのセッションが実戦形式です —— ディフェンダーがつき、時計が動き、判断を迫られます。',
   'CARD_IQ':'競技を理解することはドリルと同じくらい重要です。コート上で読み、考える力を教えます。',
@@ -1112,10 +1154,10 @@ const EN={
   'Show less':'Show less',
   'Back to app':'Back to app',
   'HIGHLIGHTS':'HIGHLIGHTS',
-  'ABOUT_P3':'Every session is built on the <b>love of the game</b>: the dedication, the grind, and the belief that <b>you never give up</b>.',
+  'ABOUT_P3':'We\'re building something that <b>loops</b>: the kids we train today become the mentors who train the next group.',
   'HERO_LEDE':'Founded by <b>{name}</b> — an active AAU competitor, not a coach who stopped playing years ago. Every session is built on the <b>love of the game</b>: the dedication, the grind, and the belief that <b>you never give up</b>.',
-  'ABOUT_P1':'RX.TRAINING was founded by <b>{name}</b>, a student-athlete at Lexington High School playing for <b>Middlesex Magic</b> — one of the most competitive AAU programs in Massachusetts. The idea was simple: players learn fastest from people still in the gym competing.',
-  'ABOUT_P2':'That standard now runs across every coach on the roster. Training here isn\'t cookie-cutter — every session includes <b>live game situations</b>: real reads, real decisions, real pressure. Not just drills. We build athletes who perform when it counts.',
+  'ABOUT_P1':'RX Training is a <b>youth sports community</b> where outstanding student-athletes coach the next generation.',
+  'ABOUT_P2':'Our mentors are <b>close enough in age</b> that kids actually want to be like them — and <b>good enough</b> to teach real skills.',
   'CARD_AAU':'Our coaches still compete for Middlesex Magic — high-level basketball in the Northeast.',
   'CARD_LIVE':'Every session puts you in real game scenarios — defender on you, clock running, a decision to make.',
   'CARD_IQ':'Understanding the game matters as much as the drills. We teach players to read and think on the court.',
@@ -2352,10 +2394,11 @@ function renderLanding(){
       </div>
     </header>
 
-    <section class="lp-sec" id="lpAbout">
+    <section class="lp-sec lp-about" id="lpAbout">
+      <span class="lp-ghost" aria-hidden="true">RX</span>
       <div class="lp-kicker">${t('Who we are')}</div>
-      <h2 class="lp-h2">${t('THE RX APPROACH')}</h2>
-${aboutParas(co)}
+      <h2 class="lp-h2 lp-h2-mark">${t('THE RX APPROACH')}</h2>
+      <div class="lp-lead">${aboutParas(co)}</div>
       <div class="lp-grid">${aboutCardsHtml()}</div>
       ${aboutQuoteHtml(co)}
     </section>
