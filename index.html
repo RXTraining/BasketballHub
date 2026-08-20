@@ -383,18 +383,22 @@
   .lp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:26px;align-items:stretch}
   /* Icon and title share one row, so a two-line title no longer opens a gap under the icon and
      every card's body copy starts at the same height without a min-height fudge. */
-  .lp-grid .lp-card{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto 1fr;
+  .lp-grid .lp-card{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto 1fr auto;
     column-gap:13px;row-gap:9px;align-items:start}
   /* icon and title centre against each other in row 1; the paragraph stays top-aligned so a
      short card's copy sits under its title instead of floating in the middle of the card */
   .lp-grid .lp-card .lp-ico{grid-column:1;grid-row:1;align-self:center}
   .lp-grid .lp-card h4{grid-column:2;grid-row:1;margin:0;align-self:center}
   .lp-grid .lp-card p{grid-column:1/-1;grid-row:2}
+  .lp-grid .lp-card .lp-card-more{grid-column:1/-1;grid-row:3;text-align:left}
+  .lp-card-txt{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+  .lp-card-txt.open{-webkit-line-clamp:unset;display:block;overflow:visible}
   @media(max-width:900px){.lp-grid{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:560px){.lp-grid{grid-template-columns:1fr}
     /* narrow phones: the title needs the full width, so it drops under the icon again */
     .lp-grid .lp-card{grid-template-columns:1fr;row-gap:7px}
-    .lp-grid .lp-card .lp-ico,.lp-grid .lp-card h4,.lp-grid .lp-card p{grid-column:1;grid-row:auto}}
+    .lp-grid .lp-card .lp-ico,.lp-grid .lp-card h4,.lp-grid .lp-card p,
+    .lp-grid .lp-card .lp-card-more{grid-column:1;grid-row:auto}}
   .lp-card{background:var(--lp-soft);border:1px solid var(--lp-line);border-radius:16px;padding:20px}
   .lp-card h4{margin:8px 0 6px;font-size:16.5px;font-weight:800;line-height:1.3}
   .lp-card p{margin:0;font-size:15px;line-height:1.62;color:var(--lp-mut)}
@@ -830,6 +834,16 @@ const ZH={
   'Highlights':'精彩集锦',
   'Book':'预约',
   'SESSIONS COACHED':'已完成课程',
+  'What\'s coming up':'近期活动',
+  'Maybe later':'以后再说',
+  'EVPROMPT_INTRO':'这些活动你还没有报名。可以现在报名，或稍后在“活动”页面查看。',
+  '/hr':'/小时',
+  '/player':'/人',
+  'Group':'团课',
+  'Previous':'上一个',
+  'Next':'下一个',
+  'Language':'语言',
+  'Owner':'管理员',
   'SPORT':'个运动项目',
   'SPORTS':'个运动项目',
   'ATHLETE TRAINED':'名学员',
@@ -970,6 +984,16 @@ const KO={
   'Highlights':'하이라이트',
   'Book':'예약',
   'SESSIONS COACHED':'진행한 세션',
+  'What\'s coming up':'다가오는 이벤트',
+  'Maybe later':'나중에',
+  'EVPROMPT_INTRO':'아직 등록하지 않은 이벤트입니다. 지금 등록하거나 나중에 이벤트 탭에서 확인하세요.',
+  '/hr':'/시간',
+  '/player':'/인',
+  'Group':'그룹',
+  'Previous':'이전',
+  'Next':'다음',
+  'Language':'언어',
+  'Owner':'운영자',
   'SPORT':'개 종목',
   'SPORTS':'개 종목',
   'ATHLETE TRAINED':'명 훈련',
@@ -1105,6 +1129,16 @@ const JA={
   'Highlights':'ハイライト',
   'Book':'予約',
   'SESSIONS COACHED':'実施セッション',
+  'What\'s coming up':'今後のイベント',
+  'Maybe later':'あとで',
+  'EVPROMPT_INTRO':'まだ申し込んでいないイベントです。今すぐ申し込むか、後で「イベント」タブから確認できます。',
+  '/hr':'/時間',
+  '/player':'/名',
+  'Group':'グループ',
+  'Previous':'前へ',
+  'Next':'次へ',
+  'Language':'言語',
+  'Owner':'オーナー',
   'SPORT':'競技',
   'SPORTS':'競技',
   'ATHLETE TRAINED':'名を指導',
@@ -1178,6 +1212,9 @@ const JA={
    language has no entry — fine when the key IS the English text, but these blocks use short
    codes, so without this dictionary English visitors saw 'ABOUT_P1' on the page. */
 const EN={
+  'What\'s coming up':'What\'s coming up',
+  'Maybe later':'Maybe later',
+  'EVPROMPT_INTRO':'You haven\'t signed up for these yet. Register now, or find them later on the Events tab.',
   'Coming up':'Coming up',
   'FEATURED':'FEATURED',
   'Read more':'Read more',
@@ -1224,7 +1261,22 @@ function t(s){const d=LANGDICT[LANG];return (d&&d[s])?d[s]:s;}
 /* t() plus {token} substitution — lets each language put the coach name or group size where its
    own grammar needs it, instead of forcing English word order by splitting the sentence. */
 function tf(k,v){let out=t(k);for(const n in (v||{}))out=out.split('{'+n+'}').join(v[n]);return out;}
-function setLang(l){LANG=l;try{localStorage.setItem('rx_lang',l);}catch(e){}try{if(!AUTH&&$('#login')&&$('#login').classList.contains('show')){const su=$('#signupPanel');if(su&&!su.classList.contains('hidden')){applyLoginLang();renderSignup();}else showLogin();}else{renderWhoami();renderTabs();refreshOwner();}}catch(e){}}
+function setLang(l){
+  LANG=l;
+  try{localStorage.setItem('rx_lang',l);}catch(e){}
+  try{
+    if(!AUTH && $('#login') && $('#login').classList.contains('show')){
+      // Repaint in place. The old code routed through showLogin(), which wipes the login fields
+      // and closes the sign-in card — switching language while typing your password lost it.
+      renderLanding();
+      applyLoginLang();          // must follow renderLanding: it rebuilds the node holding #langLbl
+      const su=$('#signupPanel');
+      if(su && !su.classList.contains('hidden')) renderSignup();
+    } else {
+      renderWhoami(); renderTabs(); refreshOwner();
+    }
+  }catch(e){}
+}
 function langToggleHtml(){return '<select class="coachsel" title="Language" onchange="setLang(this.value)">'+Object.keys(LANG_NAMES).map(k=>'<option value="'+k+'" '+(LANG===k?'selected':'')+'>'+LANG_NAMES[k]+'</option>').join('')+'</select>';}
 const $ = (s,el=document)=>el.querySelector(s);
 const $$ = (s,el=document)=>[...el.querySelectorAll(s)];
@@ -2078,7 +2130,9 @@ function initAuth(){
   let ss=null;try{ss=JSON.parse(sessionStorage.getItem('rx_sess'));}catch(e){}
   if(ss&&ss.auth==='owner'){AUTH='owner';ROLE='owner';mgCoach=ss.mgCoach||'all';TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();return;}
   if(ss&&ss.auth==='coach'&&coachById(ss.coachAs)){AUTH='coach';ROLE='coach';coachAs=ss.coachAs;TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();return;}
-  if(ss&&ss.auth==='client'&&custById(ss.clientAs)){AUTH='client';ROLE='client';clientAs=ss.clientAs;pickCoach=ss.pickCoach||defaultCoachId();pickSport=ss.pickSport||null;syncSportCoach();TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();return;}
+  if(ss&&ss.auth==='client'&&custById(ss.clientAs)){AUTH='client';ROLE='client';clientAs=ss.clientAs;pickCoach=ss.pickCoach||defaultCoachId();pickSport=ss.pickSport||null;syncSportCoach();TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();
+    setTimeout(()=>{ try{ openEventPrompt(clientAs); }catch(e){} },900);
+    return;}
   let sg=null;try{sg=JSON.parse(localStorage.getItem('rx_signup'));}catch(e){}
   if(sg&&sg.id){showLogin();showSignupStatus();return;}
   showLogin();
@@ -2210,8 +2264,8 @@ function lpGalSlideHtml(items,i){
   const dots=items.length>1?`<div class="lp-dots">${items.map((_,n)=>
       `<button class="lp-dot${n===i?' on':''}" onclick="lpGalGo(${n})" aria-label="${n+1}"></button>`).join('')}</div>`:'';
   const nav=items.length>1?`
-      <button class="lp-arrow l" onclick="lpGalStep(-1)" aria-label="Previous">‹</button>
-      <button class="lp-arrow r" onclick="lpGalStep(1)" aria-label="Next">›</button>`:'';
+      <button class="lp-arrow l" onclick="lpGalStep(-1)" aria-label="${t('Previous')}" title="${t('Previous')}">‹</button>
+      <button class="lp-arrow r" onclick="lpGalStep(1)" aria-label="${t('Next')}" title="${t('Next')}">›</button>`:'';
   return `<div class="lp-galstage">${media}${nav}</div>
     <div class="lp-galbar">
       <div><b>${h.title||t('Highlights')}</b>
@@ -2295,9 +2349,10 @@ function lpMoreBio(id,btn){
    nothing is starred, so the section never silently empties after an event passes — but an
    explicit pick always wins. */
 function lpFeaturedEvents(){
-  const up=(DB.events||[]).filter(e=>e.active!==false&&eventUpcoming(e));
-  const starred=up.filter(e=>e.featured);
-  const list=starred.length?starred:up.slice(0,1);
+  const live=(DB.events||[]).filter(e=>e.active!==false);
+  const starred=live.filter(e=>e.featured&&eventFeatureable(e));
+  // every starred event shows, not just the first; with none starred, fall back to the next one up
+  const list=starred.length?starred:live.filter(eventUpcoming).sort((a,b)=>eventSortKey(a).localeCompare(eventSortKey(b))).slice(0,1);
   return list.sort((a,b)=>eventSortKey(a).localeCompare(eventSortKey(b)));
 }
 function lpFeaturedHtml(){
@@ -2322,19 +2377,45 @@ function lpFeaturedHtml(){
    translating someone's own words would be worse. */
 /* Feature cards. Custom format is one card per line: "icon | title | body". Anything the owner
    writes is shown as typed in every language, same trade-off as the About copy. */
+let lpCardSeq=0;
+/* One card. The body copy is clamped to four lines; lpClampCards() reveals the Read more button
+   only on the cards that actually overflow, so a short card never shows a pointless control. */
+function lpCardHtml(ico,title,body){
+  const id='lpc'+(++lpCardSeq);
+  return `<div class="lp-card"><div class="lp-ico">${ico}</div><h4>${title}</h4>
+    <p class="lp-card-txt" id="${id}">${body}</p>
+    <button class="lp-more lp-card-more hidden" id="${id}b" onclick="lpMoreCard('${id}',this)">${t('Read more')} ▾</button></div>`;
+}
+let lpClampTimer=null;
+try{ window.addEventListener('resize',()=>{ clearTimeout(lpClampTimer); lpClampTimer=setTimeout(lpClampCards,180); }); }catch(e){}
+function lpMoreCard(id,btn){
+  const el=document.getElementById(id); if(!el)return;
+  const open=el.classList.toggle('open');
+  btn.innerHTML=(open?t('Show less')+' ▴':t('Read more')+' ▾');
+}
+/* Runs after the landing paints. scrollHeight beats clientHeight only when the clamp is actually
+   hiding a line, which is the honest test — counting characters guesses wrong at every width. */
+function lpClampCards(){
+  document.querySelectorAll('#lpPage .lp-card-txt').forEach(el=>{
+    const btn=document.getElementById(el.id+'b'); if(!btn)return;
+    if(el.classList.contains('open'))return;
+    btn.classList.toggle('hidden', el.scrollHeight <= el.clientHeight+2);
+  });
+}
 function aboutCardsHtml(){
+  lpCardSeq=0;
   const custom=(DB.settings.aboutCards||'').trim();
   if(custom){
     return custom.split(/\n/).map(l=>l.trim()).filter(Boolean).map(line=>{
       const p=line.split('|').map(x=>x.trim());
-      const ico=p.length>2?p[0]:'🏀', title=p.length>2?p[1]:p[0], body=p.length>2?p.slice(2).join(' | '):(p[1]||'');
-      return `<div class="lp-card"><div class="lp-ico">${ico}</div><h4>${title}</h4><p>${body}</p></div>`;
+      const ico=p.length>2?p[0]:'⭐', title=p.length>2?p[1]:p[0], body=p.length>2?p.slice(2).join(' | '):(p[1]||'');
+      return lpCardHtml(ico,title,body);
     }).join('');
   }
-  return `<div class="lp-card"><div class="lp-ico">⚡</div><h4>${t('Active AAU competitor')}</h4><p>${t('CARD_AAU')}</p></div>
-        <div class="lp-card"><div class="lp-ico">🎮</div><h4>${t('Live situation training')}</h4><p>${t('CARD_LIVE')}</p></div>
-        <div class="lp-card"><div class="lp-ico">🧠</div><h4>${t('Game IQ first')}</h4><p>${t('CARD_IQ')}</p></div>
-        <div class="lp-card"><div class="lp-ico">🔥</div><h4>${t('Never give up')}</h4><p>${t('CARD_GRIT')}</p></div>`;
+  return lpCardHtml('⚡',t('Active AAU competitor'),t('CARD_AAU'))
+       + lpCardHtml('🎮',t('Live situation training'),t('CARD_LIVE'))
+       + lpCardHtml('🧠',t('Game IQ first'),t('CARD_IQ'))
+       + lpCardHtml('🔥',t('Never give up'),t('CARD_GRIT'));
 }
 function aboutQuoteHtml(co){
   const q=(DB.settings.quoteText||'').trim();
@@ -2377,7 +2458,7 @@ function lpCoachCards(){
         <p class="lp-coach-bio" id="bio_${c.id}">${bio}</p>
         ${bio.length>190?`<button class="lp-more" onclick="lpMoreBio('${c.id}',this)">${t('Read more')} ▾</button>`:''}
       </div>`:''}
-      <div class="lp-coach-rates"><span>1:1 <b>${money(coachRate(c.id,'1on1'))}</b>/hr</span><span>Group <b>${money(coachRate(c.id,'group'))}</b>/player</span></div>
+      <div class="lp-coach-rates"><span>1:1 <b>${money(coachRate(c.id,'1on1'))}</b>${t('/hr')}</span><span>${t('Group')} <b>${money(coachRate(c.id,'group'))}</b>${t('/player')}</span></div>
       <button class="lp-btn solid" style="width:100%;margin-top:14px" onclick="openAuth('book')">${t('Book with')} ${firstName(c.name)}</button>
     </article>`;
   }).join('');
@@ -2420,9 +2501,6 @@ function renderLanding(){
   const co=(activeCoaches()[0])||{};
   const r1=coachRate(co.id,'1on1'), rg=coachRate(co.id,'group');
   const nCoach=activeCoaches().length;
-  // next published, upcoming event doubles as the "special event" banner
-  const ev=(DB.events||[]).filter(e=>e.active!==false&&eventUpcoming(e))
-            .sort((a,b)=>eventSortKey(a).localeCompare(eventSortKey(b)))[0];
   const done=DB.sessions.filter(s=>s.status==='completed').length;
   /* Header stats. "AAU" and "100% PLAYER-LED" were fixed claims that never moved and read as
      basketball-only; these four all grow on their own as the business does, and a tile with a
@@ -2457,7 +2535,7 @@ function renderLanding(){
       <a href="#" onclick="lpGo('lpBook');return false">${t('Book')}</a>
     </span>
     <span class="lp-auth">
-      <button class="lp-btn line mini" title="Language" onclick="setLang(nextLang())">🌐 <span id="langLbl"></span></button>
+      <button class="lp-btn line mini" title="${t('Language')}" onclick="setLang(nextLang())">🌐 <span id="langLbl"></span></button>
       ${AUTH?`<button class="lp-btn solid" onclick="closeHome()">← ${t('Back to app')}</button>`
             :`<button class="lp-btn line" onclick="openAuth('client')">${t('Sign in')}</button>
               <button class="lp-btn solid" onclick="openAuth('signup')">${t('Create account')}</button>`}
@@ -2560,10 +2638,16 @@ function renderLanding(){
       <!-- No coach sign-in button here: coaches use the Coach tab inside the sign-in panel,
            so the footer stays clean without locking anyone out. -->
       <div style="margin-top:10px">
-        <button class="lp-btn line mini" onclick="openAuth('owner')">🔑 Owner</button></div>
+        <button class="lp-btn line mini" onclick="openAuth('owner')">🔑 ${t('Owner')}</button></div>
     </footer>
   </div>`;
-  try{ set('langLbl',LANG_NAMES[LANG]||'EN'); }catch(e){}
+  // repaint the language button: renderLanding() has just replaced #lpPage's innerHTML, which
+  // includes #langLbl, so this has to run after the rebuild — not before it.
+  const ll=document.getElementById('langLbl'); if(ll)ll.textContent=LANG_NAMES[LANG]||'EN';
+  // measure after layout settles (and again once webfonts land, which changes line counts)
+  requestAnimationFrame(lpClampCards);
+  setTimeout(lpClampCards,350);
+  try{ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(lpClampCards); }catch(e){}
   lpAnimate();
 }
 /* Reveal-on-scroll. Uses IntersectionObserver where available and simply shows everything where
@@ -2779,6 +2863,8 @@ function loginAsClient(id){
   AUTH='client';ROLE='client';clientAs=id;pickCoach=defaultCoachId();TAB='booking';
   $('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();
   stampLogin('client',id);
+  // let the page settle first, then offer whatever they haven't seen or signed up for
+  setTimeout(()=>{ try{ openEventPrompt(id); }catch(e){} },700);
 }
 function loginAsCoach(id){
   AUTH='coach';ROLE='coach';coachAs=id;TAB='booking';
@@ -2914,6 +3000,12 @@ const CHANGELOG=[
    'Home page footer trimmed to the copyright line; the coach sign-in shortcut is gone (coaches use the Coach tab in the sign-in panel).',
    'Home page stats replaced. <b>AAU</b> and <b>100% Player-Led</b> were fixed claims that never moved and read as basketball-only; the header now shows <b>sports coached, sessions coached, athletes trained</b> and <b>coaches</b> — all live numbers that grow on their own. A tile showing zero drops out instead of advertising an empty figure, and a fifth (<b>skills tracked</b>) fills any gap.',
    'The coach profile page swapped its fixed "100% Player-Led" tile for that coach\'s own completed session count.',
+   '<b>New:</b> signing in as a player now offers whatever events they haven\'t registered for, with a <b>Register</b> button on each. Anything already registered never appears, and "Maybe later" retires those events for good — only genuinely new ones prompt again.',
+   '<b>Multiple featured events</b> on the home page: every event starred in Admin now shows, not just the first. Starred events also ignore the time-of-day cut-off, so an event whose time is still to be confirmed — or one that started this morning — can no longer be treated as past.',
+   'Owner Events table gained a <b>⭐ Featured</b> pill and a <b>⏳ Time TBC</b> state, so it is clear at a glance what the home page is advertising.',
+   'Feature cards clamp to four lines with a <b>Read more</b> toggle, shown only on the cards whose text actually overflows (re-measured on resize).',
+   '<b>Fix:</b> the language button needed two clicks. renderLanding() ended by calling a helper that only existed inside another function, so the error was swallowed and the button label was left blank after every switch. Changing language while signing in also used to clear the form and close the card.',
+   'Remaining home page text translated — coach rate units, gallery controls, the language and owner buttons.',
    '<b>Fix:</b> a coach set to "Running" showed the generic \u{1F3C5} medal in the client sport picker and left Track reading "coming soon" on the home page, because sports were compared as raw text.',
    '<b>Fix:</b> the six feature cards on the home page wrapped 4 + 2. They now lay out three per row (two on tablet, one on phone), with card titles sharing a baseline so the paragraphs line up.',
    '<b>Fix:</b> removed the oversized ghosted "RX" watermark behind the About heading.',
@@ -5833,6 +5925,17 @@ function eventUpcoming(ev){
   return (h*60+(m||0)) >= (n.getHours()*60+n.getMinutes());
 }
 function eventPast(ev){ return !eventUpcoming(ev); }
+/* Whether an event still belongs on the public home page.
+   A star is the owner deciding "advertise this", so it outranks the time-of-day cut: an event
+   that starts at 9am is still the day's headline at 9:05, and one whose time is still TBC must
+   never be treated as past just because the clock passed some default. It stops showing the day
+   after its date, or never, if the date itself is still to be confirmed. */
+function eventFeatureable(ev){
+  if(!ev||ev.active===false)return false;
+  if(!ev.featured)return eventUpcoming(ev);
+  if(!ev.date)return true;                     // date TBC — keep advertising it
+  return ev.date>=todayISO();                  // date only: ignore the start time
+}
 /* undated events sort to the top of the upcoming list rather than the bottom */
 function eventSortKey(ev){ return (ev.date||'0000-00-00')+(ev.time||''); }
 function eventPendingRegs(){return (DB.eventRegs||[]).filter(r=>r.status==='pending'&&(eventById(r.eventId)));}
@@ -5846,7 +5949,11 @@ function renderEventsOwner(){
   const rows=evs.map(ev=>{
     const regs=eventRegsFor(ev.id);const paid=regs.filter(r=>r.paid).length;const pend=regs.filter(r=>r.status==='pending').length;const conf=regs.length-pend;
     const cap=ev.capacity?('/'+ev.capacity):'';
-    const st=ev.active===false?'<span class="pill">Draft</span>':(!ev.date?'<span class="pill yellow">⏳ Date TBC</span>':(eventPast(ev)?'<span class="pill">Past</span>':'<span class="pill green">Published</span>'));
+    const star=ev.featured?'<span class="pill green">⭐ Featured</span> ':'';
+    const st=star+(ev.active===false?'<span class="pill">Draft</span>'
+      :(!ev.date?'<span class="pill yellow">⏳ Date TBC</span>'
+      :(!ev.time&&ev.date>=todayISO()?'<span class="pill yellow">⏳ Time TBC</span>'
+      :(eventPast(ev)?'<span class="pill">Past</span>':'<span class="pill green">Published</span>'))));
     return `<tr>
       <td><b>${ev.title||'(untitled)'}</b>${ev.featured?' <span class="pill orange" title="Featured on the home page">⭐</span>':''}${ev.video?' <span class="pill blue" title="Has a video">🎬</span>':''}<div class="clienttag">${(ev.detail||'').slice(0,60)}${(ev.detail||'').length>60?'…':''}</div></td>
       <td>${eventWhen(ev)}<div class="clienttag">📍 ${ev.location||'TBD'}</div></td>
@@ -6018,6 +6125,65 @@ function renderEventsClient(){
     <h1 class="page">${t('Events')}</h1>
     <div class="sub">${t('Workshops, guest sessions and more. Register for anything that interests you. Times are Boston (ET).')}</div>
     ${evs.length?evs.map(card).join(''):'<div class="panel"><div class="empty">'+t('No upcoming events right now — check back soon.')+'</div></div>'}`;
+}
+/* ---- "what's on" prompt shown once per event, at sign-in -------------------
+   Rules the owner asked for:
+     - only events this player has NOT registered for (a registration, pending or approved,
+       silences that event for them permanently)
+     - dismissing the card counts as "I've seen these" — those exact events never prompt again,
+       so it can't become a nag. New events still prompt, because the record is per event id.
+   The dismissal list lives in localStorage per client rather than in the DB: it's a per-device
+   UI preference, and writing it to the shared table would make one player's dismissal follow
+   them onto a parent's phone mid-session. */
+function evSeenKey(cid){ return 'rx_evseen_'+(cid||''); }
+function evSeen(cid){
+  try{ return JSON.parse(localStorage.getItem(evSeenKey(cid))||'[]')||[]; }catch(e){ return []; }
+}
+function evMarkSeen(cid,ids){
+  try{
+    const all=[...new Set(evSeen(cid).concat(ids||[]))];
+    // keep it from growing forever — only ids of events that still exist matter
+    const live=(DB.events||[]).map(e=>e.id);
+    localStorage.setItem(evSeenKey(cid),JSON.stringify(all.filter(id=>live.includes(id))));
+  }catch(e){}
+}
+function evPromptList(cid){
+  const seen=evSeen(cid);
+  return (DB.events||[])
+    .filter(e=>e.active!==false && eventUpcoming(e) && !myEventReg(e.id,cid)
+             && eventSpotsLeft(e)>0 && seen.indexOf(e.id)<0)
+    .sort((a,b)=>eventSortKey(a).localeCompare(eventSortKey(b)));
+}
+let evPromptIds=[];
+function openEventPrompt(cid){
+  const list=evPromptList(cid);
+  if(!list.length)return false;
+  evPromptIds=list.map(e=>e.id);
+  const rows=list.map(ev=>`<div class="panel" id="evp_${ev.id}" style="background:var(--panel2);padding:14px;margin-bottom:10px">
+      <b style="font-size:15px">${ev.title}</b>
+      ${ev.featured?' <span class="pill green">⭐ '+t('FEATURED')+'</span>':''}
+      <div class="clienttag" style="margin-top:5px">📅 ${eventWhen(ev)}${ev.location?' · 📍 '+ev.location:''}</div>
+      <div class="small" style="margin-top:6px">${ev.price?money(ev.price):t('Free')}${ev.capacity?' · '+eventSpotsLeft(ev)+' '+t('left'):''}</div>
+      ${ev.detail?`<div class="small muted" style="margin-top:6px">${(ev.detail||'').slice(0,180)}${(ev.detail||'').length>180?'…':''}</div>`:''}
+      <button class="btn sm" style="margin-top:10px" onclick="evPromptRegister('${ev.id}')">${t('Register')}</button>
+    </div>`).join('');
+  openModal(t("What's coming up"),
+    `<p class="muted small" style="margin-bottom:12px">${t('EVPROMPT_INTRO')}</p>${rows}`,
+    `<button class="btn ghost" onclick="closeEventPrompt()">${t('Maybe later')}</button>`);
+  return true;
+}
+function evPromptRegister(eid){
+  registerEvent(eid);
+  const card=document.getElementById('evp_'+eid); if(card)card.remove();
+  evPromptIds=evPromptIds.filter(x=>x!==eid);
+  // registering is its own record, so this event won't prompt again regardless
+  if(!document.querySelector('#mBody .panel')) closeEventPrompt();
+}
+/* Dismissing marks everything that was on screen as seen — that is the "don't ask me again". */
+function closeEventPrompt(){
+  evMarkSeen(clientAs,evPromptIds);
+  evPromptIds=[];
+  closeModal();
 }
 function registerEvent(eid){
   const ev=eventById(eid);if(!ev||!clientAs)return;
