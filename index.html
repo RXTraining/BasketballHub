@@ -1315,7 +1315,7 @@ const todayISO = ()=> new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric
 /* a Date whose local fields represent the current Boston wall-clock (for "now" comparisons) */
 function nowBoston(){return new Date(new Date().toLocaleString('en-US',{timeZone:TZ}));}
 const uid = ()=> Math.random().toString(36).slice(2,9);
-const MAX_GROUP = 4;
+const MAX_GROUP = 10;
 /* Upload caps. Cloudflare's own ceiling on this path is 100MB (Free/Pro request-body limit), so
    90 abuts it with headroom for request overhead. Keep this in step with MAX_VIDEO in
    functions/api/media.js — the Pages Function rejects independently, and a mismatch shows up as
@@ -3040,6 +3040,8 @@ const CHANGELOG=[
    '<b>Owner-written text can now be multilingual.</b> Coach bios, event descriptions and the About copy live in the database as one string, so the translation table had nothing to look up — that is why they stayed in English. Start a line with <b>[en]</b>, <b>[zh]</b>, <b>[ko]</b> or <b>[ja]</b> and each visitor sees their own language, falling back to English. Text with no markers shows as typed, exactly as before.',
    '<b>Fix:</b> a starred event that had already started this morning showed in the FEATURED section but vanished from the rolling strip above it — the two used different rules. Both now share one, along with the client events banner.',
    'Featured event descriptions are no longer cut off at 300 characters; they clamp to three lines with a Read more toggle.',
+   '<b>Group sessions now hold up to 10 players</b> (was 4). Every screen reads the cap from one constant, so the booking limit, the "N of 10" counters, the approvals list, the slot-full check and the translated plan copy all moved together.',
+   '<b>Fix:</b> event lists put <b>date TBC</b> entries first, because an empty date compares below every real one — so a placeholder outranked an event happening tomorrow. Events now sort soonest-first with to-be-confirmed ones last, on the home page, in the featured section and on the client\'s Events tab. A missing time does the same within its own day.',
    '<b>Fix:</b> a coach set to "Running" showed the generic \u{1F3C5} medal in the client sport picker and left Track reading "coming soon" on the home page, because sports were compared as raw text.',
    '<b>Fix:</b> the six feature cards on the home page wrapped 4 + 2. They now lay out three per row (two on tablet, one on phone), with card titles sharing a baseline so the paragraphs line up.',
    '<b>Fix:</b> removed the oversized ghosted "RX" watermark behind the About heading.',
@@ -5767,7 +5769,7 @@ function allCandidateSlots(dateStr,type,cid){
       if(type==='group'){
         const has1on1=at.some(s=>s.type==='1on1'&&!isForming(s));
         const groupClients=at.filter(s=>s.type==='group').reduce((a,s)=>a+s.customerIds.length,0);
-        open = !has1on1 && groupClients<MAX_GROUP;   // group full at 4 clients
+        open = !has1on1 && groupClients<MAX_GROUP;   // slot closes once the group hits MAX_GROUP
       }else{
         // A "forming" group — still pending and below the minimum headcount — must NOT hold this
         // slot hostage. Otherwise one speculative group request that never fills sits on a prime
@@ -5975,8 +5977,12 @@ function eventAdvertisable(ev){
   if(!ev.date)return true;                     // date TBC — keep advertising it
   return ev.date>=todayISO();                  // date only: ignore the start time
 }
-/* undated events sort to the top of the upcoming list rather than the bottom */
-function eventSortKey(ev){ return (ev.date||'0000-00-00')+(ev.time||''); }
+/* Sort order for every event list: soonest first, still-to-be-confirmed last.
+   Undated events used to sort to the TOP, because an empty date string compares below every real
+   one — so "date TBC" outranked an event happening tomorrow. A far-future placeholder puts them
+   at the bottom instead, and a missing time does the same within its own day, so a 9am event
+   still leads the day's TBC-time one. */
+function eventSortKey(ev){ return (ev.date||'9999-99-99')+(ev.time||'99:99'); }
 function eventPendingRegs(){return (DB.eventRegs||[]).filter(r=>r.status==='pending'&&(eventById(r.eventId)));}
 function eventRegApprove(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;r.status='registered';save();flash('Registration approved ✅');viewEventRegs(r.eventId);}
 
