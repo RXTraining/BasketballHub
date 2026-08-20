@@ -391,8 +391,10 @@
   .lp-grid .lp-card h4{grid-column:2;grid-row:1;margin:0;align-self:center}
   .lp-grid .lp-card p{grid-column:1/-1;grid-row:2}
   .lp-grid .lp-card .lp-card-more{grid-column:1/-1;grid-row:3;text-align:left}
-  .lp-card-txt{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
-  .lp-card-txt.open{-webkit-line-clamp:unset;display:block;overflow:visible}
+  .lp-clamp{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+  .lp-clamp.open{-webkit-line-clamp:unset;display:block;overflow:visible}
+  .lp-event .lp-clamp{-webkit-line-clamp:3}
+  .lp-event .lp-more{color:#24310a;text-decoration:underline}
   @media(max-width:900px){.lp-grid{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:560px){.lp-grid{grid-template-columns:1fr}
     /* narrow phones: the title needs the full width, so it drops under the icon again */
@@ -1260,6 +1262,30 @@ function nextLang(){const o=['en','zh','ko','ja'];return o[(o.indexOf(LANG)+1)%o
 function t(s){const d=LANGDICT[LANG];return (d&&d[s])?d[s]:s;}
 /* t() plus {token} substitution — lets each language put the coach name or group size where its
    own grammar needs it, instead of forcing English word order by splitting the sentence. */
+/* Owner-written free text (coach bios, event descriptions, the About copy) lives in the DB as a
+   single string, so t() has nothing to look up — that is why those parts of the page stayed in
+   English when the rest switched. Rather than add four columns to every table, the owner can
+   optionally mark languages inline:
+
+       [en] Raymond plays for Lexington High and coaches weekends.
+       [zh] Raymond 就读于列克星敦高中，周末担任教练。
+
+   A marker must start its own line; everything under it belongs to that language. Text with no
+   markers is returned unchanged, so nothing written before this existed breaks. Falls back to
+   English, then to whatever block exists. */
+function mlText(str){
+  const raw=(str==null?'':String(str));
+  if(!/^\s*\[(en|zh|ko|ja)\]/mi.test(raw))return raw;
+  const parts={}; let cur=null, buf=[];
+  raw.split(/\r?\n/).forEach(line=>{
+    const m=line.match(/^\s*\[(en|zh|ko|ja)\]\s?(.*)$/i);
+    if(m){ if(cur)parts[cur]=buf.join('\n').trim(); cur=m[1].toLowerCase(); buf=[m[2]]; }
+    else buf.push(line);
+  });
+  if(cur)parts[cur]=buf.join('\n').trim();
+  const keys=Object.keys(parts);
+  return parts[LANG]||parts.en||(keys.length?parts[keys[0]]:raw);
+}
 function tf(k,v){let out=t(k);for(const n in (v||{}))out=out.split('{'+n+'}').join(v[n]);return out;}
 function setLang(l){
   LANG=l;
@@ -2194,10 +2220,10 @@ function closeAuth(){
    ones most worth advertising early. Falls back to nothing when there are no events, so the
    strip never shows an empty bar. */
 function lpTickerHtml(){
-  const evs=(DB.events||[]).filter(e=>e.active!==false&&eventUpcoming(e))
+  const evs=(DB.events||[]).filter(eventAdvertisable)
     .sort((a,b)=>eventSortKey(a).localeCompare(eventSortKey(b))).slice(0,6);
   if(!evs.length)return '';
-  const one=e=>`<span class="it"><b>${e.title}</b><span>${eventWhen(e)}${e.location?' · '+e.location:''}${e.price?' · '+money(e.price):' · '+t('Free')}</span>`+
+  const one=e=>`<span class="it"><b>${mlText(e.title)}</b><span>${eventWhen(e)}${e.location?' · '+e.location:''}${e.price?' · '+money(e.price):' · '+t('Free')}</span>`+
               `<button class="go" onclick="openAuth('book')">${t('Register')}</button></span>`;
   const row=evs.map(one).join('');
   const secs=Math.max(18,evs.length*9);
@@ -2268,7 +2294,7 @@ function lpGalSlideHtml(items,i){
       <button class="lp-arrow r" onclick="lpGalStep(1)" aria-label="${t('Next')}" title="${t('Next')}">›</button>`:'';
   return `<div class="lp-galstage">${media}${nav}</div>
     <div class="lp-galbar">
-      <div><b>${h.title||t('Highlights')}</b>
+      <div><b>${mlText(h.title)||t('Highlights')}</b>
         <span class="lp-galdate">${h.date?fmtDate(h.date):''} · ${i+1}/${items.length}</span></div>
       ${items.length>1?`<button class="lp-play" onclick="lpGalToggle(this)">${lpGalPaused?'▶':'❙❙'}</button>`:''}
     </div>${dots}`;
@@ -2350,7 +2376,7 @@ function lpMoreBio(id,btn){
    explicit pick always wins. */
 function lpFeaturedEvents(){
   const live=(DB.events||[]).filter(e=>e.active!==false);
-  const starred=live.filter(e=>e.featured&&eventFeatureable(e));
+  const starred=live.filter(e=>e.featured&&eventAdvertisable(e));
   // every starred event shows, not just the first; with none starred, fall back to the next one up
   const list=starred.length?starred:live.filter(eventUpcoming).sort((a,b)=>eventSortKey(a).localeCompare(eventSortKey(b))).slice(0,1);
   return list.sort((a,b)=>eventSortKey(a).localeCompare(eventSortKey(b)));
@@ -2363,8 +2389,8 @@ function lpFeaturedHtml(){
     <h2 class="lp-h2">${t('FEATURED')}</h2>
     ${list.map(ev=>`<div class="lp-event reveal">
       <div class="lp-ico">🌟</div>
-      <h3>${ev.title}</h3>
-      ${ev.detail?`<p>${(ev.detail||'').slice(0,300)}${(ev.detail||'').length>300?'…':''}</p>`:''}
+      <h3>${mlText(ev.title)}</h3>
+      ${ev.detail?lpClampHtml('lpev_'+ev.id,mlText(ev.detail)):''}
       <p style="font-weight:800">📅 ${eventWhen(ev)}${ev.location?' · 📍 '+ev.location:''}${ev.price?' · '+money(ev.price):' · '+t('Free')}${ev.capacity?' · '+eventSpotsLeft(ev)+' '+t('left'):''}</p>
       ${ev.video?`<div style="margin:12px 0">${videoHtml(ev.video,'100%')}</div>`:''}
       <button class="lp-btn solid" onclick="openAuth('book')">${t('Reserve your spot →')}</button>
@@ -2383,8 +2409,13 @@ let lpCardSeq=0;
 function lpCardHtml(ico,title,body){
   const id='lpc'+(++lpCardSeq);
   return `<div class="lp-card"><div class="lp-ico">${ico}</div><h4>${title}</h4>
-    <p class="lp-card-txt" id="${id}">${body}</p>
-    <button class="lp-more lp-card-more hidden" id="${id}b" onclick="lpMoreCard('${id}',this)">${t('Read more')} ▾</button></div>`;
+    ${lpClampHtml(id,body,'lp-card-txt')}</div>`;
+}
+/* A clamped block of copy plus its Read more toggle. Used by the feature cards and by event
+   descriptions — anywhere owner-written text can run longer than the space allows. */
+function lpClampHtml(id,body,cls){
+  return `<p class="${cls||''} lp-clamp" id="${id}">${body}</p>
+    <button class="lp-more lp-card-more hidden" id="${id}b" onclick="lpMoreCard('${id}',this)">${t('Read more')} ▾</button>`;
 }
 let lpClampTimer=null;
 try{ window.addEventListener('resize',()=>{ clearTimeout(lpClampTimer); lpClampTimer=setTimeout(lpClampCards,180); }); }catch(e){}
@@ -2396,7 +2427,7 @@ function lpMoreCard(id,btn){
 /* Runs after the landing paints. scrollHeight beats clientHeight only when the clamp is actually
    hiding a line, which is the honest test — counting characters guesses wrong at every width. */
 function lpClampCards(){
-  document.querySelectorAll('#lpPage .lp-card-txt').forEach(el=>{
+  document.querySelectorAll('#lpPage .lp-clamp').forEach(el=>{
     const btn=document.getElementById(el.id+'b'); if(!btn)return;
     if(el.classList.contains('open'))return;
     btn.classList.toggle('hidden', el.scrollHeight <= el.clientHeight+2);
@@ -2404,7 +2435,7 @@ function lpClampCards(){
 }
 function aboutCardsHtml(){
   lpCardSeq=0;
-  const custom=(DB.settings.aboutCards||'').trim();
+  const custom=mlText(DB.settings.aboutCards||'').trim();
   if(custom){
     return custom.split(/\n/).map(l=>l.trim()).filter(Boolean).map(line=>{
       const p=line.split('|').map(x=>x.trim());
@@ -2426,7 +2457,7 @@ function aboutQuoteHtml(co){
       </div>`;
 }
 function aboutParas(co){
-  const custom=(DB.settings.aboutText||'').trim();
+  const custom=mlText(DB.settings.aboutText||'').trim();
   if(custom){
     return custom.split(/\n\s*\n/).map((para,i)=>
       `<p class="lp-p"${i?' style="margin-top:12px"':''}>${para.trim().replace(/\n/g,'<br>')}</p>`).join('');
@@ -2444,13 +2475,13 @@ function lpCoachCards(){
     const photo=c.photo&&/^https?:\/\//i.test(c.photo)
       ? `<img src="${c.photo}" alt="${c.name}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'lp-av',textContent:'${initials}'}))">`
       : `<div class="lp-av">${initials}</div>`;
-    const bio=(c.bio||'').trim();
+    const bio=mlText(c.bio||'').trim();
     return `<article class="lp-coach reveal" style="animation-delay:${i*90}ms">
       <div class="lp-coach-top">
         ${photo}
         <div style="min-width:0">
           <div class="lp-coach-name">${c.name}${founder?'<span class="lp-badge">'+t('FOUNDER')+'</span>':''}</div>
-          <div class="lp-coach-sport">${c.sport||'Basketball'}${c.affiliation?' · '+c.affiliation:''}</div>
+          <div class="lp-coach-sport">${sportLabel(c.sport)||'Basketball'}${c.affiliation?' · '+mlText(c.affiliation):''}</div>
         </div>
       </div>
       ${c.tagline?`<div class="lp-coach-tag">${c.tagline}</div>`:''}
@@ -3006,6 +3037,9 @@ const CHANGELOG=[
    'Feature cards clamp to four lines with a <b>Read more</b> toggle, shown only on the cards whose text actually overflows (re-measured on resize).',
    '<b>Fix:</b> the language button needed two clicks. renderLanding() ended by calling a helper that only existed inside another function, so the error was swallowed and the button label was left blank after every switch. Changing language while signing in also used to clear the form and close the card.',
    'Remaining home page text translated — coach rate units, gallery controls, the language and owner buttons.',
+   '<b>Owner-written text can now be multilingual.</b> Coach bios, event descriptions and the About copy live in the database as one string, so the translation table had nothing to look up — that is why they stayed in English. Start a line with <b>[en]</b>, <b>[zh]</b>, <b>[ko]</b> or <b>[ja]</b> and each visitor sees their own language, falling back to English. Text with no markers shows as typed, exactly as before.',
+   '<b>Fix:</b> a starred event that had already started this morning showed in the FEATURED section but vanished from the rolling strip above it — the two used different rules. Both now share one, along with the client events banner.',
+   'Featured event descriptions are no longer cut off at 300 characters; they clamp to three lines with a Read more toggle.',
    '<b>Fix:</b> a coach set to "Running" showed the generic \u{1F3C5} medal in the client sport picker and left Track reading "coming soon" on the home page, because sports were compared as raw text.',
    '<b>Fix:</b> the six feature cards on the home page wrapped 4 + 2. They now lay out three per row (two on tablet, one on phone), with card titles sharing a baseline so the paragraphs line up.',
    '<b>Fix:</b> removed the oversized ghosted "RX" watermark behind the About heading.',
@@ -5283,7 +5317,8 @@ function openCoach(id){
       <div class="field"><label class="f">Affiliation</label><input id="coAff" value="${g('affiliation')}" placeholder="e.g. AAU"></div>
       <div class="field"><label class="f">Affiliation detail</label><input id="coAffSub" value="${g('affiliationSub')}" placeholder="e.g. Middlesex Magic"></div>
     </div>
-    <div class="field"><label class="f">About / bio (shown to clients)</label><textarea id="coBio">${gArea('bio')}</textarea></div>
+    <div class="field"><label class="f">About / bio (shown to clients)</label><textarea id="coBio">${gArea('bio')}</textarea>
+      <div class="clienttag" style="margin-top:4px">Optional — write it in more than one language by starting a line with <b style="color:var(--txt)">[en]</b>, <b style="color:var(--txt)">[zh]</b>, <b style="color:var(--txt)">[ko]</b> or <b style="color:var(--txt)">[ja]</b>. Each visitor sees their own language (English if theirs is missing). Leave it plain and it shows as typed to everyone.</div></div>
     <div class="field"><label class="f">Photo</label>
       <div class="row" style="gap:10px;align-items:center">
         <img id="coPhotoPrev" src="${g('photo')||''}" alt="" style="width:56px;height:56px;border-radius:10px;object-fit:cover;background:var(--panel2);${g('photo')?'':'display:none'}" onerror="this.style.display='none'">
@@ -5925,12 +5960,16 @@ function eventUpcoming(ev){
   return (h*60+(m||0)) >= (n.getHours()*60+n.getMinutes());
 }
 function eventPast(ev){ return !eventUpcoming(ev); }
-/* Whether an event still belongs on the public home page.
+/* Whether an event should still be advertised — the ONE rule behind the home page ticker, the
+   featured section and the client's events banner. They used to disagree: the featured section
+   ignored the start time while the ticker didn't, so a starred 8am event showed as the headline
+   and was simultaneously missing from the strip above it.
    A star is the owner deciding "advertise this", so it outranks the time-of-day cut: an event
    that starts at 9am is still the day's headline at 9:05, and one whose time is still TBC must
    never be treated as past just because the clock passed some default. It stops showing the day
-   after its date, or never, if the date itself is still to be confirmed. */
-function eventFeatureable(ev){
+   after its date, or never, if the date itself is still to be confirmed. Unstarred events keep
+   the stricter time-aware test, so an ordinary 9am event doesn't advertise itself at 8pm. */
+function eventAdvertisable(ev){
   if(!ev||ev.active===false)return false;
   if(!ev.featured)return eventUpcoming(ev);
   if(!ev.date)return true;                     // date TBC — keep advertising it
@@ -5982,7 +6021,8 @@ function openEvent(id){
   const coachOpts='<option value="">General (no specific coach)</option>'+sortedCoaches(DB.coaches).map(c=>`<option value="${c.id}" ${ev.coachId===c.id?'selected':''}>${c.name}</option>`).join('');
   openModal(id?'Edit Event':'New Event',`
     <div class="field"><label class="f">Title *</label><input id="evTitle" value="${(ev.title||'').replace(/"/g,'&quot;')}" placeholder="e.g. Workshop with a D2 Guard"></div>
-    <div class="field"><label class="f">Details (shown to clients)</label><textarea id="evDetail">${ev.detail||''}</textarea></div>
+    <div class="field"><label class="f">Details (shown to clients)</label><textarea id="evDetail">${ev.detail||''}</textarea>
+      <div class="clienttag" style="margin-top:4px">Optional — write it in more than one language by starting a line with <b style="color:var(--txt)">[en]</b>, <b style="color:var(--txt)">[zh]</b>, <b style="color:var(--txt)">[ko]</b> or <b style="color:var(--txt)">[ja]</b>. Each visitor sees their own language (English if theirs is missing). Leave it plain and it shows as typed to everyone.</div></div>
     <div class="row">
       <div class="field"><label class="f">Date</label><input type="date" id="evDate" value="${ev.date||todayISO()}"></div>
       <div class="field"><label class="f">Time</label><input type="time" id="evTime" value="${ev.time||'10:00'}"></div>
@@ -6224,10 +6264,10 @@ function clientEventBanner(){
   // eventUpcoming() rather than `date >= today` — a blank date sorts below every real date, so
   // the old test silently dropped to-be-confirmed events from this banner even though they
   // showed on the Events tab.
-  const evs=(DB.events||[]).filter(e=>e.active!==false&&eventUpcoming(e)&&!myEventReg(e.id,clientAs)&&eventSpotsLeft(e)>0)
+  const evs=(DB.events||[]).filter(e=>eventAdvertisable(e)&&!myEventReg(e.id,clientAs)&&eventSpotsLeft(e)>0)
     .sort((a,b)=>eventSortKey(a).localeCompare(eventSortKey(b)));
   if(!evs.length)return '';
-  const item=ev=>`<span class="mq-item">📣 <b>${ev.title}</b> · ${eventWhen(ev)} · ${ev.price?money(ev.price):t('Free')} <button class="btn sm" onclick="event.stopPropagation();registerEvent('${ev.id}')">${t('Register')}</button></span>`;
+  const item=ev=>`<span class="mq-item">📣 <b>${mlText(ev.title)}</b> · ${eventWhen(ev)} · ${ev.price?money(ev.price):t('Free')} <button class="btn sm" onclick="event.stopPropagation();registerEvent('${ev.id}')">${t('Register')}</button></span>`;
   const items=evs.map(item).join('');
   const dur=Math.max(14,evs.length*9);
   return `<div class="evbanner" onclick="this.classList.toggle('paused')" title="Tap to pause / resume">
@@ -6776,7 +6816,8 @@ function renderAdmin(){
     <div class="panel" style="margin-top:16px">
       <h3>Home page — “The RX approach” text</h3>
       <div class="clienttag" style="margin-bottom:8px">The About section on rxtraining.org. Leave blank to use the built-in wording (which is translated into 中文 / 한국어 / 日本語). Anything you write here is shown exactly as typed, in every language.<br>Separate paragraphs with a <b style="color:var(--txt)">blank line</b>. Basic HTML like &lt;b&gt;bold&lt;/b&gt; works.</div>
-      <div class="field"><textarea id="aboutTxt" rows="10" placeholder="Leave blank to use the default wording…">${(DB.settings.aboutText||'').replace(/</g,'&lt;')}</textarea></div>
+      <div class="field"><textarea id="aboutTxt" rows="10" placeholder="Leave blank to use the default wording…">${(DB.settings.aboutText||'').replace(/</g,'&lt;')}</textarea>
+      <div class="clienttag" style="margin-top:4px">Optional — write it in more than one language by starting a line with <b style="color:var(--txt)">[en]</b>, <b style="color:var(--txt)">[zh]</b>, <b style="color:var(--txt)">[ko]</b> or <b style="color:var(--txt)">[ja]</b>. Each visitor sees their own language (English if theirs is missing). Leave it plain and it shows as typed to everyone.</div></div>
       <div class="row" style="gap:8px">
         <button class="btn sm" onclick="saveAboutText()">Save About text</button>
         <button class="btn ghost sm" onclick="loadDefaultAbout()">Load the default wording</button>
