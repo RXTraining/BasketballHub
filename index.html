@@ -412,16 +412,31 @@
     padding:6px 15px;border-radius:999px;margin-bottom:20px}
   .lp-h1{font-size:clamp(42px,8vw,78px);line-height:.95;font-weight:900;letter-spacing:-1.5px;margin:0 0 8px}
   .lp-h1 span{display:block;color:var(--lp-volt-d)}
-  /* The slogan is the brand line — bigger than the role strap under it, and given the volt
-     gradient so it reads as part of the wordmark rather than as body copy. */
-  .lp-slogan{font-size:clamp(19px,3.4vw,30px);font-weight:900;letter-spacing:-.4px;margin:2px 0 8px;
-    background:linear-gradient(95deg,var(--lp-volt-d) 0%,#0f7a4a 45%,#125bb0 100%);
+  /* The slogan is now the only line under the wordmark, so it carries the whole strap: bigger,
+     and kept inside the brand green family rather than running off to blue. Every stop in the
+     gradient clears 4.5:1 on white on its own — the bright volt (#c8ff2e, 1.7:1) is used only as
+     the highlight bar behind it, never as the letters. */
+  .lp-slogan{font-size:clamp(22px,4.4vw,38px);font-weight:900;letter-spacing:-.5px;
+    margin:6px 0 18px;line-height:1.22;position:relative;display:inline-block;
+    background:linear-gradient(100deg,#2f6b12 0%,var(--lp-volt-d) 34%,#0b7a42 62%,#2f6b12 100%);
+    background-size:220% 100%;
     -webkit-background-clip:text;background-clip:text;color:transparent;
-    -webkit-text-fill-color:transparent;line-height:1.25}
+    -webkit-text-fill-color:transparent;
+    animation:sloganSweep 7s ease-in-out infinite}
+  /* volt highlighter behind the words — the brand colour doing the job it is actually legible at */
+  .lp-slogan::before{content:"";position:absolute;left:-.14em;right:-.14em;bottom:.04em;height:.3em;
+    background:var(--lp-volt);border-radius:.18em;z-index:-1;opacity:.5;
+    transform:scaleX(0);transform-origin:left center;animation:sloganWipe .75s .35s cubic-bezier(.2,.8,.3,1) forwards}
+  @keyframes sloganSweep{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+  @keyframes sloganWipe{to{transform:scaleX(1)}}
   /* Safari/Chrome only paint gradient text with background-clip; anything else falls back to a
      solid deep lime, which still clears AA on white. */
   @supports not ((-webkit-background-clip:text) or (background-clip:text)){
     .lp-slogan{color:var(--lp-volt-d);-webkit-text-fill-color:var(--lp-volt-d)}}
+  @media(prefers-reduced-motion:reduce){
+    .lp-slogan{animation:none;background-position:0% 50%}
+    .lp-slogan::before{animation:none;transform:scaleX(1)}}
+  @media(max-width:560px){.lp-slogan::before{height:.3em;opacity:.45}}
   .lp-role{font-size:clamp(15px,2.4vw,19px);font-weight:800;color:var(--lp-mut);letter-spacing:3px;text-transform:uppercase;margin-bottom:20px}
   .lp-lede{max-width:640px;margin:0 auto 26px;font-size:16.5px;line-height:1.65;color:var(--lp-mut)}
   .lp-lede b{color:var(--lp-ink)}
@@ -908,7 +923,6 @@ const ZH={
   'No package yet — ask the Owner about prepaid packs.':'暂无套餐 — 可向管理员咨询预付套餐。',
   'Request a session':'预约课程','Session type':'课程类型','Date':'日期','Comment (optional)':'备注（可选）',
   /* --- public landing page --- */
-  'Train like you play':'像比赛一样训练',
   'Book a session →':'预约课程 →',
   'Meet the coaches':'认识教练团队',
   'Sign in':'登录',
@@ -1067,7 +1081,6 @@ const KO={
   'No package yet — ask the Owner about prepaid packs.':'아직 패키지가 없습니다 — 관리자에게 선불 패키지를 문의하세요.',
   'Request a session':'수업 예약','Session type':'수업 유형','Date':'날짜','Comment (optional)':'메모 (선택)',
   /* --- public landing page --- */
-  'Train like you play':'경기처럼 훈련하라',
   'Book a session →':'세션 예약 →',
   'Meet the coaches':'코치진 만나기',
   'Sign in':'로그인',
@@ -1221,7 +1234,6 @@ const JA={
   'No package yet — ask the Owner about prepaid packs.':'パッケージがありません — 管理者にプリペイドパックについてお問い合わせください。',
   'Request a session':'セッション予約','Session type':'セッション種別','Date':'日付','Comment (optional)':'コメント（任意）',
   /* --- public landing page --- */
-  'Train like you play':'試合のように鍛える',
   'Book a session →':'セッションを予約 →',
   'Meet the coaches':'コーチ陣を見る',
   'Sign in':'ログイン',
@@ -2750,7 +2762,6 @@ function renderLanding(){
     <header class="lp-hero">
       <h1 class="lp-h1 reveal">RX<i class="lp-dot" id="lpBall" data-ball="🏀"></i>TRAINING</h1>
       <div class="lp-slogan reveal">${sloganText()}</div>
-      <div class="lp-role reveal">${t('Train like you play')}</div>
       <div class="lp-cta reveal">
         <button class="lp-btn solid lp-big" onclick="${AUTH?'closeHome()':`openAuth('book')`}">${AUTH?t('Back to app'):t('Book a session →')}</button>
         <button class="lp-btn line lp-big" onclick="lpGo('lpCoaches')">${t('Meet the coaches')}</button>
@@ -3182,6 +3193,8 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
    '<b>Slogan:</b> “We plant the seed of sport” now sits under the RX•TRAINING wordmark on the home page, in a volt-to-blue gradient. Editable in <b>Admin → Home page — slogan</b>, with the same <b>[en]/[zh]/[ko]/[ja]</b> markers as the other free-text fields, so each language can have its own wording. Blank uses the built-in translated version.',
+   'Removed the “Train like you play” strap line — the slogan carries that job now, and two lines of brand copy under the wordmark was one too many.',
+   'The slogan was restyled: larger (up to 38px), kept inside the brand green family rather than running off to blue, with a volt highlighter bar that wipes in on load and a slow gradient sweep across the letters. Motion is disabled for anyone who has asked for reduced motion.',
    '<b>Colour across the whole app.</b> Eight accent hues, each paired with a tint to sit on. Header stats, section kickers and feature-card icons cycle through them on the home page; in the app, page titles carry a gradient, section headings gain a coloured tick, each active tab keeps its own hue, and the About-page stat tiles are individually coloured.',
    'Every one of the 30 resulting colour pairs was measured at or above WCAG AA — as text on its tint, as text on white, and as white on a filled button — so a hue can be used anywhere without re-checking. Gradient text falls back to a solid colour where <span class="mono">background-clip</span> is unsupported.',
  ]},
