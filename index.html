@@ -412,31 +412,24 @@
     padding:6px 15px;border-radius:999px;margin-bottom:20px}
   .lp-h1{font-size:clamp(42px,8vw,78px);line-height:.95;font-weight:900;letter-spacing:-1.5px;margin:0 0 8px}
   .lp-h1 span{display:block;color:var(--lp-volt-d)}
-  /* The slogan is now the only line under the wordmark, so it carries the whole strap: bigger,
-     and kept inside the brand green family rather than running off to blue. Every stop in the
-     gradient clears 4.5:1 on white on its own — the bright volt (#c8ff2e, 1.7:1) is used only as
-     the highlight bar behind it, never as the letters. */
-  .lp-slogan{font-size:clamp(22px,4.4vw,38px);font-weight:900;letter-spacing:-.5px;
-    margin:6px 0 18px;line-height:1.22;position:relative;display:inline-block;
-    background:linear-gradient(100deg,#2f6b12 0%,var(--lp-volt-d) 34%,#0b7a42 62%,#2f6b12 100%);
-    background-size:220% 100%;
-    -webkit-background-clip:text;background-clip:text;color:transparent;
-    -webkit-text-fill-color:transparent;
-    animation:sloganSweep 7s ease-in-out infinite}
-  /* volt highlighter behind the words — the brand colour doing the job it is actually legible at */
-  .lp-slogan::before{content:"";position:absolute;left:-.14em;right:-.14em;bottom:.04em;height:.3em;
-    background:var(--lp-volt);border-radius:.18em;z-index:-1;opacity:.5;
-    transform:scaleX(0);transform-origin:left center;animation:sloganWipe .75s .35s cubic-bezier(.2,.8,.3,1) forwards}
-  @keyframes sloganSweep{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
-  @keyframes sloganWipe{to{transform:scaleX(1)}}
-  /* Safari/Chrome only paint gradient text with background-clip; anything else falls back to a
-     solid deep lime, which still clears AA on white. */
-  @supports not ((-webkit-background-clip:text) or (background-clip:text)){
-    .lp-slogan{color:var(--lp-volt-d);-webkit-text-fill-color:var(--lp-volt-d)}}
+  /* Strap line under the wordmark.
+     Deliberately LIGHT and small: the wordmark is 900 weight at up to 78px, so a 900-weight
+     slogan competed with it instead of supporting it. The volt highlighter bar is gone — it sat
+     across the letters and read as a strikethrough. The brand colour now appears as a short rule
+     UNDERNEATH the text, where it can't touch a glyph.
+     Solid colour rather than a gradient: at this weight gradient text goes patchy, and #3f6a00
+     measures 6.5:1 on white, which matters more now the text no longer counts as "large". */
+  .lp-slogan{font-size:clamp(15px,2.5vw,23px);font-weight:400;letter-spacing:.4px;
+    margin:2px 0 20px;line-height:1.4;color:#3f6a00;position:relative;display:inline-block;
+    padding-bottom:11px}
+  .lp-slogan em{font-style:normal;font-weight:700;color:#2f6b12}
+  .lp-slogan::after{content:"";position:absolute;left:50%;transform:translateX(-50%) scaleX(0);
+    bottom:0;width:74px;height:4px;border-radius:999px;
+    background:linear-gradient(90deg,var(--lp-volt),var(--lp-volt-d));
+    transform-origin:center;animation:sloganRule .6s .3s cubic-bezier(.2,.8,.3,1) forwards}
+  @keyframes sloganRule{to{transform:translateX(-50%) scaleX(1)}}
   @media(prefers-reduced-motion:reduce){
-    .lp-slogan{animation:none;background-position:0% 50%}
-    .lp-slogan::before{animation:none;transform:scaleX(1)}}
-  @media(max-width:560px){.lp-slogan::before{height:.3em;opacity:.45}}
+    .lp-slogan::after{animation:none;transform:translateX(-50%) scaleX(1)}}
   .lp-role{font-size:clamp(15px,2.4vw,19px);font-weight:800;color:var(--lp-mut);letter-spacing:3px;text-transform:uppercase;margin-bottom:20px}
   .lp-lede{max-width:640px;margin:0 auto 26px;font-size:16.5px;line-height:1.65;color:var(--lp-mut)}
   .lp-lede b{color:var(--lp-ink)}
@@ -3194,7 +3187,7 @@ const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
    '<b>Slogan:</b> “We plant the seed of sport” now sits under the RX•TRAINING wordmark on the home page, in a volt-to-blue gradient. Editable in <b>Admin → Home page — slogan</b>, with the same <b>[en]/[zh]/[ko]/[ja]</b> markers as the other free-text fields, so each language can have its own wording. Blank uses the built-in translated version.',
    'Removed the “Train like you play” strap line — the slogan carries that job now, and two lines of brand copy under the wordmark was one too many.',
-   'The slogan was restyled: larger (up to 38px), kept inside the brand green family rather than running off to blue, with a volt highlighter bar that wipes in on load and a slow gradient sweep across the letters. Motion is disabled for anyone who has asked for reduced motion.',
+   'The slogan sits under the wordmark as a light strap line — 400 weight at up to 23px against the wordmark\'s 900 at 78px, so it supports the logo rather than competing with it. The brand colour appears as a short volt rule beneath the text that wipes in on load; an earlier highlighter bar behind the words read as a strikethrough and was removed. Motion is disabled for anyone who has asked for reduced motion.',
    '<b>Colour across the whole app.</b> Eight accent hues, each paired with a tint to sit on. Header stats, section kickers and feature-card icons cycle through them on the home page; in the app, page titles carry a gradient, section headings gain a coloured tick, each active tab keeps its own hue, and the About-page stat tiles are individually coloured.',
    'Every one of the 30 resulting colour pairs was measured at or above WCAG AA — as text on its tint, as text on white, and as white on a filled button — so a hue can be used anywhere without re-checking. Gradient text falls back to a solid colour where <span class="mono">background-clip</span> is unsupported.',
  ]},
