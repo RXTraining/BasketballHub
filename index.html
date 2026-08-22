@@ -450,13 +450,13 @@
   .lp-nav{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);
     border-bottom:1px solid var(--lp-line);display:flex;align-items:center;gap:18px;
     padding:calc(11px + env(safe-area-inset-top,0px)) 20px 11px}
-  .lp-logo{font-size:19px;font-weight:900;letter-spacing:.4px;color:var(--lp-ink)}
+  .lp-logo{font-size:19px;font-weight:900;letter-spacing:.4px;color:var(--lp-ink);white-space:nowrap;flex:0 0 auto}
   .lp-logo i{color:var(--lp-volt-d);font-style:normal}
   .lp-links{display:flex;gap:16px;margin-left:12px;min-width:0;flex-wrap:nowrap}
   .lp-links a{color:var(--lp-mut);text-decoration:none;font-size:13.5px;font-weight:700;white-space:nowrap}
   .lp-links a:hover{color:var(--lp-ink)}
-  .lp-auth{margin-left:auto;display:flex;gap:9px;align-items:center}
-  .lp-btn{border:0;cursor:pointer;font-weight:800;border-radius:999px;font-size:13.5px;padding:9px 18px;font-family:inherit}
+  .lp-auth{margin-left:auto;display:flex;gap:9px;align-items:center;flex:0 1 auto;min-width:0}
+  .lp-btn{border:0;cursor:pointer;font-weight:800;border-radius:999px;font-size:13.5px;padding:9px 18px;font-family:inherit;white-space:nowrap}
   .lp-btn.solid{background:var(--lp-volt-d);color:#fff}
   .lp-btn.solid:hover{background:#5da000}
   .lp-btn.line{background:transparent;color:var(--lp-ink);border:1.5px solid var(--lp-line)}
@@ -775,6 +775,26 @@
   /* six nav links plus two auth buttons stop fitting well below ~980px — swap the text nav for
      the scrollable chip rail there rather than only on phones */
   @media(max-width:980px){.lp-links{display:none}.lp-jump{display:flex}}
+  /* Phone nav: logo + 🌐 + Sign in + Create account is a lot for 390px. Tighten everything
+     rather than let flexbox wrap the logo and hyphenate the button labels. */
+  @media(max-width:600px){
+    .lp-nav{gap:8px;padding-left:14px;padding-right:14px}
+    .lp-logo{font-size:16.5px;letter-spacing:.2px}
+    .lp-auth{gap:6px}
+    .lp-btn{font-size:12.5px;padding:8px 12px}
+    .lp-btn.mini{padding:7px 9px}
+  }
+  @media(max-width:400px){
+    .lp-nav{gap:6px;padding-left:11px;padding-right:11px}
+    .lp-logo{font-size:15px}
+    .lp-btn{font-size:11.5px;padding:7px 10px}
+    /* the globe keeps its icon; the language code is the first thing that can go */
+    .lp-btn.mini #langLbl{display:none}
+    /* below ~400px "Create account" alone is wider than the space left, so it shortens */
+    .lp-auth .lbl-full{display:none}
+    .lp-auth .lbl-short{display:inline}
+  }
+  .lp-auth .lbl-short{display:none}
   @media(max-width:720px){.lp-hero{padding:40px 0 34px}}
   /* auth card floats over the landing page */
   .authveil{position:fixed;inset:0;z-index:340;background:rgba(8,12,8,.55);backdrop-filter:blur(3px);
@@ -1016,6 +1036,7 @@ const ZH={
   'Highlights':'精彩集锦',
   'Book':'预约',
   'SESSIONS COACHED':'已完成课程',
+  'Join':'注册',
   'TBC':'待定',
   'Group & weekend classes':'团课与周末课程',
   'Open now':'现已开课',
@@ -1191,6 +1212,7 @@ const KO={
   'Highlights':'하이라이트',
   'Book':'예약',
   'SESSIONS COACHED':'진행한 세션',
+  'Join':'가입',
   'TBC':'미정',
   'Group & weekend classes':'그룹 및 주말 클래스',
   'Open now':'지금 운영 중',
@@ -1361,6 +1383,7 @@ const JA={
   'Highlights':'ハイライト',
   'Book':'予約',
   'SESSIONS COACHED':'実施セッション',
+  'Join':'登録',
   'TBC':'未定',
   'Group & weekend classes':'グループ・週末クラス',
   'Open now':'開講中',
@@ -3015,8 +3038,8 @@ function renderLanding(){
   const statTiles=[
     [nSport,   nSport===1?t('SPORT'):t('SPORTS')],
     [done||0,  t('SESSIONS COACHED')],
-    [nAthlete, nAthlete===1?t('ATHLETE TRAINED'):t('ATHLETES TRAINED')],
     [nCoach,   nCoach===1?t('COACH'):t('COACHES')],
+    [nAthlete, nAthlete===1?t('ATHLETE TRAINED'):t('ATHLETES TRAINED')],
     [nSkill,   t('SKILLS TRACKED')]
   ].filter(x=>x[0]>0).slice(0,4);
   // Caption for the Highlights section. Prefer the saved caption, but fall back to the title of
@@ -3041,7 +3064,7 @@ function renderLanding(){
       <button class="lp-btn line mini" title="${t('Language')}" onclick="setLang(nextLang())">🌐 <span id="langLbl"></span></button>
       ${AUTH?`<button class="lp-btn solid" onclick="closeHome()">← ${t('Back to app')}</button>`
             :`<button class="lp-btn line" onclick="openAuth('client')">${t('Sign in')}</button>
-              <button class="lp-btn solid" onclick="openAuth('signup')">${t('Create account')}</button>`}
+              <button class="lp-btn solid" onclick="openAuth('signup')"><span class="lbl-full">${t('Create account')}</span><span class="lbl-short">${t('Join')}</span></button>`}
     </span>
   </nav>
   ${lpTickerHtml()}
@@ -3484,7 +3507,9 @@ const CHANGELOG=[
    'A session whose headcount no longer fits its type now says so in the editor and offers a one-tap switch — e.g. <i>“10 players in a Group (max 4). Switch to Weekend Open Run →”</i>. The switch reprices at the new type\'s rate, shows the before/after per player, and keeps payments already recorded.',
    '<b>Fix:</b> a session booked when the cap was higher could not be saved at all, because the cap check ran before the owner had any chance to correct the type — locking them out of the one screen that fixes it. The check now only blocks <i>adding</i> players beyond the cap.',
    '<b>Fix: uploads could disappear entirely.</b> Rows save on the device first, then push to Supabase. If that push failed — almost always a column <span class="mono">supabase-setup.sql</span> had not created yet — the only sign was one flash message, and the next page load pulled the server copy straight over the top of the new rows. Failures are now recorded per table with the exact Supabase error, survive a reload, and show as a red banner at the top of Admin with <b>Retry cloud save</b>, until the push actually succeeds.',
-   '<b>Fix:</b> the RX•TRAINING wordmark wrapped onto two lines on a narrow phone — the minimum font size was larger than the screen could fit, so the ball dropped to the second line. It is now sized to fit at 320px and set to never wrap.',
+   '<b>Fix:</b> on a phone the top bar broke the logo across two lines (<i>RX.TRAINI / NG</i>) and hyphenated the button label into <i>Sig n in</i>. The logo and every button are now set to never wrap; the bar tightens spacing and type below 600px, drops the language code beside the globe below 400px, and shortens <b>Create account</b> to <b>Join</b>, so the row fits down to a 320px screen.',
+   'The hero wordmark is sized to fit one line at 320px and set to never wrap — its minimum font size used to be larger than a narrow phone could fit, so the ball dropped to a second line.',
+   'Header stats reordered to <b>sports, sessions coached, coaches, athletes trained</b>.',
    'Uploaded highlights land as <b>drafts</b> on purpose, but nothing said so at a glance \u2014 uploading a batch and then looking at the home page made them seem to have vanished. The Highlights panel now shows a banner counting unpublished items with a <b>Publish all</b> button, and the upload confirmation says DRAFT explicitly.',
    '<b>Fix:</b> opening the app from the Home Screen could lay out wider than the phone, needing a manual pinch to fit. The viewport now sets <span class="mono">minimum-scale</span> so iOS cannot shrink the layout below 1x, images/video/tables/long words are capped at the screen width so nothing can force a wider layout, and the viewport is re-asserted on launch, on rotation, and when returning from the app switcher.',
    '<b>Fix:</b> the Highlights gallery played a month oldest-first. Manual order ranked above the date, and since uploads are numbered in the order they are added, that put the earliest photo first. Newest now leads, in the gallery and in the Admin list \u2014 which are sorted identically, so dragging rearranges the list you actually see. Drag order still decides the sequence within a single date, which is where a batch of photos from one session lands.',
