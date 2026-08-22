@@ -132,7 +132,8 @@
     --a8:#c41f31; --a8b:#fdeaec;   /* red    — attention  */
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  /* clip at the document level too — overflow-x on <body> alone still lets some mobile
+  /* clip at the document level too — overflow-x on <body>
+<div id="appShell"> alone still lets some mobile
      browsers scroll, which leaves the content shifted with dead space down one side */
   /* NO overflow-x here. On iOS, overflow-x:hidden on <html> makes Safari lay the page out at its
      own idea of a width — typically narrower than the screen — leaving a dead strip down the right
@@ -141,7 +142,7 @@
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     background:radial-gradient(1200px 600px at 80% -10%,rgba(200,255,46,.30),transparent 60%),var(--bg);
     color:var(--txt);min-height:100vh;-webkit-font-smoothing:antialiased;
-    overflow-x:hidden;width:100%;max-width:100%}
+    overflow:hidden;width:100%;max-width:100%;height:100%}
   a{color:inherit}
   /* Safety net: a single oversized image, video, iframe, table or long word is enough to make
      iOS lay the entire page out wider than the screen — which is what "opens zoomed out and I
@@ -471,16 +472,18 @@
      into the signed-in app, which stays dark until that's re-themed separately. */
   /* the landing page is its own scroll container; overscroll-behavior stops iOS handing the
    gesture to the page underneath, which was leaving the page occasionally stuck */
+  /* The app shell. Sized against the viewport rather than against <body>, mirroring #login,
+     which is the one layout that has always fitted this phone correctly. Everything inside it
+     therefore measures against the real screen width. */
+  #appShell{position:fixed;inset:0;overflow-y:auto;overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;background:transparent}
   .login{position:fixed;inset:0;z-index:300;display:none;overflow-y:auto;overflow-x:hidden;
     -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
     background:var(--lp-bg);color:var(--lp-ink);padding-bottom:env(safe-area-inset-bottom,0px)}
   .login.show{display:block}
-  /* The landing is a fixed layer over the app. Freezing the document behind it stops it holding
-     a scroll position that then shows through on sign-in.
-     Deliberately NOT position:fixed on <body> — that is an iOS trap: once the body has been fixed
-     to inset:0, Safari can keep a stale layout width after it is released, so the page renders far
-     wider than the screen with the right-hand side unreachable and the ≤820px media queries no
-     longer matching. overflow:hidden alone freezes it without touching the layout viewport. */
+  /* Freezing the page behind the landing is no longer needed — #appShell is its own scroller and
+     the landing sits above it, so neither can inherit the other's scroll position. Kept as a
+     no-op guard in case a browser still scrolls the document. */
   html.home-open,body.home-open{overflow:hidden}
   :root{
     --lp-bg:#ffffff; --lp-soft:#f4f7f2; --lp-ink:#0f1410; --lp-mut:#5c6b60; --lp-line:#e2e9e0;
@@ -939,6 +942,7 @@
   <section class="view" id="view-activity"></section>
   <section class="view" id="view-admin"></section>
 </div>
+</div><!-- /#appShell -->
 
 <div class="login" id="login">
   <!-- public marketing page: what a visitor to rxtraining.org sees before signing in.
@@ -2076,7 +2080,8 @@ function ptrAttachDoc(){
   const bar=document.createElement('div');
   bar.className='ptr'; bar.innerHTML='<span class="ptr-spin">↻</span>';
   document.body.appendChild(bar);
-  const top=()=>window.pageYOffset||document.documentElement.scrollTop||0;
+  const shell=()=>document.getElementById('appShell');
+  const top=()=>{const el=shell();return el?el.scrollTop:(window.pageYOffset||0);};
   const setDist=d=>{ dist=d; bar.style.transform='translateX(-50%) translateY('+Math.min(d,PTR_MAX)+'px)';
     bar.style.opacity=Math.min(1,d/PTR_TRIGGER); bar.classList.toggle('ready',d>=PTR_TRIGGER); };
   const reset=()=>{ bar.style.transition='transform .22s ease,opacity .22s ease';
@@ -2112,7 +2117,9 @@ function ptrAttachDoc(){
    identity to fix the real cause. Owner sees a tappable warning; anyone can run rxWidthAudit()
    from a console. */
 function rxWidthAudit(){
-  const vw=Math.min(document.documentElement.clientWidth||9999,window.innerWidth||9999);
+  const sh=document.getElementById('appShell');
+  const vw=Math.min(document.documentElement.clientWidth||9999,window.innerWidth||9999,
+                    (sh&&sh.clientWidth)||9999);
   const out=[];
   document.querySelectorAll('body *').forEach(el=>{
     if(!el.getBoundingClientRect)return;
@@ -2752,6 +2759,7 @@ function switchTab(){
 }
 function saveSess(){try{sessionStorage.setItem('rx_sess',JSON.stringify({auth:AUTH,clientAs,coachAs,mgCoach,pickCoach,pickSport,tab:TAB}));}catch(e){}}
 function refreshOwner(){if(AUTH==='owner')try{alertUnfilledGroups();}catch(e){}
+  try{const sh=document.getElementById('appShell'); if(sh)sh.scrollTop=0;}catch(e){}
   const f={about:renderAbout,booking:renderBooking,past:renderPast,journey:renderJourney,skills:renderSkills,money:renderMoney,events:renderEvents,messages:renderMessages,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,activity:renderActivity,admin:renderAdmin}[TAB];if(f)f();if(TAB!=='messages'&&(AUTH==='owner'||AUTH==='client'))renderTabs();if(AUTH==='owner')renderWhoami();}
 
 /* ---------- Auth ---------- */
@@ -2832,11 +2840,12 @@ function closeHome(){ const el=$('#login'); if(el)el.classList.remove('show'); e
    first screen after sign-in look mis-scaled and shifted, while the home page itself was fine. */
 function enterApp(){
   try{ document.body.classList.remove('home-open');document.documentElement.classList.remove('home-open'); }catch(e){}
+  try{ const el=document.getElementById('appShell'); if(el){el.scrollTop=0;el.scrollLeft=0;} }catch(e){}
   try{ window.scrollTo(0,0); }catch(e){}
-  try{ document.documentElement.scrollLeft=0; document.body.scrollLeft=0; }catch(e){}
   try{ if(window.rxFixViewport)window.rxFixViewport(); }catch(e){}
   // one more pass after layout settles — a freshly rendered tab can change the page height
-  setTimeout(()=>{ try{ window.scrollTo(0,0); if(window.rxFixViewport)window.rxFixViewport(); }catch(e){} },120);
+  setTimeout(()=>{ try{ const el=document.getElementById('appShell'); if(el)el.scrollTop=0;
+    window.scrollTo(0,0); if(window.rxFixViewport)window.rxFixViewport(); }catch(e){} },120);
   // If the document still measures wider than the window, the layout viewport is stale rather
   // than some element overflowing — re-asserting the meta is the only thing that recovers it.
   setTimeout(()=>{
@@ -3775,7 +3784,8 @@ const CHANGELOG=[
    'The hero wordmark is sized to fit one line at 320px and set to never wrap — its minimum font size used to be larger than a narrow phone could fit, so the ball dropped to a second line.',
    'An event can now have <b>several host coaches</b> instead of one. The Host coach dropdown is a tick list, every host is shown wherever the event appears, and a co-hosted event turns up in each host\u2019s own view rather than only the first one\u2019s. Events created before this keep working: the old single column is still read, and still written with the first host, so anything else querying it is unaffected. Finance counts a co-hosted event once, not once per coach.',
    '<b>Pull down to refresh</b> everywhere — the public home page and the signed-in app for owner, coach and client. The landing scrolls inside a fixed container and the app scrolls the document, so each needed its own binding; in a Home Screen app there is no browser pull-to-refresh at all. It only engages from the very top, ignores upward and sideways drags, skips an open dialog, and will not fight a table you are scrolling sideways.',
-   '<b>Fix:</b> the app was cut off down the right-hand side on a phone while the home page was fine. Three causes, all now removed. The header row was set to <span class="mono">nowrap</span> with controls that refused to shrink, and only wrapped inside a \u2264820px media query \u2014 so whenever iOS laid the page out at its own width, the query never matched and the header pushed the whole document wider than the screen. <span class="mono">overflow-x:hidden</span> on <span class="mono">&lt;html&gt;</span> then made Safari render narrower than the screen, leaving a dead strip; and clipping <span class="mono">.wrap</span> hid the overflowing content instead of revealing it. The header now wraps and shrinks at any width, so the layout no longer depends on a breakpoint matching at all.',
+   '<b>Fix: the app is cut off no longer.</b> The public home page always fitted the phone because it is a <span class="mono">position:fixed; inset:0</span> layer measured against the viewport. The app was not — it relied on <span class="mono">&lt;body&gt;</span> being as wide as the screen, and on iOS it was not, so content clipped at body\'s right edge with blank screen showing beyond it. The app now lives in <span class="mono">#appShell</span>, a fixed full-viewport scroller built the same way as the home page, so everything inside measures against the real screen width. Scroll resets, pull-to-refresh and the width audit all read the shell.',
+   'While chasing that, the header was also made to wrap and shrink at any width rather than only inside a \u2264820px media query, and two overflow clips were removed that had been hiding content instead of revealing it. A width audit (<span class="mono">rxWidthAudit()</span>) now reports anything sticking out past the viewport, with a red <b>\u21e4 layout</b> chip in the owner header when it finds something.',
    'Added a width audit: <span class="mono">rxWidthAudit()</span> walks the rendered page and reports anything sticking out past the viewport, ignoring elements already inside their own scroller. The owner gets a red <b>\u21e4 layout</b> chip in the header when something overflows, tappable for the list \u2014 so a layout regression names itself instead of being chased by guesswork.',
    '<b>Fix: a cancelled session no longer reads as paid.</b> Cancelling clears the payment state, and — importantly for rows cancelled before that shipped — the payment cell is now <i>derived from the status</i> rather than the stored flag, so historic sessions correct themselves with no migration. <span class="mono">custPay()</span> and the fully-paid check also report a cancelled session as unpaid, so every screen agrees.',
    'Cash that had already been collected is not simply erased: the amount is kept on the record and a red <b>↩ \$X to refund</b> flag rides alongside the Cancelled pill until you deal with it. Whoever cancels is warned first — the owner and coach see the amount, the client is told the refund is not automatic. A session paid with a package credit needs no unwinding: credits are counted from completed sessions, so cancelling returns the credit by itself.',
