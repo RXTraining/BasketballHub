@@ -2117,8 +2117,9 @@ function cancelBadge(n){return n>0?'<span class="pill red" title="Cancellations"
 function cancelledByLabel(s){return s.status==='cancelled'&&s.cancelledBy?'<span class="pill red">Cancelled · by '+(s.cancelledBy==='client'?'client':s.cancelledBy==='coach'?'coach':'owner')+'</span>':(s.status==='cancelled'?'<span class="pill red">Cancelled</span>':'');}
 function creditsFor(c,type){return Math.max(0,totalFor(c,type)-usedFor(c,type));}
 function creditBadge(c){
+  // Was hardcoded to 1:1 and Group, so a package sold against a weekend class was invisible here.
   const parts=[];
-  [['1on1','1:1'],['group','Grp']].forEach(([t,lab])=>{const tot=totalFor(c,t);if(tot>0)parts.push(lab+' '+usedFor(c,t)+'/'+tot+' used');});
+  TYPE_ORDER.forEach(ty=>{const tot=totalFor(c,ty);if(tot>0)parts.push(typeShort(ty)+' '+usedFor(c,ty)+'/'+tot+' used');});
   return parts.length?parts.map(p=>'<span class="credit">'+p+'</span>').join(' '):'<span class="muted small">—</span>';
 }
 function sessionHasCredit(s){return s.customerIds.some(id=>creditsFor(custById(id),s.type)>0);}
@@ -3287,11 +3288,11 @@ function exportExcel(){
   add('Booking & Schedule',sortSessions(DB.sessions).map(s=>({Date:s.date,Time:s.time,Coach:coachName(s.coachId),Clients:custNames(s.customerIds),
     Type:typeShort(s.type),Players:s.customerIds.length,Duration:s.dur,Location:s.location,Status:s.status,
     'Checked in':s.checkedIn?'Yes':'No',Payment:sessionFullyPaid(s)?(s.type!=='1on1'?'paid (all players)':(s.paidVia||'paid')):(s.type==='group'&&s.customerIds.some(cid=>custPay(s,cid).paid)?'partially paid':'unpaid'),Price:s.price,Notes:s.notes,Feedback:s.feedback||'',Attachments:(s.media||[]).length})));
-  add('Packages',DB.customers.flatMap(c=>c.packages.map(p=>({Client:c.name,Coach:coachName(p.coachId),Date:p.date,Type:p.type==='1on1'?'1:1':'Group',Sessions:p.qty,Amount:p.amount}))));
+  add('Packages',DB.customers.flatMap(c=>c.packages.map(p=>({Client:c.name,Coach:coachName(p.coachId),Date:p.date,Type:typeShort(p.type),Sessions:p.qty,Amount:p.amount}))));
   add('Expenses',DB.expenses.map(e=>({Date:e.date,'Attributed to':coachName(e.coachId),Category:e.cat,Note:e.note,Amount:e.amount,Frequency:e.freq||'once'})));
   add('Cash income',[
     ...DB.sessions.filter(s=>s.status!=='cancelled'&&sessionCashAmt(s)>0).map(s=>({Date:s.date,Source:custNames(s.customerIds)+' ('+(typeShort(s.type))+' session)',Note:s.notes||'',Amount:sessionCashAmt(s)})),
-    ...DB.cashEntries.map(e=>({Date:e.date,Source:(e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in')+' ('+(e.qty||1)+'× '+(e.type==='group'?'Group':'1:1')+' cash)',Note:e.note||'',Amount:e.amount}))
+    ...DB.cashEntries.map(e=>({Date:e.date,Source:(e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in')+' ('+(e.qty||1)+'× '+typeShort(e.type)+' cash)',Note:e.note||'',Amount:e.amount}))
   ]);
   add('Availability',(DB.availability||[]).map(a=>({Coach:coachName(a.coachId),Date:a.date,From:a.start,To:a.end,'Slot (min)':a.slotMin,Location:a.location,Approved:a.approved!==false?'Yes':'No'})));
   add('Events',(DB.events||[]).map(e=>({Title:e.title,Date:e.date,Time:e.time,Location:e.location,Coach:e.coachId?coachName(e.coachId):'General',Price:e.price,Capacity:e.capacity,Published:e.active!==false?'Yes':'No',Registered:eventRegsFor(e.id).length,Collected:eventRevenue(e),Details:e.detail||''})));
@@ -3338,6 +3339,9 @@ const CHANGELOG=[
    '<b>Slogan:</b> “We plant the seed of sport” now sits under the RX•TRAINING wordmark on the home page, in a volt-to-blue gradient. Editable in <b>Admin → Home page — slogan</b>, with the same <b>[en]/[zh]/[ko]/[ja]</b> markers as the other free-text fields, so each language can have its own wording. Blank uses the built-in translated version.',
    '<b>The site no longer reads as a basketball site.</b> Every piece of marketing copy that assumed one sport was rewritten in all four languages — the hero lede, the feature cards, the quote, the highlights caption and the sports heading no longer mention AAU, Middlesex Magic, “the court” or basketball itself. The basketball <i>skill catalogue</i> is untouched: those drills are filed under Basketball and belong there.',
    'The home page now names the sports that are actually open. A <b>Training now</b> strip sits directly under the slogan listing every sport with an active coach, and the Sports section splits into <b>Open now</b> and <b>Coming as we add coaches</b> with counts, instead of one mixed grid where a parent had to read ten chips to find out whether we coach their kid\'s sport.',
+   '<b>Prepaid credits now work for every session type.</b> Packages could only be sold as 1:1 or Group, so a Track player had no way to pay a conditioning session with a credit — the Credit button simply never appeared. Packages, credit balances, the Customers credit badge and the client\'s “Your prepaid sessions” panel all read the full list of types now, and both credit and cash remain available per player on any multi-player session.',
+   '<b>Fix:</b> saving a customer wiped any credits held against a weekend class. The edit form only had 1:1 and Group boxes and wrote a fixed two-key object over the whole balance. The form now renders one box per type and merges rather than replaces.',
+   '<b>Fix:</b> the Finance revenue-by-type panel showed <span class="mono">NaN</span> once a weekend session was paid — the running total was seeded with only two keys, so the third type added a number to <span class="mono">undefined</span>.',
    'The <b>SESSIONS</b> section is generated from the coach roster instead of two hardcoded cards. All four session types now appear — 1-on-1, Group, Weekend Open Run and Weekend Running/Conditioning — each tagged with the sports it is available in, its player cap, and a “from” price when coaches charge differently for it. A type only appears if an active coach can run it, so the page can never advertise something unbookable.',
    'The bullet lists under each plan were basketball drills shown to everyone — “ball handling &amp; dribbling”, “shooting form”, “court vision”, “on-court communication”. The 1:1 and Group lists are now sport-neutral; the two weekend classes have their own lists, which may name their sport because those types are sport-specific by definition.',
    'A sport with a coach but missing from the advertised list now appears anyway — the coach roster is the source of truth, so launching a sport can never be half-done.',
@@ -3685,7 +3689,7 @@ function coachSetStatus(id,val,fromModal){
   if(autoRows.length)pushRows('expenses',autoRows.map(expRow));
   const c=custById(s.customerIds[0]);
   if(val==='scheduled'&&c&&c.email){emailClient(c.email,'RX Training — your session is confirmed',
-    'Hi '+firstName(c.name)+',\n\nYour '+(s.type==='1on1'?'1:1 Private':'group')+' session with '+coachName(s.coachId)+' is confirmed:\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location+'\n\n— RX Training');}
+    'Hi '+firstName(c.name)+',\n\nYour '+typeShort(s.type)+' session with '+coachName(s.coachId)+' is confirmed:\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location+'\n\n— RX Training');}
   if(val==='cancelled'){
     notifyCancellation(s,'coach');
   }
@@ -3817,8 +3821,7 @@ function renderBookingClient(){
   const today=sortSessions(mine.filter(s=>s.date===now && (s.status==='scheduled'||s.status==='pending')));
   const pending=sortSessions(mine.filter(s=>s.date>=now && s.status==='pending'));
   const upcoming=sortSessions(mine.filter(s=>s.date>=now && s.status==='scheduled'));
-  const t1=totalFor(c,'1on1'),u1=usedFor(c,'1on1'),tG=totalFor(c,'group'),uG=usedFor(c,'group');
-  const pkgHist=c.packages.length?c.packages.slice().reverse().map(p=>`<div class="clienttag">• ${p.qty}× ${p.type==='1on1'?'1:1':'Group'} package — ${money(p.amount)} · ${fmtDate(p.date)}</div>`).join(''):'<div class="clienttag">No packages yet.</div>';
+  const pkgHist=c.packages.length?c.packages.slice().reverse().map(p=>`<div class="clienttag">• ${p.qty}× ${typeShort(p.type)} package — ${money(p.amount)} · ${fmtDate(p.date)}</div>`).join(''):'<div class="clienttag">No packages yet.</div>';
   const balLine=(lab,tot,used)=>tot>0?`<div class="small" style="margin-top:6px"><b>${lab}: ${used}/${tot} used</b> · <span style="color:var(--accent)">${tot-used} left</span><div class="creditbar"><i style="width:${tot?used/tot*100:0}%"></i></div></div>`:'';
 
   $('#view-booking').innerHTML=`
@@ -3830,7 +3833,9 @@ function renderBookingClient(){
       <div class="row" style="justify-content:space-between;align-items:flex-start">
         <div style="flex:1;min-width:200px">
           <b>${t('Your prepaid sessions')}</b>
-          ${(t1>0||tG>0)?(balLine('1:1',t1,u1)+balLine(t('Group'),tG,uG)):'<div class="clienttag" style="margin-top:6px">'+t('No package yet — ask the Owner about prepaid packs.')+'</div>'}
+          ${TYPE_ORDER.some(ty=>totalFor(c,ty)>0)
+            ? TYPE_ORDER.map(ty=>balLine(typeShort(ty),totalFor(c,ty),usedFor(c,ty))).join('')
+            : '<div class="clienttag" style="margin-top:6px">'+t('No package yet — ask the Owner about prepaid packs.')+'</div>'}
           <div class="clienttag" style="margin-top:8px">${completedCount(c)} ${t('completed')}</div>
         </div>
       </div>
@@ -4613,7 +4618,7 @@ function textConfirm(s){
   const c=custById(s.customerIds[0]); if(c){const a=smsAddr(c.phone,c.carrier);if(a)to.push(a);}
   const co=coachById(s.coachId); if(co){const a=smsAddr(co.phone,co.carrier);if(a)to.push(a);}
   if(!to.length)return;
-  const msg='RX Training: your '+(s.type==='1on1'?'1:1':'group')+' session '+fmtDT(s.date,s.time)+' @ '+(s.location||'TBD')+' with '+coachName(s.coachId)+' is CONFIRMED.';
+  const msg='RX Training: your '+typeShort(s.type)+' session '+fmtDT(s.date,s.time)+' @ '+(s.location||'TBD')+' with '+coachName(s.coachId)+' is CONFIRMED.';
   supa.functions.invoke('send-request-email',{body:{to,subject:'RX Training',text:msg,replyTo:'rx@rxtraining.org'}}).then(()=>{},()=>{});
 }
 /* email a single client via the Edge Function (replies route to rx@rxtraining.org) */
@@ -4820,7 +4825,7 @@ function confirmSession(id){
   s.status='scheduled';clearCancel(s);save();
   const c=custById(s.customerIds[0]);
   if(c&&c.email){emailClient(c.email,'RX Training — your session is confirmed',
-    'Hi '+firstName(c.name)+',\n\nYour '+(s.type==='1on1'?'1:1 Private':'group')+' session is confirmed:\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location+'\n\nReply to this email if you need to change anything.\n\n— RX Training');}
+    'Hi '+firstName(c.name)+',\n\nYour '+typeShort(s.type)+' session is confirmed:\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location+'\n\nReply to this email if you need to change anything.\n\n— RX Training');}
   textConfirm(s);
   flash('Confirmed'+(c&&c.email?' & client emailed ✅':' ✅'));refreshOwner();
 }
@@ -5270,7 +5275,7 @@ const CUST_COLS=[
   {id:'completed',label:'Completed',num:true,get:c=>completedCount(c)},
   {id:'booked',label:'Booked',num:true,get:c=>bookedCount(c)},
   {id:'cancels',label:'Cancels',num:true,get:c=>clientCancelCount(c)},
-  {id:'credits',label:'Credits (used/total)',num:true,get:c=>totalFor(c,'1on1')+totalFor(c,'group')},
+  {id:'credits',label:'Credits (used/total)',num:true,get:c=>TYPE_ORDER.reduce((a,ty)=>a+totalFor(c,ty),0)},
   {id:'joined',label:'Joined',get:c=>c.created||''},
   {id:'seen',label:'Last seen',get:c=>lastLoginOf(c)||''},
   {id:'next',label:'Next session',get:c=>{const n=sortSessions(DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.date>=todayISO()&&s.status==='scheduled'))[0];return n?(n.date+n.time):'';}}
@@ -5345,7 +5350,7 @@ function viewCustomer(id){
     <td>${p.paid?'<span class="pill green">'+(p.paidVia==='package'?'pkg':'paid')+'</span>':'<span class="pill red">unpaid</span>'}${s.type!=='1on1'&&s.customerIds.length>1?`<button class="iconbtn" title="Manage each player's payment" onclick="openGroupPay('${s.id}')">⋯</button>`:''}</td>
     <td class="right">${money(s.price/s.customerIds.length)}</td>
     <td class="right"><button class="iconbtn" onclick="openSession('${s.id}','${id}')">Edit</button></td></tr>`;}).join('')||'<tr><td colspan="6"><div class="empty">No sessions yet.</div></td></tr>';
-  const pkgs=c.packages.length?c.packages.slice().reverse().map(p=>`<tr><td>${fmtDate(p.date)}</td><td>${p.qty}× ${p.type==='1on1'?'1:1':'Group'}</td><td class="right">${money(p.amount)}</td><td class="right"><button class="iconbtn" onclick="openPackage('${id}','${p.id}')">Edit</button></td></tr>`).join(''):'<tr><td colspan="4"><div class="empty">No packages.</div></td></tr>';
+  const pkgs=c.packages.length?c.packages.slice().reverse().map(p=>`<tr><td>${fmtDate(p.date)}</td><td>${p.qty}× ${typeShort(p.type)}</td><td class="right">${money(p.amount)}</td><td class="right"><button class="iconbtn" onclick="openPackage('${id}','${p.id}')">Edit</button></td></tr>`).join(''):'<tr><td colspan="4"><div class="empty">No packages.</div></td></tr>';
   const credLine=(lab,t)=>totalFor(c,t)>0?`<div class="small" style="margin-top:4px">${lab}: <b>${usedFor(c,t)}/${totalFor(c,t)} used</b> · <span style="color:var(--accent)">${creditsFor(c,t)} left</span></div>`:'';
   openModal(c.name,`
     <div class="row" style="margin-bottom:8px">
@@ -5375,7 +5380,7 @@ function viewCustomer(id){
     </div>
     <div class="panel" style="background:var(--panel2);margin:6px 0 14px">
       <div class="row" style="justify-content:space-between;align-items:center">
-        <div><b>Prepaid sessions</b> <span class="clienttag">(${completedCount(c)} completed · used = completed)</span>${(totalFor(c,'1on1')||totalFor(c,'group'))?credLine('1:1','1on1')+credLine('Group','group'):'<div class="clienttag" style="margin-top:4px">No package yet.</div>'}</div>
+        <div><b>Prepaid sessions</b> <span class="clienttag">(${completedCount(c)} completed · used = completed)</span>${TYPE_ORDER.some(ty=>totalFor(c,ty)>0)?TYPE_ORDER.map(ty=>credLine(typeShort(ty),ty)).join(''):'<div class="clienttag" style="margin-top:4px">No package yet.</div>'}</div>
         <button class="btn sm" onclick="openSellPackage('${id}')">+ Sell package</button>
       </div>
       <table style="margin-top:10px"><thead><tr><th>Date</th><th>Package</th><th class="right">Paid</th><th></th></tr></thead><tbody>${pkgs}</tbody></table>
@@ -5396,8 +5401,8 @@ function openSellPackage(id){
     <div class="field"><label class="f">Coach (credit applies to this coach)</label><select id="pkCoach">${coachSelectOptions(targetCoach(),false)}</select></div>
     <div class="row">
       <div class="field"><label class="f">Type</label><select id="pkType" onchange="recalcPkg()">
-        <option value="1on1">1:1 Private (${money(coachRate(targetCoach(),'1on1'))}/hr)</option>
-        <option value="group">Group / 1:N (${money(coachRate(targetCoach(),'group'))}/hr)</option></select></div>
+        ${TYPE_ORDER.map(ty=>`<option value="${ty}">${typeIcon(ty)} ${typeDef(ty).label} (${money(coachRate(targetCoach(),ty))}${ty==='1on1'?'/hr':'/player'})</option>`).join('')}
+      </select></div>
       <div class="field"><label class="f">Number of sessions</label><input type="number" id="pkQty" value="10" min="1" onchange="recalcPkg()" oninput="recalcPkg()"></div>
     </div>
     <div class="row">
@@ -5413,11 +5418,11 @@ function savePackage(id){
   if(!c)return flash('Pick a client',true);
   const type=$('#pkType').value;const qty=+$('#pkQty').value;const amt=+$('#pkAmt').value;
   if(!qty||qty<1)return flash('Enter a session count',true);
-  if(!c.creditsTotal)c.creditsTotal={'1on1':0,'group':0};
+  if(!c.creditsTotal)c.creditsTotal={};
   c.creditsTotal[type]=totalFor(c,type)+qty;
   const pkgCoach=$('#pkCoach')?$('#pkCoach').value:targetCoach();
   c.packages.push({id:uid(),coachId:pkgCoach,type,qty,amount:amt,date:$('#pkDate').value});
-  save();flash(qty+'× '+(type==='1on1'?'1:1':'Group')+' package sold 🎟️');
+  save();flash(qty+'× '+typeShort(type)+' package sold 🎟️');
   if(id)viewCustomer(id);else{closeModal();refreshOwner();}
 }
 function openPackage(cid,pid){
@@ -5425,8 +5430,8 @@ function openPackage(cid,pid){
   openModal('Edit package — '+c.name,`
     <div class="row">
       <div class="field"><label class="f">Type</label><select id="epType">
-        <option value="1on1" ${p.type==='1on1'?'selected':''}>1:1 Private</option>
-        <option value="group" ${p.type==='group'?'selected':''}>Group / 1:N</option></select></div>
+        ${TYPE_ORDER.map(ty=>`<option value="${ty}" ${p.type===ty?'selected':''}>${typeIcon(ty)} ${typeDef(ty).label}</option>`).join('')}
+      </select></div>
       <div class="field"><label class="f">Number of sessions</label><input type="number" id="epQty" min="1" value="${p.qty}"></div>
     </div>
     <div class="row">
@@ -5440,7 +5445,7 @@ function savePackageEdit(cid,pid){
   const c=custById(cid);const p=c.packages.find(x=>x.id===pid);
   const nt=$('#epType').value, nq=+$('#epQty').value||0, na=+$('#epAmt').value||0, nd=$('#epDate').value;
   if(nq<1)return flash('Sessions must be at least 1',true);
-  if(!c.creditsTotal)c.creditsTotal={'1on1':0,'group':0};
+  if(!c.creditsTotal)c.creditsTotal={};
   c.creditsTotal[p.type]=Math.max(0,(c.creditsTotal[p.type]||0)-p.qty);
   c.creditsTotal[nt]=(c.creditsTotal[nt]||0)+nq;
   p.type=nt;p.qty=nq;p.amount=na;p.date=nd;
@@ -5476,10 +5481,10 @@ function openCustomer(id){
     <div class="panel" style="background:var(--panel2);padding:14px;margin-bottom:14px">
       <b class="small">Prepaid credit totals</b>
       <div class="row" style="margin-top:10px">
-        <div class="field" style="margin-bottom:0"><label class="f">1:1 — total sessions</label><input type="number" id="cTot1" min="0" value="${id?totalFor(c,'1on1'):0}"></div>
-        <div class="field" style="margin-bottom:0"><label class="f">Group — total sessions</label><input type="number" id="cTotG" min="0" value="${id?totalFor(c,'group'):0}"></div>
+        ${TYPE_ORDER.map(ty=>`<div class="field" style="margin-bottom:0"><label class="f">${typeShort(ty)} — total sessions</label>
+          <input type="number" class="cTotType" data-type="${ty}" min="0" value="${id?totalFor(c,ty):0}"></div>`).join('')}
       </div>
-      <div class="clienttag" style="margin-top:8px">${id?`Used now: 1:1 ${usedFor(c,'1on1')}/${totalFor(c,'1on1')} · Group ${usedFor(c,'group')}/${totalFor(c,'group')}. `:''}Used is counted automatically from package-paid sessions — change it by editing a session's payment in the history.</div>
+      <div class="clienttag" style="margin-top:8px">${id?('Used now: '+TYPE_ORDER.map(ty=>typeShort(ty)+' '+usedFor(c,ty)+'/'+totalFor(c,ty)).join(' · ')+'. '):''}Used is counted automatically from package-paid sessions — change it by editing a session's payment in the history.</div>
     </div>
     <div class="field"><label class="f">Client login password</label>
       <div class="row" style="gap:8px">
@@ -5497,13 +5502,16 @@ function openCustomer(id){
 function saveCustomer(id){
   const name=$('#cName').value.trim();if(!name)return flash('Name is required',true);
   const obj={name,phone:$('#cPhone').value,carrier:($('#cCarrier')?$('#cCarrier').value:''),email:$('#cEmail').value,level:$('#cLevel').value,parent:$('#cParent').value,town:($('#cTown')?$('#cTown').value:'').trim(),notes:$('#cNotes').value,wechat:($('#cWechat')?$('#cWechat').value:'').trim(),inGroup:!!($('#cInGroup')&&$('#cInGroup').checked)};
-  const tot1=Math.max(0,Math.round(+$('#cTot1').value||0)), totG=Math.max(0,Math.round(+$('#cTotG').value||0));
+  // Read whatever inputs the form rendered. The old code wrote a fixed {1on1,group} object,
+  // so saving a customer silently deleted any weekend-class credits they held.
+  const credits={};
+  $$('.cTotType').forEach(el=>{credits[el.dataset.type]=Math.max(0,Math.round(+el.value||0));});
   const pwd=($('#cPwd').value||'').trim()||DB.settings.defaultClientPwd;
   const created=($('#cCreated')&&$('#cCreated').value)||todayISO();
   const dupName=DB.customers.some(x=>x.id!==id&&(x.name||'').trim().toLowerCase()===name.toLowerCase());
   const dupNote=dupName?' ⚠ Another player has this name — give each a unique password so they can sign in.':'';
-  if(id){const ex=custById(id);Object.assign(ex,obj);ex.creditsTotal={'1on1':tot1,'group':totG};ex.pwd=pwd;ex.created=created;save();closeModal();flash('Customer saved'+dupNote,dupName);renderCustomers();}
-  else{obj.id=uid();obj.created=created;obj.creditsTotal={'1on1':tot1,'group':totG};obj.packages=[];obj.token=uid()+uid();obj.pwd=pwd;DB.customers.push(obj);save();closeModal();flash('Customer added — open 🔗 Link to share their sign-in'+dupNote,dupName);renderCustomers();}
+  if(id){const ex=custById(id);Object.assign(ex,obj);ex.creditsTotal=Object.assign({},ex.creditsTotal||{},credits);ex.pwd=pwd;ex.created=created;save();closeModal();flash('Customer saved'+dupNote,dupName);renderCustomers();}
+  else{obj.id=uid();obj.created=created;obj.creditsTotal=credits;obj.packages=[];obj.token=uid()+uid();obj.pwd=pwd;DB.customers.push(obj);save();closeModal();flash('Customer added — open 🔗 Link to share their sign-in'+dupNote,dupName);renderCustomers();}
 }
 function delCustomer(id){const c=custById(id);if(!c)return;confirmByName('customer',c.name,()=>{DB.customers=DB.customers.filter(x=>x.id!==id);save();flash('Customer deleted');renderCustomers();},'Their past sessions remain in history.');}
 function toggleCustSuspend(id){const c=custById(id);if(!c)return;const to=!c.suspended;if(!confirm((to?'Suspend ':'Resume ')+c.name+'? '+(to?'They will not be able to sign in until resumed.':'They will be able to sign in again.')))return;c.suspended=to;save();pushRows('customers',[custRow(c)]);flash(to?'Customer suspended':'Customer resumed');closeModal();renderCustomers();}
@@ -5657,7 +5665,7 @@ function doApproveSession(id){
   }
   if(s){s.status='scheduled';clearCancel(s);save();
     const c=custById(s.customerIds[0]);
-    if(c&&c.email)emailClient(c.email,'RX Training — your session is confirmed','Hi '+firstName(c.name)+',\n\nYour '+(s.type==='1on1'?'1:1 Private':'group')+' session with '+coachName(s.coachId)+' is confirmed:\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location+'\n\n— RX Training');
+    if(c&&c.email)emailClient(c.email,'RX Training — your session is confirmed','Hi '+firstName(c.name)+',\n\nYour '+typeShort(s.type)+' session with '+coachName(s.coachId)+' is confirmed:\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location+'\n\n— RX Training');
     textConfirm(s);
     flash('Session confirmed ✅');}
   refreshApprovals();
@@ -6273,8 +6281,8 @@ function bucketPayments(items,period){
 function clientPayments(id){
   const c=custById(id); if(!c)return [];
   const out=[];
-  (c.packages||[]).forEach(p=>out.push({date:p.date,amount:p.amount,label:p.qty+'× '+(p.type==='1on1'?'1:1':'Group')+' package · '+coachName(p.coachId)}));
-  DB.cashEntries.filter(e=>e.customerId===id).forEach(e=>out.push({date:e.date,amount:e.amount,label:(e.qty||1)+'× '+(e.type==='group'?'Group':'1:1')+' (cash) · '+coachName(e.coachId)}));
+  (c.packages||[]).forEach(p=>out.push({date:p.date,amount:p.amount,label:p.qty+'× '+typeShort(p.type)+' package · '+coachName(p.coachId)}));
+  DB.cashEntries.filter(e=>e.customerId===id).forEach(e=>out.push({date:e.date,amount:e.amount,label:(e.qty||1)+'× '+typeShort(e.type)+' (cash) · '+coachName(e.coachId)}));
   // Check THIS client's own share, not the session aggregate — in a mixed group, one player's
   // cash payment must never show up in another player's payment log.
   DB.sessions.filter(s=>s.customerIds.includes(id)&&s.status!=='cancelled').forEach(s=>{
@@ -6285,8 +6293,8 @@ function clientPayments(id){
 }
 function coachEarnings(id){
   const out=[];
-  DB.customers.forEach(c=>(c.packages||[]).filter(p=>p.coachId===id).forEach(p=>out.push({date:p.date,amount:p.amount,label:c.name+' — '+p.qty+'× '+(p.type==='1on1'?'1:1':'Group')+' package'})));
-  DB.cashEntries.filter(e=>e.coachId===id).forEach(e=>{const cn=e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in';out.push({date:e.date,amount:e.amount,label:cn+' — '+(e.qty||1)+'× '+(e.type==='group'?'Group':'1:1')+' (cash)'});});
+  DB.customers.forEach(c=>(c.packages||[]).filter(p=>p.coachId===id).forEach(p=>out.push({date:p.date,amount:p.amount,label:c.name+' — '+p.qty+'× '+typeShort(p.type)+' package'})));
+  DB.cashEntries.filter(e=>e.coachId===id).forEach(e=>{const cn=e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in';out.push({date:e.date,amount:e.amount,label:cn+' — '+(e.qty||1)+'× '+typeShort(e.type)+' (cash)'});});
   // sessionCashAmt() only counts what was actually collected in cash — for a mixed group that's
   // just the paying members' shares, not the full session price.
   DB.sessions.filter(s=>s.coachId===id&&s.status!=='cancelled').forEach(s=>{
@@ -7038,10 +7046,12 @@ function renderFinance(){
   EXo.forEach(e=>{const k=monthKey(e.date);expByM[k]=(expByM[k]||0)+e.amount;});
   const rev=months.map(m=>revByM[m]||0), exp=months.map(m=>expByM[m]||0), prof=months.map((m,i)=>rev[i]-exp[i]);
 
-  const byType={'1on1':0,'group':0};
-  cashSess.forEach(s=>byType[s.type]+=sessionCashAmt(s));
-  allPkgs.forEach(p=>byType[p.type]+=p.amount);
-  const maxType=Math.max(byType['1on1'],byType['group'],1);
+  // Seeded from TYPE_ORDER: with a fixed two-key object, a conditioning session hit
+  // `undefined + amount` and turned the whole revenue-by-type panel into NaN.
+  const byType={}; TYPE_ORDER.forEach(ty=>byType[ty]=0);
+  cashSess.forEach(s=>{byType[s.type]=(byType[s.type]||0)+sessionCashAmt(s);});
+  allPkgs.forEach(p=>{byType[p.type]=(byType[p.type]||0)+p.amount;});
+  const maxType=Math.max.apply(null,TYPE_ORDER.map(ty=>byType[ty]).concat([1]));
 
   const expRows=EX.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>`<tr>
     <td>${fmtDate(e.date)}${(e.freq&&e.freq!=='once')?` <span class="pill blue">↻ ${FREQ_LABEL[e.freq]}</span>`:''}</td><td>${e.coachId==='owner'?'🏢':coachIcon(e.coachId)} ${coachName(e.coachId)}</td><td>${e.cat}${isAutoExpense(e)?' <span class="pill blue">auto</span>':''}</td><td class="muted">${e.note||''}</td>
@@ -7081,14 +7091,14 @@ function renderFinance(){
   })();
 
   const manualRows=CE.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>{const cn=e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in';return `<tr>
-    <td>${fmtDate(e.date)}</td><td>${coachIcon(e.coachId)} ${coachName(e.coachId)}</td><td>${cn}</td><td class="muted">${e.qty||1}× ${e.type==='group'?'Group':'1:1'} (cash)${e.note?' · '+e.note:''}</td><td class="right">${money(e.amount)}</td>
+    <td>${fmtDate(e.date)}</td><td>${coachIcon(e.coachId)} ${coachName(e.coachId)}</td><td>${cn}</td><td class="muted">${e.qty||1}× ${typeShort(e.type)} (cash)${e.note?' · '+e.note:''}</td><td class="right">${money(e.amount)}</td>
     <td class="right"><div class="actions"><button class="iconbtn" onclick="openCashEntry('${e.id}')">Edit</button><button class="iconbtn" onclick="delCashEntry('${e.id}')">✕</button></div></td></tr>`}).join('');
   const cashSessRows=cashSess.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(s=>`<tr>
     <td>${fmtDate(s.date)}</td><td>${coachIcon(s.coachId)} ${coachName(s.coachId)}</td><td>${custNames(s.customerIds)}</td><td class="muted">${typeShort(s.type)} session${s.type!=='1on1'&&!sessionFullyPaid(s)?' · partial':''}</td><td class="right">${money(sessionCashAmt(s))}</td>
     <td class="right"><button class="iconbtn" onclick="${s.type!=='1on1'&&s.customerIds.length>1?`openGroupPay('${s.id}')`:`openSession('${s.id}')`}">Edit</button></td></tr>`).join('');
   const cashRows=(manualRows+cashSessRows)||'<tr><td colspan="6"><div class="empty">No cash income yet.</div></td></tr>';
 
-  const pkgRows=allPkgs.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>`<tr><td>${fmtDate(p.date)}</td><td>${coachIcon(p.coachId)} ${coachName(p.coachId)}</td><td>${p.cust}</td><td class="muted">${p.qty}× ${p.type==='1on1'?'1:1':'Group'}</td><td class="right">${money(p.amount)}</td>
+  const pkgRows=allPkgs.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>`<tr><td>${fmtDate(p.date)}</td><td>${coachIcon(p.coachId)} ${coachName(p.coachId)}</td><td>${p.cust}</td><td class="muted">${p.qty}× ${typeShort(p.type)}</td><td class="right">${money(p.amount)}</td>
     <td class="right"><button class="iconbtn" onclick="openPackage('${p.custId}','${p.id}')">Edit</button></td></tr>`).join('')||'<tr><td colspan="6"><div class="empty">No packages sold.</div></td></tr>';
 
   // per-coach comparison (only in the "All coaches" view)
@@ -7839,7 +7849,7 @@ function openCashEntry(id,prefillCust){
       <div class="field"><label class="f">Date</label><input type="date" id="kDate" value="${e.date}"></div>
     </div>
     <div class="row">
-      <div class="field"><label class="f">Session type</label><select id="kType" onchange="recalcCash()"><option value="1on1" ${e.type==='1on1'?'selected':''}>1:1 Private (${money(coachRate(e.coachId||targetCoach(),'1on1'))}/hr)</option><option value="group" ${e.type==='group'?'selected':''}>Group / 1:N (${money(coachRate(e.coachId||targetCoach(),'group'))}/hr)</option></select></div>
+      <div class="field"><label class="f">Session type</label><select id="kType" onchange="recalcCash()">${TYPE_ORDER.map(ty=>`<option value="${ty}" ${e.type===ty?'selected':''}>${typeIcon(ty)} ${typeDef(ty).label} (${money(coachRate(e.coachId||targetCoach(),ty))}${ty==='1on1'?'/hr':'/player'})</option>`).join('')}</select></div>
       <div class="field"><label class="f">Sessions (qty)</label><input type="number" id="kQty" min="1" value="${e.qty||1}" onchange="recalcCash()" oninput="recalcCash()"></div>
     </div>
     <div class="row">
