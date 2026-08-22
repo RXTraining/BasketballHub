@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>RX.TRAINING</title>
 <meta name="theme-color" content="#ffffff">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -30,7 +30,7 @@
   function fixViewport(){
     try{
       var v=document.querySelector('meta[name=viewport]'); if(!v)return;
-      var c='width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, viewport-fit=cover';
+      var c='width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
       v.setAttribute('content',c+', _=' + Date.now());   // force a change so Safari re-reads it
       setTimeout(function(){ v.setAttribute('content',c); },50);
     }catch(e){}
@@ -39,6 +39,15 @@
   try{
     window.addEventListener('pageshow',fixViewport);
     window.addEventListener('orientationchange',function(){setTimeout(fixViewport,250);});
+    /* visualViewport.scale reports pinch zoom. Re-writing the meta is the only thing that snaps
+       iOS back to 1 — there is no API to set the zoom directly. */
+    if(window.visualViewport){
+      var snap=function(){
+        try{ if(window.visualViewport.scale>1.02){ fixViewport(); } }catch(e){}
+      };
+      window.visualViewport.addEventListener('resize',snap);
+      window.visualViewport.addEventListener('scroll',snap);
+    }
     if(document.readyState==='complete')fixViewport();
     else window.addEventListener('load',fixViewport);
   }catch(e){}
@@ -144,6 +153,7 @@
     color:var(--txt);min-height:100vh;-webkit-font-smoothing:antialiased;
     overflow:hidden;width:100%;max-width:100%;height:100%}
   a{color:inherit}
+  /* If a stray element is ever too wide, the shell scrolls to it — nothing is hidden. */
   /* Safety net: a single oversized image, video, iframe, table or long word is enough to make
      iOS lay the entire page out wider than the screen — which is what "opens zoomed out and I
      have to pinch to fit" actually is. */
@@ -475,9 +485,9 @@
   /* The app shell. Sized against the viewport rather than against <body>, mirroring #login,
      which is the one layout that has always fitted this phone correctly. Everything inside it
      therefore measures against the real screen width. */
-  #appShell{position:fixed;inset:0;overflow-y:auto;overflow-x:hidden;
-    -webkit-overflow-scrolling:touch;background:transparent}
-  .login{position:fixed;inset:0;z-index:300;display:none;overflow-y:auto;overflow-x:hidden;
+  #appShell{position:fixed;inset:0;overflow-y:auto;overflow-x:auto;
+    -webkit-overflow-scrolling:touch;background:transparent;overscroll-behavior-y:contain}
+  .login{position:fixed;inset:0;z-index:300;display:none;overflow-y:auto;overflow-x:auto;
     -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
     background:var(--lp-bg);color:var(--lp-ink);padding-bottom:env(safe-area-inset-bottom,0px)}
   .login.show{display:block}
@@ -2139,25 +2149,37 @@ function rxWidthAudit(){
   });
   out.sort((a,b)=>b.over-a.over);
   const worst=out.slice(0,8);
+  const vv=window.visualViewport;
+  const env=['screen '+screen.width+'x'+screen.height,
+             'window.innerWidth '+Math.round(window.innerWidth),
+             'documentElement.clientWidth '+document.documentElement.clientWidth,
+             'appShell '+((sh&&sh.clientWidth)||'—'),
+             'visualViewport '+(vv?Math.round(vv.width)+' @ scale '+vv.scale.toFixed(2):'n/a'),
+             'devicePixelRatio '+(window.devicePixelRatio||1)].join('\n');
   if(worst.length){
-    console.warn('[RX width audit] viewport '+vw+'px — '+out.length+' element(s) overflow:');
+    console.warn('[RX width audit] '+out.length+' element(s) overflow '+vw+'px\n'+env);
     worst.forEach(o=>console.warn('   +'+o.over+'px  '+o.id+'  (width '+o.w+')',o.el));
-  } else console.log('[RX width audit] viewport '+vw+'px — nothing overflows');
+  } else console.log('[RX width audit] nothing overflows\n'+env);
+  rxAuditEnv=env;
   return worst.map(o=>'+'+o.over+'px '+o.id);
 }
 /* Owner-only nudge, so a layout problem reports itself instead of being noticed weeks later. */
+let rxAuditEnv='';
 function rxWidthWarn(){
   try{
     if(AUTH!=='owner')return;
     const bad=rxWidthAudit();
     const host=$('#whoami'); if(!host)return;
     const old=document.getElementById('wOver'); if(old)old.remove();
-    if(!bad.length)return;
+    const vv=window.visualViewport;
+    const zoomed=!!(vv&&Math.abs(vv.scale-1)>0.02);
+    const narrow=Math.abs(document.documentElement.clientWidth-Math.round(window.innerWidth))>2;
+    if(!bad.length&&!zoomed&&!narrow)return;
     const b=document.createElement('button');
     b.id='wOver'; b.className='btn ghost sm'; b.style.color='var(--red)';
     b.textContent='⇤ layout '+bad.length;
     b.title='Elements wider than the screen — tap for details';
-    b.onclick=()=>alert('Wider than the screen ('+Math.round(window.innerWidth)+'px):\n\n'+bad.join('\n'));
+    b.onclick=()=>alert(rxAuditEnv+'\n\nWider than the screen:\n'+(bad.length?bad.join('\n'):'nothing'));
     host.appendChild(b);
   }catch(e){}
 }
@@ -3785,7 +3807,9 @@ const CHANGELOG=[
    'An event can now have <b>several host coaches</b> instead of one. The Host coach dropdown is a tick list, every host is shown wherever the event appears, and a co-hosted event turns up in each host\u2019s own view rather than only the first one\u2019s. Events created before this keep working: the old single column is still read, and still written with the first host, so anything else querying it is unaffected. Finance counts a co-hosted event once, not once per coach.',
    '<b>Pull down to refresh</b> everywhere — the public home page and the signed-in app for owner, coach and client. The landing scrolls inside a fixed container and the app scrolls the document, so each needed its own binding; in a Home Screen app there is no browser pull-to-refresh at all. It only engages from the very top, ignores upward and sideways drags, skips an open dialog, and will not fight a table you are scrolling sideways.',
    '<b>Fix: the app is cut off no longer.</b> The public home page always fitted the phone because it is a <span class="mono">position:fixed; inset:0</span> layer measured against the viewport. The app was not — it relied on <span class="mono">&lt;body&gt;</span> being as wide as the screen, and on iOS it was not, so content clipped at body\'s right edge with blank screen showing beyond it. The app now lives in <span class="mono">#appShell</span>, a fixed full-viewport scroller built the same way as the home page, so everything inside measures against the real screen width. Scroll resets, pull-to-refresh and the width audit all read the shell.',
-   'While chasing that, the header was also made to wrap and shrink at any width rather than only inside a \u2264820px media query, and two overflow clips were removed that had been hiding content instead of revealing it. A width audit (<span class="mono">rxWidthAudit()</span>) now reports anything sticking out past the viewport, with a red <b>\u21e4 layout</b> chip in the owner header when it finds something.',
+   'Both edges of the app were being clipped with no way to pan — which is the signature of a <b>zoomed</b> visual viewport, not of overflowing content. Pinch zoom is now pinned at 1x and any reported zoom snaps back, since a fixed-position layout is positioned against the layout viewport and cannot be panned when zoomed. Text still scales through the iOS text-size setting; only pinch zoom is fixed.',
+   'Neither the app shell nor the landing layer clips horizontally any more — if something is ever too wide it scrolls to it. Hiding overflow is what turned each of these layout bugs from awkward into invisible.',
+   'The width audit now reports the device numbers too — screen, window width, document width, shell width, visual-viewport width and zoom scale — and the owner\'s <b>\u21e4 layout</b> chip shows them, so a layout problem can be diagnosed from the phone instead of guessed at.',
    'Added a width audit: <span class="mono">rxWidthAudit()</span> walks the rendered page and reports anything sticking out past the viewport, ignoring elements already inside their own scroller. The owner gets a red <b>\u21e4 layout</b> chip in the header when something overflows, tappable for the list \u2014 so a layout regression names itself instead of being chased by guesswork.',
    '<b>Fix: a cancelled session no longer reads as paid.</b> Cancelling clears the payment state, and — importantly for rows cancelled before that shipped — the payment cell is now <i>derived from the status</i> rather than the stored flag, so historic sessions correct themselves with no migration. <span class="mono">custPay()</span> and the fully-paid check also report a cancelled session as unpaid, so every screen agrees.',
    'Cash that had already been collected is not simply erased: the amount is kept on the record and a red <b>↩ \$X to refund</b> flag rides alongside the Cancelled pill until you deal with it. Whoever cancels is warned first — the owner and coach see the amount, the client is told the refund is not automatic. A session paid with a package credit needs no unwinding: credits are counted from completed sessions, so cancelling returns the credit by itself.',
