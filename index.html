@@ -459,6 +459,12 @@
   @keyframes sloganRule{to{transform:translateX(-50%) scaleX(1)}}
   @media(prefers-reduced-motion:reduce){
     .lp-slogan::after{animation:none;transform:translateX(-50%) scaleX(1)}}
+  /* "Training now" strip: the sports with a coach, named in the hero. */
+  .lp-live{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin:0 0 22px}
+  .lp-live-lab{font-size:10.5px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:var(--lp-mut)}
+  .lp-live-chip{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:800;
+    color:#2f6b12;background:var(--a1b);border:1.5px solid var(--lp-volt-d);border-radius:999px;padding:6px 14px}
+  @media(max-width:560px){.lp-live{gap:6px}.lp-live-chip{font-size:12.5px;padding:5px 11px}}
   .lp-role{font-size:clamp(15px,2.4vw,19px);font-weight:800;color:var(--lp-mut);letter-spacing:3px;text-transform:uppercase;margin-bottom:20px}
   .lp-lede{max-width:640px;margin:0 auto 26px;font-size:16.5px;line-height:1.65;color:var(--lp-mut)}
   .lp-lede b{color:var(--lp-ink)}
@@ -669,7 +675,11 @@
     padding:6px 11px;font-size:12.5px;color:var(--lp-mut);font-weight:700}
   .lp-coach-rates b{color:var(--lp-ink)}
   /* ---- sports rail ---- */
-  .lp-sports{display:grid;grid-template-columns:repeat(auto-fit,minmax(136px,1fr));gap:12px;margin-top:24px}
+  .lp-sports{display:grid;grid-template-columns:repeat(auto-fit,minmax(136px,1fr));gap:12px;margin-top:12px}
+  .lp-sport-lab{font-size:11.5px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;
+    color:var(--lp-volt-d);margin-top:24px;display:flex;align-items:center;gap:9px}
+  .lp-sport-lab::after{content:"";flex:1;height:1.5px;background:var(--lp-line)}
+  .lp-sport-lab.dim{color:var(--lp-mut)}
   .lp-sport{background:var(--lp-soft);border:1.5px dashed var(--lp-line);border-radius:16px;padding:18px 12px;
     text-align:center;transition:transform .2s ease,border-color .2s ease}
   .lp-sport:hover{transform:translateY(-4px)}
@@ -897,16 +907,16 @@ const ZH={
   'HIGHLIGHTS':'精彩集锦',
   'ABOUT_P3':'我们在打造一个<b>循环</b>：今天我们培养的孩子，就是明天带下一批孩子的导师。',
   /* --- landing page prose --- */
-  'HERO_LEDE':'由 <b>{name}</b> 创办 —— 一名现役 AAU 球员，而非早已退役的教练。每一堂课都建立在<b>对篮球的热爱</b>之上：投入、拼搏，以及<b>永不放弃</b>的信念。',
+  'HERO_LEDE':'由 <b>{name}</b> 创办 —— 一名仍在赛场上的运动员，而非早已退役的教练。每一堂课都建立在<b>对这项运动的热爱</b>之上：投入、拼搏，以及<b>永不放弃</b>的信念。',
   'ABOUT_P1':'RX Training 是一个<b>青少年体育社群</b> —— 由优秀的学生运动员来指导下一代。',
   'ABOUT_P2':'我们的导师<b>年龄相近</b>，孩子们真心想成为他们那样的人；同时<b>水平过硬</b>，能教出真本事。',
-  'CARD_AAU':'我们的教练仍效力于 Middlesex Magic —— 美国东北部高水平竞技篮球。',
+  'CARD_AAU':'我们的教练没有退役 —— 他们仍代表校队和俱乐部出赛。孩子跟着同样在拼搏的人学习。',
   'CARD_LIVE':'每堂课都置身真实比赛场景 —— 有防守人、有比赛时间、需要做出决策。',
-  'CARD_IQ':'理解比赛与技术训练同样重要。我们教球员在场上观察与思考。',
+  'CARD_IQ':'理解这项运动和练习技术同样重要。我们教球员读懂局势，先想一步。',
   'CARD_GRIT':'我们以专注与坚韧投入每一堂课，也期待每一位球员做到同样。',
-  'QUOTE':'我们教的不只是篮球，更是<em>对这项运动的热爱</em> —— 我们的投入、我们的拼搏，以及<em>永不放弃</em>的信念。',
+  'QUOTE':'我们不只是教孩子一项运动，更是在教<em>对它的热爱</em> —— 投入、拼搏，以及<em>永不放弃</em>的信念。',
   'COACHES_P':'这里的每位教练都仍在赛场上竞技。你不是在向早已停止打球的人学习。',
-  'SPORTS_P':'RX 会不断成长。同一个应用、同样的教学标准 —— 当合适的教练加入，我们就开设新的运动项目。',
+  'SPORTS_P':'RX 目前开设以下项目。标注<b>正在开课</b>的即可在应用内预约；其余项目将随教练加入陆续开放 —— 同一个应用，同样的教学标准。',
   'SPORTS_CTA':'你是这些项目的教练，并希望在 RX 开课？',
   'PLAN1_DESC':'完全围绕你的技术特点定制，包含实战对抗 —— 真实防守、真实判断、真实压力。',
   'PLAN2_DESC':'2–{max} 人小组课。球员之间的竞争营造出接近比赛的强度 —— 一起训练，共同进步。',
@@ -922,7 +932,7 @@ const ZH={
   'G_COMM':'场上沟通',
   'G_VALUE':'与朋友、队友一起，超高性价比',
   'AVAIL_LINE':'服务范围：<b>马萨诸塞州列克星敦</b>地区 · 时间灵活 · 预约与管理均可在应用内完成。',
-  'FILM_P':'观看我们代表 <b>Middlesex Magic</b> 参加 AAU 比赛。这就是我们带入每一堂训练课的水准。',
+  'FILM_P':'来看我们的运动员比赛。这就是我们带入每一堂训练课的水准。',
   'BOOK_P':'注册账号即可查看实时可预约时段、预约一对一或小组课、查询付款记录，并在每堂课后收到教练的视频反馈。',
   'NO_COACHES':'教练团队正在扩充中 —— 敬请期待。',
   'FOUNDER':'创办人',
@@ -956,6 +966,9 @@ const ZH={
   'Highlights':'精彩集锦',
   'Book':'预约',
   'SESSIONS COACHED':'已完成课程',
+  'Open now':'现已开课',
+  'Coming as we add coaches':'教练到位后开放',
+  'Training now':'现已开课',
   'SLOGAN':'我们在你心中种下运动的种子',
   'NO_WEEKEND_SLOTS':'{name} 目前还没有安排时段，教练排好后会在这里显示。',
   'Weekend Open Run':'周末自由球局',
@@ -984,14 +997,14 @@ const ZH={
   'COACHES':'教练',
   'Who we are':'关于我们',
   'THE RX APPROACH':'RX 训练理念',
-  'Active AAU competitor':'现役 AAU 球员',
+  'Active AAU competitor':'由现役运动员执教',
   'Live situation training':'实战情境训练',
   'Game IQ first':'球商优先',
   'Never give up':'永不放弃',
   'The team':'教练团队',
   'YOUR COACHES':'你的教练',
   'What\'s next':'未来规划',
-  'MORE THAN BASKETBALL':'不止于篮球',
+  'SPORTS_H':'我们开设的运动项目',
   'Now training':'已开课',
   'Coming soon':'即将开放',
   'What we offer':'课程内容',
@@ -1004,7 +1017,6 @@ const ZH={
   'Book a group':'预约小组课',
   'Book with':'预约',
   'See us play':'观看比赛',
-  'AAU HIGHLIGHTS':'AAU 精彩集锦',
   'Book a session':'预约课程',
   'LET\'S WORK':'开始训练吧',
   'Create your account':'创建账号',
@@ -1058,16 +1070,16 @@ const KO={
   'HIGHLIGHTS':'하이라이트',
   'ABOUT_P3':'우리는 <b>순환하는 구조</b>를 만들고 있습니다. 오늘 우리가 가르친 아이가 내일 다음 그룹을 가르치는 멘토가 됩니다.',
   /* --- landing page prose --- */
-  'HERO_LEDE':'<b>{name}</b>이(가) 설립했습니다 — 오래전 은퇴한 코치가 아니라 현역 AAU 선수입니다. 모든 세션은 <b>경기에 대한 사랑</b> 위에 세워집니다: 헌신, 노력, 그리고 <b>절대 포기하지 않는</b> 믿음.',
+  'HERO_LEDE':'<b>{name}</b>이(가) 설립했습니다 — 오래전 은퇴한 코치가 아니라 지금도 뛰는 선수입니다. 모든 세션은 <b>그 종목에 대한 사랑</b> 위에 세워집니다: 헌신, 노력, 그리고 <b>절대 포기하지 않는</b> 믿음.',
   'ABOUT_P1':'RX Training은 뛰어난 학생 선수들이 다음 세대를 가르치는 <b>유소년 스포츠 커뮤니티</b>입니다.',
   'ABOUT_P2':'우리 멘토들은 <b>나이가 가깝기에</b> 아이들이 닮고 싶어 하고, 동시에 <b>실력이 충분해</b> 진짜 기술을 가르칩니다.',
-  'CARD_AAU':'우리 코치진은 지금도 Middlesex Magic에서 뜁니다 — 미 북동부의 높은 수준의 경쟁 농구.',
+  'CARD_AAU':'우리 코치진은 은퇴하지 않았습니다 — 지금도 학교와 클럽 팀에서 뜁니다. 같은 길을 걷는 사람에게 배웁니다.',
   'CARD_LIVE':'모든 세션이 실제 경기 상황입니다 — 수비수가 붙고, 시계가 돌아가고, 결정을 내려야 합니다.',
-  'CARD_IQ':'경기를 이해하는 것은 훈련만큼 중요합니다. 코트에서 읽고 생각하는 법을 가르칩니다.',
+  'CARD_IQ':'종목을 이해하는 것은 훈련만큼 중요합니다. 흐름을 읽고 한 수 앞을 생각하도록 가르칩니다.',
   'CARD_GRIT':'우리는 모든 세션에 헌신과 강인함을 쏟고, 모든 선수에게도 같은 것을 기대합니다.',
-  'QUOTE':'우리는 농구만 가르치지 않습니다. <em>경기에 대한 사랑</em>을 가르칩니다 — 우리의 헌신, 우리의 노력, 그리고 <em>절대 포기하지 않는</em> 믿음을.',
+  'QUOTE':'우리는 아이들에게 종목만 가르치지 않습니다. <em>그것을 사랑하는 법</em>을 가르칩니다 — 헌신, 노력, 그리고 <em>절대 포기하지 않는</em> 믿음.',
   'COACHES_P':'이곳의 모든 코치는 여전히 경쟁합니다. 오래전 은퇴한 사람에게 배우는 것이 아닙니다.',
-  'SPORTS_P':'RX는 성장합니다. 같은 앱, 같은 코칭 기준 — 알맞은 코치가 합류하면 새로운 종목을 엽니다.',
+  'SPORTS_P':'RX는 아래 종목을 운영합니다. <b>운영 중</b> 표시는 지금 앱에서 예약할 수 있습니다. 나머지는 코치가 합류하는 대로 열립니다 — 같은 앱, 같은 기준.',
   'SPORTS_CTA':'이 종목의 코치이시고 RX에서 세션을 운영하고 싶으신가요?',
   'PLAN1_DESC':'당신의 플레이에 맞춘 완전 맞춤형 세션. 실전 반복 포함 — 실제 수비, 실제 판단, 실제 압박.',
   'PLAN2_DESC':'2–{max}명 소그룹. 선수 간 경쟁이 실전에 가까운 강도를 만듭니다 — 함께 배우고 함께 성장합니다.',
@@ -1083,7 +1095,7 @@ const KO={
   'G_COMM':'코트 위 커뮤니케이션',
   'G_VALUE':'친구·팀 동료와 함께하면 더 좋은 가격',
   'AVAIL_LINE':'<b>매사추세츠주 렉싱턴</b> 지역에서 진행 · 유연한 일정 · 예약과 관리는 모두 앱에서.',
-  'FILM_P':'<b>Middlesex Magic</b>과 함께한 AAU 경기를 확인하세요. 모든 트레이닝에 가져오는 수준입니다.',
+  'FILM_P':'우리 선수들의 경기를 확인하세요. 모든 트레이닝에 가져오는 수준입니다.',
   'BOOK_P':'계정을 만들면 실시간 예약 가능 시간 확인, 1:1·그룹 세션 예약, 결제 내역 확인, 그리고 매 세션 후 코치의 영상 피드백을 받을 수 있습니다.',
   'NO_COACHES':'코치진을 확충하고 있습니다 — 곧 만나보세요.',
   'FOUNDER':'창립자',
@@ -1114,6 +1126,9 @@ const KO={
   'Highlights':'하이라이트',
   'Book':'예약',
   'SESSIONS COACHED':'진행한 세션',
+  'Open now':'지금 운영 중',
+  'Coming as we add coaches':'코치 합류 후 오픈',
+  'Training now':'현재 운영 중',
   'SLOGAN':'우리는 스포츠의 씨앗을 심습니다',
   'NO_WEEKEND_SLOTS':'{name} 시간이 아직 공지되지 않았습니다. 코치가 일정을 올리면 여기에 표시됩니다.',
   'Weekend Open Run':'주말 오픈 런',
@@ -1142,14 +1157,14 @@ const KO={
   'COACHES':'코치',
   'Who we are':'우리는',
   'THE RX APPROACH':'RX 트레이닝 방식',
-  'Active AAU competitor':'현역 AAU 선수',
+  'Active AAU competitor':'현역 선수가 가르칩니다',
   'Live situation training':'실전 상황 훈련',
   'Game IQ first':'게임 IQ 우선',
   'Never give up':'포기하지 않는 자세',
   'The team':'팀',
   'YOUR COACHES':'당신의 코치',
   'What\'s next':'다음 단계',
-  'MORE THAN BASKETBALL':'농구 그 이상',
+  'SPORTS_H':'현재 운영 중인 종목',
   'Now training':'운영 중',
   'Coming soon':'곧 시작',
   'What we offer':'제공 프로그램',
@@ -1162,7 +1177,6 @@ const KO={
   'Book a group':'그룹 예약',
   'Book with':'예약:',
   'See us play':'경기 보기',
-  'AAU HIGHLIGHTS':'AAU 하이라이트',
   'Book a session':'세션 예약',
   'LET\'S WORK':'시작해 봅시다',
   'Create your account':'계정 만들기',
@@ -1211,16 +1225,16 @@ const JA={
   'HIGHLIGHTS':'ハイライト',
   'ABOUT_P3':'私たちは<b>循環する仕組み</b>をつくっています。今日教えた子どもが、明日は次のグループを教えるメンターになります。',
   /* --- landing page prose --- */
-  'HERO_LEDE':'<b>{name}</b> が創設 —— 何年も前に引退したコーチではなく、現役の AAU 選手です。すべてのセッションは<b>競技への愛</b>の上に成り立っています：献身、努力、そして<b>決して諦めない</b>という信念。',
+  'HERO_LEDE':'<b>{name}</b> が創設 —— 何年も前に引退したコーチではなく、今も競技を続ける選手です。すべてのセッションは<b>その競技への愛</b>の上に成り立っています：献身、努力、そして<b>決して諦めない</b>という信念。',
   'ABOUT_P1':'RX Training は、優れた学生アスリートが次の世代を指導する<b>ユーススポーツ・コミュニティ</b>です。',
   'ABOUT_P2':'メンターは<b>年齢が近い</b>から子どもたちが憧れ、しかも<b>実力があるから</b>本物の技術を教えられます。',
-  'CARD_AAU':'コーチ陣は今も Middlesex Magic でプレー —— 米国北東部のハイレベルな競技バスケットボール。',
+  'CARD_AAU':'コーチ陣は引退していません —— 今も学校やクラブのチームで戦っています。同じ道を歩む人から学べます。',
   'CARD_LIVE':'すべてのセッションが実戦形式です —— ディフェンダーがつき、時計が動き、判断を迫られます。',
-  'CARD_IQ':'競技を理解することはドリルと同じくらい重要です。コート上で読み、考える力を教えます。',
+  'CARD_IQ':'競技を理解することはドリルと同じくらい大切です。状況を読み、一手先を考える力を育てます。',
   'CARD_GRIT':'私たちはすべてのセッションに献身と強さを持ち込み、選手にも同じものを求めます。',
-  'QUOTE':'私たちが教えているのはバスケットボールだけではありません。<em>競技への愛</em>を伝えています —— 私たちの献身、努力、そして<em>決して諦めない</em>という信念を。',
+  'QUOTE':'私たちは競技を教えるだけではありません。<em>それを愛する気持ち</em>を教えます —— 献身、努力、そして<em>決して諦めない</em>という信念。',
   'COACHES_P':'ここのコーチは全員、今も競技を続けています。引退した人から学ぶのではありません。',
-  'SPORTS_P':'RX は成長し続けます。同じアプリ、同じ指導基準 —— ふさわしいコーチが加われば新しい競技を開きます。',
+  'SPORTS_P':'RX では以下の競技を開講しています。<b>開講中</b>のものは今すぐアプリで予約できます。その他はコーチが加わり次第オープンします —— 同じアプリ、同じ基準。',
   'SPORTS_CTA':'これらの競技のコーチで、RX でセッションを開きたい方はいませんか？',
   'PLAN1_DESC':'あなたのプレーに合わせた完全個別指導。実戦形式のレップ付き —— 本物のディフェンス、判断、プレッシャー。',
   'PLAN2_DESC':'2〜{max} 名の少人数グループ。選手同士の競争が実戦に近い強度を生みます —— 一緒に学び、共に成長。',
@@ -1236,7 +1250,7 @@ const JA={
   'G_COMM':'コート上のコミュニケーション',
   'G_VALUE':'友達・チームメイトと一緒ならお得',
   'AVAIL_LINE':'<b>マサチューセッツ州レキシントン</b>周辺で実施 · 柔軟なスケジュール · 予約も管理もアプリで完結。',
-  'FILM_P':'<b>Middlesex Magic</b> での AAU の試合をご覧ください。すべてのトレーニングに持ち込んでいるレベルです。',
+  'FILM_P':'選手たちの試合をご覧ください。すべてのトレーニングに持ち込んでいるレベルです。',
   'BOOK_P':'アカウントを作成すると、空き状況の確認、1:1・グループの予約、支払い状況の確認、そして毎回のセッション後にコーチからの動画フィードバックが受け取れます。',
   'NO_COACHES':'コーチを増員中です —— もう少しお待ちください。',
   'FOUNDER':'創設者',
@@ -1267,6 +1281,9 @@ const JA={
   'Highlights':'ハイライト',
   'Book':'予約',
   'SESSIONS COACHED':'実施セッション',
+  'Open now':'開講中',
+  'Coming as we add coaches':'コーチ加入後に開講',
+  'Training now':'開講中',
   'SLOGAN':'スポーツの種を蒔く',
   'NO_WEEKEND_SLOTS':'{name} の時間はまだ公開されていません。コーチが予定を追加するとここに表示されます。',
   'Weekend Open Run':'週末オープンラン',
@@ -1295,14 +1312,14 @@ const JA={
   'COACHES':'コーチ',
   'Who we are':'私たちについて',
   'THE RX APPROACH':'RX のトレーニング理念',
-  'Active AAU competitor':'現役 AAU 選手',
+  'Active AAU competitor':'現役選手が指導します',
   'Live situation training':'実戦形式のトレーニング',
   'Game IQ first':'ゲーム IQ 重視',
   'Never give up':'諦めない姿勢',
   'The team':'チーム',
   'YOUR COACHES':'あなたのコーチ',
   'What\'s next':'これから',
-  'MORE THAN BASKETBALL':'バスケットボールだけじゃない',
+  'SPORTS_H':'現在開講している競技',
   'Now training':'開講中',
   'Coming soon':'近日開始',
   'What we offer':'提供内容',
@@ -1315,7 +1332,6 @@ const JA={
   'Book a group':'グループを予約',
   'Book with':'予約：',
   'See us play':'プレーを見る',
-  'AAU HIGHLIGHTS':'AAU ハイライト',
   'Book a session':'セッション予約',
   'LET\'S WORK':'さあ始めよう',
   'Create your account':'アカウントを作成',
@@ -1359,6 +1375,8 @@ const JA={
    language has no entry — fine when the key IS the English text, but these blocks use short
    codes, so without this dictionary English visitors saw 'ABOUT_P1' on the page. */
 const EN={
+  'SPORTS_H':'THE SPORTS WE RUN',
+  'Active AAU competitor':'Coached by active competitors',
   'SLOGAN':'We plant the seed of sport',
   'NO_WEEKEND_SLOTS':'No {name} times posted yet — they appear here once the coach schedules one.',
   'What\'s coming up':'What\'s coming up',
@@ -1371,16 +1389,16 @@ const EN={
   'Back to app':'Back to app',
   'HIGHLIGHTS':'HIGHLIGHTS',
   'ABOUT_P3':'We\'re building something that <b>loops</b>: the kids we train today become the mentors who train the next group.',
-  'HERO_LEDE':'Founded by <b>{name}</b> — an active AAU competitor, not a coach who stopped playing years ago. Every session is built on the <b>love of the game</b>: the dedication, the grind, and the belief that <b>you never give up</b>.',
+  'HERO_LEDE':'Founded by <b>{name}</b> — an athlete who still competes, not a coach who stopped playing years ago. Every session is built on the <b>love of the sport</b>: the dedication, the grind, and the belief that <b>you never give up</b>.',
   'ABOUT_P1':'RX Training is a <b>youth sports community</b> where outstanding student-athletes coach the next generation.',
   'ABOUT_P2':'Our mentors are <b>close enough in age</b> that kids actually want to be like them — and <b>good enough</b> to teach real skills.',
-  'CARD_AAU':'Our coaches still compete for Middlesex Magic — high-level basketball in the Northeast.',
+  'CARD_AAU':'Our coaches are not retired — they still compete for their school and club teams. Kids learn from someone living the same grind.',
   'CARD_LIVE':'Every session puts you in real game scenarios — defender on you, clock running, a decision to make.',
-  'CARD_IQ':'Understanding the game matters as much as the drills. We teach players to read and think on the court.',
+  'CARD_IQ':'Understanding the sport matters as much as the drills. We teach players to read the play and think a step ahead.',
   'CARD_GRIT':'We bring dedication and toughness to every session — and expect the same from every player we train.',
-  'QUOTE':'We\'re not only teaching kids basketball. We\'re teaching the <em>love of the game</em> — the dedication, the grind, and the belief that <em>you never give up</em>.',
+  'QUOTE':'We are not only teaching kids a sport. We are teaching the <em>love of it</em> — the dedication, the grind, and the belief that <em>you never give up</em>.',
   'COACHES_P':'Every coach here still competes. You\'re not learning from someone who stopped playing years ago.',
-  'SPORTS_P':'RX is built to grow. Same app, same coaching standard — new sports as we bring the right coaches on.',
+  'SPORTS_P':'RX runs the sports below. Anything marked <b>Now training</b> is open today and bookable in the app; the rest arrive as we bring the right coaches on — same app, same coaching standard.',
   'SPORTS_CTA':'Coach in one of these and want to run sessions on RX?',
   'PLAN1_DESC':'Fully personalised around your game, including live reps — real defence, real reads, real pressure.',
   'PLAN2_DESC':'Small groups of 2–{max}. Competition between players creates live-game intensity — learn together, grow together.',
@@ -1396,7 +1414,7 @@ const EN={
   'G_COMM':'On-court communication',
   'G_VALUE':'Great value for friends &amp; teammates',
   'AVAIL_LINE':'Available in the <b>Lexington, MA</b> area · flexible scheduling · book and manage everything in the app.',
-  'FILM_P':'Watch us compete at the AAU level with <b>Middlesex Magic</b>. This is the level of play we bring to every training session.',
+  'FILM_P':'Watch our athletes compete. This is the level of play we bring to every training session.',
   'BOOK_P':'Create an account to see live availability, book 1-on-1 or group sessions, track payments, and get video feedback from your coach after every session.',
   'NO_COACHES':'Coaches are being added — check back soon.',
   'FOUNDER':'FOUNDER',
@@ -2690,16 +2708,38 @@ function lpCoachCards(){
     </article>`;
   }).join('');
 }
+/* The sports RX actually runs today, named in the hero. A visitor should not have to scroll to
+   a section further down to learn whether we coach their kid's sport — and with only basketball
+   for years, the whole page read as a basketball site. Falls back to nothing when no coach is
+   set up, so it can never render an empty strip. */
+function lpLiveSportsHtml(){
+  const live=bookableSports();
+  if(!live.length)return '';
+  return `<div class="lp-live reveal">
+    <span class="lp-live-lab">${t('Training now')}</span>
+    ${live.map(sp=>`<span class="lp-live-chip">${sportIcon(sp)} ${sp}</span>`).join('')}
+  </div>`;
+}
 /* Sports we advertise. Any sport with an active coach is live; the rest read "coming soon" —
    so launching a sport means adding a coach, never editing this file. */
 function lpSportChips(){
   const live={}; activeCoaches().forEach(c=>{live[sportKey(c.sport)]=true;});
-  return (DB.settings.sports||'Basketball').split(',').map(x=>x.trim()).filter(Boolean).map((sp,i)=>{
-    const on=!!live[sportKey(sp)];
-    return `<div class="lp-sport ${on?'on':''} reveal" style="animation-delay:${i*70}ms">
+  const advertised=(DB.settings.sports||'Basketball').split(',').map(x=>x.trim()).filter(Boolean);
+  // Any sport we coach but forgot to list still shows — the roster is the source of truth.
+  bookableSports().forEach(sp=>{ if(!advertised.some(x=>sportKey(x)===sportKey(sp)))advertised.push(sp); });
+  const open=advertised.filter(sp=>live[sportKey(sp)]);
+  const soon=advertised.filter(sp=>!live[sportKey(sp)]);
+  const chip=(sp,i,on)=>`<div class="lp-sport ${on?'on':''} reveal" style="animation-delay:${i*70}ms">
       <span class="lp-sport-ico">${sportIcon(sp)}</span>
       <b>${sp}</b><span>${on?t('Now training'):t('Coming soon')}</span></div>`;
-  }).join('');
+  // Two labelled groups rather than one mixed grid: with ten chips it was not obvious at a glance
+  // which sports a parent could actually book today.
+  let out='';
+  if(open.length) out+=`<div class="lp-sport-lab">${t('Open now')} · ${open.length}</div>
+    <div class="lp-sports">${open.map((sp,i)=>chip(sp,i,true)).join('')}</div>`;
+  if(soon.length) out+=`<div class="lp-sport-lab dim">${t('Coming as we add coaches')} · ${soon.length}</div>
+    <div class="lp-sports">${soon.map((sp,i)=>chip(sp,i,false)).join('')}</div>`;
+  return out;
 }
 /* Height of the sticky nav (+ jump rail when visible), published as CSS vars so both the rail's
    sticky offset and the scroll target use the same real numbers. */
@@ -2784,6 +2824,7 @@ function renderLanding(){
     <header class="lp-hero">
       <h1 class="lp-h1 reveal">RX<i class="lp-dot" id="lpBall" data-ball="🏀"></i>TRAINING</h1>
       <div class="lp-slogan reveal">${sloganText()}</div>
+      ${lpLiveSportsHtml()}
       <div class="lp-cta reveal">
         <button class="lp-btn solid lp-big" onclick="${AUTH?'closeHome()':`openAuth('book')`}">${AUTH?t('Back to app'):t('Book a session →')}</button>
         <button class="lp-btn line lp-big" onclick="lpGo('lpCoaches')">${t('Meet the coaches')}</button>
@@ -2840,9 +2881,9 @@ function renderLanding(){
 
     <section class="lp-sec" id="lpSports">
       <div class="lp-kicker">${t("What's next")}</div>
-      <h2 class="lp-h2">${t('MORE THAN BASKETBALL')}</h2>
+      <h2 class="lp-h2">${t('SPORTS_H')}</h2>
       <p class="lp-p">${t('SPORTS_P')}</p>
-      <div class="lp-sports">${lpSportChips()}</div>
+      ${lpSportChips()}
       <p class="lp-p" style="margin-top:16px;font-size:14px">${t('SPORTS_CTA')} <a href="mailto:xuraymond777@gmail.com" style="color:var(--lp-volt-d);font-weight:800">${t('Get in touch →')}</a></p>
     </section>
 
@@ -3215,6 +3256,9 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
    '<b>Slogan:</b> “We plant the seed of sport” now sits under the RX•TRAINING wordmark on the home page, in a volt-to-blue gradient. Editable in <b>Admin → Home page — slogan</b>, with the same <b>[en]/[zh]/[ko]/[ja]</b> markers as the other free-text fields, so each language can have its own wording. Blank uses the built-in translated version.',
+   '<b>The site no longer reads as a basketball site.</b> Every piece of marketing copy that assumed one sport was rewritten in all four languages — the hero lede, the feature cards, the quote, the highlights caption and the sports heading no longer mention AAU, Middlesex Magic, “the court” or basketball itself. The basketball <i>skill catalogue</i> is untouched: those drills are filed under Basketball and belong there.',
+   'The home page now names the sports that are actually open. A <b>Training now</b> strip sits directly under the slogan listing every sport with an active coach, and the Sports section splits into <b>Open now</b> and <b>Coming as we add coaches</b> with counts, instead of one mixed grid where a parent had to read ten chips to find out whether we coach their kid\'s sport.',
+   'A sport with a coach but missing from the advertised list now appears anyway — the coach roster is the source of truth, so launching a sport can never be half-done.',
    'Event registrations now show each player the way the Customers table does — avatar, name, and <b>age/level · parent</b> underneath — plus a tappable phone number, so you are not cross-referencing two screens to reach a family.',
    '<b>Print sign-in sheet</b> button on the registrations dialog. One clean page per event: title, date, location, headcount, how many still owe, then the players sorted alphabetically with age/level, guardian, phone, payment state and an empty box to tick on the day. The table header repeats on every page and no row splits across a page break.',
    'Removed the “Train like you play” strap line — the slogan carries that job now, and two lines of brand copy under the wordmark was one too many.',
