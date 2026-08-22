@@ -839,6 +839,17 @@
   .hlthumb .ply{font-size:16px;color:var(--muted)}
   .hlthumb:hover{border-color:var(--accent)}
   /* ---- highlights gallery: month tabs + auto-advancing stage ---- */
+  /* sport tabs sit above the month tabs — bigger, since they are the outer grouping */
+  .lp-sporttabs{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 10px}
+  .lp-sporttab{border:1.5px solid var(--lp-line);background:var(--lp-bg);color:var(--lp-mut);
+    border-radius:999px;padding:8px 15px;font-weight:800;font-size:13.5px;cursor:pointer;
+    font-family:inherit;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+  .lp-sporttab span{background:var(--lp-line);color:var(--lp-ink);border-radius:999px;
+    padding:1px 7px;font-size:11px}
+  .lp-sporttab:hover{border-color:var(--lp-volt-d);color:var(--lp-ink)}
+  .lp-sporttab.on{background:var(--lp-volt-d);border-color:var(--lp-volt-d);color:#fff}
+  .lp-sporttab.on span{background:rgba(255,255,255,.28);color:#fff}
+  @media(max-width:560px){.lp-sporttab{font-size:12.5px;padding:7px 12px}}
   .lp-months{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 14px}
   .lp-month{background:#fff;border:1.5px solid var(--lp-line);border-radius:999px;padding:7px 14px;
     cursor:pointer;font-family:inherit;font-weight:800;font-size:13px;color:var(--lp-ink);
@@ -1937,7 +1948,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
   d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',coachIds:(Array.isArray(e.coach_ids)?e.coach_ids:(e.coach_id?[e.coach_id]:[])),price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||'',video:e.video||'',featured:e.featured===true}));
   d.eventRegs=(regs||[]).map(r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||''}));
   d.messages=(msgs||[]).map(m=>({id:m.id,peerType:m.peer_type||'client',clientId:m.client_id||'',coachId:m.coach_id||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',readOwner:m.read_owner===true,readClient:m.read_client===true,readCoach:m.read_coach===true}));
-  d.highlights=(hl||[]).map(h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',active:h.active!==false,type:h.type||'',ord:(h.ord!=null?h.ord:null)}));
+  d.highlights=(hl||[]).map(h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',sport:h.sport||'',active:h.active!==false,type:h.type||'',ord:(h.ord!=null?h.ord:null)}));
   d.skills=(sk||[]).map(k=>({id:k.id,sport:k.sport||'Basketball',name:k.name||'',ord:k.ord||0,active:k.active!==false}));
   d.skillLog=(sl||[]).map(e=>({id:e.id,customerId:e.customer_id||'',skillId:e.skill_id||'',ts:e.ts||'',
     by:e.by_role||'',byId:e.by_id||'',byName:e.by_name||'',note:e.note||'',media:e.media||[],level:e.level||'',editedBy:e.edited_by||''}));
@@ -1945,7 +1956,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
   return normalize(d);
 }
 const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),rate_cond:(c.rateCond!=null?c.rateCond:null),rate_tbc:(c.rateTbc||''),sport:c.sport||'Basketball',family:c.family===true,share_type:c.shareType||'pct',share_val:(c.shareVal!=null?c.shareVal:0),pending:(c.pending||null),created:c.created||null,last_login:lastLoginOf(c)||null,login_count:loginCountOf(c)});
-const highlightRow=h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',active:h.active!==false,type:h.type||'video',ord:h.ord||0});
+const highlightRow=h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',sport:h.sport||'',active:h.active!==false,type:h.type||'video',ord:h.ord||0});
 const skillRow=k=>({id:k.id,sport:k.sport||'Basketball',name:k.name||'',ord:k.ord||0,active:k.active!==false});
 const skillLogRow=e=>({id:e.id,customer_id:e.customerId||'',skill_id:e.skillId||'',ts:e.ts||'',
   by_role:e.by||'',by_id:e.byId||'',by_name:e.byName||'',note:e.note||'',media:e.media||[],level:e.level||'',edited_by:e.editedBy||''});
@@ -2033,7 +2044,7 @@ function dataSig(d){return JSON.stringify({
   msg:(d.messages||[]).map(x=>[x.id,x.readOwner,x.readClient,x.readCoach]),
   // activity must be in the signature or a new log row reads as "no change" and the poll
   // returns early — which silently stopped the badge updating for activity
-  hl:(d.highlights||[]).map(x=>[x.id,x.url,x.title,x.date,x.active,x.type,x.ord]),
+  hl:(d.highlights||[]).map(x=>[x.id,x.url,x.title,x.date,x.active,x.type,x.ord,x.sport]),
   sk:(d.skills||[]).map(x=>[x.id,x.name,x.sport,x.ord,x.active]),
   sl:(d.skillLog||[]).length+':'+(d.skillLog||[]).reduce((m,e)=>(e.ts||'')>m?(e.ts||''):m,''),
   act:(d.activity||[]).length+':'+(d.activity||[]).reduce((m,a)=>(a.ts||'')>m?(a.ts||''):m,''),
@@ -2968,46 +2979,74 @@ function lpTickerHtml(){
                         without loading their player API, and guessing a duration would cut
                         someone off mid-video. Manual arrows only.
    ============================================================================ */
-let lpGalMonth=null, lpGalIdx=0, lpGalTimer=null, lpGalPaused=false;
+let lpGalMonth=null, lpGalIdx=0, lpGalTimer=null, lpGalPaused=false, lpGalSport=null;
 const LP_PHOTO_MS=4500, LP_VIDEO_CAP_MS=90000;
 function lpHighlights(){
   return (DB.highlights||[]).filter(h=>h.active!==false&&h.url)
     .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 }
 function lpMonthKey(d){ return (d||'').slice(0,7); }
+/* ---- Highlights are grouped by SPORT, then by month ------------------------
+   A track photo next to a basketball clip in the same month tab tells the wrong story now that
+   RX runs more than one sport. Anything saved before this has no sport, so it falls back to the
+   first sport the business actually runs rather than being stranded in an "Other" bucket. */
+function hlSport(h){ return sportLabel((h&&h.sport)||'')||(bookableSports()[0]||'Basketball'); }
+/* Sports that have at least one published highlight, in the order the business lists them. */
+function lpGalSports(){
+  const order=bookableSports().concat((DB.settings.sports||'').split(',').map(x=>x.trim()));
+  const seen=[];
+  lpHighlights().forEach(h=>{ const sp=hlSport(h);
+    if(!seen.some(x=>sportKey(x)===sportKey(sp)))seen.push(sp); });
+  seen.sort((a,b)=>{
+    const ia=order.findIndex(x=>sportKey(x)===sportKey(a)), ib=order.findIndex(x=>sportKey(x)===sportKey(b));
+    return (ia<0?99:ia)-(ib<0?99:ib);
+  });
+  return seen;
+}
 function lpMonthLabel(k){
   if(!k)return '';
   const [y,m]=k.split('-');
   try{ return new Date(+y,+m-1,1).toLocaleDateString('en-US',{month:'short',year:'numeric'}); }
   catch(e){ return k; }
 }
-function lpGalMonths(){
+function lpGalMonths(sport){
   const seen=[];
-  lpHighlights().forEach(h=>{const k=lpMonthKey(h.date); if(k&&!seen.includes(k))seen.push(k);});
+  lpHighlights().filter(h=>!sport||sportKey(hlSport(h))===sportKey(sport))
+    .forEach(h=>{const k=lpMonthKey(h.date); if(k&&!seen.includes(k))seen.push(k);});
   return seen;                                   // already newest-first from lpHighlights()
 }
-function lpGalItems(month){
+function lpGalItems(month,sport){
   /* Newest FIRST, with the owner's manual order as the tie-break within a single date.
      It used to be the other way round: `ord` came first, and since uploads are numbered 1,2,3…
      in the order they were added, a month of photos played back oldest-first. Dragging still
      works, and matters most where it should — a batch of photos from one session all share a
      date, so their relative order is entirely manual. */
-  return lpHighlights().filter(h=>lpMonthKey(h.date)===month)
+  return lpHighlights()
+    .filter(h=>lpMonthKey(h.date)===month&&(!sport||sportKey(hlSport(h))===sportKey(sport)))
     .sort((a,b)=>((b.date||'').localeCompare(a.date||''))||((a.ord||0)-(b.ord||0)));
 }
 function lpHighlightsHtml(){
-  const months=lpGalMonths();
-  if(!months.length){
+  const sports=lpGalSports();
+  if(!sports.length){
     return `<p class="lp-p">${t('FILM_P')}</p>
       <div class="lp-vid">${videoHtml('https://www.youtube.com/embed/1odU-4Ml2sw','100%')}</div>`;
   }
-  if(!lpGalMonth||!months.includes(lpGalMonth)){ lpGalMonth=months[0]; lpGalIdx=0; }
-  const items=lpGalItems(lpGalMonth);
+  if(!lpGalSport||!sports.some(x=>sportKey(x)===sportKey(lpGalSport))){ lpGalSport=sports[0]; lpGalMonth=null; lpGalIdx=0; }
+  const months=lpGalMonths(lpGalSport);
+  if(!months.length){ lpGalMonth=null; }
+  else if(!lpGalMonth||!months.includes(lpGalMonth)){ lpGalMonth=months[0]; lpGalIdx=0; }
+  const items=lpGalMonth?lpGalItems(lpGalMonth,lpGalSport):[];
+  /* The sport row only appears when there is more than one — a single-sport gallery should not
+     grow a tab that does nothing. */
+  const sportTabs=sports.length>1?`<div class="lp-sporttabs">${sports.map(sp=>`
+    <button class="lp-sporttab${sportKey(sp)===sportKey(lpGalSport)?' on':''}" onclick="lpGalPickSport('${sp.replace(/'/g,"\\'")}')">
+      ${sportIcon(sp)} ${sp}<span>${lpHighlights().filter(h=>sportKey(hlSport(h))===sportKey(sp)).length}</span></button>`).join('')}</div>`:'';
   const tabs=`<div class="lp-months">${months.map(k=>`
     <button class="lp-month${k===lpGalMonth?' on':''}" onclick="lpGalPick('${k}')">
-      ${lpMonthLabel(k)}<span>${lpGalItems(k).length}</span></button>`).join('')}</div>`;
-  return `${tabs}<div class="lp-gal" id="lpGal">${lpGalSlideHtml(items,lpGalIdx)}</div>`;
+      ${lpMonthLabel(k)}<span>${lpGalItems(k,lpGalSport).length}</span></button>`).join('')}</div>`;
+  return `${sportTabs}${tabs}<div class="lp-gal" id="lpGal">${lpGalSlideHtml(items,lpGalIdx)}</div>`;
 }
+function lpGalPickSport(sp){ lpGalSport=sp; lpGalMonth=null; lpGalIdx=0; renderLanding(); }
 function lpGalSlideHtml(items,i){
   if(!items.length)return `<div class="empty">${t('Nothing here yet.')}</div>`;
   i=Math.max(0,Math.min(i,items.length-1));
@@ -3059,7 +3098,7 @@ function attachCodecCheck(root){
 }
 function lpGalRender(){
   const box=document.getElementById('lpGal'); if(!box)return;
-  const items=lpGalItems(lpGalMonth);
+  const items=lpGalItems(lpGalMonth,lpGalSport);
   box.innerHTML=lpGalSlideHtml(items,lpGalIdx);
   attachCodecCheck(box);
   lpGalSchedule();
@@ -3067,7 +3106,7 @@ function lpGalRender(){
 function lpGalPick(k){ lpGalMonth=k; lpGalIdx=0; renderLanding(); }
 function lpGalGo(n){ lpGalIdx=n; lpGalRender(); }
 function lpGalStep(d){
-  const items=lpGalItems(lpGalMonth); if(!items.length)return;
+  const items=lpGalItems(lpGalMonth,lpGalSport); if(!items.length)return;
   lpGalIdx=(lpGalIdx+d+items.length)%items.length;
   lpGalRender();
 }
@@ -3081,7 +3120,7 @@ function lpGalToggle(btn){
 function lpGalSchedule(){
   if(lpGalTimer){clearTimeout(lpGalTimer);lpGalTimer=null;}
   if(lpGalPaused)return;
-  const items=lpGalItems(lpGalMonth);
+  const items=lpGalItems(lpGalMonth,lpGalSport);
   if(items.length<2)return;
   const h=items[lpGalIdx]; if(!h)return;
   const box=document.getElementById('lpGal'); if(!box)return;
@@ -3911,6 +3950,8 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    ============================================================================ */
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Highlights are grouped by sport, then by month.</b> The home page gallery gains a row of sport tabs above the month tabs, each showing how many items it holds; picking a sport filters the months beneath it. The row only appears when there is more than one sport, so a single-sport gallery is unchanged. Uploads and links carry a sport, set on the upload form and changeable per row in Admin, and the Admin list is ordered the same way the home page groups it so dragging rearranges what you are actually looking at.',
+   'Highlights saved before this have no sport recorded. Rather than stranding them in an \u201cOther\u201d bucket they fall back to the first sport the business runs, so nothing disappears from the gallery — re-file any of them from the new Sport column in Admin. Sport names use the same forgiving matching as everywhere else, so a highlight filed under \u201cRunning\u201d appears under Track &amp; Field.',
    '<b>Slogan:</b> “We plant the seed of sport” now sits under the RX•TRAINING wordmark on the home page, in a volt-to-blue gradient. Editable in <b>Admin → Home page — slogan</b>, with the same <b>[en]/[zh]/[ko]/[ja]</b> markers as the other free-text fields, so each language can have its own wording. Blank uses the built-in translated version.',
    '<b>The site no longer reads as a basketball site.</b> Every piece of marketing copy that assumed one sport was rewritten in all four languages — the hero lede, the feature cards, the quote, the highlights caption and the sports heading no longer mention AAU, Middlesex Magic, “the court” or basketball itself. The basketball <i>skill catalogue</i> is untouched: those drills are filed under Basketball and belong there.',
    'The home page now names the sports that are actually open. A <b>Training now</b> strip sits directly under the slogan listing every sport with an active coach, and the Sports section splits into <b>Open now</b> and <b>Coming as we add coaches</b> with counts, instead of one mixed grid where a parent had to read ten chips to find out whether we coach their kid\'s sport.',
@@ -8134,7 +8175,7 @@ function renderAdmin(){
     </div>
     <div class="panel" style="margin-top:16px">
       <h3>Home page highlights</h3>
-      <div class="clienttag" style="margin-bottom:10px">Drag a row by the ⠿ handle to reorder within its month, or use ↑ ↓ on a touch screen.<br>Photos and videos shown in the <b style="color:var(--txt)">HIGHLIGHTS</b> gallery on rxtraining.org. They're grouped into month tabs by date and play automatically one after another. Leave the list empty to show the built-in AAU reel.<br>Uploading several files at once adds them all — give each a title and date afterwards.</div>
+      <div class="clienttag" style="margin-bottom:10px">Grouped on the home page by <b style="color:var(--txt)">sport</b> first, then by month. Drag a row by the ⠿ handle to reorder within its month, or use ↑ ↓ on a touch screen.<br>Photos and videos shown in the <b style="color:var(--txt)">HIGHLIGHTS</b> gallery on rxtraining.org. They're grouped into month tabs by date and play automatically one after another. Leave the list empty to show the built-in AAU reel.<br>Uploading several files at once adds them all — give each a title and date afterwards.</div>
       ${(()=>{
         /* Uploads deliberately land as drafts, but nothing said so at a glance — an owner who
            uploaded ten photos and looked at the home page reasonably concluded they had vanished. */
@@ -8147,13 +8188,16 @@ function renderAdmin(){
             <button class="btn sm" onclick="publishAllHighlights()">Publish all ${drafts.length}</button>
           </div></div>`;
       })()}
-      <div style="overflow-x:auto"><table><thead><tr><th></th><th>Title</th><th>Date</th><th>Media</th><th>Status</th><th></th></tr></thead><tbody>
+      <div style="overflow-x:auto"><table><thead><tr><th></th><th>Title</th><th>Sport</th><th>Date</th><th>Media</th><th>Status</th><th></th></tr></thead><tbody>
         ${hlAdminOrder().map((h,i)=>`<tr draggable="true"
           ondragstart="dragStart(event,'${h.id}','highlight')" ondragend="dragEnd(event)"
           ondragover="dragOver(event,'highlight')" ondragleave="dragLeave(event)"
           ondrop="dropOnHighlight(event,'${h.id}')">
           <td style="width:26px" class="muted grab" title="Drag to reorder">⠿</td>
           <td><input value="${(h.title||'').replace(/"/g,'&quot;')}" onchange="updHighlight('${h.id}','title',this.value)"></td>
+          <td style="width:160px"><select onchange="updHighlight('${h.id}','sport',this.value)">
+            ${hlSportOptions().map(sp=>`<option value="${sp}" ${sportKey(sp)===sportKey(hlSport(h))?'selected':''}>${sportIcon(sp)} ${sp}</option>`).join('')}
+          </select></td>
           <td style="width:150px"><input type="date" value="${h.date||''}" onchange="updHighlight('${h.id}','date',this.value)"></td>
           <td style="width:150px">
             <div style="display:flex;align-items:center;gap:8px">
@@ -8182,6 +8226,8 @@ function renderAdmin(){
       <div class="row" style="margin-top:12px;gap:8px;align-items:flex-end">
         <div class="field" style="flex:1;min-width:180px;margin-bottom:0"><label class="f">Title</label>
           <input id="nhTitle" placeholder="e.g. Summer Showcase 2026"></div>
+        <div class="field" style="max-width:200px"><label class="f">Sport</label>
+          <select id="nhSport">${hlSportOptions().map(sp=>`<option value="${sp}">${sportIcon(sp)} ${sp}</option>`).join('')}</select></div>
         <div class="field" style="max-width:160px;margin-bottom:0"><label class="f">Date</label>
           <input type="date" id="nhDate" value="${todayISO()}"></div>
       </div>
@@ -8213,7 +8259,8 @@ function addHighlight(){
   if(!DB.highlights)DB.highlights=[];
   const type=/\.(jpe?g|png|gif|webp|heic|avif)(\?|$)/i.test(url)?'image':'video';
   const ord=(DB.highlights||[]).reduce((m,x)=>Math.max(m,x.ord||0),0)+1;
-  DB.highlights.push({id:uid(),url,title,date,active:false,type,ord});   // draft until published
+  const sport=($('#nhSport')&&$('#nhSport').value)||hlSportOptions()[0]||'';
+  DB.highlights.push({id:uid(),url,title,date,sport,active:false,type,ord});   // draft until published
   save(); flash('Added as a DRAFT — press Publish to put it on the home page'); renderAdmin();
 }
 function updHighlight(id,field,val){
@@ -8224,10 +8271,25 @@ function updHighlight(id,field,val){
 }
 /* Admin list in the same order the public gallery uses: newest month first, then the owner's
    manual order inside each month. Anything else would make ↑/↓ feel random. */
+/* Sports offered when filing a highlight: the ones we actually coach first, then anything else
+   advertised, so the common choice is at the top. */
+function hlSportOptions(){
+  const out=[];
+  bookableSports().concat((DB.settings.sports||'').split(',').map(x=>x.trim()))
+    .filter(Boolean)
+    .forEach(sp=>{ const lab=sportLabel(sp)||sp; if(!out.some(x=>sportKey(x)===sportKey(lab)))out.push(lab); });
+  return out.length?out:['Basketball'];
+}
 function hlAdminOrder(){
   // Must match lpGalItems() exactly, or dragging in Admin rearranges a list that looks nothing
   // like what visitors see.
+  // Sport first, then newest month — matching how the home page groups them, or dragging in
+  // Admin would rearrange a list that looks nothing like what visitors see.
+  const order=hlSportOptions();
+  const rank=sp=>{const i=order.findIndex(x=>sportKey(x)===sportKey(sp));return i<0?99:i;};
   return (DB.highlights||[]).slice().sort((a,b)=>{
+    const ra=rank(hlSport(a)), rb=rank(hlSport(b));
+    if(ra!==rb)return ra-rb;
     const ma=(a.date||'').slice(0,7), mb=(b.date||'').slice(0,7);
     if(ma!==mb)return mb.localeCompare(ma);
     return ((b.date||'').localeCompare(a.date||''))||((a.ord||0)-(b.ord||0));
@@ -8286,6 +8348,7 @@ async function uploadHighlightVideo(input){
   const files=[...input.files]; input.value='';
   if(!files.length)return;
   const date=$('#nhDate')&&$('#nhDate').value||todayISO();
+  const upSport=($('#nhSport')&&$('#nhSport').value)||hlSportOptions()[0]||'';
   const baseTitle=($('#nhTitle')&&$('#nhTitle').value||'').trim();
   let added=0;
   for(const f of files){
@@ -8319,7 +8382,7 @@ async function uploadHighlightVideo(input){
       if(!DB.highlights)DB.highlights=[];
       // uploads start as DRAFTS — nothing reaches the public page until it's published
       const ord=(DB.highlights||[]).reduce((m,x)=>Math.max(m,x.ord||0),0)+1;
-      DB.highlights.push({id:uid(),url,date,active:false,type:isImg?'image':'video',ord,
+      DB.highlights.push({id:uid(),url,date,sport:upSport,active:false,type:isImg?'image':'video',ord,
         title:baseTitle||name.replace(/\.[^.]+$/,'')});
       added++;
     }catch(e){flash('Upload failed: '+e.message,true);}
