@@ -194,6 +194,18 @@
   /* header stays put while the body scrolls under it */
   .tblscroll>table thead th{position:sticky;top:0;z-index:2;background:var(--panel);
     box-shadow:inset 0 -1px 0 var(--line)}
+  /* ---- frozen identity columns ----
+     Cells need an opaque background or the scrolling columns show through underneath, and the
+     header corner has to outrank both the sticky header and the frozen body cells. */
+  .tblscroll .frz{position:sticky;background:var(--panel);z-index:1}
+  .tblscroll>table thead th.frz{z-index:4;box-shadow:inset 0 -1px 0 var(--line)}
+  .tblscroll .frz-edge::after{content:"";position:absolute;top:0;bottom:0;right:0;width:1px;
+    background:var(--line)}
+  .tblscroll .frz-edge{position:sticky}
+  /* a soft shadow appears only once there is something scrolled underneath it */
+  .tblscroll.has-frozen .frz-edge{box-shadow:6px 0 8px -6px rgba(24,48,10,.22)}
+  .tblscroll>table thead th.frz-edge{box-shadow:inset 0 -1px 0 var(--line),6px 0 8px -6px rgba(24,48,10,.22)}
+  @media print{ .tblscroll .frz{position:static;box-shadow:none} }
   .tblscroll>table thead th:first-child{border-top-left-radius:6px}
   @media print{ .tblscroll{max-height:none;overflow:visible} }
   @media(max-width:820px){.tblscroll>table td,.tblscroll>table th{max-width:26ch}}
@@ -3785,6 +3797,59 @@ function wrapTables(root){
     }catch(e){}
   });
 }
+/* ---- Freeze the identity column ------------------------------------------
+   When a table is too wide, the useful thing to keep on screen is WHO the row is about. This
+   freezes every column up to and including the player/client column, so scrolling right still
+   shows the name beside whatever you are reading.
+
+   Which column that is varies by table — "Client(s)" on sessions, "Player" on registrations,
+   "Name" on customers, "Client" on approvals — so it is found from the header text rather than
+   hardcoded per table. Offsets come from measured widths, so it survives any column layout. */
+/* Two tiers, searched in order. The row is about a PERSON first — on the Finance tables "Coach"
+   sits to the left of "Client", and a single flat pattern froze Coach and scrolled the client's
+   name away, which is precisely backwards. */
+const FREEZE_PRIMARY=/^(player|client|client\(s\)|clients|name)$/i;
+const FREEZE_FALLBACK=/^(who|title|event|coach|table)$/i;
+function freezeCols(box){
+  try{
+    const t=box.querySelector('table'); if(!t)return;
+    // always start clean: widths change with the data and the window
+    t.querySelectorAll('.frz').forEach(c=>{ c.classList.remove('frz','frz-edge'); c.style.left=''; });
+    box.classList.remove('has-frozen');
+    const heads=[...t.querySelectorAll('thead > tr > th')];
+    if(heads.length<3)return;                                  // nothing worth freezing
+    if(t.scrollWidth<=box.clientWidth+2)return;                // it fits — leave it alone
+    const label=i=>(heads[i].textContent||'').trim();
+    let idx=-1;
+    heads.forEach((h,i)=>{ if(idx<0&&FREEZE_PRIMARY.test(label(i)))idx=i; });
+    if(idx<0)heads.forEach((h,i)=>{ if(idx<0&&FREEZE_FALLBACK.test(label(i)))idx=i; });
+    if(idx<0)idx=0;                                            // otherwise just the first column
+    const widths=heads.map(h=>h.getBoundingClientRect().width);
+    // Never let the frozen block eat the screen: past ~62% there is nothing left to scroll into.
+    const budget=box.clientWidth*0.62;
+    const rows=[...t.querySelectorAll('tr')].filter(r=>r.children.length===heads.length); // skip colspan rows
+    const stick=(i,off,edge)=>rows.forEach(r=>{
+      const c=r.children[i]; if(!c)return;
+      c.classList.add('frz'); c.style.left=Math.round(off)+'px';
+      if(edge)c.classList.add('frz-edge');
+    });
+    let total=0; for(let i=0;i<=idx;i++)total+=widths[i];
+    if(total<=budget){
+      // everything up to and including the identity column fits — freeze the block
+      let off=0;
+      for(let i=0;i<=idx;i++){ stick(i,off,i===idx); off+=widths[i]; }
+    } else if(widths[idx]<=budget){
+      /* The block is too wide, but the NAME is the whole point — freeze just that column and let
+         the ones before it scroll away underneath it. Better than freezing "When" and losing the
+         player's name, which is what a width-first rule would have done. */
+      stick(idx,0,true);
+    } else return;                                             // even the name column is too wide
+    box.classList.add('has-frozen');
+  }catch(e){}
+}
+function freezeAll(){ document.querySelectorAll('.tblscroll').forEach(freezeCols); }
+let _frzT=null;
+try{ window.addEventListener('resize',()=>{ clearTimeout(_frzT); _frzT=setTimeout(freezeAll,150); }); }catch(e){}
 /* On a mouse, a table that scrolls only sideways is awkward: the wheel scrolls the page past it
    and the scrollbar is easy to miss. Over such a table the wheel pans it horizontally instead,
    and hands control back to the page the moment it reaches either end — so it can never trap the
@@ -3807,12 +3872,12 @@ try{ document.addEventListener('wheel',ptrWheelPan,{passive:false}); }catch(e){}
    on every one of them remembering to call wrapTables(). Debounced so a burst costs one pass. */
 let _wrapT=null;
 try{
-  new MutationObserver(()=>{ clearTimeout(_wrapT); _wrapT=setTimeout(()=>wrapTables(),40); })
+  new MutationObserver(()=>{ clearTimeout(_wrapT); _wrapT=setTimeout(()=>{wrapTables();freezeAll();},40); })
     .observe(document.documentElement,{childList:true,subtree:true});
 }catch(e){}
 function openModal(title,body,foot){$('#mTitle').textContent=title;$('#mBody').innerHTML=body;
   $('#mFoot').innerHTML=foot||'';$('#modal').classList.add('show');
-  wrapTables($('#mBody'));}
+  wrapTables($('#mBody')); setTimeout(()=>freezeAll(),0);}
 function closeModal(){$('#modal').classList.remove('show');}
 let __delTarget='',__delYes=null;
 function confirmByName(kind,name,onYes,extraWarn){
@@ -3862,6 +3927,8 @@ const CHANGELOG=[
    'Cash that had already been collected is not simply erased: the amount is kept on the record and a red <b>↩ \$X to refund</b> flag rides alongside the Cancelled pill until you deal with it. Whoever cancels is warned first — the owner and coach see the amount, the client is told the refund is not automatic. A session paid with a package credit needs no unwinding: credits are counted from completed sessions, so cancelling returns the credit by itself.',
    '<b>Fix: every table scrolls sideways, on desktop and on mobile.</b> Tables live in panels, in dialogs and in bare divs, so scoping the scroll to any one container fixed one place and broke another. Each table is now put inside its own scroller as it renders — and where it is already inside one, that container is tagged instead of nested. Columns keep their natural widths, the page never widens, and long cells are capped so one note cannot stretch a table several screens wide.',
    '<b>Fix:</b> that wrapping had a single try/catch around the whole pass, so one awkward node aborted it and left every table after it unscrollable — which is why the Customers table could not be scrolled to its last column. The guard is now per table. The scrollbar is also thicker and higher-contrast so it is visible and grabbable with a mouse, and a panel will scroll as a fallback if a table ever escapes wrapping entirely.',
+   '<b>The identity column stays put when a table scrolls.</b> Scroll a wide table sideways and the column naming the row — <b>Client(s)</b>, <b>Player</b>, <b>Name</b> — stays frozen at the left with everything before it, so a status or a payment is never read against the wrong person. Which column that is comes from the header text, not a per-table list, so it works on every table including new ones.',
+   'Two judgement calls there: the person outranks the coach, because on the Finance tables \u201cCoach\u201d sits to the left of \u201cClient\u201d and a width-first rule would have frozen the coach and scrolled the client away; and when the whole block will not fit, the name column alone is frozen and the columns before it scroll underneath it, rather than freezing \u201cWhen\u201d and losing the name. The frozen block never exceeds ~62% of the width, or there would be nothing left to scroll into.',
    'A long table\'s horizontal scrollbar sat at the very bottom of the table — several screens down on a 40-row list — so the columns off to the right could not be reached without scrolling to the end first. Table boxes are now capped at 70% of the screen height, which keeps both scrollbars in view, and the header row sticks so you can still tell which column you are reading. On a mouse, the wheel pans a table that only scrolls sideways, handing control back to the page at each end so it can never trap the scroll; shift+wheel and browser zoom are untouched.',
    'Header stats reordered to <b>sports, sessions coached, coaches, athletes trained</b>.',
    'Uploaded highlights land as <b>drafts</b> on purpose, but nothing said so at a glance \u2014 uploading a batch and then looking at the home page made them seem to have vanished. The Highlights panel now shows a banner counting unpublished items with a <b>Publish all</b> button, and the upload confirmation says DRAFT explicitly.',
