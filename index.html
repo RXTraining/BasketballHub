@@ -144,14 +144,21 @@
      have to pinch to fit" actually is. */
   img,video,iframe,canvas,svg,table{max-width:100%}
   img,video{height:auto}
-  td,th,p,li,h1,h2,h3,h4,b,span,div{overflow-wrap:anywhere;word-break:normal}
-  pre,code{white-space:pre-wrap;overflow-wrap:anywhere}
+  /* break-word, NOT anywhere: `anywhere` also shrinks min-content width, which collapses table
+     columns to a single character and stacks every label vertically. break-word breaks a long
+     word only when it genuinely cannot fit, and leaves column sizing alone. */
+  p,li,h1,h2,h3,h4{overflow-wrap:break-word}
+  td,th{overflow-wrap:break-word;word-break:normal}
+  pre,code{white-space:pre-wrap;overflow-wrap:break-word}
   .wrap{max-width:1720px;margin:0 auto;padding:0 28px 80px;width:100%;box-sizing:border-box}
   /* any single long word / URL / wide cell would otherwise stretch the page and leave a gap
      down the right-hand side on a phone */
   section.view{min-width:0;max-width:100%}
   .panel,.stat,.jcard,.skrow{min-width:0;max-width:100%}
   .panel table{max-width:100%}
+  /* Status chips and money must never be broken across lines. */
+  .pill,.credit,.slotchip,.badge{white-space:nowrap}
+  td .right,td.right{white-space:nowrap}
 
   header.top{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
     background:rgba(255,255,255,.90);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
@@ -826,6 +833,17 @@
 
   /* ---------- responsive / mobile ---------- */
   @media(max-width:820px){
+    /* Phones: give a table its natural column widths and let the PANEL scroll sideways, rather
+       than crushing six columns into a 360px screen. min-width beats max-width in CSS, so this
+       overrides .panel table{max-width:100%} deliberately. */
+    .panel{overflow-x:auto;-webkit-overflow-scrolling:touch;
+      /* a subtle right-edge fade hints there is more table off-screen */
+      background-image:linear-gradient(to left,rgba(0,0,0,.055),transparent 26px);
+      background-repeat:no-repeat;background-position:right center;background-size:26px 100%;
+      background-attachment:local}
+    table{min-width:560px}
+    /* …except tables that are really just stacked rows, which should stay full width */
+    .nomin table,table.nomin{min-width:0}
     /* below 820px the page was still using the desktop's 28px side padding, so large phones
        lost ~56px of usable width. Match the header's 14px and let content run edge to edge. */
     .wrap{padding:0 14px 70px}
@@ -2024,6 +2042,45 @@ function ptrAttach(box){
   },{passive:true});
   box.addEventListener('touchcancel',reset,{passive:true});
 }
+/* The signed-in app scrolls the DOCUMENT rather than a fixed container, so it needs the same
+   gesture bound at window level. In a Home Screen app there is no browser pull-to-refresh at
+   all, which is why owner/coach/client had no way to force a refresh. */
+function ptrAttachDoc(){
+  if(window._ptrDoc)return; window._ptrDoc=true;
+  let startY=0,startX=0,pulling=false,armed=false,dist=0;
+  const bar=document.createElement('div');
+  bar.className='ptr'; bar.innerHTML='<span class="ptr-spin">↻</span>';
+  document.body.appendChild(bar);
+  const top=()=>window.pageYOffset||document.documentElement.scrollTop||0;
+  const setDist=d=>{ dist=d; bar.style.transform='translateX(-50%) translateY('+Math.min(d,PTR_MAX)+'px)';
+    bar.style.opacity=Math.min(1,d/PTR_TRIGGER); bar.classList.toggle('ready',d>=PTR_TRIGGER); };
+  const reset=()=>{ bar.style.transition='transform .22s ease,opacity .22s ease';
+    setDist(0); pulling=false; armed=false; setTimeout(()=>{bar.style.transition='';},240); };
+  document.addEventListener('touchstart',e=>{
+    if(!AUTH||e.touches.length!==1){armed=false;return;}
+    if($('#modal')&&$('#modal').classList.contains('show')){armed=false;return;}   // not over a dialog
+    if($('#login')&&$('#login').classList.contains('show')){armed=false;return;}   // landing has its own
+    armed = top()<=0;
+    startY=e.touches[0].clientY; startX=e.touches[0].clientX; pulling=false;
+  },{passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(!armed||e.touches.length!==1)return;
+    const dy=e.touches[0].clientY-startY, dx=Math.abs(e.touches[0].clientX-startX);
+    if(dy<=0||dx>Math.abs(dy)){ if(!pulling)armed=false; return; }
+    if(top()>0){ armed=false; return; }
+    // don't fight a sideways-scrolling table
+    let el=e.target;
+    while(el&&el!==document.body){ if(el.scrollWidth>el.clientWidth+2){armed=false;return;} el=el.parentElement; }
+    pulling=true; setDist(dy*0.45);
+  },{passive:true});
+  document.addEventListener('touchend',()=>{
+    if(!pulling)return reset();
+    if(dist>=PTR_TRIGGER){ bar.classList.add('spinning');
+      ptrRefresh().then(()=>{ bar.classList.remove('spinning'); reset(); }); }
+    else reset();
+  },{passive:true});
+  document.addEventListener('touchcancel',reset,{passive:true});
+}
 /* What a pull actually does: re-read the cloud, then repaint whatever is on screen. */
 async function ptrRefresh(){
   const started=Date.now();
@@ -2042,6 +2099,7 @@ async function ptrRefresh(){
   return new Promise(r=>setTimeout(r,wait));
 }
 function startPolling(){
+  ptrAttachDoc();                  // every signed-in role gets pull-to-refresh
   lastSig=dataSig(DB);clearInterval(pollTimer);
   // Realtime is the primary live channel (it pushes changes instantly). The interval is only a
   // fallback for when Realtime isn't connected — this avoids re-downloading every table every few
@@ -3229,6 +3287,7 @@ function renderLanding(){
   // includes #langLbl, so this has to run after the rebuild — not before it.
   const ll=document.getElementById('langLbl'); if(ll)ll.textContent=LANG_NAMES[LANG]||'EN';
   ptrAttach($('#login'));          // idempotent — binds once per element
+  ptrAttachDoc();                  // and the app underneath it
   // measure after layout settles (and again once webfonts land, which changes line counts)
   requestAnimationFrame(lpClampCards);
   setTimeout(lpClampCards,350);
@@ -3583,7 +3642,8 @@ const CHANGELOG=[
    '<b>Fix:</b> on a phone the top bar broke the logo across two lines (<i>RX.TRAINI / NG</i>) and hyphenated the button label into <i>Sig n in</i>. The logo and every button are now set to never wrap; the bar tightens spacing and type below 600px, drops the language code beside the globe below 400px, and shortens <b>Create account</b> to <b>Join</b>, so the row fits down to a 320px screen.',
    'The hero wordmark is sized to fit one line at 320px and set to never wrap — its minimum font size used to be larger than a narrow phone could fit, so the ball dropped to a second line.',
    'An event can now have <b>several host coaches</b> instead of one. The Host coach dropdown is a tick list, every host is shown wherever the event appears, and a co-hosted event turns up in each host\u2019s own view rather than only the first one\u2019s. Events created before this keep working: the old single column is still read, and still written with the first host, so anything else querying it is unaffected. Finance counts a co-hosted event once, not once per coach.',
-   '<b>Pull down to refresh</b> on the home page. The landing scrolls inside a fixed container, so the browser\'s own pull-to-refresh never fired — and in a Home Screen app there is no address bar to pull on at all. Dragging down from the very top now shows a spinner, re-reads the cloud and repaints. It only engages when already scrolled to the top and moving downward, and ignores horizontal swipes, so it cannot hijack a normal scroll or the highlights gallery.',
+   '<b>Pull down to refresh</b> everywhere — the public home page and the signed-in app for owner, coach and client. The landing scrolls inside a fixed container and the app scrolls the document, so each needed its own binding; in a Home Screen app there is no browser pull-to-refresh at all. It only engages from the very top, ignores upward and sideways drags, skips an open dialog, and will not fight a table you are scrolling sideways.',
+   '<b>Fix:</b> tables in the owner, coach and client views were crushed on a phone, one letter per line (<i>S c h e d u l e d</i>). The mobile-fit change had set <span class="mono">overflow-wrap:anywhere</span> on table cells, which also collapses a column\'s minimum width to a single character. Cells now use <span class="mono">break-word</span>, which wraps long words without touching column sizing; panels scroll sideways on phones so columns keep their natural widths, with a fade at the edge to show there is more; and status chips, prices and money never break across lines.',
    'Header stats reordered to <b>sports, sessions coached, coaches, athletes trained</b>.',
    'Uploaded highlights land as <b>drafts</b> on purpose, but nothing said so at a glance \u2014 uploading a batch and then looking at the home page made them seem to have vanished. The Highlights panel now shows a banner counting unpublished items with a <b>Publish all</b> button, and the upload confirmation says DRAFT explicitly.',
    '<b>Fix:</b> opening the app from the Home Screen could lay out wider than the phone, needing a manual pinch to fit. The viewport now sets <span class="mono">minimum-scale</span> so iOS cannot shrink the layout below 1x, images/video/tables/long words are capped at the screen width so nothing can force a wider layout, and the viewport is re-asserted on launch, on rotation, and when returning from the app switcher.',
