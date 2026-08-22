@@ -156,6 +156,24 @@
   section.view{min-width:0;max-width:100%}
   .panel,.stat,.jcard,.skrow{min-width:0;max-width:100%}
   .panel table{max-width:100%}
+  /* ---- Every table gets its own horizontal scroller -------------------------
+     Tables live in panels, in modals and in bare divs, at every screen width. Scoping the scroll
+     to one of those containers fixed that place and broke another. wrapTables() puts each table
+     inside .tblscroll instead, so a table always scrolls within its own box — never crushing its
+     columns, never widening the page, and working the same inside a dialog. */
+  .tblscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;
+    overscroll-behavior-x:contain;
+    background-image:linear-gradient(to left,rgba(0,0,0,.06),rgba(0,0,0,0) 28px);
+    background-repeat:no-repeat;background-position:right center;background-size:28px 100%;
+    background-attachment:local}
+  /* max-content = every column takes its natural width; the wrapper scrolls if that overflows.
+     Cells are capped so one long note cannot stretch the table to several screens wide — past
+     that width the text wraps as usual. */
+  .tblscroll>table{min-width:max-content;max-width:none}
+  .tblscroll>table td,.tblscroll>table th{max-width:42ch}
+  @media(max-width:820px){.tblscroll>table td,.tblscroll>table th{max-width:26ch}}
+  .tblscroll::-webkit-scrollbar{height:7px}
+  .tblscroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
   /* Status chips and money must never be broken across lines. */
   .pill,.credit,.slotchip,.badge{white-space:nowrap}
   td .right,td.right{white-space:nowrap}
@@ -307,7 +325,7 @@
     border-radius:8px;padding:6px 9px;font-size:12px}
   .iconbtn:hover{color:var(--txt)}
 
-  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:8px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:14px;margin-bottom:8px}
   .stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;position:relative;overflow:hidden}
   .stat:nth-child(1){background:linear-gradient(160deg,var(--a1b),var(--panel));border-color:var(--a1)}
   .stat:nth-child(2){background:linear-gradient(160deg,var(--a3b),var(--panel));border-color:var(--a3)}
@@ -376,7 +394,7 @@
   .hero p{color:#556352;max-width:640px;line-height:1.6}   /* --muted is 4.36:1 on the volt tint */
   .hl{color:var(--accent);font-weight:700}
 
-  .cards3{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+  .cards3{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(230px,100%),1fr));gap:14px}
   .feat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
   .feat .ic{font-size:24px;margin-bottom:10px}
   .feat h4{font-size:15px;margin-bottom:6px}
@@ -833,17 +851,8 @@
 
   /* ---------- responsive / mobile ---------- */
   @media(max-width:820px){
-    /* Phones: give a table its natural column widths and let the PANEL scroll sideways, rather
-       than crushing six columns into a 360px screen. min-width beats max-width in CSS, so this
-       overrides .panel table{max-width:100%} deliberately. */
-    .panel{overflow-x:auto;-webkit-overflow-scrolling:touch;
-      /* a subtle right-edge fade hints there is more table off-screen */
-      background-image:linear-gradient(to left,rgba(0,0,0,.055),transparent 26px);
-      background-repeat:no-repeat;background-position:right center;background-size:26px 100%;
-      background-attachment:local}
-    table{min-width:560px}
-    /* …except tables that are really just stacked rows, which should stay full width */
-    .nomin table,table.nomin{min-width:0}
+    /* last line of defence: whatever else overflows, the page itself must not scroll sideways */
+    .wrap{overflow-x:hidden}
     /* below 820px the page was still using the desktop's 28px side padding, so large phones
        lost ~56px of usable width. Match the header's 14px and let content run edge to edge. */
     .wrap{padding:0 14px 70px}
@@ -3602,8 +3611,31 @@ function exportExcel(){
 let flashT;
 function flash(msg,warn){const f=$('#flash');f.textContent=msg;f.className='flash show'+(warn?' warn':'');
   clearTimeout(flashT);flashT=setTimeout(()=>f.className='flash'+(warn?' warn':''),2800);}
+/* Wrap every table in a horizontal scroller, once. Runs after any render — including modal
+   bodies, which are replaced wholesale — so no call site has to remember to do it. */
+function wrapTables(root){
+  try{
+    (root||document).querySelectorAll('table').forEach(t=>{
+      const par=t.parentElement;
+      if(par&&par.classList&&par.classList.contains('tblscroll'))return;   // already wrapped
+      if(t.closest&&t.closest('#printArea'))return;                        // print sheet lays itself out
+      const w=document.createElement('div');
+      w.className='tblscroll';
+      par.insertBefore(w,t);
+      w.appendChild(t);
+    });
+  }catch(e){}
+}
+/* Renders replace innerHTML in a dozen places; an observer catches them all rather than relying
+   on every one of them remembering to call wrapTables(). Debounced so a burst costs one pass. */
+let _wrapT=null;
+try{
+  new MutationObserver(()=>{ clearTimeout(_wrapT); _wrapT=setTimeout(()=>wrapTables(),40); })
+    .observe(document.documentElement,{childList:true,subtree:true});
+}catch(e){}
 function openModal(title,body,foot){$('#mTitle').textContent=title;$('#mBody').innerHTML=body;
-  $('#mFoot').innerHTML=foot||'';$('#modal').classList.add('show');}
+  $('#mFoot').innerHTML=foot||'';$('#modal').classList.add('show');
+  wrapTables($('#mBody'));}
 function closeModal(){$('#modal').classList.remove('show');}
 let __delTarget='',__delYes=null;
 function confirmByName(kind,name,onYes,extraWarn){
@@ -3643,7 +3675,7 @@ const CHANGELOG=[
    'The hero wordmark is sized to fit one line at 320px and set to never wrap — its minimum font size used to be larger than a narrow phone could fit, so the ball dropped to a second line.',
    'An event can now have <b>several host coaches</b> instead of one. The Host coach dropdown is a tick list, every host is shown wherever the event appears, and a co-hosted event turns up in each host\u2019s own view rather than only the first one\u2019s. Events created before this keep working: the old single column is still read, and still written with the first host, so anything else querying it is unaffected. Finance counts a co-hosted event once, not once per coach.',
    '<b>Pull down to refresh</b> everywhere — the public home page and the signed-in app for owner, coach and client. The landing scrolls inside a fixed container and the app scrolls the document, so each needed its own binding; in a Home Screen app there is no browser pull-to-refresh at all. It only engages from the very top, ignores upward and sideways drags, skips an open dialog, and will not fight a table you are scrolling sideways.',
-   '<b>Fix:</b> tables in the owner, coach and client views were crushed on a phone, one letter per line (<i>S c h e d u l e d</i>). The mobile-fit change had set <span class="mono">overflow-wrap:anywhere</span> on table cells, which also collapses a column\'s minimum width to a single character. Cells now use <span class="mono">break-word</span>, which wraps long words without touching column sizing; panels scroll sideways on phones so columns keep their natural widths, with a fade at the edge to show there is more; and status chips, prices and money never break across lines.',
+   '<b>Fix: every table now scrolls sideways on its own.</b> Tables appear in panels, in dialogs and in bare divs, so scoping the scroll to any one container fixed that place and broke another — first columns crushed to one letter per line (<i>S c h e d u l e d</i>), then the whole app opening scrolled sideways with the logo cut off, then a registrations dialog that could not be scrolled at all. Each table is now wrapped in its own scroller as it renders, wherever it lives: columns keep their natural widths, the page itself never widens, and there is a fade at the right edge to show more is there. Very long cells are capped so a single note cannot stretch a table several screens wide.',
    'Header stats reordered to <b>sports, sessions coached, coaches, athletes trained</b>.',
    'Uploaded highlights land as <b>drafts</b> on purpose, but nothing said so at a glance \u2014 uploading a batch and then looking at the home page made them seem to have vanished. The Highlights panel now shows a banner counting unpublished items with a <b>Publish all</b> button, and the upload confirmation says DRAFT explicitly.',
    '<b>Fix:</b> opening the app from the Home Screen could lay out wider than the phone, needing a manual pinch to fit. The viewport now sets <span class="mono">minimum-scale</span> so iOS cannot shrink the layout below 1x, images/video/tables/long words are capped at the screen width so nothing can force a wider layout, and the viewport is re-asserted on launch, on rotation, and when returning from the app switcher.',
@@ -8473,7 +8505,7 @@ function custAnalyticsHtml(){
       <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="margin:0">New customers added</h3>${growthSeg()}</div>
       <div class="chart-wrap"><canvas id="custGrowth"></canvas></div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:16px;margin-bottom:16px">
       <div class="panel"><h3>Most valuable — by money</h3><div style="max-height:240px;overflow-y:auto;padding-right:12px">${topRows}</div><div class="clienttag" style="margin-top:8px">Ranked by lifetime money paid. Click a bar to filter the table.</div></div>
       <div class="panel"><h3>Most active — by sessions</h3><div style="max-height:240px;overflow-y:auto;padding-right:12px">${sessRows}</div><div class="clienttag" style="margin-top:8px">Ranked by sessions (completed + booked). Click a bar to filter the table.</div></div>
       <div class="panel"><h3>Customers by town</h3><div style="max-height:240px;overflow-y:auto;padding-right:12px">${townRows}</div><div class="clienttag" style="margin-top:8px">Where your players come from. Click a town to filter the table.</div></div>
