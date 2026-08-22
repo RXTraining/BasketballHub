@@ -209,7 +209,9 @@
   .tblscroll>table thead th:first-child{border-top-left-radius:6px}
   @media print{ .tblscroll{max-height:none;overflow:visible} }
   @media(max-width:820px){.tblscroll>table td,.tblscroll>table th{max-width:26ch}}
-  .tblscroll{scrollbar-width:thin;scrollbar-color:var(--muted) transparent}
+  /* A scroller must have no horizontal padding: sticky cells stop at the content edge, so any
+     padding-left becomes a strip that scrolling content shows through. */
+  .tblscroll{padding-left:0!important;padding-right:0!important;scrollbar-width:thin;scrollbar-color:var(--muted) transparent}
   .tblscroll::-webkit-scrollbar{height:10px}
   .tblscroll::-webkit-scrollbar-track{background:var(--panel2);border-radius:5px}
   .tblscroll::-webkit-scrollbar-thumb{background:var(--muted);border-radius:5px;border:2px solid var(--panel2)}
@@ -257,8 +259,11 @@
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;
     max-width:100%}
   /* Belt and braces: if a table ever escapes wrapTables(), its panel can still scroll to it
-     rather than the content being unreachable. */
+     rather than the content being unreachable. A panel that DOES contain a wrapper must not
+     scroll as well — a second scrollport around the sticky one recreates the padding strip that
+     frozen cells bleed through. */
   .panel{overflow-x:auto}
+  .panel:has(> .tblscroll),.panel:has(.tblscroll){overflow-x:visible}
   /* An empty state should still feel like part of the page, not a gap. */
   .empty{border-radius:10px}
   /* Section headings get a coloured tick so a long page reads as sections rather than one
@@ -3783,17 +3788,17 @@ function wrapTables(root){
       if(t.closest&&t.closest('#printArea'))return;      // the print sheet lays itself out
       const par=t.parentElement; if(!par||!par.classList)return;
       if(par.classList.contains('tblscroll'))return;     // done already
-      // Many tables are already inside <div style="overflow-x:auto">. Adding a second wrapper
-      // inside it works, but tagging the existing one is cleaner and — importantly — makes the
-      // .tblscroll>table sizing rule apply, which is what actually makes it scrollable.
-      const cs=getComputedStyle(par);
-      if((cs.overflowX==='auto'||cs.overflowX==='scroll')&&par.children.length===1){
-        par.classList.add('tblscroll'); return;
-      }
+      /* ALWAYS our own wrapper, never the existing container.
+         Tagging a panel that already scrolls looked tidier, but those panels carry horizontal
+         padding — and `position:sticky; left:0` sticks at the CONTENT edge, so scrolled cells
+         showed through the padding strip to the left of the frozen column. A wrapper we create
+         has no padding, so there is no strip for anything to bleed into. */
       const w=document.createElement('div');
       w.className='tblscroll';
       par.insertBefore(w,t);
       w.appendChild(t);
+      // :has() covers this in modern browsers; do it directly for the rest
+      try{ if(getComputedStyle(par).overflowX!=='visible')par.style.overflowX='visible'; }catch(e){}
     }catch(e){}
   });
 }
@@ -3929,6 +3934,7 @@ const CHANGELOG=[
    '<b>Fix:</b> that wrapping had a single try/catch around the whole pass, so one awkward node aborted it and left every table after it unscrollable — which is why the Customers table could not be scrolled to its last column. The guard is now per table. The scrollbar is also thicker and higher-contrast so it is visible and grabbable with a mouse, and a panel will scroll as a fallback if a table ever escapes wrapping entirely.',
    '<b>The identity column stays put when a table scrolls.</b> Scroll a wide table sideways and the column naming the row — <b>Client(s)</b>, <b>Player</b>, <b>Name</b> — stays frozen at the left with everything before it, so a status or a payment is never read against the wrong person. Which column that is comes from the header text, not a per-table list, so it works on every table including new ones.',
    'Two judgement calls there: the person outranks the coach, because on the Finance tables \u201cCoach\u201d sits to the left of \u201cClient\u201d and a width-first rule would have frozen the coach and scrolled the client away; and when the whole block will not fit, the name column alone is frozen and the columns before it scroll underneath it, rather than freezing \u201cWhen\u201d and losing the name. The frozen block never exceeds ~62% of the width, or there would be nothing left to scroll into.',
+   '<b>Fix:</b> scrolling a table sideways showed fragments of the scrolled columns bleeding through to the LEFT of the frozen column. A sticky cell stops at its scroller\u2019s content edge, and those tables were scrolling inside a panel with horizontal padding — so the padding strip was left uncovered for content to slide under. Each table now gets a padding-free wrapper of its own rather than reusing the panel, the wrapper\u2019s padding is forced to zero, and a panel containing one stops scrolling itself so there is never a second scrollport around the sticky one.',
    'A long table\'s horizontal scrollbar sat at the very bottom of the table — several screens down on a 40-row list — so the columns off to the right could not be reached without scrolling to the end first. Table boxes are now capped at 70% of the screen height, which keeps both scrollbars in view, and the header row sticks so you can still tell which column you are reading. On a mouse, the wheel pans a table that only scrolls sideways, handing control back to the page at each end so it can never trap the scroll; shift+wheel and browser zoom are untouched.',
    'Header stats reordered to <b>sports, sessions coached, coaches, athletes trained</b>.',
    'Uploaded highlights land as <b>drafts</b> on purpose, but nothing said so at a glance \u2014 uploading a batch and then looking at the home page made them seem to have vanished. The Highlights panel now shows a banner counting unpublished items with a <b>Publish all</b> button, and the upload confirmation says DRAFT explicitly.',
