@@ -1842,7 +1842,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
   d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:(s.price==null?null:Number(s.price)),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||'',paymentRequested:!!s.payment_requested,pay:(s.pay&&typeof s.pay==='object')?s.pay:{},joinReq:Array.isArray(s.join_req)?s.join_req:[],formAlerted:!!s.form_alerted}));
   d.expenses=(exp||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||'',freq:e.freq||'once'}));
   d.cashEntries=(cash||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,amount:Number(e.amount),note:e.note||'',customerId:e.customer_id||'',type:e.type||'1on1',qty:e.qty||1}));
-  d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||'',video:e.video||'',featured:e.featured===true}));
+  d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',coachIds:(Array.isArray(e.coach_ids)?e.coach_ids:(e.coach_id?[e.coach_id]:[])),price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||'',video:e.video||'',featured:e.featured===true}));
   d.eventRegs=(regs||[]).map(r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||''}));
   d.messages=(msgs||[]).map(m=>({id:m.id,peerType:m.peer_type||'client',clientId:m.client_id||'',coachId:m.coach_id||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',readOwner:m.read_owner===true,readClient:m.read_client===true,readCoach:m.read_coach===true}));
   d.highlights=(hl||[]).map(h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',active:h.active!==false,type:h.type||'',ord:(h.ord!=null?h.ord:null)}));
@@ -1882,7 +1882,7 @@ function loginCountOf(c){
 const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,approved:c.approved!==false,suspended:c.suspended===true,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',last_login:lastLoginOf(c)||null,login_count:loginCountOf(c)});
 const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,payment_requested:!!s.paymentRequested,pay:s.pay||{},join_req:s.joinReq||[],form_alerted:!!s.formAlerted});
 const expRow=e=>({id:e.id,coach_id:e.coachId||null,date:e.date,cat:e.cat,amount:e.amount,note:e.note||'',freq:e.freq||'once'});
-const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:e.coachId||null,price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||'',video:e.video||'',featured:e.featured===true});
+const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:(eventCoachIds(e)[0]||null),coach_ids:eventCoachIds(e),price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||'',video:e.video||'',featured:e.featured===true});
 const eventRegRow=r=>({id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||''});
 const messageRow=m=>({id:m.id,peer_type:m.peerType||'client',client_id:m.clientId||'',coach_id:m.coachId||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',read_owner:m.readOwner===true,read_client:m.readClient===true,read_coach:m.readCoach===true});
 async function migrateSource(){
@@ -1936,7 +1936,7 @@ function dataSig(d){return JSON.stringify({
   a:(d.availability||[]).map(x=>[x.id,x.coachId,x.date,x.start,x.end,x.location,x.sessionType,x.approved]),
   co:(d.coaches||[]).map(x=>[x.id,x.name,x.active,x.tagline,x.bio,x.affiliation,x.rate1on1,x.rateGroup,x.rateCond,x.rateTbc,x.sport,x.pending]),
   e:(d.expenses||[]).length, k:(d.cashEntries||[]).length,
-  ev:(d.events||[]).map(x=>[x.id,x.title,x.date,x.time,x.price,x.capacity,x.active,x.location,x.featured]),
+  ev:(d.events||[]).map(x=>[x.id,x.title,x.date,x.time,x.price,x.capacity,x.active,x.location,x.featured,(x.coachIds||[]).join('|')]),
   er:(d.eventRegs||[]).map(x=>[x.id,x.eventId,x.customerId,x.status,x.paid,x.checkedIn]),
   msg:(d.messages||[]).map(x=>[x.id,x.readOwner,x.readClient,x.readCoach]),
   // activity must be in the signature or a new log row reads as "no change" and the poll
@@ -3532,7 +3532,7 @@ function exportExcel(){
     ...DB.cashEntries.map(e=>({Date:e.date,Source:(e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in')+' ('+(e.qty||1)+'× '+typeShort(e.type)+' cash)',Note:e.note||'',Amount:e.amount}))
   ]);
   add('Availability',(DB.availability||[]).map(a=>({Coach:coachName(a.coachId),Date:a.date,From:a.start,To:a.end,'Slot (min)':a.slotMin,Location:a.location,Approved:a.approved!==false?'Yes':'No'})));
-  add('Events',(DB.events||[]).map(e=>({Title:e.title,Date:e.date,Time:e.time,Location:e.location,Coach:e.coachId?coachName(e.coachId):'General',Price:e.price,Capacity:e.capacity,Published:e.active!==false?'Yes':'No',Registered:eventRegsFor(e.id).length,Collected:eventRevenue(e),Details:e.detail||''})));
+  add('Events',(DB.events||[]).map(e=>({Title:e.title,Date:e.date,Time:e.time,Location:e.location,Coach:eventCoachNames(e),Price:e.price,Capacity:e.capacity,Published:e.active!==false?'Yes':'No',Registered:eventRegsFor(e.id).length,Collected:eventRevenue(e),Details:e.detail||''})));
   add('Event registrations',(DB.eventRegs||[]).map(r=>{const ev=eventById(r.eventId);const c=custById(r.customerId);return {Event:ev?ev.title:'(deleted)',Client:c?c.name:'?',Status:r.status,Paid:r.paid?'Yes':'No','Checked in':r.checkedIn?'Yes':'No','Event date':ev?ev.date:'',Registered:r.created||''};}));
   add('Messages',(DB.messages||[]).slice().sort((a,b)=>(a.created||'').localeCompare(b.created||'')).map(m=>{const pt=m.peerType||'client';return {'Thread with':(pt==='coach'?'Coach '+coachName(m.coachId):peerName('client',m.clientId)),Type:pt,From:m.sender,Message:m.text||'',Photos:(m.media||[]).length,When:m.created||'','Read by owner':m.readOwner?'Yes':'No','Read by peer':(pt==='coach'?m.readCoach:m.readClient)?'Yes':'No'};}));
   XLSX.writeFile(wb,'RXTraining-export-'+todayISO()+'.xlsx');
@@ -3582,6 +3582,7 @@ const CHANGELOG=[
    '<b>Fix: uploads could disappear entirely.</b> Rows save on the device first, then push to Supabase. If that push failed — almost always a column <span class="mono">supabase-setup.sql</span> had not created yet — the only sign was one flash message, and the next page load pulled the server copy straight over the top of the new rows. Failures are now recorded per table with the exact Supabase error, survive a reload, and show as a red banner at the top of Admin with <b>Retry cloud save</b>, until the push actually succeeds.',
    '<b>Fix:</b> on a phone the top bar broke the logo across two lines (<i>RX.TRAINI / NG</i>) and hyphenated the button label into <i>Sig n in</i>. The logo and every button are now set to never wrap; the bar tightens spacing and type below 600px, drops the language code beside the globe below 400px, and shortens <b>Create account</b> to <b>Join</b>, so the row fits down to a 320px screen.',
    'The hero wordmark is sized to fit one line at 320px and set to never wrap — its minimum font size used to be larger than a narrow phone could fit, so the ball dropped to a second line.',
+   'An event can now have <b>several host coaches</b> instead of one. The Host coach dropdown is a tick list, every host is shown wherever the event appears, and a co-hosted event turns up in each host\u2019s own view rather than only the first one\u2019s. Events created before this keep working: the old single column is still read, and still written with the first host, so anything else querying it is unaffected. Finance counts a co-hosted event once, not once per coach.',
    '<b>Pull down to refresh</b> on the home page. The landing scrolls inside a fixed container, so the browser\'s own pull-to-refresh never fired — and in a Home Screen app there is no address bar to pull on at all. Dragging down from the very top now shows a spinner, re-reads the cloud and repaints. It only engages when already scrolled to the top and moving downward, and ignores horizontal swipes, so it cannot hijack a normal scroll or the highlights gallery.',
    'Header stats reordered to <b>sports, sessions coached, coaches, athletes trained</b>.',
    'Uploaded highlights land as <b>drafts</b> on purpose, but nothing said so at a glance \u2014 uploading a batch and then looking at the home page made them seem to have vanished. The Highlights panel now shows a banner counting unpublished items with a <b>Publish all</b> button, and the upload confirmation says DRAFT explicitly.',
@@ -3897,7 +3898,7 @@ function renderBookingCalendar(){
   const byDate={};
   DB.sessions.filter(s=>inScope(s.coachId)&&s.status!=='cancelled').forEach(s=>{(byDate[s.date]=byDate[s.date]||[]).push(s);});
   const evByDate={};
-  (DB.events||[]).filter(e=>e.active!==false&&(scopeCoach()==='all'||!e.coachId||e.coachId===scopeCoach())).forEach(e=>{(evByDate[e.date]=evByDate[e.date]||[]).push(e);});
+  (DB.events||[]).filter(e=>e.active!==false&&(scopeCoach()==='all'||!eventCoachIds(e).length||eventHasCoach(e,scopeCoach()))).forEach(e=>{(evByDate[e.date]=evByDate[e.date]||[]).push(e);});
   const dows=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   let cells='';
   for(let i=0;i<firstDow;i++) cells+='<div class="calcell empty"></div>';
@@ -6711,6 +6712,30 @@ function eventUpcoming(ev){
   return (h*60+(m||0)) >= (n.getHours()*60+n.getMinutes());
 }
 function eventPast(ev){ return !eventUpcoming(ev); }
+/* ---- Host coaches on an event --------------------------------------------
+   An event used to have exactly one coachId. Workshops and camps are usually run by more than
+   one, so it now carries a list. The old single field is still read (and still written, holding
+   the first host) so events created before this — and anything else reading coach_id — keep
+   working untouched. */
+function eventCoachIds(ev){
+  if(!ev)return [];
+  const list=Array.isArray(ev.coachIds)?ev.coachIds.filter(Boolean):[];
+  if(list.length)return list;
+  return ev.coachId?[ev.coachId]:[];
+}
+function eventHasCoach(ev,cid){ return !cid||eventCoachIds(ev).indexOf(cid)>=0; }
+/* "🏀 Raymond Xu · 🏃 Jack" — or nothing at all for a general event */
+function eventCoachHtml(ev,pill){
+  const ids=eventCoachIds(ev);
+  if(!ids.length)return pill?'':'<span class="muted">General</span>';
+  return ids.map(id=>pill
+    ? `<span class="pill">${coachIcon(id)} ${coachName(id)}</span>`
+    : `${coachIcon(id)} ${coachName(id)}`).join(pill?' ':' · ');
+}
+function eventCoachNames(ev){
+  const ids=eventCoachIds(ev);
+  return ids.length?ids.map(coachName).join(', '):'General';
+}
 /* Whether an event should still be advertised — the ONE rule behind the home page ticker, the
    featured section and the client's events banner. They used to disagree: the featured section
    ignored the start time while the ticker didn't, so a starred 8am event showed as the headline
@@ -6751,7 +6776,7 @@ function renderEventsOwner(){
     return `<tr>
       <td><b>${ev.title||'(untitled)'}</b>${ev.featured?' <span class="pill orange" title="Featured on the home page">⭐</span>':''}${ev.video?' <span class="pill blue" title="Has a video">🎬</span>':''}<div class="clienttag">${(ev.detail||'').slice(0,60)}${(ev.detail||'').length>60?'…':''}</div></td>
       <td>${eventWhen(ev)}<div class="clienttag">📍 ${ev.location||'TBD'}</div></td>
-      <td>${ev.coachId?(coachIcon(ev.coachId)+' '+coachName(ev.coachId)):'<span class="muted">General</span>'}</td>
+      <td>${eventCoachHtml(ev)}</td>
       <td>${ev.price?money(ev.price):'Free'}</td>
       <td>${conf}${cap}<div class="clienttag">${pend?('⏳ '+pend+' pending · '):''}${paid} paid</div></td>
       <td class="right">${money(eventRevenue(ev))}</td>
@@ -6773,7 +6798,12 @@ function renderEventsOwner(){
 }
 function openEvent(id){
   const ev=id?eventById(id):{id:'',title:'',detail:'',date:todayISO(),time:'10:00',location:(DB.locations[0]?DB.locations[0].name:''),coachId:'',price:0,capacity:0,active:true};
-  const coachOpts='<option value="">General (no specific coach)</option>'+sortedCoaches(DB.coaches).map(c=>`<option value="${c.id}" ${ev.coachId===c.id?'selected':''}>${c.name}</option>`).join('');
+  const hostIds=eventCoachIds(ev);
+  const coachOpts=sortedCoaches(DB.coaches).filter(c=>c.active!==false).map(c=>
+    `<label style="display:flex;align-items:center;gap:8px;padding:5px 4px;cursor:pointer;font-size:14px;margin:0">
+       <input type="checkbox" class="evCoachCb" value="${c.id}" style="width:auto" ${hostIds.indexOf(c.id)>=0?'checked':''}>
+       ${coachIcon(c)} ${c.name}</label>`).join('')
+    ||'<div class="clienttag">No active coaches yet.</div>';
   openModal(id?'Edit Event':'New Event',`
     <div class="field"><label class="f">Title *</label><input id="evTitle" value="${(ev.title||'').replace(/"/g,'&quot;')}" placeholder="e.g. Workshop with a D2 Guard"></div>
     <div class="field"><label class="f">Details (shown to clients)</label><textarea id="evDetail">${ev.detail||''}</textarea>
@@ -6784,8 +6814,10 @@ function openEvent(id){
     </div>
     <div class="row">
       <div class="field"><label class="f">Location</label><select id="evLoc">${locOptions(ev.location)}</select></div>
-      <div class="field"><label class="f">Host coach (optional)</label><select id="evCoach">${coachOpts}</select></div>
     </div>
+    <div class="field"><label class="f">Host coaches (optional — tick any number)</label>
+      <div id="evCoachBox" style="max-height:150px;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px">${coachOpts}</div>
+      <div class="clienttag" style="margin-top:4px">Tick none for a general event. Every coach ticked is shown as a host and sees the event in their own view.</div></div>
     <div class="row">
       <div class="field"><label class="f">Price per person ($) — 0 = free</label><input type="number" id="evPrice" value="${ev.price||0}"></div>
       <div class="field"><label class="f">Capacity — 0 = unlimited</label><input type="number" id="evCap" value="${ev.capacity||0}"></div>
@@ -6838,7 +6870,7 @@ function saveEvent(id){
   const title=($('#evTitle').value||'').trim();if(!title)return flash('Title is required',true);
   const video=safeUrl($('#evVideo')?$('#evVideo').value:'');
   if(video&&!videoEmbed(video))return flash('That video link doesn\'t look like a URL — it should start with https://',true);
-  const obj={title,detail:$('#evDetail').value,date:$('#evDate').value,time:$('#evTime').value,location:$('#evLoc').value,coachId:$('#evCoach').value||'',price:Math.max(0,+$('#evPrice').value||0),capacity:Math.max(0,Math.round(+$('#evCap').value||0)),active:$('#evActive').checked,featured:!!($('#evFeatured')&&$('#evFeatured').checked),video};
+  const obj={title,detail:$('#evDetail').value,date:$('#evDate').value,time:$('#evTime').value,location:$('#evLoc').value,coachIds:$$('.evCoachCb').filter(cb=>cb.checked).map(cb=>cb.value),price:Math.max(0,+$('#evPrice').value||0),capacity:Math.max(0,Math.round(+$('#evCap').value||0)),active:$('#evActive').checked,featured:!!($('#evFeatured')&&$('#evFeatured').checked),video};
   if(id){Object.assign(eventById(id),obj);}
   else{obj.id=uid();obj.created=todayISO();DB.events.push(obj);}
   // an event's video can double as the public Highlights reel
@@ -6947,7 +6979,7 @@ function renderEventsClient(){
     return `<div class="panel" style="margin-bottom:12px">
       <div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px">
         <div style="flex:1;min-width:200px">
-          <b style="font-size:15px">${ev.title}</b> ${ev.coachId?`<span class="pill">${coachIcon(ev.coachId)} ${coachName(ev.coachId)}</span>`:''} ${ev.price?`<span class="pill orange">${money(ev.price)}</span>`:'<span class="pill green">'+t('Free')+'</span>'}
+          <b style="font-size:15px">${ev.title}</b> ${eventCoachHtml(ev,true)} ${ev.price?`<span class="pill orange">${money(ev.price)}</span>`:'<span class="pill green">'+t('Free')+'</span>'}
           <div class="clienttag" style="margin-top:4px">📅 ${eventWhen(ev)} · 📍 ${ev.location||'TBD'}${ev.capacity?` · ${left} ${t('left')}`:''}</div>
           ${ev.detail?`<div class="small muted" style="margin-top:8px;line-height:1.6">${ev.detail}</div>`:''}
           ${videoHtml(ev.video,'340px')}
@@ -7353,7 +7385,14 @@ function renderFinance(){
   const pkgRev=allPkgs.reduce((a,p)=>a+p.amount,0);
   const sessCash=cashSess.reduce((a,s)=>a+sessionCashAmt(s),0);
   const otherCash=CE.reduce((a,e)=>a+e.amount,0);
-  const eventInc=(DB.eventRegs||[]).filter(r=>r.paid&&r.status!=='cancelled').reduce((a,r)=>{const ev=eventById(r.eventId);return (ev&&inScope(ev.coachId))?a+(ev.price||0):a;},0);
+  // A co-hosted event counts once for whichever host is in scope — it is one payment, not one
+  // per coach, so it must not be double-counted when viewing "all".
+  const eventInc=(DB.eventRegs||[]).filter(r=>r.paid&&r.status!=='cancelled').reduce((a,r)=>{
+    const ev=eventById(r.eventId); if(!ev)return a;
+    const ids=eventCoachIds(ev);
+    const counts=ids.length?ids.some(inScope):inScope('');
+    return counts?a+(ev.price||0):a;
+  },0);
   const cashRev=sessCash+otherCash+eventInc;
   const revenue=pkgRev+cashRev;
   const outstanding=S.reduce((a,s)=>a+sessionOutstandingAmt(s),0);
