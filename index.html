@@ -3340,6 +3340,7 @@ const CHANGELOG=[
    '<b>The site no longer reads as a basketball site.</b> Every piece of marketing copy that assumed one sport was rewritten in all four languages — the hero lede, the feature cards, the quote, the highlights caption and the sports heading no longer mention AAU, Middlesex Magic, “the court” or basketball itself. The basketball <i>skill catalogue</i> is untouched: those drills are filed under Basketball and belong there.',
    'The home page now names the sports that are actually open. A <b>Training now</b> strip sits directly under the slogan listing every sport with an active coach, and the Sports section splits into <b>Open now</b> and <b>Coming as we add coaches</b> with counts, instead of one mixed grid where a parent had to read ten chips to find out whether we coach their kid\'s sport.',
    '<b>Prepaid credits now work for every session type.</b> Packages could only be sold as 1:1 or Group, so a Track player had no way to pay a conditioning session with a credit — the Credit button simply never appeared. Packages, credit balances, the Customers credit badge and the client\'s “Your prepaid sessions” panel all read the full list of types now, and both credit and cash remain available per player on any multi-player session.',
+   'The <b>Credit</b> control is now always visible on a payment screen. It used to be hidden whenever the player held no matching credit, which made "this player has no package" and "credit is not supported here" look identical. It now shows the remaining count when one is available, and otherwise explains itself — the owner gets a one-tap <b>Sell credit</b> that opens the package form with the right session type and price already filled in, so the credit it creates is actually usable for that session.',
    '<b>Fix:</b> saving a customer wiped any credits held against a weekend class. The edit form only had 1:1 and Group boxes and wrote a fixed two-key object over the whole balance. The form now renders one box per type and merges rather than replaces.',
    '<b>Fix:</b> the Finance revenue-by-type panel showed <span class="mono">NaN</span> once a weekend session was paid — the running total was seeded with only two keys, so the third type added a number to <span class="mono">undefined</span>.',
    'The <b>SESSIONS</b> section is generated from the coach roster instead of two hardcoded cards. All four session types now appear — 1-on-1, Group, Weekend Open Run and Weekend Running/Conditioning — each tagged with the sports it is available in, its player cap, and a “from” price when coaches charge differently for it. A type only appears if an active coach can run it, so the page can never advertise something unbookable.',
@@ -3600,7 +3601,8 @@ function renderBookingTable(){
     else if(s.paid){payCell='<span class="pill green">Paid</span><div class="clienttag">'+(s.paidVia==='package'?'package':'cash')+'</div>';}
     else if(AUTH==='coach'){payCell='<div class="actions" style="justify-content:flex-start"><span class="pill red">Unpaid</span><button class="iconbtn" title="Mark paid (cash)" onclick="coachSetPaid(\''+s.id+'\',true)">Cash</button></div>';}
     else{payCell=`<div class="actions" style="justify-content:flex-start">
-        ${sessionHasCredit(s)?`<button class="iconbtn" title="Use prepaid credit" onclick="payCredit('${s.id}')">Credit</button>`:''}
+        ${sessionHasCredit(s)?`<button class="iconbtn" title="Use a prepaid ${typeShort(s.type)} credit" onclick="payCredit('${s.id}')">🎟️ Credit</button>`
+          :(AUTH==='owner'?`<button class="iconbtn" style="opacity:.5" title="No prepaid ${typeShort(s.type)} credit — tap to sell a package" onclick="openSellPackage('${s.customerIds[0]||''}','${s.type}')">🎟️ Sell credit</button>`:'')}
         <button class="iconbtn" onclick="payCash('${s.id}')">Cash</button></div>`;}
     const actionCell = AUTH==='coach'
       ? statusSelect(s)+`<button class="iconbtn" title="Feedback, photos & payment" onclick="openCoachStatus('${s.id}')">📝</button><button class="iconbtn" title="Calendar" onclick="addToCalendar('${s.id}')">📅</button>`
@@ -5187,8 +5189,13 @@ function openGroupPay(id){
         ? `<span class="pill green">${p.paidVia==='package'?'Credit':'Cash'}</span>
            <button class="iconbtn" title="Undo" onclick="setGroupPay('${id}','${cid}',false)">Undo</button>
            <button class="iconbtn" title="Resend payment-received confirmation" onclick="manualMemberPaymentConfirm('${id}','${cid}')">✅</button>`
-        : `${hasCredit?`<button class="iconbtn" title="Use prepaid credit" onclick="setGroupPay('${id}','${cid}',true,'package')">Credit</button>`:''}
-           <button class="iconbtn" onclick="setGroupPay('${id}','${cid}',true,'cash')">Cash</button>`;
+        : `${hasCredit
+             ? `<button class="iconbtn" title="Use a prepaid ${typeShort(s.type)} credit — ${creditsFor(c,s.type)} left" onclick="setGroupPay('${id}','${cid}',true,'package')">🎟️ Credit (${creditsFor(c,s.type)})</button>`
+             /* Previously this rendered nothing, so "no credit" and "credit not supported here"
+                looked identical. Now it stays visible, explains itself, and — for the owner —
+                is a one-tap route to selling the package that would make it usable. */
+             : `<button class="iconbtn" style="opacity:.5" title="${(c?c.name:'This player')} has no prepaid ${typeShort(s.type)} credit${AUTH==='owner'?' — tap to sell a package':''}" ${AUTH==='owner'?`onclick="openSellPackage('${cid}','${s.type}')"`:'disabled'}>🎟️ ${AUTH==='owner'?'Sell credit':'No credit'}</button>`}
+           <button class="iconbtn" onclick="setGroupPay('${id}','${cid}',true,'cash')">💵 Cash</button>`;
     }
     return `<div class="row" style="justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)">
       <div><b>${c?c.name:'—'}</b><div class="clienttag">${money(s.price/n)} share${(hasCredit&&!p.paid)?' · has a credit available':''}</div></div>
@@ -5198,7 +5205,8 @@ function openGroupPay(id){
   openModal('Payments — '+custNames(s.customerIds),`
     <div class="clienttag" style="margin-bottom:8px">${fmtDT(s.date,s.time)} · Group · Total ${money(s.price)}</div>
     ${rows}
-    <p class="muted small" style="margin-top:10px">Each player's payment is tracked separately — one can use a prepaid credit while another pays cash, or hasn't paid yet.</p>
+    <p class="muted small" style="margin-top:10px">Each player's payment is tracked separately — one can use a prepaid credit while another pays cash, or hasn't paid yet.<br>
+      <b style="color:var(--txt)">Credit</b> is only offered to a player holding an unused <b style="color:var(--txt)">${typeShort(s.type)}</b> package. Credits are per session type, so a 1:1 package cannot pay for this one.</p>
   `,`<button class="btn ghost" onclick="closeModal()">Close</button>`);
 }
 function setGroupPay(id,custId,paid,method){
@@ -5393,20 +5401,24 @@ function viewCustomer(id){
     <p class="muted small" style="margin-top:8px">Editing a session here updates the client's "My Sessions" too.</p>
   `,`<button class="btn ghost" onclick="copyClientLink('${id}')">🔗 Client link</button><button class="btn ghost" onclick="openClientSkills('${id}')">🎯 Skills</button><button class="btn ghost" onclick="openCustomer('${id}')">Edit</button><button class="btn" onclick="closeModal()">Close</button>`);
 }
-function openSellPackage(id){
+/* preType preselects the session type when this is opened from a payment screen. Without it the
+   owner sells a 1:1 package to settle a conditioning session and the Credit button still refuses
+   to appear — credits are per type. */
+function openSellPackage(id,preType){
   const c=id?custById(id):null;
+  const pre=SESSION_TYPES[preType]?preType:'1on1';
   const clientField=id?'':`<div class="field"><label class="f">Client</label><select id="pkClient">${DB.customers.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')||'<option value="">No customers yet</option>'}</select></div>`;
   openModal('Sell package'+(c?' — '+c.name:''),`
     ${clientField}
     <div class="field"><label class="f">Coach (credit applies to this coach)</label><select id="pkCoach">${coachSelectOptions(targetCoach(),false)}</select></div>
     <div class="row">
       <div class="field"><label class="f">Type</label><select id="pkType" onchange="recalcPkg()">
-        ${TYPE_ORDER.map(ty=>`<option value="${ty}">${typeIcon(ty)} ${typeDef(ty).label} (${money(coachRate(targetCoach(),ty))}${ty==='1on1'?'/hr':'/player'})</option>`).join('')}
+        ${TYPE_ORDER.map(ty=>`<option value="${ty}" ${pre===ty?'selected':''}>${typeIcon(ty)} ${typeDef(ty).label} (${money(coachRate(targetCoach(),ty))}${ty==='1on1'?'/hr':'/player'})</option>`).join('')}
       </select></div>
       <div class="field"><label class="f">Number of sessions</label><input type="number" id="pkQty" value="10" min="1" onchange="recalcPkg()" oninput="recalcPkg()"></div>
     </div>
     <div class="row">
-      <div class="field"><label class="f">Amount charged ($) — editable</label><input type="number" id="pkAmt" value="${10*coachRate(targetCoach(),'1on1')}"></div>
+      <div class="field"><label class="f">Amount charged ($) — editable</label><input type="number" id="pkAmt" value="${10*coachRate(targetCoach(),pre)}"></div>
       <div class="field"><label class="f">Date</label><input type="date" id="pkDate" value="${todayISO()}"></div>
     </div>
     <p class="muted small">Adds to the client's total credits and records the amount as revenue. Balance shows as used/total; package-paid sessions aren't billed again.</p>
@@ -7083,7 +7095,7 @@ function renderFinance(){
         out.push({date:s.date,html:`<tr>
           <td>${fmtDate(s.date)}</td><td>${coachIcon(s.coachId)} ${coachName(s.coachId)}</td><td>${custNames(s.customerIds)}</td>
           <td>${typeShort(s.type)}</td><td class="right">${money(s.price)}</td>
-          <td class="right"><div class="actions">${sessionHasCredit(s)?`<button class="btn sm ghost" onclick="payCredit('${s.id}')">Credit</button>`:''}<button class="btn sm" onclick="payCash('${s.id}')">Cash</button></div></td></tr>`});
+          <td class="right"><div class="actions">${sessionHasCredit(s)?`<button class="btn sm ghost" onclick="payCredit('${s.id}')">🎟️ Credit</button>`:`<button class="btn sm ghost" style="opacity:.5" title="No prepaid ${typeShort(s.type)} credit — tap to sell a package" onclick="openSellPackage('${s.customerIds[0]||''}','${s.type}')">🎟️ Sell credit</button>`}<button class="btn sm" onclick="payCash('${s.id}')">Cash</button></div></td></tr>`});
       }
     });
     out.sort((a,b)=>a.date.localeCompare(b.date));
