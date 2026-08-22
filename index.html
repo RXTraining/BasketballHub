@@ -289,6 +289,35 @@
   .stat::after{content:"";position:absolute;right:-20px;top:-20px;width:80px;height:80px;border-radius:50%;
     background:linear-gradient(135deg,var(--accent),transparent);opacity:.12}
 
+  /* ---- printable sign-in sheet -------------------------------------------
+     #printArea lives in the page (hidden) rather than in a popup: window.open is blocked by
+     default on iOS Safari, which is where the owner is most likely to print from. */
+  #printArea{display:none}
+  @media print{
+    body.printing > *{display:none!important}
+    body.printing > #printArea{display:block!important}
+    body.printing{background:#fff!important;color:#000!important;overflow:visible!important}
+    html{overflow:visible!important}
+    @page{margin:14mm}
+    #printArea{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:#000}
+    #printArea .ph{border-bottom:2.5px solid #000;padding-bottom:8px;margin-bottom:12px}
+    #printArea .pt{font-size:19pt;font-weight:800;line-height:1.2}
+    #printArea .ps{font-size:9.5pt;margin-top:3px;color:#333}
+    #printArea .ptab{width:100%;border-collapse:collapse;font-size:9.5pt}
+    #printArea .ptab th{text-align:left;border-bottom:1.5px solid #000;padding:6px 5px;font-size:8.5pt;
+      text-transform:uppercase;letter-spacing:.4px}
+    #printArea .ptab td{border-bottom:1px solid #bbb;padding:7px 5px;vertical-align:top}
+    /* repeat the header on every page of a long list */
+    #printArea .ptab thead{display:table-header-group}
+    #printArea .ptab tr{break-inside:avoid;page-break-inside:avoid}
+    #printArea .ptab .n{width:26px;color:#666}
+    #printArea .ptab .box{width:78px}
+    #printArea .ptab td.box{border-bottom:1px solid #bbb}
+    /* a real box to tick with a pen — the on-screen check-in state is not what gets used on the day */
+    #printArea .ptab td.box::before{content:"";display:inline-block;width:15px;height:15px;
+      border:1.3px solid #000;border-radius:3px}
+    #printArea .pf{margin-top:14px;font-size:8pt;color:#666;border-top:1px solid #bbb;padding-top:6px}
+  }
   .modal{position:fixed;inset:0;background:rgba(18,30,12,.42);display:none;align-items:center;justify-content:center;
     z-index:100;padding:18px}
   .modal.show{display:flex}
@@ -3186,6 +3215,8 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
    '<b>Slogan:</b> “We plant the seed of sport” now sits under the RX•TRAINING wordmark on the home page, in a volt-to-blue gradient. Editable in <b>Admin → Home page — slogan</b>, with the same <b>[en]/[zh]/[ko]/[ja]</b> markers as the other free-text fields, so each language can have its own wording. Blank uses the built-in translated version.',
+   'Event registrations now show each player the way the Customers table does — avatar, name, and <b>age/level · parent</b> underneath — plus a tappable phone number, so you are not cross-referencing two screens to reach a family.',
+   '<b>Print sign-in sheet</b> button on the registrations dialog. One clean page per event: title, date, location, headcount, how many still owe, then the players sorted alphabetically with age/level, guardian, phone, payment state and an empty box to tick on the day. The table header repeats on every page and no row splits across a page break.',
    'Removed the “Train like you play” strap line — the slogan carries that job now, and two lines of brand copy under the wordmark was one too many.',
    'The slogan sits under the wordmark as a light strap line — 400 weight at up to 23px against the wordmark\'s 900 at 78px, so it supports the logo rather than competing with it. The brand colour appears as a short volt rule beneath the text that wipes in on load; an earlier highlighter bar behind the words read as a strikethrough and was removed. Motion is disabled for anyone who has asked for reduced motion.',
    '<b>Colour across the whole app.</b> Eight accent hues, each paired with a tint to sit on. Header stats, section kickers and feature-card icons cycle through them on the home page; in the app, page titles carry a gradient, section headings gain a coloured tick, each active tab keeps its own hue, and the About-page stat tiles are individually coloured.',
@@ -6366,7 +6397,9 @@ function viewEventRegs(id){
   const ev=eventById(id);if(!ev)return;
   const regs=(DB.eventRegs||[]).filter(r=>r.eventId===id&&r.status!=='cancelled');
   const rows=regs.map(r=>{const c=custById(r.customerId);return `<tr>
-    <td>${c?c.name:'?'}</td>
+    <td><div class="nameceil"><span class="av">${c?initials(c.name):'?'}</span><div><b>${c?c.name:'?'}</b>
+      <div class="clienttag">${(c&&c.level)||'—'}${c&&c.parent?' · '+c.parent:''}</div></div></div></td>
+    <td>${c&&c.phone?`<a href="tel:${c.phone.replace(/[^0-9+]/g,'')}">${c.phone}</a>`:'<span class="muted">—</span>'}</td>
     <td>${r.status==='pending'?'<span class="pill yellow">⏳ Pending</span>':'<span class="pill green">Registered</span>'}</td>
     <td>${r.paid?'<span class="pill green">Paid</span>':(ev.price?'<span class="pill red">Unpaid</span>':'<span class="pill">Free</span>')}</td>
     <td>${r.checkedIn?'<span class="pill green">✓ In</span>':'—'}</td>
@@ -6375,7 +6408,7 @@ function viewEventRegs(id){
       ${ev.price&&!r.paid?`<button class="iconbtn" onclick="eventRegPay('${r.id}')">Mark paid</button>`:''}
       <button class="iconbtn" onclick="eventRegCheckin('${r.id}')">${r.checkedIn?'Undo in':'Check in'}</button>
       <button class="iconbtn" onclick="eventRegRemove('${r.id}')">✕</button>
-    </div></td></tr>`;}).join('')||'<tr><td colspan="5"><div class="empty">No registrations yet.</div></td></tr>';
+    </div></td></tr>`;}).join('')||'<tr><td colspan="6"><div class="empty">No registrations yet.</div></td></tr>';
   const custOpts='<option value="">— add a client —</option>'+DB.customers.filter(c=>!myEventReg(id,c.id)).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
   openModal('Registrations — '+ev.title,`
     <div class="clienttag" style="margin-bottom:10px">${eventWhen(ev)} · 📍 ${ev.location||'TBD'} · ${ev.price?money(ev.price):'Free'} · ${regs.length}${ev.capacity?('/'+ev.capacity):''} registered · collected ${money(eventRevenue(ev))}</div>
@@ -6383,8 +6416,49 @@ function viewEventRegs(id){
       <div class="field" style="margin-bottom:0"><label class="f">Register a client</label><select id="evAddCust">${custOpts}</select></div>
       <button class="btn sm" onclick="ownerAddReg('${id}')">Add</button>
     </div>
-    <div class="panel" style="padding:6px 14px;overflow-x:auto"><table><thead><tr><th>Client</th><th>Status</th><th>Payment</th><th>Check-in</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
-  `,`<button class="btn" onclick="closeModal()">Close</button>`);
+    <div class="panel" style="padding:6px 14px;overflow-x:auto"><table><thead><tr><th>Player</th><th>Phone</th><th>Status</th><th>Payment</th><th>Check-in</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+  `,`<button class="btn ghost" onclick="printEventRegs('${id}')">🖨 Print sign-in sheet</button>
+     <button class="btn" onclick="closeModal()">Close</button>`);
+}
+/* Printable sign-in sheet.
+   Renders into a hidden #printArea in the page rather than opening a new window: window.open is
+   blocked by default on iOS Safari, which is exactly where the owner would be printing from a
+   phone. @media print hides everything except this node. */
+function printEventRegs(id){
+  const ev=eventById(id); if(!ev)return;
+  const regs=(DB.eventRegs||[]).filter(r=>r.eventId===id&&r.status!=='cancelled')
+    .map(r=>({r,c:custById(r.customerId)}))
+    .sort((a,b)=>((a.c&&a.c.name)||'').localeCompare((b.c&&b.c.name)||''));   // alphabetical for a paper list
+  let host=document.getElementById('printArea');
+  if(!host){ host=document.createElement('div'); host.id='printArea'; document.body.appendChild(host); }
+  const rows=regs.map((x,i)=>`<tr>
+      <td class="n">${i+1}</td>
+      <td><b>${x.c?x.c.name:'?'}</b></td>
+      <td>${(x.c&&x.c.level)||''}</td>
+      <td>${(x.c&&x.c.parent)||''}</td>
+      <td>${(x.c&&x.c.phone)||''}</td>
+      <td>${x.r.status==='pending'?'Pending':'Registered'}</td>
+      <td>${ev.price?(x.r.paid?'Paid':'DUE '+money(ev.price)):'Free'}</td>
+      <td class="box"></td>
+    </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;padding:18px">No registrations yet.</td></tr>';
+  const due=regs.filter(x=>ev.price&&!x.r.paid).length;
+  host.innerHTML=`
+    <div class="ph">
+      <div class="pt">${mlText(ev.title)}</div>
+      <div class="ps">📅 ${eventWhen(ev)}${ev.location?' &nbsp;·&nbsp; 📍 '+ev.location:''}
+        &nbsp;·&nbsp; ${ev.price?money(ev.price)+' per player':'Free'}</div>
+      <div class="ps">${regs.length} registered${ev.capacity?' of '+ev.capacity:''}${due?' &nbsp;·&nbsp; '+due+' still to pay':''}
+        &nbsp;·&nbsp; collected ${money(eventRevenue(ev))}</div>
+    </div>
+    <table class="ptab"><thead><tr>
+      <th class="n">#</th><th>Player</th><th>Age / level</th><th>Parent / guardian</th><th>Phone</th>
+      <th>Status</th><th>Payment</th><th class="box">Check-in</th>
+    </tr></thead><tbody>${rows}</tbody></table>
+    <div class="pf">RX.TRAINING &nbsp;·&nbsp; printed ${fmtDate(todayISO())}</div>`;
+  document.body.classList.add('printing');
+  const done=()=>{ document.body.classList.remove('printing'); window.removeEventListener('afterprint',done); };
+  window.addEventListener('afterprint',done);
+  setTimeout(()=>{ window.print(); setTimeout(done,1500); },60);   // belt and braces: afterprint is unreliable on iOS
 }
 function ownerAddReg(eid){
   const cid=$('#evAddCust')?$('#evAddCust').value:'';if(!cid)return flash('Pick a client',true);
