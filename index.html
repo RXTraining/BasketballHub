@@ -2620,6 +2620,14 @@ function bookableSports(){
     if(sp&&!seen.some(x=>sportKey(x)===sportKey(sp)))seen.push(sportLabel(sp)||sp);});
   return seen;
 }
+/* Longest-serving first. Used by the public roster and the client's coach picker, so a client
+   sees the team in the same order a visitor does. A coach with no joined date sorts LAST — an
+   empty string compares below every real date and would otherwise lead the list. */
+function coachesByJoined(list){
+  const joined=c=>(c.created||'9999-99-99');
+  return (list||[]).slice().sort((a,b)=>
+    joined(a).localeCompare(joined(b)) || (a.name||'').localeCompare(b.name||''));
+}
 function coachesForSport(sp){
   if(!sp)return activeCoaches();
   return activeCoaches().filter(c=>sportKey(c.sport)===sportKey(sp));
@@ -3248,9 +3256,7 @@ function lpCoachCards(){
      what an empty string would otherwise do. Name breaks a tie.
      The BOOKING pickers keep their own order — Raymond pinned first, where he is the usual
      choice — because that is a convenience list, not a roster. */
-  const joined=c=>(c.created||'9999-99-99');
-  const list=activeCoaches().slice().sort((a,b)=>
-    joined(a).localeCompare(joined(b)) || (a.name||'').localeCompare(b.name||''));
+  const list=coachesByJoined(activeCoaches());
   if(!list.length)return '<div class="lp-card">'+t('NO_COACHES')+'</div>';
   return list.map((c,i)=>{
     const founder=(c.name||'').trim().toLowerCase()==='raymond xu';
@@ -3985,7 +3991,7 @@ const CHANGELOG=[
    'Uploaded highlights land as <b>drafts</b> on purpose, but nothing said so at a glance \u2014 uploading a batch and then looking at the home page made them seem to have vanished. The Highlights panel now shows a banner counting unpublished items with a <b>Publish all</b> button, and the upload confirmation says DRAFT explicitly.',
    '<b>Fix:</b> opening the app from the Home Screen could lay out wider than the phone, needing a manual pinch to fit. The viewport now sets <span class="mono">minimum-scale</span> so iOS cannot shrink the layout below 1x, images/video/tables/long words are capped at the screen width so nothing can force a wider layout, and the viewport is re-asserted on launch, on rotation, and when returning from the app switcher.',
    '<b>Fix:</b> the Highlights gallery played a month oldest-first. Manual order ranked above the date, and since uploads are numbered in the order they are added, that put the earliest photo first. Newest now leads, in the gallery and in the Admin list \u2014 which are sorted identically, so dragging rearranges the list you actually see. Drag order still decides the sequence within a single date, which is where a batch of photos from one session lands.',
-   'The public coach roster is ordered by <b>date joined</b>, longest-serving first, so it reads as the team\u2019s history and the founder leads it without a special case. A coach with no joined date sorts last rather than jumping to the front. The booking pickers keep their own order with Raymond pinned first \u2014 that is a convenience list, not a roster.',
+   'The coach list is ordered by <b>date joined</b>, longest-serving first, on the public roster and in the client\u2019s coach picker \u2014 so a client sees the team in the same order a visitor does. A coach with no joined date sorts last rather than jumping to the front. The owner\u2019s picker keeps Raymond pinned first; that is a convenience list for the person booking all day, not a roster.',
    '<b>Fix:</b> a coach added with the rate boxes left empty was saved at <b>\$0</b>, because an empty number input reads as zero. They were then advertised as free on the public page, and dragged the \u201cfrom\u201d price on the plan cards down to \$0. Blank now stays unset and falls back to the Admin default; a stored <b>0</b> is read as \u201cnot agreed yet\u201d and shows as TBC, so coaches already saved this way correct themselves without being re-edited.',
    '<b>A coach\u2019s rate can be marked TBC.</b> New coaches often start before the money is agreed. Ticking <i>Rate is TBC</i> beside any rate in the coach form shows <b>TBC</b> everywhere that rate would appear \u2014 the public coach card, the plan cards, the client\u2019s booking dropdown, the Coaches table and Finance \u2014 instead of a number nobody agreed to.',
    'A session booked against a TBC rate is now <b>unpriced</b> rather than priced at zero. Zero is a real number \u2014 it reports as revenue, shows the client \u201c\$0 due\u201d, and lets a session be marked paid without anyone agreeing a figure. An unpriced session shows <b>TBC</b> everywhere, is excluded from outstanding and collected totals, and cannot be marked paid or sent a payment request until the owner enters the agreed amount. Once entered, it is never overwritten by the rate table.',
@@ -4527,7 +4533,7 @@ function renderBookingClient(){
                 <span class="n">${n} ${n===1?t('coach'):t('coaches')}</span></button>`;
             }).join('')}</div></div>`:''}
           <div class="field"><label class="f">${t('Coach')}</label>
-            <select id="rqCoach" onchange="pickCoachChange(this.value)">${coachesForSport(pickSport).map(co=>`<option value="${co.id}" ${pickCoach===co.id?'selected':''}>${co.name}</option>`).join('')||'<option value="">No coaches available</option>'}</select></div>
+            <select id="rqCoach" onchange="pickCoachChange(this.value)">${coachesByJoined(coachesForSport(pickSport)).map(co=>`<option value="${co.id}" ${pickCoach===co.id?'selected':''}>${co.name}</option>`).join('')||'<option value="">No coaches available</option>'}</select></div>
           ${coachMiniProfile(coachById(pickCoach))}
           <div class="field"><label class="f">${t('Session type')}</label>
             <select id="rqType" onchange="reqSel=[];renderOpenSlots()">${typesForCoach(pickCoach).map(ty=>
