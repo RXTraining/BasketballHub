@@ -3340,6 +3340,8 @@ const CHANGELOG=[
    '<b>The site no longer reads as a basketball site.</b> Every piece of marketing copy that assumed one sport was rewritten in all four languages — the hero lede, the feature cards, the quote, the highlights caption and the sports heading no longer mention AAU, Middlesex Magic, “the court” or basketball itself. The basketball <i>skill catalogue</i> is untouched: those drills are filed under Basketball and belong there.',
    'The home page now names the sports that are actually open. A <b>Training now</b> strip sits directly under the slogan listing every sport with an active coach, and the Sports section splits into <b>Open now</b> and <b>Coming as we add coaches</b> with counts, instead of one mixed grid where a parent had to read ten chips to find out whether we coach their kid\'s sport.',
    '<b>Prepaid credits now work for every session type.</b> Packages could only be sold as 1:1 or Group, so a Track player had no way to pay a conditioning session with a credit — the Credit button simply never appeared. Packages, credit balances, the Customers credit badge and the client\'s “Your prepaid sessions” panel all read the full list of types now, and both credit and cash remain available per player on any multi-player session.',
+   'A session whose headcount no longer fits its type now says so in the editor and offers a one-tap switch — e.g. <i>“10 players in a Group (max 4). Switch to Weekend Open Run →”</i>. The switch reprices at the new type\'s rate, shows the before/after per player, and keeps payments already recorded.',
+   '<b>Fix:</b> a session booked when the cap was higher could not be saved at all, because the cap check ran before the owner had any chance to correct the type — locking them out of the one screen that fixes it. The check now only blocks <i>adding</i> players beyond the cap.',
    'The <b>Credit</b> control is now always visible on a payment screen. It used to be hidden whenever the player held no matching credit, which made "this player has no package" and "credit is not supported here" look identical. It now shows the remaining count when one is available, and otherwise explains itself — the owner gets a one-tap <b>Sell credit</b> that opens the package form with the right session type and price already filled in, so the credit it creates is actually usable for that session.',
    '<b>Fix:</b> saving a customer wiped any credits held against a weekend class. The edit form only had 1:1 and Group boxes and wrote a fixed two-key object over the whole balance. The form now renders one box per type and merges rather than replaces.',
    '<b>Fix:</b> the Finance revenue-by-type panel showed <span class="mono">NaN</span> once a weekend session was paid — the running total was seeded with only two keys, so the third type added a number to <span class="mono">undefined</span>.',
@@ -5025,7 +5027,16 @@ function openSession(id,returnCust,preset){
         <option value="group" ${s.type==='group'?'selected':''}>Group / 1:N (max ${MAX_GROUP})</option>
         ${TYPE_ORDER.filter(typeIsDedicated).filter(ty=>coachOffersType(s.coachId||targetCoach(),ty)||s.type===ty)
           .map(ty=>`<option value="${ty}" ${s.type===ty?'selected':''}>${typeIcon(ty)} ${typeDef(ty).label} (max ${typeMax(ty)})</option>`).join('')}
-      </select></div>
+      </select>${(()=>{
+        // e.g. a Saturday run booked as a "Group" back when that cap was 10 — name the type it
+        // actually fits and offer a one-tap switch rather than leaving the owner to work it out.
+        const n=(s.customerIds||[]).length;
+        if(!id||s.type==='1on1'||n<=typeMax(s.type))return '';
+        const fit=TYPE_ORDER.filter(ty=>ty!=='1on1'&&ty!==s.type&&typeMax(ty)>=n
+                    &&(coachOffersType(s.coachId||targetCoach(),ty)));
+        return `<div class="clienttag" style="margin-top:6px;color:var(--yellow)">⚠ ${n} players in a ${typeShort(s.type)} (max ${typeMax(s.type)}).${
+          fit.length?` <a href="#" onclick="switchSessionType('${id}','${fit[0]}');return false" style="color:var(--accent);font-weight:800">Switch to ${typeDef(fit[0]).label} →</a>`:''}</div>`;
+      })()}</div>
       <div class="field"><label class="f">Duration (min)</label><input type="number" id="sDur" value="${s.dur}" onchange="recalcPrice()"></div>
     </div>
     <div class="row">
@@ -5072,6 +5083,21 @@ function openSession(id,returnCust,preset){
   renderMediaPrev();
 }
 function closeSessionEditor(){const rc=sessionReturnCust;sessionReturnCust=null;if(rc&&custById(rc))viewCustomer(rc);else closeModal();}
+/* Retype a session in place and reprice it at the new type's rate. Used by the mismatch prompt
+   in the session editor; the price must move too, or a Group booked at the group rate would keep
+   billing that rate after becoming a weekend class. */
+function switchSessionType(id,ty){
+  const s=DB.sessions.find(x=>x.id===id); if(!s||!SESSION_TYPES[ty])return;
+  const n=(s.customerIds||[]).length;
+  if(n>typeMax(ty))return flash(typeDef(ty).label+' is capped at '+typeMax(ty)+' players',true);
+  const oldPrice=s.price, newPrice=computePrice(ty,s.dur,n,s.coachId);
+  if(!confirm('Change this session from '+typeShort(s.type)+' to '+typeDef(ty).label+'?\n\n'
+     +'Price: '+money(oldPrice)+' → '+money(newPrice)+' ('+money(newPrice/Math.max(1,n))+' per player).\n'
+     +'Payments already recorded are kept.'))return;
+  s.type=ty; s.price=newPrice;
+  save(); flash('Now a '+typeDef(ty).label+' '+typeIcon(ty));
+  openSession(id);
+}
 function recalcPrice(){
   const type=$('#sType').value, dur=+$('#sDur').value||60;
   const n=Math.max(1,$$('.sCustCb').filter(cb=>cb.checked).length);
@@ -5084,7 +5110,13 @@ function saveSession(id,emailAfter){
   const ids=$$('.sCustCb').filter(cb=>cb.checked).map(cb=>cb.value);
   if(!ids.length)return flash('Tick at least one client',true);
   const type=$('#sType').value;
-  if(type!=='1on1' && ids.length>typeMax(type)) return flash(typeLabel(type)+' is capped at '+typeMax(type)+' players',true);
+  // Grandfathering: a session booked when the cap was higher must stay editable, otherwise the
+  // owner cannot even open it to fix the type. Only block ADDING players beyond the cap.
+  if(type!=='1on1' && ids.length>typeMax(type)){
+    const was=id?((DB.sessions.find(x=>x.id===id)||{}).customerIds||[]).length:0;
+    if(ids.length>Math.max(typeMax(type),was))
+      return flash(typeLabel(type)+' is capped at '+typeMax(type)+' players',true);
+  }
   const pay=$('#sPay').value;
   const coachId=(AUTH==='coach')?coachAs:($('#sCoach')?$('#sCoach').value:targetCoach());
   const baseDate=$('#sDate').value;
