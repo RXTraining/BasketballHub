@@ -35,6 +35,7 @@
       setTimeout(function(){ v.setAttribute('content',c); },50);
     }catch(e){}
   }
+  window.rxFixViewport=fixViewport;
   try{
     window.addEventListener('pageshow',fixViewport);
     window.addEventListener('orientationchange',function(){setTimeout(fixViewport,250);});
@@ -467,6 +468,9 @@
     -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
     background:var(--lp-bg);color:var(--lp-ink);padding-bottom:env(safe-area-inset-bottom,0px)}
   .login.show{display:block}
+  /* The landing is a fixed layer over the app. Without this the document behind it keeps
+     scrolling and holds that position, so sign-in revealed the app already scrolled. */
+  body.home-open{overflow:hidden;position:fixed;inset:0;width:100%}
   :root{
     --lp-bg:#ffffff; --lp-soft:#f4f7f2; --lp-ink:#0f1410; --lp-mut:#5c6b60; --lp-line:#e2e9e0;
     --lp-volt:#c8ff2e; --lp-volt-d:#4d8000; --lp-orange:#ff6a00;
@@ -1866,7 +1870,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
   d.availability=(avail||[]).map(a=>({id:a.id,coachId:a.coach_id||'',date:a.date,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||'',sessionType:a.session_type||'',approved:a.approved!==false}));
   d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',inGroup:!!c.in_group,approved:c.approved!==false,suspended:c.suspended===true,creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
     packages:(pkg||[]).filter(p=>p.customer_id===c.id).map(p=>({id:p.id,coachId:p.coach_id||'',type:p.type,qty:p.qty,amount:Number(p.amount),date:p.date}))}));
-  d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:(s.price==null?null:Number(s.price)),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||'',paymentRequested:!!s.payment_requested,pay:(s.pay&&typeof s.pay==='object')?s.pay:{},joinReq:Array.isArray(s.join_req)?s.join_req:[],formAlerted:!!s.form_alerted}));
+  d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:(s.price==null?null:Number(s.price)),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||'',paidWas:(s.paid_was!=null?Number(s.paid_was):null),paymentRequested:!!s.payment_requested,pay:(s.pay&&typeof s.pay==='object')?s.pay:{},joinReq:Array.isArray(s.join_req)?s.join_req:[],formAlerted:!!s.form_alerted}));
   d.expenses=(exp||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||'',freq:e.freq||'once'}));
   d.cashEntries=(cash||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,amount:Number(e.amount),note:e.note||'',customerId:e.customer_id||'',type:e.type||'1on1',qty:e.qty||1}));
   d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',coachIds:(Array.isArray(e.coach_ids)?e.coach_ids:(e.coach_id?[e.coach_id]:[])),price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||'',video:e.video||'',featured:e.featured===true}));
@@ -1907,7 +1911,7 @@ function loginCountOf(c){
   return Math.max(c.loginCount||0,logged);
 }
 const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,approved:c.approved!==false,suspended:c.suspended===true,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',last_login:lastLoginOf(c)||null,login_count:loginCountOf(c)});
-const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,payment_requested:!!s.paymentRequested,pay:s.pay||{},join_req:s.joinReq||[],form_alerted:!!s.formAlerted});
+const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,paid_was:(s.paidWas!=null?s.paidWas:null),payment_requested:!!s.paymentRequested,pay:s.pay||{},join_req:s.joinReq||[],form_alerted:!!s.formAlerted});
 const expRow=e=>({id:e.id,coach_id:e.coachId||null,date:e.date,cat:e.cat,amount:e.amount,note:e.note||'',freq:e.freq||'once'});
 const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:(eventCoachIds(e)[0]||null),coach_ids:eventCoachIds(e),price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||'',video:e.video||'',featured:e.featured===true});
 const eventRegRow=r=>({id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||''});
@@ -2376,7 +2380,11 @@ function bookedCount(c){return DB.sessions.filter(s=>s.customerIds.includes(c.id
 function clientCancelCount(c){return DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status==='cancelled'&&s.cancelledBy==='client').length;}
 function coachCancelCount(id){return DB.sessions.filter(s=>s.coachId===id&&s.status==='cancelled'&&s.cancelledBy==='coach').length;}
 function cancelBadge(n){return n>0?'<span class="pill red" title="Cancellations">✖ '+n+'</span>':'<span class="muted small">0</span>';}
-function cancelledByLabel(s){return s.status==='cancelled'&&s.cancelledBy?'<span class="pill red">Cancelled · by '+(s.cancelledBy==='client'?'client':s.cancelledBy==='coach'?'coach':'owner')+'</span>':(s.status==='cancelled'?'<span class="pill red">Cancelled</span>':'');}
+function cancelledByLabel(s){
+  if(s.status!=='cancelled')return '';
+  const who=s.cancelledBy?(' · by '+(s.cancelledBy==='client'?'client':s.cancelledBy==='coach'?'coach':'owner')):'';
+  return '<span class="pill red">Cancelled'+who+'</span>'+refundPill(s);
+}
 /* ---- Credit pools --------------------------------------------------------
    Group, Weekend Open Run and Weekend Running/Conditioning are all priced per player at a
    similar rate, so a credit bought for one can settle any of them — a family with two group
@@ -2713,9 +2721,9 @@ function initAuth(){
   const m=location.hash.match(/[#&]c=([a-z0-9]+)/i);
   if(m){const c=DB.customers.find(x=>x.token===m[1]);if(c)pendingClient=c.id;}
   let ss=null;try{ss=JSON.parse(sessionStorage.getItem('rx_sess'));}catch(e){}
-  if(ss&&ss.auth==='owner'){AUTH='owner';ROLE='owner';mgCoach=ss.mgCoach||'all';TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();return;}
-  if(ss&&ss.auth==='coach'&&coachById(ss.coachAs)){AUTH='coach';ROLE='coach';coachAs=ss.coachAs;TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();return;}
-  if(ss&&ss.auth==='client'&&custById(ss.clientAs)){AUTH='client';ROLE='client';clientAs=ss.clientAs;pickCoach=ss.pickCoach||defaultCoachId();pickSport=ss.pickSport||null;syncSportCoach();TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();
+  if(ss&&ss.auth==='owner'){AUTH='owner';ROLE='owner';mgCoach=ss.mgCoach||'all';TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();enterApp();return;}
+  if(ss&&ss.auth==='coach'&&coachById(ss.coachAs)){AUTH='coach';ROLE='coach';coachAs=ss.coachAs;TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();enterApp();return;}
+  if(ss&&ss.auth==='client'&&custById(ss.clientAs)){AUTH='client';ROLE='client';clientAs=ss.clientAs;pickCoach=ss.pickCoach||defaultCoachId();pickSport=ss.pickSport||null;syncSportCoach();TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();enterApp();
     setTimeout(()=>{ try{ openEventPrompt(clientAs); }catch(e){} },900);
     return;}
   let sg=null;try{sg=JSON.parse(localStorage.getItem('rx_signup'));}catch(e){}
@@ -2749,8 +2757,22 @@ function openHome(){
   renderLanding();
   closeAuth();
   const el=$('#login'); if(el){el.classList.add('show');el.scrollTop=0;}
+  try{ document.body.classList.add('home-open'); }catch(e){}
 }
-function closeHome(){ const el=$('#login'); if(el)el.classList.remove('show'); }
+function closeHome(){ const el=$('#login'); if(el)el.classList.remove('show'); enterApp(); }
+/* Handing the screen from the landing to the app.
+   The landing is a position:fixed layer sitting ON TOP of the app, so while it is open the
+   document underneath keeps whatever scroll position it had — and iOS keeps the visual viewport
+   it worked out for the fixed layer. Revealing the app without resetting either is what made the
+   first screen after sign-in look mis-scaled and shifted, while the home page itself was fine. */
+function enterApp(){
+  try{ document.body.classList.remove('home-open'); }catch(e){}
+  try{ window.scrollTo(0,0); }catch(e){}
+  try{ document.documentElement.scrollLeft=0; document.body.scrollLeft=0; }catch(e){}
+  try{ if(window.rxFixViewport)window.rxFixViewport(); }catch(e){}
+  // one more pass after layout settles — a freshly rendered tab can change the page height
+  setTimeout(()=>{ try{ window.scrollTo(0,0); if(window.rxFixViewport)window.rxFixViewport(); }catch(e){} },120);
+}
 function openAuth(which){
   const v=$('#authveil'); if(!v)return;
   // 'book' picks the right door: a returning player on this device gets sign-in with their name
@@ -3388,6 +3410,7 @@ function showLogin(){
   renderLanding();                 // repaint marketing page (picks up live rates/events)
   closeAuth();                     // landing first — the card opens only on Sign in / Create account
   $('#login').classList.add('show');
+  try{ document.body.classList.add('home-open'); }catch(e){}
 }
 function openSignup(){
   const _v=$('#authveil'); if(_v)_v.classList.add('show');
@@ -3482,7 +3505,7 @@ function ownerLogin(){
   if(!DB.settings.ownerPwd){if((v||'').length<4)return flash('Choose a password with 4+ characters',true);DB.settings.ownerPwd=v;save();flash('Owner password set 🔑');}
   else if(v!==DB.settings.ownerPwd)return flash('Incorrect password',true);
   AUTH='owner';ROLE='owner';mgCoach='all';TAB='booking';
-  $('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();
+  $('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();enterApp();
 }
 function clientLoginPick(){
   const name=($('#loginClient').value||'').trim().toLowerCase();
@@ -3514,14 +3537,14 @@ function loginAsClient(id){
   try{const c=custById(id); if(c)localStorage.setItem('rx_lastclient',c.name||'');}catch(e){}
   if(signupTimer){clearInterval(signupTimer);signupTimer=null;}
   AUTH='client';ROLE='client';clientAs=id;pickCoach=defaultCoachId();TAB='booking';
-  $('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();
+  $('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();enterApp();
   stampLogin('client',id);
   // let the page settle first, then offer whatever they haven't seen or signed up for
   setTimeout(()=>{ try{ openEventPrompt(id); }catch(e){} },700);
 }
 function loginAsCoach(id){
   AUTH='coach';ROLE='coach';coachAs=id;TAB='booking';
-  $('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();
+  $('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();enterApp();
   stampLogin('coach',id);
   flash('Signed in as coach 🏀');
 }
@@ -3675,6 +3698,9 @@ const CHANGELOG=[
    'The hero wordmark is sized to fit one line at 320px and set to never wrap — its minimum font size used to be larger than a narrow phone could fit, so the ball dropped to a second line.',
    'An event can now have <b>several host coaches</b> instead of one. The Host coach dropdown is a tick list, every host is shown wherever the event appears, and a co-hosted event turns up in each host\u2019s own view rather than only the first one\u2019s. Events created before this keep working: the old single column is still read, and still written with the first host, so anything else querying it is unaffected. Finance counts a co-hosted event once, not once per coach.',
    '<b>Pull down to refresh</b> everywhere — the public home page and the signed-in app for owner, coach and client. The landing scrolls inside a fixed container and the app scrolls the document, so each needed its own binding; in a Home Screen app there is no browser pull-to-refresh at all. It only engages from the very top, ignores upward and sideways drags, skips an open dialog, and will not fight a table you are scrolling sideways.',
+   '<b>Fix:</b> the public home page fitted the phone correctly but the first screen after signing in did not — for owner, coach and client alike. The landing is a fixed layer sitting on top of the app, so while it was open the document underneath kept scrolling and held that position, and iOS kept the visual viewport it had worked out for the fixed layer. The app is now frozen while the landing covers it, and revealing it resets the scroll and re-asserts the viewport — twice, since a freshly rendered tab changes the page height after the first pass.',
+   '<b>Fix: a cancelled session no longer reads as paid.</b> The finance totals already skipped cancelled sessions, but the payment flags themselves survived — so a cancelled session still showed a green <b>Paid</b> pill and still counted as settled in the per-player view. Cancelling now clears the session-level and per-player payment state and any pending payment request.',
+   'Cash that had already been collected is not simply erased: the amount is kept on the record and a red <b>↩ \$X to refund</b> flag rides alongside the Cancelled pill until you deal with it. Whoever cancels is warned first — the owner and coach see the amount, the client is told the refund is not automatic. A session paid with a package credit needs no unwinding: credits are counted from completed sessions, so cancelling returns the credit by itself.',
    '<b>Fix: every table now scrolls sideways on its own.</b> Tables appear in panels, in dialogs and in bare divs, so scoping the scroll to any one container fixed that place and broke another — first columns crushed to one letter per line (<i>S c h e d u l e d</i>), then the whole app opening scrolled sideways with the logo cut off, then a registrations dialog that could not be scrolled at all. Each table is now wrapped in its own scroller as it renders, wherever it lives: columns keep their natural widths, the page itself never widens, and there is a fade at the right edge to show more is there. Very long cells are capped so a single note cannot stretch a table several screens wide.',
    'Header stats reordered to <b>sports, sessions coached, coaches, athletes trained</b>.',
    'Uploaded highlights land as <b>drafts</b> on purpose, but nothing said so at a glance \u2014 uploading a batch and then looking at the home page made them seem to have vanished. The Highlights panel now shows a banner counting unpublished items with a <b>Publish all</b> button, and the upload confirmation says DRAFT explicitly.',
@@ -3878,7 +3904,13 @@ function renderBooking(){
   renderBookingOwner();
 }
 function sortSessions(arr){return arr.slice().sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));}
+/* Shown wherever a cancelled session appears, so an unrefunded payment stays visible. */
+function refundPill(s){
+  return (s&&s.status==='cancelled'&&s.paidWas>0)
+    ? '<span class="pill red" title="Collected in cash before this was cancelled">↩ '+money(s.paidWas)+' to refund</span>' : '';
+}
 function typePill(s){
+  if(s.status==='cancelled')return '<span class="pill">'+typeShort(s.type)+'</span>'+refundPill(s);
   if(s.type==='1on1')return '<span class="pill blue">1:1</span>';
   const n=(s.customerIds||[]).length;
   if(typeIsDedicated(s.type))return '<span class="pill green">'+typeIcon(s.type)+' '+typeShort(s.type)+' ('+n+')</span>';
@@ -4031,7 +4063,11 @@ function statusSelect(s){
 function coachSetStatus(id,val,fromModal){
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
   const prev=s.status; if(prev===val)return;
-  if(val==='cancelled'){ if(!confirm('Cancel this session? The owner and client will be notified.')){refreshOwner();return;} markCancelled(s,'coach');}else{s.status=val;clearCancel(s);}
+  if(val==='cancelled'){
+    const due=cancelRefundDue(s);
+    const warn=due>0?('\n\n\u26a0 '+money(due)+' was recorded as paid in cash. Cancelling clears that — refund the client, or reinstate the session if this was a mistake.'):'';
+    if(!confirm('Cancel this session? The owner and client will be notified.'+warn)){refreshOwner();return;}
+    markCancelled(s,'coach');}else{s.status=val;clearCancel(s);}
   save(); // recomputes this session's auto gas/payout expenses
   // Coaches only push their own sessions/coach profile/availability in the normal sync — target
   // the auto expense rows explicitly so they reach Supabase without needing a full owner sync.
@@ -5131,7 +5167,31 @@ function manualMemberPaymentConfirm(id,custId){
   flash('Payment confirmation sent ✅');
 }
 /* record who cancelled (client / coach / owner) + when, for the integrity tally */
-function markCancelled(s,who){s.status='cancelled';s.cancelledBy=who;s.cancelledAt=new Date().toISOString();}
+/* Cancelling clears the payment state as well as the status.
+   The finance totals already skipped cancelled sessions, but the flags themselves survived — so a
+   cancelled session still showed a green "Paid" pill, still counted as settled in the per-player
+   view, and still looked like money had changed hands for it. What was actually collected is
+   preserved on the record (paidWas/paidViaWas) so the owner can see a refund is owed rather than
+   losing the fact entirely. A package credit needs no unwinding: credits are counted from
+   COMPLETED sessions, so cancelling returns it automatically. */
+function markCancelled(s,who){
+  s.status='cancelled';s.cancelledBy=who;s.cancelledAt=new Date().toISOString();
+  const hadCash=cancelRefundDue(s);
+  if(hadCash>0){ s.paidWas=hadCash; s.paidViaWas='cash'; }
+  s.paid=false; s.paidVia='';
+  if(s.pay){ Object.keys(s.pay).forEach(cid=>{ s.pay[cid]={paid:false,paidVia:'',requested:!!(s.pay[cid]||{}).requested}; }); }
+  s.paymentRequested=false;
+}
+/* Cash actually taken for a session, computed BEFORE the flags are cleared. */
+function cancelRefundDue(s){
+  if(!s||!sessionPriced(s))return 0;
+  const n=Math.max(1,(s.customerIds||[]).length);
+  if(s.type==='1on1')return (s.paid&&s.paidVia==='cash')?priceOf(s):0;
+  return (s.customerIds||[]).reduce((a,id)=>{
+    const p=(s.pay&&s.pay[id])||{paid:s.paid,paidVia:s.paidVia};
+    return a+((p.paid&&p.paidVia==='cash')?priceOf(s)/n:0);
+  },0);
+}
 function clearCancel(s){s.cancelledBy='';s.cancelledAt='';}
 /* email the assigned coach (if they have an email on file) that one of their sessions was
    cancelled by someone else. Silent — no flash — since this is a background side notification,
@@ -5157,7 +5217,9 @@ function notifyCancellation(s,actor){
   if(actor!=='owner'){ notifyCancel(s,actor); }
 }
 function clientCancel(id){
-  if(!confirm('Cancel this session?'))return;
+  const s0=DB.sessions.find(x=>x.id===id);
+  const due=s0?cancelRefundDue(s0):0;
+  if(!confirm('Cancel this session?'+(due>0?('\n\nYou have already paid '+money(due)+' for it. Cancelling here does not refund you automatically — the owner will be in touch.'):'')))return;
   const s=DB.sessions.find(x=>x.id===id);if(!s)return;
   markCancelled(s,'client');save();pushRows('sessions',[sessRow(s)]);flash('Session cancelled');
   logAct('cancel',fmtDT(s.date,s.time)+' · '+(typeShort(s.type)),s.id);
