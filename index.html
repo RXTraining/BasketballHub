@@ -466,7 +466,12 @@
   .lp-hero{padding:62px 0 46px;text-align:center}
   .lp-tag{display:inline-block;background:var(--lp-volt);color:#24310a;font-weight:800;font-size:12.5px;
     padding:6px 15px;border-radius:999px;margin-bottom:20px}
-  .lp-h1{font-size:clamp(42px,8vw,78px);line-height:.95;font-weight:900;letter-spacing:-1.5px;margin:0 0 8px}
+  /* One line, always. The 42px floor was taller than a narrow phone could fit, so the wordmark
+     wrapped after "RX" — the ball sat on line two. The floor is now low enough that the widest
+     realistic string still fits at 320px, and nowrap makes a wrap impossible rather than
+     unlikely. */
+  .lp-h1{font-size:clamp(27px,8.4vw,78px);line-height:1.02;font-weight:900;letter-spacing:-1.5px;
+    margin:0 0 8px;white-space:nowrap;max-width:100%}
   .lp-h1 span{display:block;color:var(--lp-volt-d)}
   /* Strap line under the wordmark.
      Deliberately LIGHT and small: the wordmark is 900 weight at up to 78px, so a 900-weight
@@ -2057,6 +2062,9 @@ async function syncTable(name,rows){
   else{await supa.from(name).delete().neq('id','__none__');}
 }
 let pushing=false;
+/* table name -> last error message. Survives a reload so the warning cannot be missed. */
+let syncFails={};
+try{ syncFails=JSON.parse(localStorage.getItem('rx_syncfails')||'{}')||{}; }catch(e){ syncFails={}; }
 async function cloudPush(){
   if(!supa||!SUPA_OK)return;
   pushing=true;
@@ -2091,7 +2099,15 @@ async function cloudPush(){
     // Each table syncs independently so one schema gap (e.g. a column you haven't
     // added yet) can't block everything else — the critical stuff still saves.
     const fails=[];
-    const push=async(name,fn)=>{try{await fn();}catch(e){fails.push(name);console.warn('sync failed:',name,e&&e.message);}};
+    /* A failed push used to show one flash and vanish. That is how uploads get lost: the rows
+       save locally, the push to Supabase fails (usually a column the setup SQL has not added
+       yet), and the next page load pulls the cloud copy over the top of them. The failure is now
+       recorded so Admin can keep showing it until it is actually fixed. */
+    const push=async(name,fn)=>{try{await fn();}catch(e){
+      fails.push(name);
+      syncFails[name]=(e&&e.message)||'unknown error';
+      console.warn('sync failed:',name,e&&e.message);
+    }};
     await push('settings',async()=>{const {error}=await supa.from('settings').upsert({id:'main',rate1on1:DB.settings.rate1on1,rate_group:DB.settings.rateGroup,rate_cond:(DB.settings.rateCond!==''&&DB.settings.rateCond!=null)?DB.settings.rateCond:null,default_client_pwd:DB.settings.defaultClientPwd,owner_pwd:DB.settings.ownerPwd||null,notify_emails:DB.settings.notifyEmails||null,ej_service:DB.settings.ejService||null,ej_template:DB.settings.ejTemplate||null,ej_key:DB.settings.ejKey||null,zelle_phone:DB.settings.zellePhone||null,activity_push:DB.settings.activityPush||'important',activity_seen_at:DB.settings.activitySeenAt||null,sports:DB.settings.sports||null,slogan:DB.settings.slogan||null,highlight_video:DB.settings.highlightVideo||null,highlight_title:DB.settings.highlightTitle||null,about_text:DB.settings.aboutText||null,about_cards:DB.settings.aboutCards||null,quote_text:DB.settings.quoteText||null,quote_by:DB.settings.quoteBy||null,group_min_players:DB.settings.groupMinPlayers||2,group_form_hours:DB.settings.groupFormHours||48,home_address:DB.settings.homeAddress||null,mileage_rate:DB.settings.mileageRate!=null?DB.settings.mileageRate:null});if(error)throw error;});
     await push('coaches',()=>syncTable('coaches',(DB.coaches||[]).map(coachRow)));
     await push('locations',()=>syncTable('locations',DB.locations.map(l=>({id:l.id,name:l.name,address:l.address||'',miles:l.miles||0}))));
@@ -2107,7 +2123,10 @@ async function cloudPush(){
     await push('highlights',()=>syncTable('highlights',(DB.highlights||[]).map(highlightRow)));
     await push('skills',()=>syncTable('skills',(DB.skills||[]).map(skillRow)));
     await push('skill_log',()=>syncTable('skill_log',(DB.skillLog||[]).map(skillLogRow)));
-    if(fails.length)flash('⚠ These tables need setup — run supabase-setup.sql: '+fails.join(', '),true);
+    fails.forEach(n=>{});                       // keep syncFails as written above
+    Object.keys(syncFails).forEach(n=>{ if(fails.indexOf(n)<0)delete syncFails[n]; });  // cleared on success
+    try{localStorage.setItem('rx_syncfails',JSON.stringify(syncFails));}catch(e){}
+    if(fails.length)flash('⚠ '+fails.length+' table(s) failed to save to the cloud — see Admin: '+fails.join(', '),true);
   }catch(e){flash('Cloud save failed — saved on this device',true);}
   finally{pushing=false;}
 }
@@ -3464,6 +3483,8 @@ const CHANGELOG=[
    '<b>Prepaid credits now work for every session type.</b> Packages could only be sold as 1:1 or Group, so a Track player had no way to pay a conditioning session with a credit — the Credit button simply never appeared. Packages, credit balances, the Customers credit badge and the client\'s “Your prepaid sessions” panel all read the full list of types now, and both credit and cash remain available per player on any multi-player session.',
    'A session whose headcount no longer fits its type now says so in the editor and offers a one-tap switch — e.g. <i>“10 players in a Group (max 4). Switch to Weekend Open Run →”</i>. The switch reprices at the new type\'s rate, shows the before/after per player, and keeps payments already recorded.',
    '<b>Fix:</b> a session booked when the cap was higher could not be saved at all, because the cap check ran before the owner had any chance to correct the type — locking them out of the one screen that fixes it. The check now only blocks <i>adding</i> players beyond the cap.',
+   '<b>Fix: uploads could disappear entirely.</b> Rows save on the device first, then push to Supabase. If that push failed — almost always a column <span class="mono">supabase-setup.sql</span> had not created yet — the only sign was one flash message, and the next page load pulled the server copy straight over the top of the new rows. Failures are now recorded per table with the exact Supabase error, survive a reload, and show as a red banner at the top of Admin with <b>Retry cloud save</b>, until the push actually succeeds.',
+   '<b>Fix:</b> the RX•TRAINING wordmark wrapped onto two lines on a narrow phone — the minimum font size was larger than the screen could fit, so the ball dropped to the second line. It is now sized to fit at 320px and set to never wrap.',
    'Uploaded highlights land as <b>drafts</b> on purpose, but nothing said so at a glance \u2014 uploading a batch and then looking at the home page made them seem to have vanished. The Highlights panel now shows a banner counting unpublished items with a <b>Publish all</b> button, and the upload confirmation says DRAFT explicitly.',
    '<b>Fix:</b> opening the app from the Home Screen could lay out wider than the phone, needing a manual pinch to fit. The viewport now sets <span class="mono">minimum-scale</span> so iOS cannot shrink the layout below 1x, images/video/tables/long words are capped at the screen width so nothing can force a wider layout, and the viewport is re-asserted on launch, on rotation, and when returning from the app switcher.',
    '<b>Fix:</b> the Highlights gallery played a month oldest-first. Manual order ranked above the date, and since uploads are numbered in the order they are added, that put the earliest photo first. Newest now leads, in the gallery and in the Admin list \u2014 which are sorted identically, so dragging rearranges the list you actually see. Drag order still decides the sequence within a single date, which is where a batch of photos from one session lands.',
@@ -7404,6 +7425,15 @@ function renderFinance(){
     </div>`;
   drawCashChart(months.map(monthLabel),rev,exp,prof);
 }
+function retrySync(){
+  flash('Retrying…');
+  cloudPush().then(()=>{ renderAdmin(); flash(Object.keys(syncFails).length?'Still failing — check the error above':'Cloud save succeeded ✅'); });
+}
+function clearSyncFails(){
+  syncFails={};
+  try{localStorage.removeItem('rx_syncfails');}catch(e){}
+  renderAdmin();
+}
 function saveRates(){
   DB.settings.rate1on1=+$('#rate1').value;
   DB.settings.rateGroup=+$('#rateG').value;
@@ -7422,6 +7452,25 @@ function renderAdmin(){
   $('#view-admin').innerHTML=`
     <h1 class="page">Admin</h1>
     <div class="sub">Pricing and access settings.</div>
+    ${(()=>{
+      const names=Object.keys(syncFails);
+      if(!names.length)return '';
+      /* This is the failure that loses work: rows save on the device, the cloud write fails
+         (almost always a column supabase-setup.sql has not created yet), and the next page load
+         pulls the server copy over the top of them. */
+      return `<div class="panel" style="border-color:var(--red);background:var(--a8b);margin-bottom:16px">
+        <h3 style="border-left-color:var(--red)">⚠ Cloud save is failing — your changes are only on this device</h3>
+        <div class="clienttag" style="margin-bottom:10px">These tables could not be written to Supabase. Anything you add to them
+          <b style="color:var(--txt)">will be lost the next time this page reloads</b>, because the cloud copy is pulled over the top.
+          Almost always this means <b style="color:var(--txt)">supabase-setup.sql</b> has not been re-run since a new column was added.</div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Table</th><th>Error from Supabase</th></tr></thead><tbody>
+          ${names.map(n=>`<tr><td><b>${n}</b></td><td class="muted">${String(syncFails[n]).replace(/</g,'&lt;')}</td></tr>`).join('')}
+        </tbody></table></div>
+        <div class="row" style="gap:8px;margin-top:12px">
+          <button class="btn sm" onclick="retrySync()">Retry cloud save</button>
+          <button class="btn ghost sm" onclick="clearSyncFails()">Dismiss</button>
+        </div></div>`;
+    })()}
     <div class="twocol">
       <div class="panel">
         <h3>Default rates (fallback)</h3>
