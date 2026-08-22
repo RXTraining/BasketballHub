@@ -2613,9 +2613,13 @@ function lpGalMonths(){
   return seen;                                   // already newest-first from lpHighlights()
 }
 function lpGalItems(month){
-  // manual order first (owner-controlled), newest date as the tie-break
+  /* Newest FIRST, with the owner's manual order as the tie-break within a single date.
+     It used to be the other way round: `ord` came first, and since uploads are numbered 1,2,3…
+     in the order they were added, a month of photos played back oldest-first. Dragging still
+     works, and matters most where it should — a batch of photos from one session all share a
+     date, so their relative order is entirely manual. */
   return lpHighlights().filter(h=>lpMonthKey(h.date)===month)
-    .sort((a,b)=>((a.ord||0)-(b.ord||0))||((b.date||'').localeCompare(a.date||'')));
+    .sort((a,b)=>((b.date||'').localeCompare(a.date||''))||((a.ord||0)-(b.ord||0)));
 }
 function lpHighlightsHtml(){
   const months=lpGalMonths();
@@ -3433,6 +3437,7 @@ const CHANGELOG=[
    '<b>Prepaid credits now work for every session type.</b> Packages could only be sold as 1:1 or Group, so a Track player had no way to pay a conditioning session with a credit — the Credit button simply never appeared. Packages, credit balances, the Customers credit badge and the client\'s “Your prepaid sessions” panel all read the full list of types now, and both credit and cash remain available per player on any multi-player session.',
    'A session whose headcount no longer fits its type now says so in the editor and offers a one-tap switch — e.g. <i>“10 players in a Group (max 4). Switch to Weekend Open Run →”</i>. The switch reprices at the new type\'s rate, shows the before/after per player, and keeps payments already recorded.',
    '<b>Fix:</b> a session booked when the cap was higher could not be saved at all, because the cap check ran before the owner had any chance to correct the type — locking them out of the one screen that fixes it. The check now only blocks <i>adding</i> players beyond the cap.',
+   '<b>Fix:</b> the Highlights gallery played a month oldest-first. Manual order ranked above the date, and since uploads are numbered in the order they are added, that put the earliest photo first. Newest now leads, in the gallery and in the Admin list \u2014 which are sorted identically, so dragging rearranges the list you actually see. Drag order still decides the sequence within a single date, which is where a batch of photos from one session lands.',
    'The public coach roster is sorted <b>A\u2013Z by name</b>. The booking pickers still put Raymond first, where he is the usual choice \u2014 but on the home page that read as a ranking of the team rather than a roster. His standing is carried by the FOUNDER badge on his card.',
    '<b>Fix:</b> a coach added with the rate boxes left empty was saved at <b>\$0</b>, because an empty number input reads as zero. They were then advertised as free on the public page, and dragged the \u201cfrom\u201d price on the plan cards down to \$0. Blank now stays unset and falls back to the Admin default; a stored <b>0</b> is read as \u201cnot agreed yet\u201d and shows as TBC, so coaches already saved this way correct themselves without being re-edited.',
    '<b>A coach\u2019s rate can be marked TBC.</b> New coaches often start before the money is agreed. Ticking <i>Rate is TBC</i> beside any rate in the coach form shows <b>TBC</b> everywhere that rate would appear \u2014 the public coach card, the plan cards, the client\u2019s booking dropdown, the Coaches table and Finance \u2014 instead of a number nobody agreed to.',
@@ -7596,10 +7601,12 @@ function updHighlight(id,field,val){
 /* Admin list in the same order the public gallery uses: newest month first, then the owner's
    manual order inside each month. Anything else would make ↑/↓ feel random. */
 function hlAdminOrder(){
+  // Must match lpGalItems() exactly, or dragging in Admin rearranges a list that looks nothing
+  // like what visitors see.
   return (DB.highlights||[]).slice().sort((a,b)=>{
     const ma=(a.date||'').slice(0,7), mb=(b.date||'').slice(0,7);
     if(ma!==mb)return mb.localeCompare(ma);
-    return ((a.ord||0)-(b.ord||0))||((b.date||'').localeCompare(a.date||''));
+    return ((b.date||'').localeCompare(a.date||''))||((a.ord||0)-(b.ord||0));
   });
 }
 /* Swaps with the neighbour IN THE SAME MONTH — moving an item past a month boundary would be
