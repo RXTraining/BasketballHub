@@ -2101,7 +2101,28 @@ function rateTbcList(c){
   const co=(typeof c==='object'&&c)?c:coachById(c);
   return String((co&&co.rateTbc)||'').split(',').map(x=>x.trim()).filter(Boolean);
 }
-function isRateTbc(coachId,type){ return rateTbcList(coachId).indexOf(type)>=0; }
+function isRateTbc(coachId,type){
+  const c=(typeof coachId==='object'&&coachId)?coachId:coachById(coachId);
+  if(!c)return false;
+  if(rateTbcList(c).indexOf(type)>=0)return true;
+  // A stored rate of zero is not a price — it is what an untouched form leaves behind. Treat it
+  // as "not agreed yet" rather than advertising the coach as free, or quietly substituting the
+  // business default for a figure nobody discussed.
+  const raw=c[typeDef(type).rateKey];
+  if(raw!=null&&raw!==''&&!isNaN(raw))return Number(raw)<=0;
+  // No rate of their own: the Admin default applies, unless that is missing or zero too.
+  return !(coachRateDefault(type)>0);
+}
+/* the business-wide fallback for a type, with no coach involved */
+function coachRateDefault(type){
+  const key=typeDef(type).rateKey;
+  if(key==='rateCond'){
+    const d=DB.settings.rateCond;
+    if(d!=null&&d!==''&&!isNaN(d)&&Number(d)>0)return Number(d);
+    return Number(DB.settings.rateGroup)||0;
+  }
+  return Number(key==='rate1on1'?DB.settings.rate1on1:DB.settings.rateGroup)||0;
+}
 /* Any TBC rate among the players' coach means the session total cannot be stated. */
 function sessionRateTbc(s){ return !!s && isRateTbc(s.coachId,s.type); }
 /* The one function every screen should use to print a rate or a session price. */
@@ -2121,12 +2142,8 @@ function coachRate(coachId,type){
   const c=coachById(coachId);
   const key=typeDef(type).rateKey;
   const r=c?c[key]:undefined;
-  if(r!=null&&r!==''&&!isNaN(r))return Number(r);
-  if(key==='rateCond'){
-    const d=DB.settings.rateCond;
-    return (d!=null&&d!==''&&!isNaN(d))?Number(d):DB.settings.rateGroup;   // falls back, never NaN
-  }
-  return key==='rate1on1'?DB.settings.rate1on1:DB.settings.rateGroup;
+  if(r!=null&&r!==''&&!isNaN(r)&&Number(r)>0)return Number(r);
+  return coachRateDefault(type);
 }
 function computePrice(type,dur,n,coachId){
   // No agreed rate means no computed price — returning 0 here is what put "$0" on the screen.
@@ -3417,6 +3434,7 @@ const CHANGELOG=[
    'A session whose headcount no longer fits its type now says so in the editor and offers a one-tap switch — e.g. <i>“10 players in a Group (max 4). Switch to Weekend Open Run →”</i>. The switch reprices at the new type\'s rate, shows the before/after per player, and keeps payments already recorded.',
    '<b>Fix:</b> a session booked when the cap was higher could not be saved at all, because the cap check ran before the owner had any chance to correct the type — locking them out of the one screen that fixes it. The check now only blocks <i>adding</i> players beyond the cap.',
    'The public coach roster is sorted <b>A\u2013Z by name</b>. The booking pickers still put Raymond first, where he is the usual choice \u2014 but on the home page that read as a ranking of the team rather than a roster. His standing is carried by the FOUNDER badge on his card.',
+   '<b>Fix:</b> a coach added with the rate boxes left empty was saved at <b>\$0</b>, because an empty number input reads as zero. They were then advertised as free on the public page, and dragged the \u201cfrom\u201d price on the plan cards down to \$0. Blank now stays unset and falls back to the Admin default; a stored <b>0</b> is read as \u201cnot agreed yet\u201d and shows as TBC, so coaches already saved this way correct themselves without being re-edited.',
    '<b>A coach\u2019s rate can be marked TBC.</b> New coaches often start before the money is agreed. Ticking <i>Rate is TBC</i> beside any rate in the coach form shows <b>TBC</b> everywhere that rate would appear \u2014 the public coach card, the plan cards, the client\u2019s booking dropdown, the Coaches table and Finance \u2014 instead of a number nobody agreed to.',
    'A session booked against a TBC rate is now <b>unpriced</b> rather than priced at zero. Zero is a real number \u2014 it reports as revenue, shows the client \u201c\$0 due\u201d, and lets a session be marked paid without anyone agreeing a figure. An unpriced session shows <b>TBC</b> everywhere, is excluded from outstanding and collected totals, and cannot be marked paid or sent a payment request until the owner enters the agreed amount. Once entered, it is never overwritten by the rate table.',
    'On the public page, a coach whose rate is TBC is left out of the \u201cfrom\u201d price on a plan card entirely \u2014 averaging a zero in would advertise a price that does not exist. If no coach has agreed a rate for a type, that card reads TBC.',
@@ -5863,7 +5881,8 @@ function openCoach(id){
       <b class="small">Hourly rates</b>
       <div class="row" style="margin-top:10px">
         <div class="field" style="margin-bottom:0"><label class="f">1:1 rate ($/hr)</label><input type="number" id="coR1" value="${r1}" ${isRateTbc(c,'1on1')?'disabled':''}>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-top:5px;margin-bottom:0"><input type="checkbox" class="rateTbcCb" data-type="1on1" style="width:auto" ${isRateTbc(c,'1on1')?'checked':''} onchange="tbcToggle(this,'coR1')"> Rate is TBC</label></div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-top:5px;margin-bottom:0"><input type="checkbox" class="rateTbcCb" data-type="1on1" style="width:auto" ${isRateTbc(c,'1on1')?'checked':''} onchange="tbcToggle(this,'coR1')"> Rate is TBC</label>
+          <div class="clienttag" style="margin-top:4px">Leave blank to use the Admin default (${money(coachRateDefault('1on1'))}/hr). <b style="color:var(--txt)">0</b> or <b style="color:var(--txt)">TBC</b> means not agreed yet — shown as TBC and left unpriced.</div></div>
         <div class="field" style="margin-bottom:0"><label class="f">Group rate ($/hr/player)</label><input type="number" id="coRG" value="${rG}" ${isRateTbc(c,'group')?'disabled':''}>
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-top:5px;margin-bottom:0"><input type="checkbox" class="rateTbcCb" data-type="group" style="width:auto" ${isRateTbc(c,'group')?'checked':''} onchange="tbcToggle(this,'coRG')"> Rate is TBC</label></div>
         <div class="field" style="margin-bottom:0"><label class="f">Weekend class ($/player)</label><input type="number" id="coRC" value="${c.rateCond!=null?c.rateCond:''}" placeholder="${DB.settings.rateCond!=null&&DB.settings.rateCond!==''?DB.settings.rateCond:''}">
@@ -5938,7 +5957,11 @@ function tbcToggle(cb,inputId){
   const el=document.getElementById(inputId); if(el)el.disabled=cb.checked;
 }
 function saveCoach(id){
-  const r1=+$('#coR1').value, rG=+$('#coRG').value;
+  // `+''` is 0, so leaving a rate blank used to save a real price of zero — which is how a coach
+  // ended up advertised at "$0/hr". Blank now stays undefined (falls back to the Admin default);
+  // a deliberately typed 0 is read as "not agreed yet" by isRateTbc().
+  const numOrUndef=el=>{const v=el?String(el.value).trim():''; return v===''?undefined:(+v||0);};
+  const r1=numOrUndef($('#coR1')), rG=numOrUndef($('#coRG'));
   // blank means "use the Admin default", which is different from zero — keep it undefined
   const rcRaw=$('#coRC')?String($('#coRC').value).trim():'';
   const rC=rcRaw===''?undefined:(+rcRaw||0);
