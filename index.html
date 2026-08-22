@@ -984,6 +984,7 @@ const ZH={
   'Highlights':'精彩集锦',
   'Book':'预约',
   'SESSIONS COACHED':'已完成课程',
+  'Group & weekend classes':'团课与周末课程',
   'Open now':'现已开课',
   'Coming as we add coaches':'教练到位后开放',
   'Training now':'现已开课',
@@ -1157,6 +1158,7 @@ const KO={
   'Highlights':'하이라이트',
   'Book':'예약',
   'SESSIONS COACHED':'진행한 세션',
+  'Group & weekend classes':'그룹 및 주말 클래스',
   'Open now':'지금 운영 중',
   'Coming as we add coaches':'코치 합류 후 오픈',
   'Training now':'현재 운영 중',
@@ -1325,6 +1327,7 @@ const JA={
   'Highlights':'ハイライト',
   'Book':'予約',
   'SESSIONS COACHED':'実施セッション',
+  'Group & weekend classes':'グループ・週末クラス',
   'Open now':'開講中',
   'Coming as we add coaches':'コーチ加入後に開講',
   'Training now':'開講中',
@@ -2115,11 +2118,37 @@ function clientCancelCount(c){return DB.sessions.filter(s=>s.customerIds.include
 function coachCancelCount(id){return DB.sessions.filter(s=>s.coachId===id&&s.status==='cancelled'&&s.cancelledBy==='coach').length;}
 function cancelBadge(n){return n>0?'<span class="pill red" title="Cancellations">✖ '+n+'</span>':'<span class="muted small">0</span>';}
 function cancelledByLabel(s){return s.status==='cancelled'&&s.cancelledBy?'<span class="pill red">Cancelled · by '+(s.cancelledBy==='client'?'client':s.cancelledBy==='coach'?'coach':'owner')+'</span>':(s.status==='cancelled'?'<span class="pill red">Cancelled</span>':'');}
-function creditsFor(c,type){return Math.max(0,totalFor(c,type)-usedFor(c,type));}
+/* ---- Credit pools --------------------------------------------------------
+   Group, Weekend Open Run and Weekend Running/Conditioning are all priced per player at a
+   similar rate, so a credit bought for one can settle any of them — a family with two group
+   credits left can spend them on Saturday running. 1:1 sits in its own pool because it costs
+   substantially more; letting a $20 credit pay for a $35 session would quietly lose money.
+
+   Nothing is stored per allocation: "used" is counted from completed package-paid sessions
+   across the whole pool, so the balance is always derived and can never drift out of step with
+   the sessions themselves. */
+const CREDIT_POOLS=[['1on1'],['group','openrun','cond']];
+function creditPool(type){ return CREDIT_POOLS.find(p=>p.indexOf(type)>=0)||[type]; }
+function poolLabel(type){
+  const p=creditPool(type);
+  return p.length===1?typeShort(p[0]):t('Group & weekend classes');
+}
+function poolTotal(c,type){ return creditPool(type).reduce((a,ty)=>a+totalFor(c,ty),0); }
+function poolUsed(c,type){
+  if(!c)return 0;
+  const pool=creditPool(type);
+  const done=DB.sessions.filter(s=>s.customerIds.includes(c.id)&&pool.indexOf(s.type)>=0
+              &&s.status==='completed'&&custPay(s,c.id).paidVia==='package').length;
+  return Math.min(poolTotal(c,type),done);
+}
+function creditsFor(c,type){ return Math.max(0,poolTotal(c,type)-poolUsed(c,type)); }
 function creditBadge(c){
-  // Was hardcoded to 1:1 and Group, so a package sold against a weekend class was invisible here.
+  // One entry per pool: showing four separate balances implied they could not be shared.
   const parts=[];
-  TYPE_ORDER.forEach(ty=>{const tot=totalFor(c,ty);if(tot>0)parts.push(typeShort(ty)+' '+usedFor(c,ty)+'/'+tot+' used');});
+  CREDIT_POOLS.forEach(pool=>{
+    const ty=pool[0], tot=poolTotal(c,ty);
+    if(tot>0)parts.push(poolLabel(ty)+' '+poolUsed(c,ty)+'/'+tot+' used');
+  });
   return parts.length?parts.map(p=>'<span class="credit">'+p+'</span>').join(' '):'<span class="muted small">—</span>';
 }
 function sessionHasCredit(s){return s.customerIds.some(id=>creditsFor(custById(id),s.type)>0);}
@@ -2136,11 +2165,11 @@ function setCustPay(s,custId,paid,paidVia){
 }
 /* true only once every player in the session has their own paid status = true (group), or the
    plain paid flag for 1:1 */
-function sessionFullyPaid(s){ return s.type!=='group' ? !!s.paid : s.customerIds.every(id=>custPay(s,id).paid); }
+function sessionFullyPaid(s){ return s.type==='1on1' ? !!s.paid : s.customerIds.every(id=>custPay(s,id).paid); }
 /* cash actually collected for this session — for a group, only the paid-cash players' shares */
 function sessionCashAmt(s){
   if(s.status==='cancelled')return 0;
-  if(s.type!=='group') return (s.paid&&s.paidVia==='cash')?s.price:0;
+  if(s.type==='1on1') return (s.paid&&s.paidVia==='cash')?s.price:0;
   const n=s.customerIds.length||1;
   return s.customerIds.reduce((a,id)=>{const p=custPay(s,id);return a+((p.paid&&p.paidVia==='cash')?s.price/n:0);},0);
 }
@@ -3279,8 +3308,9 @@ function exportExcel(){
     {Metric:'Group rate / hr (default)',Amount:DB.settings.rateGroup}
   ]);
   add('Customers',DB.customers.map(c=>({Name:c.name,Phone:c.phone,Email:c.email,Town:c.town||'',WeChat:c.wechat||'','In group':c.inGroup?'Yes':'No',Parent:c.parent,Level:c.level,
-    '1:1 used':usedFor(c,'1on1'),'1:1 total':totalFor(c,'1on1'),'1:1 left':creditsFor(c,'1on1'),
-    'Group used':usedFor(c,'group'),'Group total':totalFor(c,'group'),'Group left':creditsFor(c,'group'),
+    '1:1 used':poolUsed(c,'1on1'),'1:1 total':poolTotal(c,'1on1'),'1:1 left':creditsFor(c,'1on1'),
+    'Group+weekend used':poolUsed(c,'group'),'Group+weekend total':poolTotal(c,'group'),'Group+weekend left':creditsFor(c,'group'),
+    'Group pkg':totalFor(c,'group'),'Open Run pkg':totalFor(c,'openrun'),'Conditioning pkg':totalFor(c,'cond'),
     Password:c.pwd,Created:c.created,Notes:c.notes})));
   add('Coaches',(DB.coaches||[]).map(co=>({Name:co.name,Tagline:co.tagline,Affiliation:co.affiliation,Detail:co.affiliationSub,
     Active:co.active!==false?'Yes':'No',Sessions:DB.sessions.filter(s=>s.coachId===co.id&&s.status!=='cancelled').length})));
@@ -3342,6 +3372,9 @@ const CHANGELOG=[
    '<b>Prepaid credits now work for every session type.</b> Packages could only be sold as 1:1 or Group, so a Track player had no way to pay a conditioning session with a credit — the Credit button simply never appeared. Packages, credit balances, the Customers credit badge and the client\'s “Your prepaid sessions” panel all read the full list of types now, and both credit and cash remain available per player on any multi-player session.',
    'A session whose headcount no longer fits its type now says so in the editor and offers a one-tap switch — e.g. <i>“10 players in a Group (max 4). Switch to Weekend Open Run →”</i>. The switch reprices at the new type\'s rate, shows the before/after per player, and keeps payments already recorded.',
    '<b>Fix:</b> a session booked when the cap was higher could not be saved at all, because the cap check ran before the owner had any chance to correct the type — locking them out of the one screen that fixes it. The check now only blocks <i>adding</i> players beyond the cap.',
+   '<b>Credits are shared across Group and the weekend classes.</b> A player holding two group credits can spend them on Weekend Open Run or Weekend Running/Conditioning, in any sport — they are all priced per player at a similar rate, so nothing is lost. <b>1:1 stays separate</b>, because a $20 credit paying for a $35 session would quietly cost you money. Balances now read as one pooled figure (“Group &amp; weekend classes”) rather than four that looked unrelated.',
+   'The pooled balance is <i>derived</i> from completed package-paid sessions rather than stored, so it can never drift out of step with the sessions themselves and no migration was needed for existing packages.',
+   '<b>Fix:</b> two money checks still tested <span class="mono">type !== \'group\'</span> and so treated the weekend classes as single-payer — a conditioning session counted as fully paid once <i>one</i> player had paid, and only that player\'s share was counted as cash collected.',
    'The <b>Credit</b> control is now always visible on a payment screen. It used to be hidden whenever the player held no matching credit, which made "this player has no package" and "credit is not supported here" look identical. It now shows the remaining count when one is available, and otherwise explains itself — the owner gets a one-tap <b>Sell credit</b> that opens the package form with the right session type and price already filled in, so the credit it creates is actually usable for that session.',
    '<b>Fix:</b> saving a customer wiped any credits held against a weekend class. The edit form only had 1:1 and Group boxes and wrote a fixed two-key object over the whole balance. The form now renders one box per type and merges rather than replaces.',
    '<b>Fix:</b> the Finance revenue-by-type panel showed <span class="mono">NaN</span> once a weekend session was paid — the running total was seeded with only two keys, so the third type added a number to <span class="mono">undefined</span>.',
@@ -3837,8 +3870,8 @@ function renderBookingClient(){
       <div class="row" style="justify-content:space-between;align-items:flex-start">
         <div style="flex:1;min-width:200px">
           <b>${t('Your prepaid sessions')}</b>
-          ${TYPE_ORDER.some(ty=>totalFor(c,ty)>0)
-            ? TYPE_ORDER.map(ty=>balLine(typeShort(ty),totalFor(c,ty),usedFor(c,ty))).join('')
+          ${CREDIT_POOLS.some(pl=>poolTotal(c,pl[0])>0)
+            ? CREDIT_POOLS.map(pl=>balLine(poolLabel(pl[0]),poolTotal(c,pl[0]),poolUsed(c,pl[0]))).join('')
             : '<div class="clienttag" style="margin-top:6px">'+t('No package yet — ask the Owner about prepaid packs.')+'</div>'}
           <div class="clienttag" style="margin-top:8px">${completedCount(c)} ${t('completed')}</div>
         </div>
@@ -5222,11 +5255,11 @@ function openGroupPay(id){
            <button class="iconbtn" title="Undo" onclick="setGroupPay('${id}','${cid}',false)">Undo</button>
            <button class="iconbtn" title="Resend payment-received confirmation" onclick="manualMemberPaymentConfirm('${id}','${cid}')">✅</button>`
         : `${hasCredit
-             ? `<button class="iconbtn" title="Use a prepaid ${typeShort(s.type)} credit — ${creditsFor(c,s.type)} left" onclick="setGroupPay('${id}','${cid}',true,'package')">🎟️ Credit (${creditsFor(c,s.type)})</button>`
+             ? `<button class="iconbtn" title="Use a prepaid credit — ${creditsFor(c,s.type)} left across ${poolLabel(s.type)}" onclick="setGroupPay('${id}','${cid}',true,'package')">🎟️ Credit (${creditsFor(c,s.type)})</button>`
              /* Previously this rendered nothing, so "no credit" and "credit not supported here"
                 looked identical. Now it stays visible, explains itself, and — for the owner —
                 is a one-tap route to selling the package that would make it usable. */
-             : `<button class="iconbtn" style="opacity:.5" title="${(c?c.name:'This player')} has no prepaid ${typeShort(s.type)} credit${AUTH==='owner'?' — tap to sell a package':''}" ${AUTH==='owner'?`onclick="openSellPackage('${cid}','${s.type}')"`:'disabled'}>🎟️ ${AUTH==='owner'?'Sell credit':'No credit'}</button>`}
+             : `<button class="iconbtn" style="opacity:.5" title="${(c?c.name:'This player')} has no ${poolLabel(s.type)} credit left${AUTH==='owner'?' — tap to sell a package':''}" ${AUTH==='owner'?`onclick="openSellPackage('${cid}','${s.type}')"`:'disabled'}>🎟️ ${AUTH==='owner'?'Sell credit':'No credit'}</button>`}
            <button class="iconbtn" onclick="setGroupPay('${id}','${cid}',true,'cash')">💵 Cash</button>`;
     }
     return `<div class="row" style="justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)">
@@ -5238,7 +5271,7 @@ function openGroupPay(id){
     <div class="clienttag" style="margin-bottom:8px">${fmtDT(s.date,s.time)} · Group · Total ${money(s.price)}</div>
     ${rows}
     <p class="muted small" style="margin-top:10px">Each player's payment is tracked separately — one can use a prepaid credit while another pays cash, or hasn't paid yet.<br>
-      <b style="color:var(--txt)">Credit</b> is only offered to a player holding an unused <b style="color:var(--txt)">${typeShort(s.type)}</b> package. Credits are per session type, so a 1:1 package cannot pay for this one.</p>
+      <b style="color:var(--txt)">Credit</b> draws from the player's <b style="color:var(--txt)">${poolLabel(s.type)}</b> balance — Group, Weekend Open Run and Weekend Running/Conditioning share one pool, so a group credit can pay for a weekend class in any sport. 1:1 packages are separate, because they cost more per session.</p>
   `,`<button class="btn ghost" onclick="closeModal()">Close</button>`);
 }
 function setGroupPay(id,custId,paid,method){
@@ -5391,7 +5424,7 @@ function viewCustomer(id){
     <td class="right">${money(s.price/s.customerIds.length)}</td>
     <td class="right"><button class="iconbtn" onclick="openSession('${s.id}','${id}')">Edit</button></td></tr>`;}).join('')||'<tr><td colspan="6"><div class="empty">No sessions yet.</div></td></tr>';
   const pkgs=c.packages.length?c.packages.slice().reverse().map(p=>`<tr><td>${fmtDate(p.date)}</td><td>${p.qty}× ${typeShort(p.type)}</td><td class="right">${money(p.amount)}</td><td class="right"><button class="iconbtn" onclick="openPackage('${id}','${p.id}')">Edit</button></td></tr>`).join(''):'<tr><td colspan="4"><div class="empty">No packages.</div></td></tr>';
-  const credLine=(lab,t)=>totalFor(c,t)>0?`<div class="small" style="margin-top:4px">${lab}: <b>${usedFor(c,t)}/${totalFor(c,t)} used</b> · <span style="color:var(--accent)">${creditsFor(c,t)} left</span></div>`:'';
+  const credLine=(lab,t)=>poolTotal(c,t)>0?`<div class="small" style="margin-top:4px">${lab}: <b>${poolUsed(c,t)}/${poolTotal(c,t)} used</b> · <span style="color:var(--accent)">${creditsFor(c,t)} left</span></div>`:'';
   openModal(c.name,`
     <div class="row" style="margin-bottom:8px">
       <div class="field"><label class="f">Phone</label><div>${c.phone||'—'}</div></div>
@@ -5420,7 +5453,7 @@ function viewCustomer(id){
     </div>
     <div class="panel" style="background:var(--panel2);margin:6px 0 14px">
       <div class="row" style="justify-content:space-between;align-items:center">
-        <div><b>Prepaid sessions</b> <span class="clienttag">(${completedCount(c)} completed · used = completed)</span>${TYPE_ORDER.some(ty=>totalFor(c,ty)>0)?TYPE_ORDER.map(ty=>credLine(typeShort(ty),ty)).join(''):'<div class="clienttag" style="margin-top:4px">No package yet.</div>'}</div>
+        <div><b>Prepaid sessions</b> <span class="clienttag">(${completedCount(c)} completed · used = completed)</span>${CREDIT_POOLS.some(pl=>poolTotal(c,pl[0])>0)?CREDIT_POOLS.map(pl=>credLine(poolLabel(pl[0]),pl[0])).join(''):'<div class="clienttag" style="margin-top:4px">No package yet.</div>'}</div>
         <button class="btn sm" onclick="openSellPackage('${id}')">+ Sell package</button>
       </div>
       <table style="margin-top:10px"><thead><tr><th>Date</th><th>Package</th><th class="right">Paid</th><th></th></tr></thead><tbody>${pkgs}</tbody></table>
@@ -5453,7 +5486,8 @@ function openSellPackage(id,preType){
       <div class="field"><label class="f">Amount charged ($) — editable</label><input type="number" id="pkAmt" value="${10*coachRate(targetCoach(),pre)}"></div>
       <div class="field"><label class="f">Date</label><input type="date" id="pkDate" value="${todayISO()}"></div>
     </div>
-    <p class="muted small">Adds to the client's total credits and records the amount as revenue. Balance shows as used/total; package-paid sessions aren't billed again.</p>
+    <p class="muted small">Adds to the client's total credits and records the amount as revenue. Balance shows as used/total; package-paid sessions aren't billed again.<br>
+      <b style="color:var(--txt)">Group</b>, <b style="color:var(--txt)">Weekend Open Run</b> and <b style="color:var(--txt)">Weekend Running/Conditioning</b> credits are interchangeable — buy one, spend it on any of the three, in any sport. <b style="color:var(--txt)">1:1</b> credits are separate.</p>
   `,`<button class="btn ghost" onclick="${id?`viewCustomer('${id}')`:'closeModal()'}">Cancel</button><button class="btn" onclick="savePackage('${id||''}')">Sell package</button>`);
 }
 function recalcPkg(){const type=$('#pkType').value,qty=+$('#pkQty').value||0;const cid=$('#pkCoach')?$('#pkCoach').value:targetCoach();const rate=coachRate(cid,type);$('#pkAmt').value=qty*rate;}
@@ -5528,7 +5562,8 @@ function openCustomer(id){
         ${TYPE_ORDER.map(ty=>`<div class="field" style="margin-bottom:0"><label class="f">${typeShort(ty)} — total sessions</label>
           <input type="number" class="cTotType" data-type="${ty}" min="0" value="${id?totalFor(c,ty):0}"></div>`).join('')}
       </div>
-      <div class="clienttag" style="margin-top:8px">${id?('Used now: '+TYPE_ORDER.map(ty=>typeShort(ty)+' '+usedFor(c,ty)+'/'+totalFor(c,ty)).join(' · ')+'. '):''}Used is counted automatically from package-paid sessions — change it by editing a session's payment in the history.</div>
+      <div class="clienttag" style="margin-top:8px">${id?('Balance now: '+CREDIT_POOLS.map(pl=>poolLabel(pl[0])+' '+poolUsed(c,pl[0])+'/'+poolTotal(c,pl[0])).join(' · ')+'. '):''}Used is counted automatically from package-paid sessions — change it by editing a session's payment in the history.
+        <br><b style="color:var(--txt)">Group</b>, <b style="color:var(--txt)">Open Run</b> and <b style="color:var(--txt)">Conditioning</b> totals add into one shared balance; a credit bought for any of them can pay for any of them.</div>
     </div>
     <div class="field"><label class="f">Client login password</label>
       <div class="row" style="gap:8px">
