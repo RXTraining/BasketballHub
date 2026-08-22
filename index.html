@@ -3242,11 +3242,15 @@ function aboutParas(co){
       <p class="lp-p" style="margin-top:12px">${t('ABOUT_P3')}</p>`;
 }
 function lpCoachCards(){
-  /* Plain A–Z on the public roster. activeCoaches() pins Raymond first, which is right for the
-     BOOKING pickers (owner and client) where he is the usual choice — but on the public page it
-     reads as a ranking of the team. His standing is carried by the FOUNDER badge on his card,
-     not by being first in the list. */
-  const list=activeCoaches().slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  /* Ordered by when each coach joined, longest-serving first — the roster then reads as the
+     team's history, and the founder leads it without needing a special case. Coaches with no
+     joined date sort last (they predate the field) rather than jumping to the front, which is
+     what an empty string would otherwise do. Name breaks a tie.
+     The BOOKING pickers keep their own order — Raymond pinned first, where he is the usual
+     choice — because that is a convenience list, not a roster. */
+  const joined=c=>(c.created||'9999-99-99');
+  const list=activeCoaches().slice().sort((a,b)=>
+    joined(a).localeCompare(joined(b)) || (a.name||'').localeCompare(b.name||''));
   if(!list.length)return '<div class="lp-card">'+t('NO_COACHES')+'</div>';
   return list.map((c,i)=>{
     const founder=(c.name||'').trim().toLowerCase()==='raymond xu';
@@ -3981,7 +3985,7 @@ const CHANGELOG=[
    'Uploaded highlights land as <b>drafts</b> on purpose, but nothing said so at a glance \u2014 uploading a batch and then looking at the home page made them seem to have vanished. The Highlights panel now shows a banner counting unpublished items with a <b>Publish all</b> button, and the upload confirmation says DRAFT explicitly.',
    '<b>Fix:</b> opening the app from the Home Screen could lay out wider than the phone, needing a manual pinch to fit. The viewport now sets <span class="mono">minimum-scale</span> so iOS cannot shrink the layout below 1x, images/video/tables/long words are capped at the screen width so nothing can force a wider layout, and the viewport is re-asserted on launch, on rotation, and when returning from the app switcher.',
    '<b>Fix:</b> the Highlights gallery played a month oldest-first. Manual order ranked above the date, and since uploads are numbered in the order they are added, that put the earliest photo first. Newest now leads, in the gallery and in the Admin list \u2014 which are sorted identically, so dragging rearranges the list you actually see. Drag order still decides the sequence within a single date, which is where a batch of photos from one session lands.',
-   'The public coach roster is sorted <b>A\u2013Z by name</b>. The booking pickers still put Raymond first, where he is the usual choice \u2014 but on the home page that read as a ranking of the team rather than a roster. His standing is carried by the FOUNDER badge on his card.',
+   'The public coach roster is ordered by <b>date joined</b>, longest-serving first, so it reads as the team\u2019s history and the founder leads it without a special case. A coach with no joined date sorts last rather than jumping to the front. The booking pickers keep their own order with Raymond pinned first \u2014 that is a convenience list, not a roster.',
    '<b>Fix:</b> a coach added with the rate boxes left empty was saved at <b>\$0</b>, because an empty number input reads as zero. They were then advertised as free on the public page, and dragged the \u201cfrom\u201d price on the plan cards down to \$0. Blank now stays unset and falls back to the Admin default; a stored <b>0</b> is read as \u201cnot agreed yet\u201d and shows as TBC, so coaches already saved this way correct themselves without being re-edited.',
    '<b>A coach\u2019s rate can be marked TBC.</b> New coaches often start before the money is agreed. Ticking <i>Rate is TBC</i> beside any rate in the coach form shows <b>TBC</b> everywhere that rate would appear \u2014 the public coach card, the plan cards, the client\u2019s booking dropdown, the Coaches table and Finance \u2014 instead of a number nobody agreed to.',
    'A session booked against a TBC rate is now <b>unpriced</b> rather than priced at zero. Zero is a real number \u2014 it reports as revenue, shows the client \u201c\$0 due\u201d, and lets a session be marked paid without anyone agreeing a figure. An unpriced session shows <b>TBC</b> everywhere, is excluded from outstanding and collected totals, and cannot be marked paid or sent a payment request until the owner enters the agreed amount. Once entered, it is never overwritten by the rate table.',
