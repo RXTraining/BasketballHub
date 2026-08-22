@@ -675,6 +675,11 @@
     padding:6px 11px;font-size:12.5px;color:var(--lp-mut);font-weight:700}
   .lp-coach-rates b{color:var(--lp-ink)}
   /* ---- sports rail ---- */
+  /* which sports a plan is available in — matters now that Open Run is basketball-only and
+     Conditioning is track-only */
+  .lp-plan-sports{display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 12px}
+  .lp-plan-sports span{font-size:11.5px;font-weight:800;color:#2f6b12;background:var(--a1b);
+    border-radius:999px;padding:3px 9px}
   .lp-sports{display:grid;grid-template-columns:repeat(auto-fit,minmax(136px,1fr));gap:12px;margin-top:12px}
   .lp-sport-lab{font-size:11.5px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;
     color:var(--lp-volt-d);margin-top:24px;display:flex;align-items:center;gap:9px}
@@ -899,6 +904,19 @@ const DB_KEY = 'rxtraining_v2';
 /* ---------- i18n: English / 中文 (client-facing) ---------- */
 let LANG='en'; try{LANG=localStorage.getItem('rx_lang')||'en';}catch(e){}
 const ZH={
+  'PLAN3_DESC':'周末自由球局，最多 {max} 人。以实战代替练习 —— 检验这一周的训练成果。',
+  'PLAN4_DESC':'周末跑步与体能课，最多 {max} 人。打好体能基础，其他一切才有支撑。',
+  'O_GAMES':'完整对抗，教练在场',
+  'O_APPLY':'把一周的训练用出来',
+  'O_MIX':'混合水平，均衡分队',
+  'O_FUN':'有竞争，也欢迎新人',
+  'C_FORM':'热身、跑姿与技术训练',
+  'C_INT':'间歇与节奏跑',
+  'C_STR':'力量与伤病预防',
+  'C_ALL':'欢迎各个水平',
+  'Book this':'预约',
+  'from':'起',
+  'players':'人',
   'Coming up':'即将开始',
   'FEATURED':'精选活动',
   'Read more':'展开全文',
@@ -918,19 +936,19 @@ const ZH={
   'COACHES_P':'这里的每位教练都仍在赛场上竞技。你不是在向早已停止打球的人学习。',
   'SPORTS_P':'RX 目前开设以下项目。标注<b>正在开课</b>的即可在应用内预约；其余项目将随教练加入陆续开放 —— 同一个应用，同样的教学标准。',
   'SPORTS_CTA':'你是这些项目的教练，并希望在 RX 开课？',
-  'PLAN1_DESC':'完全围绕你的技术特点定制，包含实战对抗 —— 真实防守、真实判断、真实压力。',
-  'PLAN2_DESC':'2–{max} 人小组课。球员之间的竞争营造出接近比赛的强度 —— 一起训练，共同进步。',
-  'B_BALL':'控球与运球',
-  'B_SHOT':'投篮姿势与技术',
-  'B_FOOT':'脚步与运动能力',
-  'B_1V1':'实战一对一情境',
-  'B_VISION':'场上视野与决策',
+  'PLAN1_DESC':'完全围绕一名球员设计 —— 你的项目、你的目标、你的短板。真实对抗、真实压力，每一次都有反馈。',
+  'PLAN2_DESC':'2–{max} 人小组课。球员之间的竞争营造出真实的强度 —— 一起训练，共同进步。',
+  'B_BALL':'技术与基本功',
+  'B_SHOT':'速度、步法与运动能力',
+  'B_FOOT':'针对本项目的体能训练',
+  'B_1V1':'真实压力下的实战演练',
+  'B_VISION':'读懂局势与决策能力',
   'B_MENTAL':'心理韧性与自信',
-  'G_DRILLS':'实战情境训练与一对一对抗',
-  'G_SCEN':'竞争性比赛情境',
-  'G_TEAM':'团队战术与空间概念',
-  'G_COMM':'场上沟通',
-  'G_VALUE':'与朋友、队友一起，超高性价比',
+  'G_DRILLS':'实战情景训练',
+  'G_SCEN':'竞技对抗场景',
+  'G_TEAM':'团队协作',
+  'G_COMM':'压力下的沟通',
+  'G_VALUE':'与朋友、队友一起更划算',
   'AVAIL_LINE':'服务范围：<b>马萨诸塞州列克星敦</b>地区 · 时间灵活 · 预约与管理均可在应用内完成。',
   'FILM_P':'来看我们的运动员比赛。这就是我们带入每一堂训练课的水准。',
   'BOOK_P':'注册账号即可查看实时可预约时段、预约一对一或小组课、查询付款记录，并在每堂课后收到教练的视频反馈。',
@@ -1062,6 +1080,19 @@ const ZH={
   'Session cancelled':'课程已取消','Registration cancelled':'报名已取消'
 };
 const KO={
+  'PLAN3_DESC':'주말 오픈 런, 최대 {max}명. 훈련이 아닌 실제 경기 — 한 주의 훈련을 시험하는 자리입니다.',
+  'PLAN4_DESC':'주말 러닝과 컨디셔닝, 최대 {max}명. 나머지 모든 것을 떠받치는 체력을 만듭니다.',
+  'O_GAMES':'풀 게임, 코치가 현장에',
+  'O_APPLY':'한 주의 훈련을 실전에',
+  'O_MIX':'다양한 레벨, 균형 잡힌 팀',
+  'O_FUN':'경쟁적이지만 열린 분위기',
+  'C_FORM':'워밍업, 러닝 폼과 드릴',
+  'C_INT':'인터벌과 템포 훈련',
+  'C_STR':'근력과 부상 예방',
+  'C_ALL':'모든 레벨 환영',
+  'Book this':'예약하기',
+  'from':'부터',
+  'players':'명',
   'Coming up':'다가오는 일정',
   'FEATURED':'추천 이벤트',
   'Read more':'더 보기',
@@ -1081,19 +1112,19 @@ const KO={
   'COACHES_P':'이곳의 모든 코치는 여전히 경쟁합니다. 오래전 은퇴한 사람에게 배우는 것이 아닙니다.',
   'SPORTS_P':'RX는 아래 종목을 운영합니다. <b>운영 중</b> 표시는 지금 앱에서 예약할 수 있습니다. 나머지는 코치가 합류하는 대로 열립니다 — 같은 앱, 같은 기준.',
   'SPORTS_CTA':'이 종목의 코치이시고 RX에서 세션을 운영하고 싶으신가요?',
-  'PLAN1_DESC':'당신의 플레이에 맞춘 완전 맞춤형 세션. 실전 반복 포함 — 실제 수비, 실제 판단, 실제 압박.',
+  'PLAN1_DESC':'한 명의 선수에게 완전히 맞춘 세션 — 종목, 목표, 약점까지. 실전 반복과 실제 압박, 매 반복마다 피드백.',
   'PLAN2_DESC':'2–{max}명 소그룹. 선수 간 경쟁이 실전에 가까운 강도를 만듭니다 — 함께 배우고 함께 성장합니다.',
-  'B_BALL':'볼 핸들링 &amp; 드리블',
-  'B_SHOT':'슈팅 폼 &amp; 메커니즘',
-  'B_FOOT':'풋워크 &amp; 운동 능력',
-  'B_1V1':'실전 1대1 상황',
-  'B_VISION':'코트 시야 &amp; 의사결정',
-  'B_MENTAL':'멘탈 강화 &amp; 자신감',
-  'G_DRILLS':'실전 상황 훈련 &amp; 1대1',
-  'G_SCEN':'경쟁적 경기 시나리오',
-  'G_TEAM':'팀 개념 &amp; 스페이싱',
-  'G_COMM':'코트 위 커뮤니케이션',
-  'G_VALUE':'친구·팀 동료와 함께하면 더 좋은 가격',
+  'B_BALL':'기술과 기본기',
+  'B_SHOT':'스피드, 풋워크, 운동 능력',
+  'B_FOOT':'종목에 맞춘 컨디셔닝',
+  'B_1V1':'실제 압박 속 반복 훈련',
+  'B_VISION':'흐름 읽기와 판단력',
+  'B_MENTAL':'멘탈과 자신감',
+  'G_DRILLS':'실전 상황 훈련',
+  'G_SCEN':'경쟁 시나리오',
+  'G_TEAM':'팀으로 움직이기',
+  'G_COMM':'압박 속 소통',
+  'G_VALUE':'친구·팀 동료와 함께면 더 알뜰하게',
   'AVAIL_LINE':'<b>매사추세츠주 렉싱턴</b> 지역에서 진행 · 유연한 일정 · 예약과 관리는 모두 앱에서.',
   'FILM_P':'우리 선수들의 경기를 확인하세요. 모든 트레이닝에 가져오는 수준입니다.',
   'BOOK_P':'계정을 만들면 실시간 예약 가능 시간 확인, 1:1·그룹 세션 예약, 결제 내역 확인, 그리고 매 세션 후 코치의 영상 피드백을 받을 수 있습니다.',
@@ -1217,6 +1248,19 @@ const KO={
   'Session cancelled':'수업이 취소되었습니다','Registration cancelled':'등록이 취소되었습니다'
 };
 const JA={
+  'PLAN3_DESC':'週末オープンラン、最大 {max} 名。ドリルではなく実際のゲーム —— 一週間の成果を試す場です。',
+  'PLAN4_DESC':'週末のランニングとコンディショニング、最大 {max} 名。すべての土台となる体力をつくります。',
+  'O_GAMES':'フルゲーム、コーチも現場に',
+  'O_APPLY':'一週間の練習を実戦で',
+  'O_MIX':'レベル混合、バランスの取れたチーム',
+  'O_FUN':'競争的、でも歓迎ムード',
+  'C_FORM':'ウォームアップ・走フォーム・ドリル',
+  'C_INT':'インターバルとテンポ走',
+  'C_STR':'筋力と怪我の予防',
+  'C_ALL':'どのレベルでも歓迎',
+  'Book this':'予約する',
+  'from':'〜',
+  'players':'名',
   'Coming up':'近日開催',
   'FEATURED':'注目イベント',
   'Read more':'続きを読む',
@@ -1236,19 +1280,19 @@ const JA={
   'COACHES_P':'ここのコーチは全員、今も競技を続けています。引退した人から学ぶのではありません。',
   'SPORTS_P':'RX では以下の競技を開講しています。<b>開講中</b>のものは今すぐアプリで予約できます。その他はコーチが加わり次第オープンします —— 同じアプリ、同じ基準。',
   'SPORTS_CTA':'これらの競技のコーチで、RX でセッションを開きたい方はいませんか？',
-  'PLAN1_DESC':'あなたのプレーに合わせた完全個別指導。実戦形式のレップ付き —— 本物のディフェンス、判断、プレッシャー。',
+  'PLAN1_DESC':'選手ひとりに完全に合わせたセッション —— 競技、目標、弱点まで。実戦的な反復と本物のプレッシャー、毎回フィードバック。',
   'PLAN2_DESC':'2〜{max} 名の少人数グループ。選手同士の競争が実戦に近い強度を生みます —— 一緒に学び、共に成長。',
-  'B_BALL':'ボールハンドリング &amp; ドリブル',
-  'B_SHOT':'シュートフォーム &amp; メカニクス',
-  'B_FOOT':'フットワーク &amp; 運動能力',
-  'B_1V1':'実戦 1on1 の状況',
-  'B_VISION':'コートビジョン &amp; 判断力',
-  'B_MENTAL':'メンタルの強さ &amp; 自信',
-  'G_DRILLS':'実戦形式ドリル &amp; 1on1',
-  'G_SCEN':'競争型のゲームシナリオ',
-  'G_TEAM':'チーム戦術 &amp; スペーシング',
-  'G_COMM':'コート上のコミュニケーション',
-  'G_VALUE':'友達・チームメイトと一緒ならお得',
+  'B_BALL':'技術と基礎',
+  'B_SHOT':'スピード・フットワーク・運動能力',
+  'B_FOOT':'競技に合わせたコンディショニング',
+  'B_1V1':'実際のプレッシャー下での反復',
+  'B_VISION':'状況を読む力と判断',
+  'B_MENTAL':'メンタルと自信',
+  'G_DRILLS':'実戦形式のドリル',
+  'G_SCEN':'競争的なシナリオ',
+  'G_TEAM':'チームとして動く',
+  'G_COMM':'プレッシャー下のコミュニケーション',
+  'G_VALUE':'友達・チームメイトと一緒にお得に',
   'AVAIL_LINE':'<b>マサチューセッツ州レキシントン</b>周辺で実施 · 柔軟なスケジュール · 予約も管理もアプリで完結。',
   'FILM_P':'選手たちの試合をご覧ください。すべてのトレーニングに持ち込んでいるレベルです。',
   'BOOK_P':'アカウントを作成すると、空き状況の確認、1:1・グループの予約、支払い状況の確認、そして毎回のセッション後にコーチからの動画フィードバックが受け取れます。',
@@ -1327,7 +1371,7 @@ const JA={
   '1-on-1 Training':'1:1 トレーニング',
   'Group Lessons':'グループレッスン',
   '1 hour':'1時間',
-  'per player':'1人あたり',
+  'per player':'1名あたり',
   'Book 1-on-1':'1:1 を予約',
   'Book a group':'グループを予約',
   'Book with':'予約：',
@@ -1375,6 +1419,23 @@ const JA={
    language has no entry — fine when the key IS the English text, but these blocks use short
    codes, so without this dictionary English visitors saw 'ABOUT_P1' on the page. */
 const EN={
+  'PLAN3_DESC':'Weekend runs, up to {max} players. Games rather than drills — where the work from the week actually gets tested.',
+  'PLAN4_DESC':'Weekend running and conditioning for up to {max} athletes. Build the engine everything else runs on.',
+  'O_GAMES':'Full games, coach on the floor',
+  'O_APPLY':'Apply the week\'s work live',
+  'O_MIX':'Mixed levels, balanced teams',
+  'O_FUN':'Competitive but welcoming',
+  'C_FORM':'Warm-up, running form &amp; drills',
+  'C_INT':'Intervals &amp; tempo work',
+  'C_STR':'Strength &amp; injury prevention',
+  'C_ALL':'Every level welcome',
+  'Weekend Open Run':'Weekend Open Run',
+  'Weekend Running/Conditioning':'Weekend Running/Conditioning',
+  'Book this':'Book this',
+  'per player':'per player',
+  'from':'from',
+  'up to':'up to',
+  'players':'players',
   'SPORTS_H':'THE SPORTS WE RUN',
   'Active AAU competitor':'Coached by active competitors',
   'SLOGAN':'We plant the seed of sport',
@@ -1400,18 +1461,18 @@ const EN={
   'COACHES_P':'Every coach here still competes. You\'re not learning from someone who stopped playing years ago.',
   'SPORTS_P':'RX runs the sports below. Anything marked <b>Now training</b> is open today and bookable in the app; the rest arrive as we bring the right coaches on — same app, same coaching standard.',
   'SPORTS_CTA':'Coach in one of these and want to run sessions on RX?',
-  'PLAN1_DESC':'Fully personalised around your game, including live reps — real defence, real reads, real pressure.',
-  'PLAN2_DESC':'Small groups of 2–{max}. Competition between players creates live-game intensity — learn together, grow together.',
-  'B_BALL':'Ball handling &amp; dribbling',
-  'B_SHOT':'Shooting form &amp; mechanics',
-  'B_FOOT':'Footwork &amp; athleticism',
-  'B_1V1':'Live 1v1 game situations',
-  'B_VISION':'Court vision &amp; decision making',
+  'PLAN1_DESC':'Built entirely around one athlete — your sport, your goals, your weak spots. Real reps, real pressure, feedback on every one.',
+  'PLAN2_DESC':'Small groups of 2–{max}. Competition between players creates real intensity — learn together, grow together.',
+  'B_BALL':'Technique &amp; fundamentals',
+  'B_SHOT':'Speed, footwork &amp; athleticism',
+  'B_FOOT':'Conditioning built around your sport',
+  'B_1V1':'Live reps under real pressure',
+  'B_VISION':'Reading the play &amp; decision making',
   'B_MENTAL':'Mental toughness &amp; confidence',
-  'G_DRILLS':'Live situation drills &amp; 1v1 reps',
-  'G_SCEN':'Competitive game scenarios',
-  'G_TEAM':'Team concepts &amp; spacing',
-  'G_COMM':'On-court communication',
+  'G_DRILLS':'Live situation drills',
+  'G_SCEN':'Competitive scenarios',
+  'G_TEAM':'Working together as a unit',
+  'G_COMM':'Communication under pressure',
   'G_VALUE':'Great value for friends &amp; teammates',
   'AVAIL_LINE':'Available in the <b>Lexington, MA</b> area · flexible scheduling · book and manage everything in the app.',
   'FILM_P':'Watch our athletes compete. This is the level of play we bring to every training session.',
@@ -2722,6 +2783,40 @@ function lpLiveSportsHtml(){
 }
 /* Sports we advertise. Any sport with an active coach is live; the rest read "coming soon" —
    so launching a sport means adding a coach, never editing this file. */
+/* The session types RX actually sells, generated from the coach roster.
+   This was two hardcoded cards — 1:1 and Group — so the two weekend classes were invisible on
+   the public page even after they existed in the app, and the bullets underneath described
+   basketball to everyone regardless of the sports on offer. A type appears here only if some
+   active coach can run it, so the page can never advertise something unbookable. */
+function lpPlanMeta(type){
+  return {
+    '1on1':   {ico:'🎯',hot:true, title:'1-on-1 Training',desc:'PLAN1_DESC',bullets:['B_BALL','B_SHOT','B_FOOT','B_1V1','B_VISION','B_MENTAL'],cta:'Book 1-on-1'},
+    'group':  {ico:'👥',hot:false,title:'Group Lessons',   desc:'PLAN2_DESC',bullets:['G_DRILLS','G_SCEN','G_TEAM','G_COMM','G_VALUE'],       cta:'Book a group'},
+    'openrun':{ico:'🏀',hot:false,desc:'PLAN3_DESC',bullets:['O_GAMES','O_APPLY','O_MIX','O_FUN'],                    cta:'Book this'},
+    'cond':   {ico:'🏃',hot:false,desc:'PLAN4_DESC',bullets:['C_FORM','C_INT','C_STR','C_ALL'],                       cta:'Book this'}
+  }[type];
+}
+function lpPlanCards(){
+  const coaches=activeCoaches();
+  const types=TYPE_ORDER.filter(ty=>coaches.some(c=>coachOffersType(c.id,ty)));
+  if(!types.length)return '';
+  return types.map(ty=>{
+    const m=lpPlanMeta(ty); if(!m)return '';
+    // Coaches may price the same type differently, so show the lowest and say "from" when they differ.
+    const rates=coaches.filter(c=>coachOffersType(c.id,ty)).map(c=>coachRate(c.id,ty)).filter(r=>!isNaN(r));
+    const lo=rates.length?Math.min.apply(null,rates):0, hi=rates.length?Math.max.apply(null,rates):0;
+    const unit=ty==='1on1'?t('1 hour'):t('per player');
+    const sports=[...new Set(coaches.filter(c=>coachOffersType(c.id,ty)).map(c=>sportLabel(c.sport)))];
+    return `<div class="lp-plan${m.hot?' hot':''}">
+      <div class="lp-ico">${m.ico}</div><h3>${m.title?t(m.title):typeLabel(ty)}</h3>
+      <div class="lp-cost">${hi>lo?`<small>${t('from')} </small>`:''}${money(lo)} <small>· ${unit}${ty!=='1on1'?' · '+t('up to')+' '+typeMax(ty):''}</small></div>
+      ${typeIsDedicated(ty)||sports.length<3?`<div class="lp-plan-sports">${sports.map(sp=>`<span>${sportIcon(sp)} ${sp}</span>`).join('')}</div>`:''}
+      <p class="lp-p" style="font-size:14px">${tf(m.desc,{max:typeMax(ty)})}</p>
+      <ul>${m.bullets.map(k=>'<li>'+t(k)+'</li>').join('')}</ul>
+      <button class="lp-btn ${m.hot?'solid':'line'}" style="width:100%;margin-top:18px" onclick="openAuth('book')">${t(m.cta)}</button>
+    </div>`;
+  }).join('');
+}
 function lpSportChips(){
   const live={}; activeCoaches().forEach(c=>{live[sportKey(c.sport)]=true;});
   const advertised=(DB.settings.sports||'Basketball').split(',').map(x=>x.trim()).filter(Boolean);
@@ -2853,22 +2948,7 @@ function renderLanding(){
     <section class="lp-sec" id="lpSessions">
       <div class="lp-kicker">${t('What we offer')}</div>
       <h2 class="lp-h2">${t('SESSIONS')}</h2>
-      <div class="lp-price">
-        <div class="lp-plan hot">
-          <div class="lp-ico">🎯</div><h3>${t('1-on-1 Training')}</h3>
-          <div class="lp-cost">${money(r1)} <small>· ${t('1 hour')}</small></div>
-          <p class="lp-p" style="font-size:14px">${t('PLAN1_DESC')}</p>
-          <ul>${['B_BALL','B_SHOT','B_FOOT','B_1V1','B_VISION','B_MENTAL'].map(k=>'<li>'+t(k)+'</li>').join('')}</ul>
-          <button class="lp-btn solid" style="width:100%;margin-top:18px" onclick="openAuth('book')">${t('Book 1-on-1')}</button>
-        </div>
-        <div class="lp-plan">
-          <div class="lp-ico">👥</div><h3>${t('Group Lessons')}</h3>
-          <div class="lp-cost">${money(rg)} <small>· ${t('per player')} · ${t('1 hour')}</small></div>
-          <p class="lp-p" style="font-size:14px">${tf('PLAN2_DESC',{max:MAX_GROUP})}</p>
-          <ul>${['G_DRILLS','G_SCEN','G_TEAM','G_COMM','G_VALUE'].map(k=>'<li>'+t(k)+'</li>').join('')}</ul>
-          <button class="lp-btn line" style="width:100%;margin-top:18px" onclick="openAuth('book')">${t('Book a group')}</button>
-        </div>
-      </div>
+      <div class="lp-price">${lpPlanCards()}</div>
       <p class="lp-p" style="margin-top:18px">📍 ${t('AVAIL_LINE')}</p>
     </section>
 
@@ -3258,6 +3338,8 @@ const CHANGELOG=[
    '<b>Slogan:</b> “We plant the seed of sport” now sits under the RX•TRAINING wordmark on the home page, in a volt-to-blue gradient. Editable in <b>Admin → Home page — slogan</b>, with the same <b>[en]/[zh]/[ko]/[ja]</b> markers as the other free-text fields, so each language can have its own wording. Blank uses the built-in translated version.',
    '<b>The site no longer reads as a basketball site.</b> Every piece of marketing copy that assumed one sport was rewritten in all four languages — the hero lede, the feature cards, the quote, the highlights caption and the sports heading no longer mention AAU, Middlesex Magic, “the court” or basketball itself. The basketball <i>skill catalogue</i> is untouched: those drills are filed under Basketball and belong there.',
    'The home page now names the sports that are actually open. A <b>Training now</b> strip sits directly under the slogan listing every sport with an active coach, and the Sports section splits into <b>Open now</b> and <b>Coming as we add coaches</b> with counts, instead of one mixed grid where a parent had to read ten chips to find out whether we coach their kid\'s sport.',
+   'The <b>SESSIONS</b> section is generated from the coach roster instead of two hardcoded cards. All four session types now appear — 1-on-1, Group, Weekend Open Run and Weekend Running/Conditioning — each tagged with the sports it is available in, its player cap, and a “from” price when coaches charge differently for it. A type only appears if an active coach can run it, so the page can never advertise something unbookable.',
+   'The bullet lists under each plan were basketball drills shown to everyone — “ball handling &amp; dribbling”, “shooting form”, “court vision”, “on-court communication”. The 1:1 and Group lists are now sport-neutral; the two weekend classes have their own lists, which may name their sport because those types are sport-specific by definition.',
    'A sport with a coach but missing from the advertised list now appears anyway — the coach roster is the source of truth, so launching a sport can never be half-done.',
    'Event registrations now show each player the way the Customers table does — avatar, name, and <b>age/level · parent</b> underneath — plus a tappable phone number, so you are not cross-referencing two screens to reach a family.',
    '<b>Print sign-in sheet</b> button on the registrations dialog. One clean page per event: title, date, location, headcount, how many still owe, then the players sorted alphabetically with age/level, guardian, phone, payment state and an empty box to tick on the day. The table header repeats on every page and no row splits across a page break.',
