@@ -186,8 +186,11 @@
   .tblscroll>table{min-width:max-content;max-width:none}
   .tblscroll>table td,.tblscroll>table th{max-width:42ch}
   @media(max-width:820px){.tblscroll>table td,.tblscroll>table th{max-width:26ch}}
-  .tblscroll::-webkit-scrollbar{height:7px}
-  .tblscroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+  .tblscroll{scrollbar-width:thin;scrollbar-color:var(--muted) transparent}
+  .tblscroll::-webkit-scrollbar{height:10px}
+  .tblscroll::-webkit-scrollbar-track{background:var(--panel2);border-radius:5px}
+  .tblscroll::-webkit-scrollbar-thumb{background:var(--muted);border-radius:5px;border:2px solid var(--panel2)}
+  .tblscroll::-webkit-scrollbar-thumb:hover{background:var(--txt)}
   /* Status chips and money must never be broken across lines. */
   .pill,.credit,.slotchip,.badge{white-space:nowrap}
   td .right,td.right{white-space:nowrap}
@@ -228,7 +231,11 @@
   @supports not ((-webkit-background-clip:text) or (background-clip:text)){
     h1.page{color:var(--txt);-webkit-text-fill-color:var(--txt)}}
   .sub{color:var(--muted);margin-bottom:22px;font-size:14px}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;
+    max-width:100%}
+  /* Belt and braces: if a table ever escapes wrapTables(), its panel can still scroll to it
+     rather than the content being unreachable. */
+  .panel{overflow-x:auto}
   /* An empty state should still feel like part of the page, not a gap. */
   .empty{border-radius:10px}
   /* Section headings get a coloured tick so a long page reads as sections rather than one
@@ -3746,17 +3753,26 @@ function flash(msg,warn){const f=$('#flash');f.textContent=msg;f.className='flas
 /* Wrap every table in a horizontal scroller, once. Runs after any render — including modal
    bodies, which are replaced wholesale — so no call site has to remember to do it. */
 function wrapTables(root){
-  try{
-    (root||document).querySelectorAll('table').forEach(t=>{
-      const par=t.parentElement;
-      if(par&&par.classList&&par.classList.contains('tblscroll'))return;   // already wrapped
-      if(t.closest&&t.closest('#printArea'))return;                        // print sheet lays itself out
+  // try/catch is per table: one awkward node used to abort the whole pass, leaving every table
+  // after it unwrapped — which is exactly how a table ends up unable to scroll.
+  (root||document).querySelectorAll('table').forEach(t=>{
+    try{
+      if(t.closest&&t.closest('#printArea'))return;      // the print sheet lays itself out
+      const par=t.parentElement; if(!par||!par.classList)return;
+      if(par.classList.contains('tblscroll'))return;     // done already
+      // Many tables are already inside <div style="overflow-x:auto">. Adding a second wrapper
+      // inside it works, but tagging the existing one is cleaner and — importantly — makes the
+      // .tblscroll>table sizing rule apply, which is what actually makes it scrollable.
+      const cs=getComputedStyle(par);
+      if((cs.overflowX==='auto'||cs.overflowX==='scroll')&&par.children.length===1){
+        par.classList.add('tblscroll'); return;
+      }
       const w=document.createElement('div');
       w.className='tblscroll';
       par.insertBefore(w,t);
       w.appendChild(t);
-    });
-  }catch(e){}
+    }catch(e){}
+  });
 }
 /* Renders replace innerHTML in a dozen places; an observer catches them all rather than relying
    on every one of them remembering to call wrapTables(). Debounced so a burst costs one pass. */
@@ -3815,7 +3831,8 @@ const CHANGELOG=[
    'Added a width audit: <span class="mono">rxWidthAudit()</span> walks the rendered page and reports anything sticking out past the viewport, ignoring elements already inside their own scroller. The owner gets a red <b>\u21e4 layout</b> chip in the header when something overflows, tappable for the list \u2014 so a layout regression names itself instead of being chased by guesswork.',
    '<b>Fix: a cancelled session no longer reads as paid.</b> Cancelling clears the payment state, and — importantly for rows cancelled before that shipped — the payment cell is now <i>derived from the status</i> rather than the stored flag, so historic sessions correct themselves with no migration. <span class="mono">custPay()</span> and the fully-paid check also report a cancelled session as unpaid, so every screen agrees.',
    'Cash that had already been collected is not simply erased: the amount is kept on the record and a red <b>↩ \$X to refund</b> flag rides alongside the Cancelled pill until you deal with it. Whoever cancels is warned first — the owner and coach see the amount, the client is told the refund is not automatic. A session paid with a package credit needs no unwinding: credits are counted from completed sessions, so cancelling returns the credit by itself.',
-   '<b>Fix: every table now scrolls sideways on its own.</b> Tables appear in panels, in dialogs and in bare divs, so scoping the scroll to any one container fixed that place and broke another — first columns crushed to one letter per line (<i>S c h e d u l e d</i>), then the whole app opening scrolled sideways with the logo cut off, then a registrations dialog that could not be scrolled at all. Each table is now wrapped in its own scroller as it renders, wherever it lives: columns keep their natural widths, the page itself never widens, and there is a fade at the right edge to show more is there. Very long cells are capped so a single note cannot stretch a table several screens wide.',
+   '<b>Fix: every table scrolls sideways, on desktop and on mobile.</b> Tables live in panels, in dialogs and in bare divs, so scoping the scroll to any one container fixed one place and broke another. Each table is now put inside its own scroller as it renders — and where it is already inside one, that container is tagged instead of nested. Columns keep their natural widths, the page never widens, and long cells are capped so one note cannot stretch a table several screens wide.',
+   '<b>Fix:</b> that wrapping had a single try/catch around the whole pass, so one awkward node aborted it and left every table after it unscrollable — which is why the Customers table could not be scrolled to its last column. The guard is now per table. The scrollbar is also thicker and higher-contrast so it is visible and grabbable with a mouse, and a panel will scroll as a fallback if a table ever escapes wrapping entirely.',
    'Header stats reordered to <b>sports, sessions coached, coaches, athletes trained</b>.',
    'Uploaded highlights land as <b>drafts</b> on purpose, but nothing said so at a glance \u2014 uploading a batch and then looking at the home page made them seem to have vanished. The Highlights panel now shows a banner counting unpublished items with a <b>Publish all</b> button, and the upload confirmation says DRAFT explicitly.',
    '<b>Fix:</b> opening the app from the Home Screen could lay out wider than the phone, needing a manual pinch to fit. The viewport now sets <span class="mono">minimum-scale</span> so iOS cannot shrink the layout below 1x, images/video/tables/long words are capped at the screen width so nothing can force a wider layout, and the viewport is re-asserted on launch, on rotation, and when returning from the app switcher.',
