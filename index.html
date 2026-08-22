@@ -468,9 +468,13 @@
     -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
     background:var(--lp-bg);color:var(--lp-ink);padding-bottom:env(safe-area-inset-bottom,0px)}
   .login.show{display:block}
-  /* The landing is a fixed layer over the app. Without this the document behind it keeps
-     scrolling and holds that position, so sign-in revealed the app already scrolled. */
-  body.home-open{overflow:hidden;position:fixed;inset:0;width:100%}
+  /* The landing is a fixed layer over the app. Freezing the document behind it stops it holding
+     a scroll position that then shows through on sign-in.
+     Deliberately NOT position:fixed on <body> — that is an iOS trap: once the body has been fixed
+     to inset:0, Safari can keep a stale layout width after it is released, so the page renders far
+     wider than the screen with the right-hand side unreachable and the ≤820px media queries no
+     longer matching. overflow:hidden alone freezes it without touching the layout viewport. */
+  html.home-open,body.home-open{overflow:hidden}
   :root{
     --lp-bg:#ffffff; --lp-soft:#f4f7f2; --lp-ink:#0f1410; --lp-mut:#5c6b60; --lp-line:#e2e9e0;
     --lp-volt:#c8ff2e; --lp-volt-d:#4d8000; --lp-orange:#ff6a00;
@@ -2370,6 +2374,8 @@ function totalFor(c,type){return (c&&c.creditsTotal&&c.creditsTotal[type])||0;}
    is exactly today's behavior — so nothing existing changes until someone actually uses the
    per-player controls. */
 function custPay(s,custId){
+  // A cancelled session owes nothing and has paid nothing, whatever the stored flags say.
+  if(s&&s.status==='cancelled')return {paid:false,paidVia:'',requested:false};
   if(s.type!=='1on1' && s.pay && s.pay[custId]) return s.pay[custId];
   return {paid:!!s.paid, paidVia:s.paidVia||'', requested:!!s.paymentRequested};
 }
@@ -2432,7 +2438,10 @@ function setCustPay(s,custId,paid,paidVia){
 }
 /* true only once every player in the session has their own paid status = true (group), or the
    plain paid flag for 1:1 */
-function sessionFullyPaid(s){ return s.type==='1on1' ? !!s.paid : s.customerIds.every(id=>custPay(s,id).paid); }
+function sessionFullyPaid(s){
+  if(s.status==='cancelled')return false;   // nothing is owed and nothing is settled
+  return s.type==='1on1' ? !!s.paid : s.customerIds.every(id=>custPay(s,id).paid);
+}
 /* cash actually collected for this session — for a group, only the paid-cash players' shares */
 function sessionCashAmt(s){
   if(s.status==='cancelled'||!sessionPriced(s))return 0;
@@ -2757,7 +2766,7 @@ function openHome(){
   renderLanding();
   closeAuth();
   const el=$('#login'); if(el){el.classList.add('show');el.scrollTop=0;}
-  try{ document.body.classList.add('home-open'); }catch(e){}
+  try{ document.body.classList.add('home-open');document.documentElement.classList.add('home-open'); }catch(e){}
 }
 function closeHome(){ const el=$('#login'); if(el)el.classList.remove('show'); enterApp(); }
 /* Handing the screen from the landing to the app.
@@ -2766,12 +2775,23 @@ function closeHome(){ const el=$('#login'); if(el)el.classList.remove('show'); e
    it worked out for the fixed layer. Revealing the app without resetting either is what made the
    first screen after sign-in look mis-scaled and shifted, while the home page itself was fine. */
 function enterApp(){
-  try{ document.body.classList.remove('home-open'); }catch(e){}
+  try{ document.body.classList.remove('home-open');document.documentElement.classList.remove('home-open'); }catch(e){}
   try{ window.scrollTo(0,0); }catch(e){}
   try{ document.documentElement.scrollLeft=0; document.body.scrollLeft=0; }catch(e){}
   try{ if(window.rxFixViewport)window.rxFixViewport(); }catch(e){}
   // one more pass after layout settles — a freshly rendered tab can change the page height
   setTimeout(()=>{ try{ window.scrollTo(0,0); if(window.rxFixViewport)window.rxFixViewport(); }catch(e){} },120);
+  // If the document still measures wider than the window, the layout viewport is stale rather
+  // than some element overflowing — re-asserting the meta is the only thing that recovers it.
+  setTimeout(()=>{
+    try{
+      const d=document.documentElement;
+      if(d.scrollWidth>Math.ceil(window.innerWidth)+2 && window.rxFixViewport){
+        window.rxFixViewport();
+        console.warn('layout wider than viewport ('+d.scrollWidth+' vs '+window.innerWidth+') — viewport re-asserted');
+      }
+    }catch(e){}
+  },400);
 }
 function openAuth(which){
   const v=$('#authveil'); if(!v)return;
@@ -3410,7 +3430,7 @@ function showLogin(){
   renderLanding();                 // repaint marketing page (picks up live rates/events)
   closeAuth();                     // landing first — the card opens only on Sign in / Create account
   $('#login').classList.add('show');
-  try{ document.body.classList.add('home-open'); }catch(e){}
+  try{ document.body.classList.add('home-open');document.documentElement.classList.add('home-open'); }catch(e){}
 }
 function openSignup(){
   const _v=$('#authveil'); if(_v)_v.classList.add('show');
@@ -3698,8 +3718,8 @@ const CHANGELOG=[
    'The hero wordmark is sized to fit one line at 320px and set to never wrap — its minimum font size used to be larger than a narrow phone could fit, so the ball dropped to a second line.',
    'An event can now have <b>several host coaches</b> instead of one. The Host coach dropdown is a tick list, every host is shown wherever the event appears, and a co-hosted event turns up in each host\u2019s own view rather than only the first one\u2019s. Events created before this keep working: the old single column is still read, and still written with the first host, so anything else querying it is unaffected. Finance counts a co-hosted event once, not once per coach.',
    '<b>Pull down to refresh</b> everywhere — the public home page and the signed-in app for owner, coach and client. The landing scrolls inside a fixed container and the app scrolls the document, so each needed its own binding; in a Home Screen app there is no browser pull-to-refresh at all. It only engages from the very top, ignores upward and sideways drags, skips an open dialog, and will not fight a table you are scrolling sideways.',
-   '<b>Fix:</b> the public home page fitted the phone correctly but the first screen after signing in did not — for owner, coach and client alike. The landing is a fixed layer sitting on top of the app, so while it was open the document underneath kept scrolling and held that position, and iOS kept the visual viewport it had worked out for the fixed layer. The app is now frozen while the landing covers it, and revealing it resets the scroll and re-asserts the viewport — twice, since a freshly rendered tab changes the page height after the first pass.',
-   '<b>Fix: a cancelled session no longer reads as paid.</b> The finance totals already skipped cancelled sessions, but the payment flags themselves survived — so a cancelled session still showed a green <b>Paid</b> pill and still counted as settled in the per-player view. Cancelling now clears the session-level and per-player payment state and any pending payment request.',
+   '<b>Fix:</b> the public home page fitted the phone correctly but the app did not — the right-hand side was cut off and unreachable for owner, coach and client. Freezing the page behind the landing had used <span class="mono">position:fixed</span> on the body, which is an iOS trap: once released, Safari can keep a stale layout width, so the page renders far wider than the screen and the mobile breakpoints stop matching. The freeze now uses <span class="mono">overflow:hidden</span> alone, which does not touch the layout viewport, and entering the app checks whether the document still measures wider than the window and re-asserts the viewport if so.',
+   '<b>Fix: a cancelled session no longer reads as paid.</b> Cancelling clears the payment state, and — importantly for rows cancelled before that shipped — the payment cell is now <i>derived from the status</i> rather than the stored flag, so historic sessions correct themselves with no migration. <span class="mono">custPay()</span> and the fully-paid check also report a cancelled session as unpaid, so every screen agrees.',
    'Cash that had already been collected is not simply erased: the amount is kept on the record and a red <b>↩ \$X to refund</b> flag rides alongside the Cancelled pill until you deal with it. Whoever cancels is warned first — the owner and coach see the amount, the client is told the refund is not automatic. A session paid with a package credit needs no unwinding: credits are counted from completed sessions, so cancelling returns the credit by itself.',
    '<b>Fix: every table now scrolls sideways on its own.</b> Tables appear in panels, in dialogs and in bare divs, so scoping the scroll to any one container fixed that place and broke another — first columns crushed to one letter per line (<i>S c h e d u l e d</i>), then the whole app opening scrolled sideways with the logo cut off, then a registrations dialog that could not be scrolled at all. Each table is now wrapped in its own scroller as it renders, wherever it lives: columns keep their natural widths, the page itself never widens, and there is a fade at the right edge to show more is there. Very long cells are capped so a single note cannot stretch a table several screens wide.',
    'Header stats reordered to <b>sports, sessions coached, coaches, athletes trained</b>.',
@@ -3971,7 +3991,15 @@ function renderBookingTable(){
     const checkCell = s.checkedIn?'<span class="pill green">✓ In</span>':
       (s.date<=now && s.status!=='cancelled'?`<button class="iconbtn" onclick="ownerCheckIn('${s.id}')">Check in</button>`:'<span class="pill">—</span>');
     let payCell;
-    if(s.type!=='1on1' && s.customerIds.length>1){
+    /* Cancelled wins over everything. markCancelled() clears the flags going forward, but rows
+       cancelled before that shipped still carry paid=true — deriving the cell from status fixes
+       the history too, with no migration. */
+    if(s.status==='cancelled'){
+      payCell=(s.paidWas>0)
+        ? '<span class="pill red">↩ '+money(s.paidWas)+' to refund</span>'
+        : '<span class="pill">—</span>';
+    }
+    else if(s.type!=='1on1' && s.customerIds.length>1){
       const paidN=s.customerIds.filter(cid=>custPay(s,cid).paid).length;
       const allPaid=paidN===s.customerIds.length;
       payCell=`<div class="actions" style="justify-content:flex-start">
@@ -5175,8 +5203,8 @@ function manualMemberPaymentConfirm(id,custId){
    losing the fact entirely. A package credit needs no unwinding: credits are counted from
    COMPLETED sessions, so cancelling returns it automatically. */
 function markCancelled(s,who){
+  const hadCash=cancelRefundDue(s);        // BEFORE the status flips — custPay() hides paid state
   s.status='cancelled';s.cancelledBy=who;s.cancelledAt=new Date().toISOString();
-  const hadCash=cancelRefundDue(s);
   if(hadCash>0){ s.paidWas=hadCash; s.paidViaWas='cash'; }
   s.paid=false; s.paidVia='';
   if(s.pay){ Object.keys(s.pay).forEach(cid=>{ s.pay[cid]={paid:false,paidVia:'',requested:!!(s.pay[cid]||{}).requested}; }); }
