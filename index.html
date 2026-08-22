@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
 <title>RX.TRAINING</title>
 <meta name="theme-color" content="#ffffff">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -22,6 +22,26 @@
        render a still PNG; there is no animated-icon support for web apps, so the ball is drawn
        once, as the dot in RX(ball)TRAINING, matching icon-192/512.png.
      - favicon (browser tab): repainted on a timer, so the ball really does cycle sports there. */
+/* iOS standalone (added to the Home Screen) sometimes paints once before the viewport is
+   applied, leaving the app laid out too wide and needing a manual pinch. Re-setting the meta
+   forces a re-evaluation; doing it on pageshow also covers returning from the app switcher,
+   where the same thing happens on restore. */
+(function(){
+  function fixViewport(){
+    try{
+      var v=document.querySelector('meta[name=viewport]'); if(!v)return;
+      var c='width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, viewport-fit=cover';
+      v.setAttribute('content',c+', _=' + Date.now());   // force a change so Safari re-reads it
+      setTimeout(function(){ v.setAttribute('content',c); },50);
+    }catch(e){}
+  }
+  try{
+    window.addEventListener('pageshow',fixViewport);
+    window.addEventListener('orientationchange',function(){setTimeout(fixViewport,250);});
+    if(document.readyState==='complete')fixViewport();
+    else window.addEventListener('load',fixViewport);
+  }catch(e){}
+})();
 (function(){try{
   var BALLS=['basketball','soccer','tennis','baseball','volleyball'];
   function ball(x,cx,cy,r,kind){
@@ -119,6 +139,13 @@
     color:var(--txt);min-height:100vh;-webkit-font-smoothing:antialiased;
     overflow-x:hidden;width:100%;max-width:100%}
   a{color:inherit}
+  /* Safety net: a single oversized image, video, iframe, table or long word is enough to make
+     iOS lay the entire page out wider than the screen — which is what "opens zoomed out and I
+     have to pinch to fit" actually is. */
+  img,video,iframe,canvas,svg,table{max-width:100%}
+  img,video{height:auto}
+  td,th,p,li,h1,h2,h3,h4,b,span,div{overflow-wrap:anywhere;word-break:normal}
+  pre,code{white-space:pre-wrap;overflow-wrap:anywhere}
   .wrap{max-width:1720px;margin:0 auto;padding:0 28px 80px;width:100%;box-sizing:border-box}
   /* any single long word / URL / wide cell would otherwise stretch the page and leave a gap
      down the right-hand side on a phone */
@@ -3437,6 +3464,8 @@ const CHANGELOG=[
    '<b>Prepaid credits now work for every session type.</b> Packages could only be sold as 1:1 or Group, so a Track player had no way to pay a conditioning session with a credit — the Credit button simply never appeared. Packages, credit balances, the Customers credit badge and the client\'s “Your prepaid sessions” panel all read the full list of types now, and both credit and cash remain available per player on any multi-player session.',
    'A session whose headcount no longer fits its type now says so in the editor and offers a one-tap switch — e.g. <i>“10 players in a Group (max 4). Switch to Weekend Open Run →”</i>. The switch reprices at the new type\'s rate, shows the before/after per player, and keeps payments already recorded.',
    '<b>Fix:</b> a session booked when the cap was higher could not be saved at all, because the cap check ran before the owner had any chance to correct the type — locking them out of the one screen that fixes it. The check now only blocks <i>adding</i> players beyond the cap.',
+   'Uploaded highlights land as <b>drafts</b> on purpose, but nothing said so at a glance \u2014 uploading a batch and then looking at the home page made them seem to have vanished. The Highlights panel now shows a banner counting unpublished items with a <b>Publish all</b> button, and the upload confirmation says DRAFT explicitly.',
+   '<b>Fix:</b> opening the app from the Home Screen could lay out wider than the phone, needing a manual pinch to fit. The viewport now sets <span class="mono">minimum-scale</span> so iOS cannot shrink the layout below 1x, images/video/tables/long words are capped at the screen width so nothing can force a wider layout, and the viewport is re-asserted on launch, on rotation, and when returning from the app switcher.',
    '<b>Fix:</b> the Highlights gallery played a month oldest-first. Manual order ranked above the date, and since uploads are numbered in the order they are added, that put the earliest photo first. Newest now leads, in the gallery and in the Admin list \u2014 which are sorted identically, so dragging rearranges the list you actually see. Drag order still decides the sequence within a single date, which is where a batch of photos from one session lands.',
    'The public coach roster is sorted <b>A\u2013Z by name</b>. The booking pickers still put Raymond first, where he is the usual choice \u2014 but on the home page that read as a ranking of the team rather than a roster. His standing is carried by the FOUNDER badge on his card.',
    '<b>Fix:</b> a coach added with the rate boxes left empty was saved at <b>\$0</b>, because an empty number input reads as zero. They were then advertised as free on the public page, and dragged the \u201cfrom\u201d price on the plan cards down to \$0. Blank now stays unset and falls back to the Admin default; a stored <b>0</b> is read as \u201cnot agreed yet\u201d and shows as TBC, so coaches already saved this way correct themselves without being re-edited.',
@@ -7523,6 +7552,18 @@ function renderAdmin(){
     <div class="panel" style="margin-top:16px">
       <h3>Home page highlights</h3>
       <div class="clienttag" style="margin-bottom:10px">Drag a row by the ⠿ handle to reorder within its month, or use ↑ ↓ on a touch screen.<br>Photos and videos shown in the <b style="color:var(--txt)">HIGHLIGHTS</b> gallery on rxtraining.org. They're grouped into month tabs by date and play automatically one after another. Leave the list empty to show the built-in AAU reel.<br>Uploading several files at once adds them all — give each a title and date afterwards.</div>
+      ${(()=>{
+        /* Uploads deliberately land as drafts, but nothing said so at a glance — an owner who
+           uploaded ten photos and looked at the home page reasonably concluded they had vanished. */
+        const drafts=(DB.highlights||[]).filter(h=>h.active===false);
+        if(!drafts.length)return '';
+        return `<div class="panel" style="background:var(--a6b);border-color:var(--a6);padding:12px;margin-bottom:12px">
+          <div class="row" style="justify-content:space-between;align-items:center;gap:10px">
+            <div><b>⏳ ${drafts.length} item${drafts.length>1?'s':''} not on the home page yet</b>
+              <div class="clienttag" style="margin-top:3px">Uploads start as drafts so nothing goes public by accident. Publish to show ${drafts.length>1?'them':'it'}.</div></div>
+            <button class="btn sm" onclick="publishAllHighlights()">Publish all ${drafts.length}</button>
+          </div></div>`;
+      })()}
       <div style="overflow-x:auto"><table><thead><tr><th></th><th>Title</th><th>Date</th><th>Media</th><th>Status</th><th></th></tr></thead><tbody>
         ${hlAdminOrder().map((h,i)=>`<tr draggable="true"
           ondragstart="dragStart(event,'${h.id}','highlight')" ondragend="dragEnd(event)"
@@ -7590,7 +7631,7 @@ function addHighlight(){
   const type=/\.(jpe?g|png|gif|webp|heic|avif)(\?|$)/i.test(url)?'image':'video';
   const ord=(DB.highlights||[]).reduce((m,x)=>Math.max(m,x.ord||0),0)+1;
   DB.highlights.push({id:uid(),url,title,date,active:false,type,ord});   // draft until published
-  save(); flash('Added as a draft — press Publish to show it on the home page'); renderAdmin();
+  save(); flash('Added as a DRAFT — press Publish to put it on the home page'); renderAdmin();
 }
 function updHighlight(id,field,val){
   const h=(DB.highlights||[]).find(x=>x.id===id); if(!h)return;
@@ -7620,6 +7661,13 @@ function moveHighlight(id,dir){
   const a=sibs[i], b=sibs[j], t2=a.ord||0; a.ord=b.ord||0; b.ord=t2;
   if(a.ord===b.ord){ a.ord=(dir<0?b.ord-1:b.ord+1); }   // guard against equal legacy values
   save(); renderAdmin();
+}
+function publishAllHighlights(){
+  const drafts=(DB.highlights||[]).filter(h=>h.active===false);
+  if(!drafts.length)return;
+  if(!confirm('Publish '+drafts.length+' item'+(drafts.length>1?'s':'')+' to the home page?'))return;
+  drafts.forEach(h=>h.active=true);
+  save(); flash(drafts.length+' published to the home page 🎬'); renderAdmin();
 }
 function pubHighlight(id){
   const h=(DB.highlights||[]).find(x=>x.id===id); if(!h)return;
@@ -7693,7 +7741,7 @@ async function uploadHighlightVideo(input){
       added++;
     }catch(e){flash('Upload failed: '+e.message,true);}
   }
-  if(added){ save(); flash(added+' item'+(added>1?'s':'')+' added as draft — press Publish when ready'); renderAdmin(); }
+  if(added){ save(); flash(added+' item'+(added>1?'s':'')+' uploaded as DRAFT — press Publish to show on the home page'); renderAdmin(); }
 }
 
 /* ============================================================================
