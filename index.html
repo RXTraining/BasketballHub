@@ -984,6 +984,7 @@ const ZH={
   'Highlights':'精彩集锦',
   'Book':'预约',
   'SESSIONS COACHED':'已完成课程',
+  'TBC':'待定',
   'Group & weekend classes':'团课与周末课程',
   'Open now':'现已开课',
   'Coming as we add coaches':'教练到位后开放',
@@ -1158,6 +1159,7 @@ const KO={
   'Highlights':'하이라이트',
   'Book':'예약',
   'SESSIONS COACHED':'진행한 세션',
+  'TBC':'미정',
   'Group & weekend classes':'그룹 및 주말 클래스',
   'Open now':'지금 운영 중',
   'Coming as we add coaches':'코치 합류 후 오픈',
@@ -1327,6 +1329,7 @@ const JA={
   'Highlights':'ハイライト',
   'Book':'予約',
   'SESSIONS COACHED':'実施セッション',
+  'TBC':'未定',
   'Group & weekend classes':'グループ・週末クラス',
   'Open now':'開講中',
   'Coming as we add coaches':'コーチ加入後に開講',
@@ -1764,7 +1767,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
   d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,rateCond:(st&&st.rate_cond!=null)?Number(st.rate_cond):'',defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',activityPush:(st&&st.activity_push)||'important',activitySeenAt:(st&&st.activity_seen_at)||'',sports:(st&&st.sports)||'Basketball, Soccer, Tennis, Golf, Track',slogan:(st&&st.slogan)||'',highlightVideo:(st&&st.highlight_video)||'',highlightTitle:(st&&st.highlight_title)||'',aboutText:(st&&st.about_text)||'',aboutCards:(st&&st.about_cards)||'',quoteText:(st&&st.quote_text)||'',quoteBy:(st&&st.quote_by)||'',groupMinPlayers:(st&&st.group_min_players)||2,groupFormHours:(st&&st.group_form_hours)||48,homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
   d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',
     sport:(c.sport||'Basketball'),family:(c.family==null?undefined:c.family===true),shareType:(c.share_type||'pct'),shareVal:(c.share_val!=null?Number(c.share_val):0),
-    rate1on1:(c.rate_1on1!=null?Number(c.rate_1on1):undefined),rateGroup:(c.rate_group!=null?Number(c.rate_group):undefined),rateCond:(c.rate_cond!=null?Number(c.rate_cond):undefined),
+    rate1on1:(c.rate_1on1!=null?Number(c.rate_1on1):undefined),rateGroup:(c.rate_group!=null?Number(c.rate_group):undefined),rateCond:(c.rate_cond!=null?Number(c.rate_cond):undefined),rateTbc:(c.rate_tbc||''),
     pending:(c.pending||null),created:c.created||''}));
   d.locations=(loc||[]).map(l=>({id:l.id,name:l.name,address:l.address||'',miles:Number(l.miles)||0}));
   d.availability=(avail||[]).map(a=>({id:a.id,coachId:a.coach_id||'',date:a.date,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||'',sessionType:a.session_type||'',approved:a.approved!==false}));
@@ -1783,7 +1786,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
   d.activity=(acts||[]).map(a=>({id:a.id,ts:a.ts||'',role:a.role||'',actorId:a.actor_id||'',actorName:a.actor_name||'',action:a.action||'',detail:a.detail||'',refId:a.ref_id||'',notify:a.notify===true}));
   return normalize(d);
 }
-const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),rate_cond:(c.rateCond!=null?c.rateCond:null),sport:c.sport||'Basketball',family:c.family===true,share_type:c.shareType||'pct',share_val:(c.shareVal!=null?c.shareVal:0),pending:(c.pending||null),created:c.created||null,last_login:lastLoginOf(c)||null,login_count:loginCountOf(c)});
+const coachRow=c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliation_sub:c.affiliationSub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',rate_1on1:(c.rate1on1!=null?c.rate1on1:null),rate_group:(c.rateGroup!=null?c.rateGroup:null),rate_cond:(c.rateCond!=null?c.rateCond:null),rate_tbc:(c.rateTbc||''),sport:c.sport||'Basketball',family:c.family===true,share_type:c.shareType||'pct',share_val:(c.shareVal!=null?c.shareVal:0),pending:(c.pending||null),created:c.created||null,last_login:lastLoginOf(c)||null,login_count:loginCountOf(c)});
 const highlightRow=h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',active:h.active!==false,type:h.type||'video',ord:h.ord||0});
 const skillRow=k=>({id:k.id,sport:k.sport||'Basketball',name:k.name||'',ord:k.ord||0,active:k.active!==false});
 const skillLogRow=e=>({id:e.id,customer_id:e.customerId||'',skill_id:e.skillId||'',ts:e.ts||'',
@@ -1865,7 +1868,7 @@ function dataSig(d){return JSON.stringify({
   s:(d.sessions||[]).map(x=>[x.id,x.coachId,x.status,x.checkedIn,x.paidVia,x.date,x.time,x.price,x.feedback||'',(x.media||[]).length,(x.customerIds||[]).length,(x.joinReq||[]).length]),
   c:(d.customers||[]).map(x=>[x.id,x.name,x.email,x.pwd,x.creditsTotal,x.packages.length]),
   a:(d.availability||[]).map(x=>[x.id,x.coachId,x.date,x.start,x.end,x.location,x.sessionType,x.approved]),
-  co:(d.coaches||[]).map(x=>[x.id,x.name,x.active,x.tagline,x.bio,x.affiliation,x.rate1on1,x.rateGroup,x.rateCond,x.sport,x.pending]),
+  co:(d.coaches||[]).map(x=>[x.id,x.name,x.active,x.tagline,x.bio,x.affiliation,x.rate1on1,x.rateGroup,x.rateCond,x.rateTbc,x.sport,x.pending]),
   e:(d.expenses||[]).length, k:(d.cashEntries||[]).length,
   ev:(d.events||[]).map(x=>[x.id,x.title,x.date,x.time,x.price,x.capacity,x.active,x.location,x.featured]),
   er:(d.eventRegs||[]).map(x=>[x.id,x.eventId,x.customerId,x.status,x.paid,x.checkedIn]),
@@ -2088,7 +2091,24 @@ const custNames = ids => ids.map(i=>{const c=custById(i);return c?c.name:'?';}).
 const initials = n => n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
 const firstName = n => n.split(' ')[0];
 /* effective (owner-approved) hourly rate for a coach, falling back to the global default */
+/* ---- Rates that are not agreed yet ---------------------------------------
+   A new coach often joins before the money is settled. Storing 0 would advertise free sessions
+   and silently bill nothing; leaving it blank fell through to the business default, which quietly
+   invented a price nobody agreed. Instead the coach carries a list of types whose rate is still
+   TBC. Everything that PRICES a session treats TBC as 0 so no arithmetic breaks, and everything
+   that DISPLAYS a price shows "TBC" and refuses to imply a number. */
+function rateTbcList(c){
+  const co=(typeof c==='object'&&c)?c:coachById(c);
+  return String((co&&co.rateTbc)||'').split(',').map(x=>x.trim()).filter(Boolean);
+}
+function isRateTbc(coachId,type){ return rateTbcList(coachId).indexOf(type)>=0; }
+/* Any TBC rate among the players' coach means the session total cannot be stated. */
+function sessionRateTbc(s){ return !!s && isRateTbc(s.coachId,s.type); }
+/* The one function every screen should use to print a rate or a session price. */
+function rateLabel(coachId,type){ return isRateTbc(coachId,type)?t('TBC'):money(coachRate(coachId,type)); }
+function priceLabel(s){ return sessionRateTbc(s)&&!(s.price>0)?t('TBC'):money(s.price); }
 function coachRate(coachId,type){
+  if(isRateTbc(coachId,type))return 0;   // priced as 0 until agreed; never billed as free by accident
   const c=coachById(coachId);
   const key=typeDef(type).rateKey;
   const r=c?c[key]:undefined;
@@ -2772,7 +2792,11 @@ function aboutParas(co){
       <p class="lp-p" style="margin-top:12px">${t('ABOUT_P3')}</p>`;
 }
 function lpCoachCards(){
-  const list=activeCoaches();
+  /* Plain A–Z on the public roster. activeCoaches() pins Raymond first, which is right for the
+     BOOKING pickers (owner and client) where he is the usual choice — but on the public page it
+     reads as a ranking of the team. His standing is carried by the FOUNDER badge on his card,
+     not by being first in the list. */
+  const list=activeCoaches().slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(!list.length)return '<div class="lp-card">'+t('NO_COACHES')+'</div>';
   return list.map((c,i)=>{
     const founder=(c.name||'').trim().toLowerCase()==='raymond xu';
@@ -2794,7 +2818,7 @@ function lpCoachCards(){
         <p class="lp-coach-bio" id="bio_${c.id}">${bio}</p>
         ${bio.length>190?`<button class="lp-more" onclick="lpMoreBio('${c.id}',this)">${t('Read more')} ▾</button>`:''}
       </div>`:''}
-      <div class="lp-coach-rates"><span>1:1 <b>${money(coachRate(c.id,'1on1'))}</b>${t('/hr')}</span><span>${t('Group')} <b>${money(coachRate(c.id,'group'))}</b>${t('/player')}</span></div>
+      <div class="lp-coach-rates"><span>1:1 <b>${rateLabel(c.id,'1on1')}</b>${isRateTbc(c.id,'1on1')?'':t('/hr')}</span><span>${t('Group')} <b>${rateLabel(c.id,'group')}</b>${isRateTbc(c.id,'group')?'':t('/player')}</span></div>
       <button class="lp-btn solid" style="width:100%;margin-top:14px" onclick="openAuth('book')">${t('Book with')} ${firstName(c.name)}</button>
     </article>`;
   }).join('');
@@ -2833,13 +2857,17 @@ function lpPlanCards(){
   return types.map(ty=>{
     const m=lpPlanMeta(ty); if(!m)return '';
     // Coaches may price the same type differently, so show the lowest and say "from" when they differ.
-    const rates=coaches.filter(c=>coachOffersType(c.id,ty)).map(c=>coachRate(c.id,ty)).filter(r=>!isNaN(r));
+    // coaches whose rate for this type is still TBC are left out of the "from" figure entirely —
+    // averaging a 0 in would advertise a price nobody has agreed
+    const priced=coaches.filter(c=>coachOffersType(c.id,ty)&&!isRateTbc(c.id,ty));
+    const rates=priced.map(c=>coachRate(c.id,ty)).filter(r=>!isNaN(r));
+    const allTbc=!rates.length;
     const lo=rates.length?Math.min.apply(null,rates):0, hi=rates.length?Math.max.apply(null,rates):0;
     const unit=ty==='1on1'?t('1 hour'):t('per player');
     const sports=[...new Set(coaches.filter(c=>coachOffersType(c.id,ty)).map(c=>sportLabel(c.sport)))];
     return `<div class="lp-plan${m.hot?' hot':''}">
       <div class="lp-ico">${m.ico}</div><h3>${m.title?t(m.title):typeLabel(ty)}</h3>
-      <div class="lp-cost">${hi>lo?`<small>${t('from')} </small>`:''}${money(lo)} <small>· ${unit}${ty!=='1on1'?' · '+t('up to')+' '+typeMax(ty):''}</small></div>
+      <div class="lp-cost">${allTbc?t('TBC'):`${hi>lo?`<small>${t('from')} </small>`:''}${money(lo)}`} <small>· ${allTbc?'':unit+' · '}${ty!=='1on1'?t('up to')+' '+typeMax(ty):(allTbc?'':'')}</small></div>
       ${typeIsDedicated(ty)||sports.length<3?`<div class="lp-plan-sports">${sports.map(sp=>`<span>${sportIcon(sp)} ${sp}</span>`).join('')}</div>`:''}
       <p class="lp-p" style="font-size:14px">${tf(m.desc,{max:typeMax(ty)})}</p>
       <ul>${m.bullets.map(k=>'<li>'+t(k)+'</li>').join('')}</ul>
@@ -3372,6 +3400,10 @@ const CHANGELOG=[
    '<b>Prepaid credits now work for every session type.</b> Packages could only be sold as 1:1 or Group, so a Track player had no way to pay a conditioning session with a credit — the Credit button simply never appeared. Packages, credit balances, the Customers credit badge and the client\'s “Your prepaid sessions” panel all read the full list of types now, and both credit and cash remain available per player on any multi-player session.',
    'A session whose headcount no longer fits its type now says so in the editor and offers a one-tap switch — e.g. <i>“10 players in a Group (max 4). Switch to Weekend Open Run →”</i>. The switch reprices at the new type\'s rate, shows the before/after per player, and keeps payments already recorded.',
    '<b>Fix:</b> a session booked when the cap was higher could not be saved at all, because the cap check ran before the owner had any chance to correct the type — locking them out of the one screen that fixes it. The check now only blocks <i>adding</i> players beyond the cap.',
+   'The public coach roster is sorted <b>A\u2013Z by name</b>. The booking pickers still put Raymond first, where he is the usual choice \u2014 but on the home page that read as a ranking of the team rather than a roster. His standing is carried by the FOUNDER badge on his card.',
+   '<b>A coach\u2019s rate can be marked TBC.</b> New coaches often start before the money is agreed. Ticking <i>Rate is TBC</i> beside any rate in the coach form shows <b>TBC</b> everywhere that rate would appear \u2014 the public coach card, the plan cards, the client\u2019s booking dropdown, the Coaches table and Finance \u2014 instead of a number nobody agreed to.',
+   'A TBC rate prices the session at <b>0</b> rather than falling through to the business default, which previously invented a price silently. The session editor warns that the rate is TBC and lets the owner type the agreed figure; once typed, it is never overwritten by the rate table.',
+   'On the public page, a coach whose rate is TBC is left out of the \u201cfrom\u201d price on a plan card entirely \u2014 averaging a zero in would advertise a price that does not exist. If no coach has agreed a rate for a type, that card reads TBC.',
    '<b>Credits are shared across Group and the weekend classes.</b> A player holding two group credits can spend them on Weekend Open Run or Weekend Running/Conditioning, in any sport — they are all priced per player at a similar rate, so nothing is lost. <b>1:1 stays separate</b>, because a $20 credit paying for a $35 session would quietly cost you money. Balances now read as one pooled figure (“Group &amp; weekend classes”) rather than four that looked unrelated.',
    'The pooled balance is <i>derived</i> from completed package-paid sessions rather than stored, so it can never drift out of step with the sessions themselves and no migration was needed for existing packages.',
    '<b>Fix:</b> two money checks still tested <span class="mono">type !== \'group\'</span> and so treated the weekend classes as single-payer — a conditioning session counted as fully paid once <i>one</i> player had paid, and only that player\'s share was counted as cash collected.',
@@ -3651,7 +3683,7 @@ function renderBookingTable(){
       <td>${statusPill}</td>
       <td>${checkCell}</td>
       <td>${payCell}</td>
-      <td class="right">${money(s.price)}</td>
+      <td class="right">${priceLabel(s)}</td>
       <td class="right"><div class="actions">${actionCell}</div></td>
     </tr>`;
   }).join('');
@@ -3764,7 +3796,7 @@ function openCoachStatus(id){
     : `<div class="field"><label class="f">Payment</label>
       ${pkg
         ? '<div class="clienttag">Paid with a prepaid package — managed by the owner.</div>'
-        : `<label style="display:flex;align-items:center;gap:8px;font-size:14px"><input type="checkbox" id="csPaid" ${s.paid?'checked':''} style="width:auto"> Paid (cash) — ${money(s.price)}</label>`}
+        : `<label style="display:flex;align-items:center;gap:8px;font-size:14px"><input type="checkbox" id="csPaid" ${s.paid?'checked':''} style="width:auto"> Paid (cash) — ${priceLabel(s)}</label>`}
     </div>`;
   openModal('Update session',`
     <div class="clienttag" style="margin-bottom:12px"><b>${fmtDT(s.date,s.time)}</b> · ${typeShort(s.type)} · ${custNames(s.customerIds)}<br>📍 ${s.location||''}</div>
@@ -3895,7 +3927,7 @@ function renderBookingClient(){
           ${coachMiniProfile(coachById(pickCoach))}
           <div class="field"><label class="f">${t('Session type')}</label>
             <select id="rqType" onchange="reqSel=[];renderOpenSlots()">${typesForCoach(pickCoach).map(ty=>
-              `<option value="${ty}">${typeLabel(ty)} (${money(coachRate(pickCoach,ty))}${ty==='1on1'?t('/hr'):t('/player')})${ty!=='1on1'?' · '+t('up to')+' '+typeMax(ty):''}</option>`).join('')}</select></div>
+              `<option value="${ty}">${typeLabel(ty)} (${rateLabel(pickCoach,ty)}${isRateTbc(pickCoach,ty)?'':(ty==='1on1'?t('/hr'):t('/player'))})${ty!=='1on1'?' · '+t('up to')+' '+typeMax(ty):''}</option>`).join('')}</select></div>
           <div class="field"><label class="f">${coachName(pickCoach)} — tap as many times as you'd like to request</label><div id="openSlots" class="slotlist"></div></div>
           <div class="field"><label class="f">${t('Comment (optional)')}</label><textarea id="rqComment" placeholder="…"></textarea></div>
           <button class="btn" id="rqSubmitBtn" style="width:100%" onclick="submitRequest()">${t('Request Session')}</button>
@@ -5085,7 +5117,8 @@ function openSession(id,returnCust,preset){
       <div class="field" style="display:flex;align-items:flex-end"><div class="clienttag">Tick day(s) of the week + an end date to create this same session on every matching day in one Save.</div></div>
     </div>`:''}
     <div class="row">
-      <div class="field"><label class="f">Price ($) — auto, editable</label><input type="number" id="sPrice" value="${s.price}"></div>
+      <div class="field"><label class="f">Price ($) — auto, editable</label><input type="number" id="sPrice" value="${s.price}">
+        <div class="clienttag" id="sPriceNote" style="margin-top:4px;color:var(--yellow)">${isRateTbc(s.coachId||targetCoach(),s.type)?('⚠ '+coachName(s.coachId||targetCoach())+"'s "+typeShort(s.type)+' rate is still TBC — type the agreed price here.'):''}</div></div>
       <div class="field"><label class="f">Status — syncs to client</label><select id="sStatus">
         ${['pending','scheduled','completed','cancelled'].map(v=>`<option ${s.status===v?'selected':''}>${v}</option>`).join('')}</select></div>
     </div>
@@ -5135,7 +5168,14 @@ function recalcPrice(){
   const type=$('#sType').value, dur=+$('#sDur').value||60;
   const n=Math.max(1,$$('.sCustCb').filter(cb=>cb.checked).length);
   const cid=(AUTH==='coach')?coachAs:($('#sCoach')?$('#sCoach').value:targetCoach());
-  $('#sPrice').value=computePrice(type,dur,n,cid);
+  // A TBC rate must not overwrite a price the owner has typed by hand — that is the whole point
+  // of TBC: the number comes from a person, not from the rate table.
+  const el=$('#sPrice'); if(!el)return;
+  const tbc=isRateTbc(cid,type);
+  const note=$('#sPriceNote');
+  if(note)note.innerHTML=tbc?'⚠ '+coachName(cid)+"'s "+typeShort(type)+' rate is still TBC — type the agreed price here.':'';
+  if(tbc){ if(!(+el.value>0))el.value=''; return; }
+  el.value=computePrice(type,dur,n,cid);
 }
 function afterSessionSave(){const rc=sessionReturnCust;sessionReturnCust=null;closeModal();if(rc&&custById(rc))viewCustomer(rc);else refreshOwner();}
 function saveSession(id,emailAfter){
@@ -5268,7 +5308,7 @@ function openGroupPay(id){
     </div>`;
   }).join('');
   openModal('Payments — '+custNames(s.customerIds),`
-    <div class="clienttag" style="margin-bottom:8px">${fmtDT(s.date,s.time)} · Group · Total ${money(s.price)}</div>
+    <div class="clienttag" style="margin-bottom:8px">${fmtDT(s.date,s.time)} · Group · Total ${priceLabel(s)}</div>
     ${rows}
     <p class="muted small" style="margin-top:10px">Each player's payment is tracked separately — one can use a prepaid credit while another pays cash, or hasn't paid yet.<br>
       <b style="color:var(--txt)">Credit</b> draws from the player's <b style="color:var(--txt)">${poolLabel(s.type)}</b> balance — Group, Weekend Open Run and Weekend Running/Conditioning share one pool, so a group credit can pay for a weekend class in any sport. 1:1 packages are separate, because they cost more per session.</p>
@@ -5357,7 +5397,7 @@ const COACH_COLS=[
   {id:'name',label:'Coach',get:c=>c.name||''},
   {id:'sport',label:'Sport',get:c=>c.sport||'Basketball'},
   {id:'aff',label:'Affiliation',get:c=>c.affiliation||''},
-  {id:'rate',label:'Rates ($/hr)',num:true,get:c=>coachRate(c.id,'1on1')},
+  {id:'rate',label:'Rates ($/hr)',num:true,get:c=>isRateTbc(c.id,'1on1')?-1:coachRate(c.id,'1on1')},
   {id:'status',label:'Status',num:true,get:c=>c.active!==false?1:0},
   {id:'completed',label:'Completed',num:true,get:c=>coachStats(c.id).done},
   {id:'sessions',label:'Sessions',num:true,get:c=>coachStats(c.id).total},
@@ -5617,7 +5657,7 @@ function renderCoaches(){
       <td><div class="nameceil"><span class="av">${initials(c.name)}</span><div><b>${c.name}</b><div class="clienttag">${c.tagline||'—'}</div></div></div></td>
       <td>${sportIcon(c.sport)} ${c.sport||'Basketball'}</td>
       <td>${c.affiliation||'—'}<div class="clienttag">${c.affiliationSub||''}</div></td>
-      <td>1:1 ${money(coachRate(c.id,'1on1'))}<div class="clienttag">Group ${money(coachRate(c.id,'group'))}/player</div></td>
+      <td>1:1 ${rateLabel(c.id,'1on1')}<div class="clienttag">Group ${rateLabel(c.id,'group')}${isRateTbc(c.id,'group')?'':'/player'}</div></td>
       <td>${c.active!==false?'<span class="pill green">Active</span>':'<span class="pill red">Inactive</span>'}${c.pending?' <span class="pill yellow">⏳ Pending</span>':''}</td>
       <td>${st.done}<div class="clienttag">completed</div></td>
       <td>${st.total}<div class="clienttag">${st.up} upcoming</div></td>
@@ -5655,6 +5695,7 @@ function pendingSummary(c){
   cmp('1:1 rate',money(c.rate1on1),p.rate1on1!=null?money(p.rate1on1):null);
   cmp('Group rate',money(c.rateGroup),p.rateGroup!=null?money(p.rateGroup):null);
   cmp('Weekend class rate',c.rateCond!=null?money(c.rateCond):'',p.rateCond!=null?money(p.rateCond):null);
+  cmp('Rates still TBC',(c.rateTbc||'')||'none',p.rateTbc!=null?((p.rateTbc||'')||'none'):null);
   return out.join('')||'<span class="muted">No differences from current.</span>';
 }
 function approveCoach(id){
@@ -5720,7 +5761,7 @@ function openApprovals(){
   openModal('⏳ Pending approvals',body,`<button class="btn" onclick="closeModal()">Close</button>`);
 }
 function refreshApprovals(){renderWhoami();if($('#modal').classList.contains('show'))openApprovals();if(AUTH==='owner')refreshOwner();}
-function doApproveCoach(id){const c=coachById(id);if(c&&c.pending){const p=c.pending;['tagline','bio','affiliation','affiliationSub','photo'].forEach(k=>{if(p[k]!=null)c[k]=p[k];});if(p.rate1on1!=null&&!isNaN(p.rate1on1))c.rate1on1=+p.rate1on1;if(p.rateGroup!=null&&!isNaN(p.rateGroup))c.rateGroup=+p.rateGroup;if(p.rateCond!=null&&!isNaN(p.rateCond))c.rateCond=+p.rateCond;c.pending=null;save();flash('Approved ✅');}refreshApprovals();}
+function doApproveCoach(id){const c=coachById(id);if(c&&c.pending){const p=c.pending;['tagline','bio','affiliation','affiliationSub','photo'].forEach(k=>{if(p[k]!=null)c[k]=p[k];});if(p.rate1on1!=null&&!isNaN(p.rate1on1))c.rate1on1=+p.rate1on1;if(p.rateGroup!=null&&!isNaN(p.rateGroup))c.rateGroup=+p.rateGroup;if(p.rateCond!=null&&!isNaN(p.rateCond))c.rateCond=+p.rateCond;if(p.rateTbc!=null)c.rateTbc=p.rateTbc;c.pending=null;save();flash('Approved ✅');}refreshApprovals();}
 function doRejectCoach(id){if(!confirm('Reject this coach\'s pending profile changes? Their edits will be discarded.'))return;const c=coachById(id);if(c){c.pending=null;save();flash('Rejected');}refreshApprovals();}
 function doApproveAvail(id){const a=(DB.availability||[]).find(x=>x.id===id);if(a){a.approved=true;save();flash('Availability approved ✅');}refreshApprovals();}
 function doRejectAvail(id){if(!confirm('Reject and remove this availability window?'))return;DB.availability=(DB.availability||[]).filter(x=>x.id!==id);save();flash('Removed');refreshApprovals();}
@@ -5797,10 +5838,13 @@ function openCoach(id){
     <div class="panel" style="background:var(--panel2);padding:14px;margin-bottom:14px">
       <b class="small">Hourly rates</b>
       <div class="row" style="margin-top:10px">
-        <div class="field" style="margin-bottom:0"><label class="f">1:1 rate ($/hr)</label><input type="number" id="coR1" value="${r1}"></div>
-        <div class="field" style="margin-bottom:0"><label class="f">Group rate ($/hr/player)</label><input type="number" id="coRG" value="${rG}"></div>
+        <div class="field" style="margin-bottom:0"><label class="f">1:1 rate ($/hr)</label><input type="number" id="coR1" value="${r1}" ${isRateTbc(c,'1on1')?'disabled':''}>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-top:5px;margin-bottom:0"><input type="checkbox" class="rateTbcCb" data-type="1on1" style="width:auto" ${isRateTbc(c,'1on1')?'checked':''} onchange="tbcToggle(this,'coR1')"> Rate is TBC</label></div>
+        <div class="field" style="margin-bottom:0"><label class="f">Group rate ($/hr/player)</label><input type="number" id="coRG" value="${rG}" ${isRateTbc(c,'group')?'disabled':''}>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-top:5px;margin-bottom:0"><input type="checkbox" class="rateTbcCb" data-type="group" style="width:auto" ${isRateTbc(c,'group')?'checked':''} onchange="tbcToggle(this,'coRG')"> Rate is TBC</label></div>
         <div class="field" style="margin-bottom:0"><label class="f">Weekend class ($/player)</label><input type="number" id="coRC" value="${c.rateCond!=null?c.rateCond:''}" placeholder="${DB.settings.rateCond!=null&&DB.settings.rateCond!==''?DB.settings.rateCond:''}">
-          <div class="clienttag" style="margin-top:4px">Weekend Open Run (Basketball) / Weekend Running/Conditioning (Track &amp; Field) — whichever this coach's sport allows. Blank uses the Admin default.</div></div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-top:5px;margin-bottom:0"><input type="checkbox" class="rateTbcCb" data-type="openrun" style="width:auto" ${isRateTbc(c,'openrun')?'checked':''} onchange="tbcToggle(this,'coRC')"> Rate is TBC</label>
+          <div class="clienttag" style="margin-top:4px">Weekend Open Run (Basketball) / Weekend Running/Conditioning (Track &amp; Field) — whichever this coach's sport allows. Blank uses the Admin default. <b style="color:var(--txt)">TBC</b> shows “TBC” everywhere instead of a price, and leaves the session unpriced until you set it.</div></div>
       </div>
     </div>
     <div class="row">
@@ -5866,11 +5910,19 @@ async function uploadCoachPhoto(input){
     flash('Photo uploaded ✅ — remember to Save');
   }catch(e){flash('Upload failed: '+e.message,true);}
 }
+function tbcToggle(cb,inputId){
+  const el=document.getElementById(inputId); if(el)el.disabled=cb.checked;
+}
 function saveCoach(id){
   const r1=+$('#coR1').value, rG=+$('#coRG').value;
   // blank means "use the Admin default", which is different from zero — keep it undefined
   const rcRaw=$('#coRC')?String($('#coRC').value).trim():'';
   const rC=rcRaw===''?undefined:(+rcRaw||0);
+  // both weekend types share one rate field, so ticking TBC there marks both
+  const tbc=[];
+  $$('.rateTbcCb').forEach(cb=>{ if(cb.checked){ tbc.push(cb.dataset.type);
+    if(cb.dataset.type==='openrun')tbc.push('cond'); } });
+  const rateTbc=tbc.join(',');
   if(AUTH==='coach'){
     const c=coachById(coachAs);if(!c)return;
     // Contact info applies immediately (no review needed) — syncs to the owner + DB via the
@@ -5879,7 +5931,7 @@ function saveCoach(id){
     c.phone=($('#coPhone')?$('#coPhone').value:'').trim();
     c.carrier=$('#coCarrier')?$('#coCarrier').value:'';
     c.email=($('#coEmail')?$('#coEmail').value:'').trim();
-    c.pending={tagline:$('#coTag').value,bio:$('#coBio').value,affiliation:$('#coAff').value,affiliationSub:$('#coAffSub').value,photo:$('#coPhoto').value,rate1on1:r1,rateGroup:rG,rateCond:rC};
+    c.pending={tagline:$('#coTag').value,bio:$('#coBio').value,affiliation:$('#coAff').value,affiliationSub:$('#coAffSub').value,photo:$('#coPhoto').value,rate1on1:r1,rateGroup:rG,rateCond:rC,rateTbc,rateTbc};
     save();closeModal();flash('Contact info updated · other changes sent to owner for approval ⏳');refreshOwner();return;
   }
   const name=($('#coName').value||'').trim();if(!name)return flash('Name is required',true);
@@ -7161,7 +7213,7 @@ function renderFinance(){
       } else if(!s.paid){
         out.push({date:s.date,html:`<tr>
           <td>${fmtDate(s.date)}</td><td>${coachIcon(s.coachId)} ${coachName(s.coachId)}</td><td>${custNames(s.customerIds)}</td>
-          <td>${typeShort(s.type)}</td><td class="right">${money(s.price)}</td>
+          <td>${typeShort(s.type)}</td><td class="right">${priceLabel(s)}</td>
           <td class="right"><div class="actions">${sessionHasCredit(s)?`<button class="btn sm ghost" onclick="payCredit('${s.id}')">🎟️ Credit</button>`:`<button class="btn sm ghost" style="opacity:.5" title="No prepaid ${typeShort(s.type)} credit — tap to sell a package" onclick="openSellPackage('${s.customerIds[0]||''}','${s.type}')">🎟️ Sell credit</button>`}<button class="btn sm" onclick="payCash('${s.id}')">Cash</button></div></td></tr>`});
       }
     });
@@ -7197,7 +7249,7 @@ function renderFinance(){
     compareHtml=`<div class="panel" style="margin-bottom:16px;overflow-x:auto">
       <h3>Coach comparison</h3>
       <table><thead><tr><th>Coach</th><th>Arrangement</th><th class="right">Revenue</th><th class="right">Expenses</th><th class="right">Business keeps</th><th class="right">Completed</th><th class="right">Upcoming</th><th></th></tr></thead>
-      <tbody>${rows.map(r=>`<tr><td><b>${r.co.name}</b><div class="clienttag">1:1 ${money(coachRate(r.co.id,'1on1'))} · Grp ${money(coachRate(r.co.id,'group'))}</div></td>
+      <tbody>${rows.map(r=>`<tr><td><b>${r.co.name}</b><div class="clienttag">1:1 ${rateLabel(r.co.id,'1on1')} · Grp ${money(coachRate(r.co.id,'group'))}</div></td>
         <td>${r.co.family===true
           ? '<span class="pill green">In-house</span><div class="clienttag">keeps 100% · pays gas</div>'
           : `<span class="pill orange">Partner</span><div class="clienttag">business takes ${r.co.shareType==='flat'?money(r.co.shareVal||0)+'/session':(r.co.shareVal||0)+'%'}</div>`}</td>
