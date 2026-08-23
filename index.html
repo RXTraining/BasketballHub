@@ -2152,7 +2152,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
   d.availability=(avail||[]).map(a=>({id:a.id,coachId:a.coach_id||'',date:a.date,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||'',sessionType:a.session_type||'',approved:a.approved!==false}));
   d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',inGroup:!!c.in_group,approved:c.approved!==false,suspended:c.suspended===true,creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
     packages:(pkg||[]).filter(p=>p.customer_id===c.id).map(p=>({id:p.id,coachId:p.coach_id||'',type:p.type,qty:p.qty,amount:Number(p.amount),date:p.date}))}));
-  d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:(s.price==null?null:Number(s.price)),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||'',paidWas:(s.paid_was!=null?Number(s.paid_was):null),paymentRequested:!!s.payment_requested,pay:(s.pay&&typeof s.pay==='object')?s.pay:{},joinReq:Array.isArray(s.join_req)?s.join_req:[],formAlerted:!!s.form_alerted}));
+  d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:(s.price==null?null:Number(s.price)),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||'',paidWas:(s.paid_was!=null?Number(s.paid_was):null),payouts:(Array.isArray(s.payouts)?s.payouts:[]),paymentRequested:!!s.payment_requested,pay:(s.pay&&typeof s.pay==='object')?s.pay:{},joinReq:Array.isArray(s.join_req)?s.join_req:[],formAlerted:!!s.form_alerted}));
   d.expenses=(exp||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||'',freq:e.freq||'once'}));
   d.cashEntries=(cash||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,amount:Number(e.amount),note:e.note||'',customerId:e.customer_id||'',type:e.type||'1on1',qty:e.qty||1}));
   d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',coachIds:(Array.isArray(e.coach_ids)?e.coach_ids:(e.coach_id?[e.coach_id]:[])),price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||'',video:e.video||'',featured:e.featured===true}));
@@ -2193,7 +2193,7 @@ function loginCountOf(c){
   return Math.max(c.loginCount||0,logged);
 }
 const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,approved:c.approved!==false,suspended:c.suspended===true,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',last_login:lastLoginOf(c)||null,login_count:loginCountOf(c)});
-const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,paid_was:(s.paidWas!=null?s.paidWas:null),payment_requested:!!s.paymentRequested,pay:s.pay||{},join_req:s.joinReq||[],form_alerted:!!s.formAlerted});
+const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,paid_was:(s.paidWas!=null?s.paidWas:null),payouts:(s.payouts||[]),payment_requested:!!s.paymentRequested,pay:s.pay||{},join_req:s.joinReq||[],form_alerted:!!s.formAlerted});
 const expRow=e=>({id:e.id,coach_id:e.coachId||null,date:e.date,cat:e.cat,amount:e.amount,note:e.note||'',freq:e.freq||'once'});
 const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:(eventCoachIds(e)[0]||null),coach_ids:eventCoachIds(e),price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||'',video:e.video||'',featured:e.featured===true});
 const eventRegRow=r=>({id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||''});
@@ -4206,9 +4206,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-23 19:03 UTC';
+const BUILD='2026-08-23 19:15 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Coach pay can be set on the session itself.</b> The share deal on a coach\u2019s profile covers the ordinary case but cannot express what a weekend class actually costs: a flat fee to whoever ran it regardless of takings, plus assistant fees to whoever helped. The session editor now has a <b>Coach pay</b> panel — add any number of people with an amount and a note, and those amounts replace the deal for that session only. Leave it empty and nothing changes.',
+   'Each person becomes their own <b>Coach payout</b> expense, so the P&amp;L and the coach comparison attribute the money correctly. A family coach who normally has no payout still gets an assistant fee if you list one. Nothing posts until the session is <b>completed</b> — an unheld session owes nobody — and a session with hand-set pay carries a pill showing the total and how many people share it.',
    '<b>New P&amp;L tab</b> for the owner. Summary tiles for revenue, expenses, net profit and margin; a month-by-month table with a totals row and a margin column; and a chart whose bars are labelled and whose colours match its legend — the old cashflow chart drew revenue in orange while the legend said green, put no values on anything, and had no zero line, so a loss looked much like a small profit.',
    'Revenue can be sliced by <b>sport, session type, coach, client</b> or <b>source</b> (session / package / cash entry / event), each with a share bar and a percentage. Expenses split three ways — <b>fixed overhead</b> that exists whether or not anyone trains, <b>coach-attributed</b> entries, and <b>per-session</b> costs like mileage and payouts that scale with activity — plus a breakdown by category.',
    'Every figure on the page comes from one revenue list and one expense list, so a total in a chart can never disagree with a total in a table. Revenue is cash received, matching the Finance page: a package counts when it is sold, a session when it is paid. Money owed is not revenue — that stays on Outstanding.',
@@ -4458,12 +4460,19 @@ function renderBooking(){
 }
 function sortSessions(arr){return arr.slice().sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));}
 /* Shown wherever a cancelled session appears, so an unrefunded payment stays visible. */
+/* Shown wherever a session is listed, so a hand-set payout is not invisible. */
+function payoutPill(s){
+  if(!hasCustomPayouts(s))return '';
+  const n=sessionPayouts(s).length, tot=sessionPayoutTotal(s);
+  return '<span class="pill teal" title="Coach pay set on this session, replacing the share deal">\u{1F4B0} '+money(tot)+' to '+n+'</span>';
+}
 function refundPill(s){
   return (s&&s.status==='cancelled'&&s.paidWas>0)
     ? '<span class="pill red" title="Collected in cash before this was cancelled">↩ '+money(s.paidWas)+' to refund</span>' : '';
 }
 function typePill(s){
   if(s.status==='cancelled')return '<span class="pill">'+typeShort(s.type)+'</span>'+refundPill(s);
+  if(hasCustomPayouts(s))return '<span class="pill orange">'+typeShort(s.type)+' ('+(s.customerIds||[]).length+')</span>'+payoutPill(s);
   if(s.type==='1on1')return '<span class="pill blue">1:1</span>';
   const n=(s.customerIds||[]).length;
   if(typeIsDedicated(s.type))return '<span class="pill green">'+typeIcon(s.type)+' '+typeShort(s.type)+' ('+n+')</span>';
@@ -6026,6 +6035,17 @@ function openSession(id,returnCust,preset){
     <div class="row">
       <div class="field"><label class="f">Price ($) — auto, editable</label><input type="number" id="sPrice" value="${sessionPriced(s)?s.price:''}" placeholder="${t('TBC')}">
         <div class="clienttag" id="sPriceNote" style="margin-top:4px;color:var(--yellow)">${isRateTbc(s.coachId||targetCoach(),s.type)?('⚠ '+coachName(s.coachId||targetCoach())+"'s "+typeShort(s.type)+' rate is still TBC — type the agreed price here.'):''}</div></div>
+      </div>
+    <div class="panel" style="background:var(--panel2);padding:14px;margin-bottom:14px">
+      <div class="row" style="justify-content:space-between;align-items:center;gap:8px">
+        <b class="small">Coach pay for this session</b>
+        <button type="button" class="btn ghost sm" onclick="payoutAddRow()">+ Add person</button>
+      </div>
+      <div class="clienttag" style="margin:5px 0 8px">Leave empty to use each coach's normal share deal. Add anyone here — the coach who ran it and any assistants — and these amounts replace the deal for this session only. They post to Finance as <b style="color:var(--txt)">Coach payout</b> once the session is <b style="color:var(--txt)">completed</b>.</div>
+      <div id="sPayouts">${payoutRowsHtml(s)}</div>
+      <div class="clienttag" style="margin-top:6px" id="sPayoutTotal"></div>
+    </div>
+    <div class="row">
       <div class="field"><label class="f">Status — syncs to client</label><select id="sStatus">
         ${['pending','scheduled','completed','cancelled'].map(v=>`<option ${s.status===v?'selected':''}>${v}</option>`).join('')}</select></div>
     </div>
@@ -6071,6 +6091,49 @@ function switchSessionType(id,ty){
   save(); flash('Now a '+typeDef(ty).label+' '+typeIcon(ty));
   openSession(id);
 }
+/* One row per person paid. Rendered from data so add/remove is just a re-render. */
+function payoutRowsHtml(s){
+  const rows=sessionPayouts(s);
+  if(!rows.length)return '<div class="clienttag" id="sPayoutEmpty">Using each coach\'s share deal.</div>';
+  return rows.map((x,i)=>payoutRowHtml(x,i)).join('');
+}
+function payoutRowHtml(x,i){
+  return `<div class="row payoutRow" style="gap:8px;align-items:flex-end;margin-bottom:8px">
+    <div class="field" style="margin-bottom:0;min-width:130px"><label class="f">Paid to</label>
+      <select class="poCoach">${sortedCoaches(DB.coaches).filter(c=>c.active!==false)
+        .map(c=>`<option value="${c.id}" ${x.coachId===c.id?'selected':''}>${coachIcon(c)} ${c.name}</option>`).join('')}</select></div>
+    <div class="field" style="margin-bottom:0;max-width:110px"><label class="f">Amount ($)</label>
+      <input type="number" class="poAmt" value="${x.amount!=null?x.amount:''}" oninput="payoutTotal()"></div>
+    <div class="field" style="margin-bottom:0"><label class="f">Note</label>
+      <input class="poNote" value="${(x.note||'').replace(/"/g,'&quot;')}" placeholder="e.g. assistant fee"></div>
+    <button type="button" class="iconbtn" title="Remove" onclick="payoutDelRow(this)">✕</button>
+  </div>`;
+}
+function payoutReadRows(){
+  return $$('.payoutRow').map(r=>({
+    coachId:(r.querySelector('.poCoach')||{}).value||'',
+    amount:+((r.querySelector('.poAmt')||{}).value||0)||0,
+    note:((r.querySelector('.poNote')||{}).value||'').trim()
+  })).filter(x=>x.coachId&&x.amount>0);
+}
+function payoutTotal(){
+  const el=$('#sPayoutTotal'); if(!el)return;
+  const rows=payoutReadRows();
+  el.innerHTML=rows.length
+    ? 'Total paid out: <b style="color:var(--txt)">'+money(rows.reduce((a,x)=>a+x.amount,0))+'</b> across '+rows.length+' person'+(rows.length===1?'':'s')
+    : '';
+}
+function payoutAddRow(){
+  const box=$('#sPayouts'); if(!box)return;
+  const empty=$('#sPayoutEmpty'); if(empty)empty.remove();
+  const d=document.createElement('div'); d.innerHTML=payoutRowHtml({coachId:(($('#sCoach')&&$('#sCoach').value)||targetCoach()),amount:'',note:''},0);
+  box.appendChild(d.firstElementChild); payoutTotal();
+}
+function payoutDelRow(btn){
+  const r=btn.closest('.payoutRow'); if(r)r.remove();
+  if(!$$('.payoutRow').length&&$('#sPayouts'))$('#sPayouts').innerHTML='<div class="clienttag" id="sPayoutEmpty">Using each coach\'s share deal.</div>';
+  payoutTotal();
+}
 function recalcPrice(){
   const type=$('#sType').value, dur=+$('#sDur').value||60;
   const n=Math.max(1,$$('.sCustCb').filter(cb=>cb.checked).length);
@@ -6101,7 +6164,7 @@ function saveSession(id,emailAfter){
   const coachId=(AUTH==='coach')?coachAs:($('#sCoach')?$('#sCoach').value:targetCoach());
   const baseDate=$('#sDate').value;
   const obj={coachId,customerIds:ids,type,dur:+$('#sDur').value,date:baseDate,time:$('#sTime').value,
-    price:(String($('#sPrice').value).trim()===''?null:+$('#sPrice').value),status:$('#sStatus').value,location:$('#sLoc').value,
+    price:(String($('#sPrice').value).trim()===''?null:+$('#sPrice').value),payouts:payoutReadRows(),status:$('#sStatus').value,location:$('#sLoc').value,
     paid:pay!=='',paidVia:pay,checkedIn:$('#sCheck').checked,notes:$('#sNotes').value,
     feedback:$('#sFeedback').value,media:editMedia.slice()};
   const exSess=id?DB.sessions.find(x=>x.id===id):null;
@@ -9149,8 +9212,20 @@ function saveMileage(){
    scratch on every save rather than patched at each call site.
    ============================================================================ */
 function gasExpenseId(sessionId){return 'gas-'+sessionId;}
-function payoutExpenseId(sessionId){return 'payout-'+sessionId;}
+function payoutExpenseId(sessionId,coachId){return 'payout-'+sessionId+(coachId?('-'+coachId):'');}
 function isAutoExpense(e){return !!e&&/^(gas|payout)-/.test(e.id||'');}
+/* ---- Who actually gets paid for a session ---------------------------------
+   The share deal on a coach's profile covers the ordinary case. It cannot express what a weekend
+   class often costs: a flat fee to the coach who ran it regardless of takings, plus assistant
+   fees to whoever helped. s.payouts is an explicit override — a list of {coachId, amount, note} —
+   and when present it replaces the computed payout entirely. Empty means "use the deal". */
+function sessionPayouts(s){ return Array.isArray(s&&s.payouts)?s.payouts.filter(x=>x&&x.coachId):[]; }
+function hasCustomPayouts(s){ return sessionPayouts(s).length>0; }
+function sessionPayoutTotal(s){
+  if(hasCustomPayouts(s))return sessionPayouts(s).reduce((a,x)=>a+(Number(x.amount)||0),0);
+  const e=DB.expenses.find(x=>x.id===payoutExpenseId(s.id));
+  return e?Number(e.amount)||0:0;
+}
 function isFamilyCoach(coachId){const c=coachById(coachId);return !!(c&&c.family===true);}
 /* Money actually collected for a session — unlike sessionCashAmt() this counts prepaid package
    credit too, since that money was received (at package purchase) and the session is delivered. */
@@ -9196,6 +9271,20 @@ function syncGasExpense(s){
 function syncPayoutExpense(s){
   if(!s)return null;
   const eid=payoutExpenseId(s.id);
+  /* An explicit list wins over the deal — including for a family coach, who normally has no
+     payout but may still be owed a flat fee or an assistant fee on a weekend class. */
+  if(hasCustomPayouts(s)){
+    upsertAutoExpense(null,eid);                       // drop the computed one
+    if(s.status!=='completed')return null;             // not delivered — nothing owed yet
+    return sessionPayouts(s).map(x=>{
+      const amt=Math.round((Number(x.amount)||0)*100)/100;
+      const id=payoutExpenseId(s.id,x.coachId);
+      if(amt<=0)return upsertAutoExpense(null,id);
+      return upsertAutoExpense({id,coachId:x.coachId,date:s.date,cat:'Coach payout',amount:amt,
+        note:coachName(x.coachId)+(x.note?(' — '+x.note):'')+' · '+typeShort(s.type)+' '+fmtDate(s.date)+' (set per session)',
+        freq:'once'},id);
+    }).filter(Boolean)[0]||null;
+  }
   // Family coach = business keeps everything, so there's nothing to pay out.
   if(s.status!=='completed'||isFamilyCoach(s.coachId))return upsertAutoExpense(null,eid);
   const paidAmt=sessionPaidAmt(s);
@@ -9214,7 +9303,12 @@ function syncSessionExpenses(s){return [syncGasExpense(s),syncPayoutExpense(s)].
    matter which action changed things — status, payment, coach deal, mileage or rate. */
 function resyncAutoExpenses(){
   const live=new Set();
-  DB.sessions.forEach(s=>{syncSessionExpenses(s);live.add(gasExpenseId(s.id));live.add(payoutExpenseId(s.id));});
+  DB.sessions.forEach(s=>{
+    syncSessionExpenses(s);
+    live.add(gasExpenseId(s.id));
+    live.add(payoutExpenseId(s.id));
+    sessionPayouts(s).forEach(x=>live.add(payoutExpenseId(s.id,x.coachId)));   // one row per person
+  });
   DB.expenses=DB.expenses.filter(e=>!isAutoExpense(e)||live.has(e.id));
 }
 function openExpense(id){
