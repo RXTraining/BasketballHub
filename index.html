@@ -1717,14 +1717,20 @@ function setLang(l){
   LANG=l;
   try{localStorage.setItem('rx_lang',l);}catch(e){}
   try{
-    if(!AUTH && $('#login') && $('#login').classList.contains('show')){
-      // Repaint in place. The old code routed through showLogin(), which wipes the login fields
-      // and closes the sign-in card — switching language while typing your password lost it.
+    /* Repaint whatever is actually on screen — which is NOT the same question as "is anyone
+       signed in". An owner or client viewing the public page through the header logo is signed
+       in AND looking at the landing; testing AUTH repainted the app underneath and left the
+       visible page in the old language. */
+    const landingOpen = $('#login') && $('#login').classList.contains('show');
+    if(landingOpen){
+      // Repaint in place. Routing through showLogin() wipes the login fields and closes the
+      // sign-in card — switching language while typing your password lost it.
       renderLanding();
       applyLoginLang();          // must follow renderLanding: it rebuilds the node holding #langLbl
       const su=$('#signupPanel');
       if(su && !su.classList.contains('hidden')) renderSignup();
-    } else {
+    }
+    if(AUTH){                    // and the app behind it, so it is right when you go back
       renderWhoami(); renderTabs(); refreshOwner();
     }
   }catch(e){}
@@ -2865,6 +2871,7 @@ async function initPush(){
   }catch(e){console.warn('push init failed',e&&e.message);}
 }
 function switchTab(){
+  try{window.scrollTo(0,0);}catch(e){}   // a new tab starts at the top; a refresh does not
   renderTabs();
   $$('.view').forEach(v=>v.classList.remove('active'));
   $('#view-'+TAB).classList.add('active');
@@ -2876,7 +2883,6 @@ function switchTab(){
 }
 function saveSess(){try{sessionStorage.setItem('rx_sess',JSON.stringify({auth:AUTH,clientAs,coachAs,mgCoach,pickCoach,pickSport,tab:TAB}));}catch(e){}}
 function refreshOwner(){if(AUTH==='owner')try{alertUnfilledGroups();}catch(e){}
-  try{window.scrollTo(0,0);}catch(e){}
   const f={about:renderAbout,booking:renderBooking,past:renderPast,journey:renderJourney,skills:renderSkills,money:renderMoney,events:renderEvents,messages:renderMessages,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,activity:renderActivity,admin:renderAdmin}[TAB];if(f)f();if(TAB!=='messages'&&(AUTH==='owner'||AUTH==='client'))renderTabs();if(AUTH==='owner')renderWhoami();}
 
 /* ---------- Auth ---------- */
@@ -4018,6 +4024,8 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    ============================================================================ */
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Fix:</b> the language button did nothing when you were <i>signed in and viewing the home page</i> through the header logo. It decided what to repaint by asking whether anyone was signed in, rather than what was actually on screen — so it refreshed the app hidden underneath and left the visible page in the old language. It now repaints whatever is showing, and the app behind it too, so both are right when you go back.',
+   '<b>Fix:</b> the page jumped to the top on every save and every background sync. A scroll-to-top meant for tab switching had been added one function too far up, into the refresh that also runs on saves and on the 45-second poll — so it yanked you away mid-read. It now runs only when the tab actually changes.',
    '<b>Outstanding now counts only sessions that have actually been delivered.</b> A session booked for next week is not a debt — nobody has had anything yet — and counting it inflated the figure with work that had not happened. Only <b>completed</b> sessions are counted; pending requests, future bookings, cancellations and unpriced sessions are all excluded. The change is at the source, so the headline figure, the table and the Excel export all agree.',
    'Booked-but-unpaid work has not vanished: the Outstanding panel says how many upcoming sessions there are and what they are worth, as a note rather than a debt.',
    '<b>Outstanding payments can be filtered to one client.</b> The picker lists only people who actually owe something, each with their total, biggest debt first — and a pill beside it shows the amount due for whatever is selected. Choosing <i>Everyone</i> shows the full figure and how many clients it is spread across, so the question \u201chow much does this family owe me\u201d is one tap rather than a scan down the table.',
