@@ -1024,6 +1024,7 @@
   <section class="view" id="view-availability"></section>
   <section class="view" id="view-messages"></section>
   <section class="view" id="view-finance"></section>
+  <section class="view" id="view-pl"></section>
   <section class="view" id="view-activity"></section>
   <section class="view" id="view-admin"></section>
 </div>
@@ -2965,6 +2966,7 @@ const TABS=[
   {id:'locations',label:'Locations'},
   {id:'availability',label:'Availability'},
   {id:'finance',label:'Finance'},
+  {id:'pl',label:'P&L'},
   {id:'activity',label:'Activity'},
   {id:'admin',label:'Admin'}
 ];
@@ -3065,7 +3067,7 @@ function switchTab(){
 }
 function saveSess(){try{sessionStorage.setItem('rx_sess',JSON.stringify({auth:AUTH,clientAs,coachAs,mgCoach,pickCoach,pickSport,tab:TAB}));}catch(e){}}
 function refreshOwner(){if(AUTH==='owner')try{alertUnfilledGroups();}catch(e){}
-  const f={about:renderAbout,booking:renderBooking,past:renderPast,journey:renderJourney,skills:renderSkills,money:renderMoney,events:renderEvents,messages:renderMessages,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,activity:renderActivity,admin:renderAdmin}[TAB];if(f)f();if(TAB!=='messages'&&(AUTH==='owner'||AUTH==='client'))renderTabs();if(AUTH==='owner')renderWhoami();}
+  const f={about:renderAbout,booking:renderBooking,past:renderPast,journey:renderJourney,skills:renderSkills,money:renderMoney,events:renderEvents,messages:renderMessages,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,pl:renderPL,activity:renderActivity,admin:renderAdmin}[TAB];if(f)f();if(TAB!=='messages'&&(AUTH==='owner'||AUTH==='client'))renderTabs();if(AUTH==='owner')renderWhoami();}
 
 /* ---------- Auth ---------- */
 function ensureTokens(){let ch=false;DB.customers.forEach(c=>{if(!c.token){c.token=uid()+uid();ch=true;}});if(ch)save();}
@@ -4204,9 +4206,12 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-23 04:09 UTC';
+const BUILD='2026-08-23 19:03 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>New P&amp;L tab</b> for the owner. Summary tiles for revenue, expenses, net profit and margin; a month-by-month table with a totals row and a margin column; and a chart whose bars are labelled and whose colours match its legend — the old cashflow chart drew revenue in orange while the legend said green, put no values on anything, and had no zero line, so a loss looked much like a small profit.',
+   'Revenue can be sliced by <b>sport, session type, coach, client</b> or <b>source</b> (session / package / cash entry / event), each with a share bar and a percentage. Expenses split three ways — <b>fixed overhead</b> that exists whether or not anyone trains, <b>coach-attributed</b> entries, and <b>per-session</b> costs like mileage and payouts that scale with activity — plus a breakdown by category.',
+   'Every figure on the page comes from one revenue list and one expense list, so a total in a chart can never disagree with a total in a table. Revenue is cash received, matching the Finance page: a package counts when it is sold, a session when it is paid. Money owed is not revenue — that stays on Outstanding.',
    'New <b>Translation coverage</b> panel at the bottom of Admin. It lists every piece of text a visitor reads that has no version in a given language, and separates the two cases: the slogan, About copy, cards and quote fall back to the app\u2019s own translated wording and are safe to leave, while a <b>coach bio</b> or an <b>event</b> genuinely shows English because there is nothing generic to substitute for a specific person or occasion. Each row has an Open button that jumps straight to the field.',
    'Added a <b>build stamp</b>, shown on this page and beside the Admin heading. The whole app is one file, so a browser holding a cached copy means a stale app — and that is indistinguishable from a change not working. If the stamp is older than your last deploy, you are looking at a cached file: pull down to refresh, or close and reopen the app. The page also now tells the browser to revalidate rather than reuse its copy.',
    '<b>Sport names are translated</b> — 篮球 / 농구 / バスケットボール rather than \u201cBasketball\u201d — on the coach cards, the sports rail, the Training-now strip, the highlights tabs, the client\u2019s sport picker and the coach profile. All 35 sports in the catalogue, in all three languages. The canonical English label is still what gets stored and matched on; only what a visitor reads changes.',
@@ -8086,6 +8091,168 @@ function expenseOccurrences(list){
 }
 const FREQ_LABEL={once:'',monthly:'monthly',yearly:'yearly'};
 function monthLabel(k){const[y,m]=k.split('-');return new Date(y,m-1,1).toLocaleDateString('en-US',{month:'short'});}
+/* ============================================================================
+   P&L — one flat list of revenue lines and one of expense lines, each tagged with
+   every dimension we might want to slice by. Every figure on the P&L page comes from these two
+   functions, so a total in a chart can never disagree with a total in a table.
+
+   Revenue is CASH RECEIVED, matching the Finance page: a package counts when it is sold, a
+   session when it is paid, an event when the registration is paid. Money owed is not revenue —
+   it lives on the Outstanding table. */
+function plRevenueLines(){
+  const out=[];
+  const coachSport=id=>{const c=coachById(id);return c?(sportLabel(c.sport)||'Basketball'):'—';};
+  // sessions paid in cash (package-paid sessions are counted when the package was sold)
+  (DB.sessions||[]).filter(s=>s.status!=='cancelled').forEach(s=>{
+    const amt=sessionCashAmt(s); if(amt<=0)return;
+    const n=Math.max(1,(s.customerIds||[]).length);
+    (s.customerIds||[]).forEach(cid=>{
+      const p=custPay(s,cid); if(!(p.paid&&p.paidVia==='cash'))return;
+      out.push({date:s.date,amount:sessionPriced(s)?priceOf(s)/n:0,src:'Session',
+        sport:coachSport(s.coachId),type:typeShort(s.type),coachId:s.coachId||'',custId:cid});
+    });
+  });
+  // prepaid packages — revenue on the day they were sold
+  (DB.customers||[]).forEach(c=>(c.packages||[]).forEach(p=>{
+    out.push({date:p.date,amount:Number(p.amount)||0,src:'Package',
+      sport:coachSport(p.coachId),type:typeShort(p.type),coachId:p.coachId||'',custId:c.id});
+  }));
+  // walk-in / manual cash
+  (DB.cashEntries||[]).forEach(e=>{
+    out.push({date:e.date,amount:Number(e.amount)||0,src:'Cash entry',
+      sport:coachSport(e.coachId),type:typeShort(e.type),coachId:e.coachId||'',custId:e.customerId||''});
+  });
+  // event registrations that have been paid
+  (DB.eventRegs||[]).filter(r=>r.paid&&r.status!=='cancelled').forEach(r=>{
+    const ev=eventById(r.eventId); if(!ev)return;
+    const host=(eventCoachIds(ev)[0]||'');
+    out.push({date:ev.date||r.created||todayISO(),amount:Number(ev.price)||0,src:'Event',
+      sport:host?coachSport(host):'—',type:'Event',coachId:host,custId:r.customerId||''});
+  });
+  return out.filter(r=>r.date&&r.amount>0);
+}
+/* Expenses split three ways, because they answer different questions:
+     fixed  — recurring overhead that exists whether or not anyone trains
+     coach  — attributed to a coach but entered by hand
+     auto   — derived per session (mileage, coach payouts); these scale with activity */
+function plExpenseLines(){
+  return expenseOccurrences(DB.expenses||[]).map(e=>({
+    date:e.date, amount:Number(e.amount)||0, cat:e.cat||'Other',
+    coachId:e.coachId||'', recurring:(e.freq&&e.freq!=='once')||false,
+    kind: isAutoExpense(e) ? 'auto' : ((e.coachId&&e.coachId!=='owner') ? 'coach' : 'fixed')
+  })).filter(e=>e.date&&e.amount>0);
+}
+/* months from oldest to newest across a window ending this month */
+function plMonths(n){
+  const out=[]; const d=new Date(); d.setDate(1);
+  for(let i=n-1;i>=0;i--){ const x=new Date(d.getFullYear(),d.getMonth()-i,1);
+    out.push(x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')); }
+  return out;
+}
+function plMonthLabel(k){const[y,m]=k.split('-');
+  return new Date(y,m-1,1).toLocaleDateString('en-US',{month:'short',year:'2-digit'});}
+/* ---- P&L page ---- */
+let plRange=6, plDim='sport';
+function setPlRange(n){ plRange=n; renderPL(); }
+function setPlDim(d){ plDim=d; renderPL(); }
+const PL_DIMS=[['sport','Sport'],['type','Session type'],['coach','Coach'],['client','Client'],['src','Source']];
+function plGroup(lines,dim){
+  const key=r=>dim==='coach'?(r.coachId?coachName(r.coachId):'— unassigned')
+            :dim==='client'?(r.custId&&custById(r.custId)?custById(r.custId).name:'— walk-in')
+            :dim==='type'?r.type : dim==='src'?r.src : (r.sport||'—');
+  const m={};
+  lines.forEach(r=>{ const k=key(r); m[k]=(m[k]||0)+r.amount; });
+  return Object.keys(m).map(k=>({k,v:m[k]})).sort((a,b)=>b.v-a.v);
+}
+function plBarRows(rows,total){
+  if(!rows.length)return '<tr><td colspan="3"><div class="empty">Nothing in this period.</div></td></tr>';
+  return rows.map(r=>`<tr>
+    <td><b>${r.k}</b></td>
+    <td style="min-width:130px"><div class="bar"><i style="width:${total?Math.max(2,r.v/total*100):0}%"></i></div></td>
+    <td class="right"><b>${money(r.v)}</b><div class="clienttag">${total?(r.v/total*100).toFixed(1):0}%</div></td></tr>`).join('');
+}
+function renderPL(){
+  const el=$('#view-pl'); if(!el)return;
+  const months=plMonths(plRange), from=months[0], to=months[months.length-1];
+  const inWin=r=>{const k=(r.date||'').slice(0,7); return k>=from&&k<=to;};
+  const rev=plRevenueLines().filter(inWin).filter(r=>inScope(r.coachId));
+  const exp=plExpenseLines().filter(inWin).filter(r=>inScope(r.coachId));
+  const R=rev.reduce((a,r)=>a+r.amount,0), E=exp.reduce((a,r)=>a+r.amount,0), N=R-E;
+  const margin=R?(N/R*100):0;
+
+  const byMonth=months.map(k=>{
+    const r=rev.filter(x=>x.date.slice(0,7)===k).reduce((a,x)=>a+x.amount,0);
+    const e=exp.filter(x=>x.date.slice(0,7)===k).reduce((a,x)=>a+x.amount,0);
+    return {k,r,e,n:r-e};
+  });
+  const best=byMonth.reduce((m,x)=>x.n>m.n?x:m,byMonth[0]||{n:0,k:''});
+
+  const kinds=[['fixed','Fixed / overhead','Rent, gear, anything that exists whether or not anyone trains'],
+               ['coach','Coach-attributed','Entered by hand against a coach'],
+               ['auto','Per-session (auto)','Mileage and coach payouts, derived from sessions']];
+  const expByKind=kinds.map(([k,lab,note])=>({k,lab,note,v:exp.filter(x=>x.kind===k).reduce((a,x)=>a+x.amount,0)}));
+  const expByCat={}; exp.forEach(x=>{expByCat[x.cat]=(expByCat[x.cat]||0)+x.amount;});
+  const catRows=Object.keys(expByCat).map(k=>({k,v:expByCat[k]})).sort((a,b)=>b.v-a.v);
+
+  const dimRows=plGroup(rev,plDim);
+
+  el.innerHTML=`
+    <h1 class="page">Profit &amp; Loss</h1>
+    <div class="sub">Cash received against money spent, ${plRange} months to ${plMonthLabel(to)}. ${scopeCoach()==='all'?'All coaches':coachName(scopeCoach())}.</div>
+    <div class="seg">${[3,6,12,24].map(n=>`<button class="${plRange===n?'active':''}" onclick="setPlRange(${n})">${n}m</button>`).join('')}</div>
+
+    <div class="stats">
+      <div class="stat"><div class="k">Revenue</div><div class="v">${money(R)}</div><div class="d muted">cash received</div></div>
+      <div class="stat"><div class="k">Expenses</div><div class="v">${money(E)}</div><div class="d muted">${expByKind.filter(x=>x.v>0).length} kind(s)</div></div>
+      <div class="stat"><div class="k">Net profit</div><div class="v" style="color:${N>=0?'var(--green)':'var(--red)'}">${money(N)}</div><div class="d muted">${margin.toFixed(1)}% margin</div></div>
+      <div class="stat"><div class="k">Best month</div><div class="v" style="font-size:20px">${best&&best.k?plMonthLabel(best.k):'—'}</div><div class="d muted">${best?money(best.n):''} net</div></div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <h3>By month</h3>
+      <div class="chart-wrap" style="height:250px"><canvas id="plChart"></canvas></div>
+      <div class="row" style="gap:14px;margin-top:8px;font-size:12px;color:var(--muted)">
+        <span><i style="display:inline-block;width:10px;height:10px;background:var(--a1);border-radius:2px"></i> Revenue</span>
+        <span><i style="display:inline-block;width:10px;height:10px;background:var(--a8);border-radius:2px"></i> Expenses</span>
+        <span><i style="display:inline-block;width:14px;height:3px;background:var(--a3);border-radius:2px"></i> Net profit</span>
+      </div>
+      <table style="margin-top:12px"><thead><tr><th>Month</th><th class="right">Revenue</th><th class="right">Expenses</th><th class="right">Net</th><th class="right">Margin</th></tr></thead><tbody>
+        ${byMonth.map(m=>`<tr>
+          <td><b>${plMonthLabel(m.k)}</b></td>
+          <td class="right">${money(m.r)}</td>
+          <td class="right">${money(m.e)}</td>
+          <td class="right" style="color:${m.n>=0?'var(--green)':'var(--red)'}"><b>${money(m.n)}</b></td>
+          <td class="right muted">${m.r?((m.n/m.r)*100).toFixed(0)+'%':'—'}</td></tr>`).join('')}
+        <tr style="border-top:2px solid var(--line)">
+          <td><b>Total</b></td><td class="right"><b>${money(R)}</b></td><td class="right"><b>${money(E)}</b></td>
+          <td class="right" style="color:${N>=0?'var(--green)':'var(--red)'}"><b>${money(N)}</b></td>
+          <td class="right muted"><b>${margin.toFixed(0)}%</b></td></tr>
+      </tbody></table>
+    </div>
+
+    <div class="twocol" style="margin-top:16px">
+      <div class="panel">
+        <h3>Where the revenue came from</h3>
+        <div class="seg" style="margin-bottom:10px">${PL_DIMS.map(([d,lab])=>`<button class="${plDim===d?'active':''}" onclick="setPlDim('${d}')">${lab}</button>`).join('')}</div>
+        <table><thead><tr><th>${(PL_DIMS.find(x=>x[0]===plDim)||[])[1]}</th><th></th><th class="right">Revenue</th></tr></thead>
+          <tbody>${plBarRows(dimRows,R)}</tbody></table>
+      </div>
+      <div class="panel">
+        <h3>Where the money went</h3>
+        <table><thead><tr><th>Kind</th><th></th><th class="right">Spent</th></tr></thead><tbody>
+          ${expByKind.filter(x=>x.v>0).map(x=>`<tr>
+            <td><b>${x.lab}</b><div class="clienttag">${x.note}</div></td>
+            <td style="min-width:110px"><div class="bar"><i style="width:${E?Math.max(2,x.v/E*100):0}%"></i></div></td>
+            <td class="right"><b>${money(x.v)}</b><div class="clienttag">${E?(x.v/E*100).toFixed(1):0}%</div></td></tr>`).join('')
+            ||'<tr><td colspan="3"><div class="empty">No expenses in this period.</div></td></tr>'}
+        </tbody></table>
+        <h3 style="margin-top:18px">By category</h3>
+        <table><thead><tr><th>Category</th><th></th><th class="right">Spent</th></tr></thead>
+          <tbody>${plBarRows(catRows,E)}</tbody></table>
+      </div>
+    </div>`;
+  try{ drawPLChart(byMonth); }catch(e){ console.warn('P&L chart failed:',e&&e.message); }
+}
 function renderFinance(){
   // ----- everything on this page is scoped to the coach selected top-right -----
   const S=DB.sessions.filter(s=>inScope(s.coachId));
@@ -9266,6 +9433,55 @@ function coachAnalyticsHtml(){
     </div>`;
 }
 function mountCoachGrowth(){drawBars('coachGrowth',bucketByPeriodCount(DB.coaches.map(c=>c.created).filter(Boolean),growthRange,12),'#ff9100',(it)=>{coachDateFilter=(coachDateFilter&&coachDateFilter.key===it.key)?null:{period:growthRange,key:it.key,label:it.label};renderCoaches();},coachDateFilter&&coachDateFilter.key);}
+/* Grouped bars + a profit line. The old cashflow chart drew revenue in orange while its legend
+   said green, put no values on the bars, and had no zero line — so a loss looked much like a
+   small profit. This one matches its legend, labels every net figure, and draws the zero line
+   whenever a month is negative. */
+function drawPLChart(rows){
+  const cv=$('#plChart'); if(!cv||!rows.length)return;
+  const dpr=window.devicePixelRatio||1, W=cv.clientWidth||600, H=cv.clientHeight||250;
+  cv.width=W*dpr; cv.height=H*dpr;
+  // A canvas with no 2d context (rare, but it happens) must not take the whole page down with it —
+  // the tables below carry the same numbers, so losing the chart alone is survivable.
+  const c=cv.getContext&&cv.getContext('2d'); if(!c)return;
+  c.scale(dpr,dpr);
+  c.clearRect(0,0,W,H);
+  const padL=54,padR=10,padT=20,padB=30;
+  const x0=padL,x1=W-padR,y0=padT,y1=H-padB;
+  const vals=rows.reduce((a,r)=>a.concat([r.r,r.e,r.n]),[]);
+  const max=Math.max.apply(null,vals.concat([10])), min=Math.min.apply(null,vals.concat([0]));
+  const range=(max-min)||1;
+  const yfor=v=>y1-(v-min)/range*(y1-y0);
+  const slot=(x1-x0)/rows.length, bw=Math.min(26,slot/3.2);
+  const css=getComputedStyle(document.documentElement);
+  const pick=(n,f)=>(css.getPropertyValue(n).trim()||f);
+  const REV=pick('--a1','#4d8000'), EXP=pick('--a8','#c41f31'), NET=pick('--a3','#125bb0');
+  c.font='10px -apple-system,system-ui,sans-serif';
+  for(let g=0;g<=4;g++){ const v=min+range*g/4, y=yfor(v);
+    c.strokeStyle='rgba(20,40,10,.09)'; c.beginPath(); c.moveTo(x0,y); c.lineTo(x1,y); c.stroke();
+    c.fillStyle='#6b7a63'; c.textAlign='right'; c.fillText('$'+Math.round(v),padL-6,y+3); }
+  if(min<0){ const z=yfor(0); c.strokeStyle='rgba(20,40,10,.35)'; c.beginPath(); c.moveTo(x0,z); c.lineTo(x1,z); c.stroke(); }
+  c.textAlign='center';
+  const zero=yfor(Math.max(0,min));
+  rows.forEach((r,i)=>{
+    const cx=x0+slot*(i+0.5);
+    [[r.r,REV,-bw*0.55],[r.e,EXP,bw*0.55]].forEach(pair=>{
+      const v=pair[0],col=pair[1],off=pair[2],y=yfor(v);
+      c.fillStyle=col; c.fillRect(cx+off-bw/2, Math.min(y,zero), bw, Math.abs(zero-y)||1);
+    });
+    c.fillStyle='#6b7a63'; c.fillText(plMonthLabel(r.k),cx,H-10);
+  });
+  c.strokeStyle=NET; c.lineWidth=2.5; c.beginPath();
+  rows.forEach((r,i)=>{const x=x0+slot*(i+0.5),y=yfor(r.n); i?c.lineTo(x,y):c.moveTo(x,y);}); c.stroke();
+  rows.forEach((r,i)=>{const x=x0+slot*(i+0.5),y=yfor(r.n);
+    c.fillStyle='#fff'; c.beginPath(); c.arc(x,y,4.5,0,7); c.fill();
+    c.fillStyle=NET; c.beginPath(); c.arc(x,y,3,0,7); c.fill();
+    c.fillStyle=r.n>=0?NET:EXP; c.font='700 10px -apple-system,system-ui,sans-serif';
+    c.fillText(money(Math.round(r.n)), x, y-9);
+    c.font='10px -apple-system,system-ui,sans-serif';
+  });
+  c.textAlign='start';
+}
 function drawCashChart(labels,rev,exp,prof){
   const cv=$('#cashChart');if(!cv)return;
   const dpr=window.devicePixelRatio||1;const W=cv.clientWidth||600,H=cv.clientHeight||230;
@@ -9290,7 +9506,7 @@ function drawCashChart(labels,rev,exp,prof){
   prof.forEach((v,i)=>{const x=xfor(i),y=yfor(v);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();
   ctx.fillStyle='#39d98a';prof.forEach((v,i)=>{ctx.beginPath();ctx.arc(xfor(i),yfor(v),3,0,7);ctx.fill();});
 }
-window.addEventListener('resize',()=>{if(AUTH==='owner'&&['finance','booking','customers','coaches'].includes(TAB))refreshOwner();});
+window.addEventListener('resize',()=>{if(AUTH==='owner'&&['finance','pl','booking','customers','coaches'].includes(TAB))refreshOwner();});
 
 /* ---------- boot ---------- */
 (async function(){
