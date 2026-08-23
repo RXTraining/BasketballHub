@@ -4204,10 +4204,10 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-23 03:50 UTC';
+const BUILD='2026-08-23 04:09 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
-   'New <b>Translation coverage</b> panel at the top of Admin. It lists every piece of text a visitor reads that has no version in a given language, and separates the two cases: the slogan, About copy, cards and quote fall back to the app\u2019s own translated wording and are safe to leave, while a <b>coach bio</b> or an <b>event</b> genuinely shows English because there is nothing generic to substitute for a specific person or occasion. Each row has an Open button that jumps straight to the field.',
+   'New <b>Translation coverage</b> panel at the bottom of Admin. It lists every piece of text a visitor reads that has no version in a given language, and separates the two cases: the slogan, About copy, cards and quote fall back to the app\u2019s own translated wording and are safe to leave, while a <b>coach bio</b> or an <b>event</b> genuinely shows English because there is nothing generic to substitute for a specific person or occasion. Each row has an Open button that jumps straight to the field.',
    'Added a <b>build stamp</b>, shown on this page and beside the Admin heading. The whole app is one file, so a browser holding a cached copy means a stale app — and that is indistinguishable from a change not working. If the stamp is older than your last deploy, you are looking at a cached file: pull down to refresh, or close and reopen the app. The page also now tells the browser to revalidate rather than reuse its copy.',
    '<b>Sport names are translated</b> — 篮球 / 농구 / バスケットボール rather than \u201cBasketball\u201d — on the coach cards, the sports rail, the Training-now strip, the highlights tabs, the client\u2019s sport picker and the coach profile. All 35 sports in the catalogue, in all three languages. The canonical English label is still what gets stored and matched on; only what a visitor reads changes.',
    'Language tabs extended to the rest of the owner-written text: <b>coach tagline and bio</b>, and <b>event title and details</b>. Those have no built-in translation to fall back on — a bio is personal to the coach and an event name is specific — so a language left blank shows the English, which is stated under each field.',
@@ -8482,11 +8482,6 @@ function renderAdmin(){
       </div>
     </div>
     <div class="panel" style="margin-top:16px">
-      <h3>Translation coverage</h3>
-      <div class="clienttag" style="margin-bottom:8px">Anything below is still shown in English to visitors reading in that language. The <b style="color:var(--txt)">slogan, About copy, cards and quote</b> fall back to the app's own translated wording, so they are safe to leave. A <b style="color:var(--txt)">coach bio</b> or an <b style="color:var(--txt)">event</b> has nothing generic to fall back on — those really do stay English until someone writes them.</div>
-      ${mlGapsHtml()}
-    </div>
-    <div class="panel" style="margin-top:16px">
       <h3>Home page — slogan</h3>
       <div class="panel" style="background:var(--a3b);border-color:var(--a3);padding:11px;margin-bottom:12px">
         <b class="small">🌐 Your own words cannot be translated automatically</b>
@@ -8602,6 +8597,11 @@ function renderAdmin(){
         <button class="btn sm" onclick="addHighlight()">+ Add highlight</button>
       </div>
       <div id="hiPrev" style="margin-top:10px"></div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h3>Translation coverage</h3>
+      <div class="clienttag" style="margin-bottom:8px">Text a visitor reads that has no version in their language. The <b style="color:var(--txt)">slogan, About copy, cards and quote</b> fall back to the app's own translated wording, so they are safe to leave. A <b style="color:var(--txt)">coach bio</b> or an <b style="color:var(--txt)">event</b> has nothing generic to fall back on — those really do stay English until someone writes them.</div>
+      ${mlGapsHtml()}
     </div>`;
 }
 function saveNotify(){
