@@ -4207,6 +4207,7 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
 const BUILD='2026-08-23 03:50 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   'New <b>Translation coverage</b> panel at the top of Admin. It lists every piece of text a visitor reads that has no version in a given language, and separates the two cases: the slogan, About copy, cards and quote fall back to the app\u2019s own translated wording and are safe to leave, while a <b>coach bio</b> or an <b>event</b> genuinely shows English because there is nothing generic to substitute for a specific person or occasion. Each row has an Open button that jumps straight to the field.',
    'Added a <b>build stamp</b>, shown on this page and beside the Admin heading. The whole app is one file, so a browser holding a cached copy means a stale app — and that is indistinguishable from a change not working. If the stamp is older than your last deploy, you are looking at a cached file: pull down to refresh, or close and reopen the app. The page also now tells the browser to revalidate rather than reuse its copy.',
    '<b>Sport names are translated</b> — 篮球 / 농구 / バスケットボール rather than \u201cBasketball\u201d — on the coach cards, the sports rail, the Training-now strip, the highlights tabs, the client\u2019s sport picker and the coach profile. All 35 sports in the catalogue, in all three languages. The canonical English label is still what gets stored and matched on; only what a visitor reads changes.',
    'Language tabs extended to the rest of the owner-written text: <b>coach tagline and bio</b>, and <b>event title and details</b>. Those have no built-in translation to fall back on — a bio is personal to the coach and an event name is specific — so a language left blank shows the English, which is stated under each field.',
@@ -8312,6 +8313,48 @@ function renderFinance(){
    so it survives the repaint that follows marking something paid. */
 let owedCust='';
 function setOwedCust(id){ owedCust=id||''; renderFinance(); }
+/* ---- Translation coverage -------------------------------------------------
+   Some text has a built-in translation to fall back on (the About copy, the cards, the slogan);
+   the rest — a coach's bio, an event's name — is specific to one person or one occasion and can
+   only be written, not substituted. This lists exactly what is still English so "why isn't it
+   translated" becomes a to-do list instead of a mystery. */
+function mlGaps(){
+  const rows=[];
+  const add=(what,where,val,fix,safe)=>{
+    const v=(val==null?'':String(val)).trim(); if(!v)return;
+    const parts=mlParse(v);
+    const missing=ML_LANGS.filter(([k])=>k!=='en'&&!(parts[k]||'').trim()).map(([k,lab])=>lab);
+    if(missing.length)rows.push({what,where,missing,fix,safe:!!safe});
+  };
+  add('Slogan','Admin → Home page — slogan',DB.settings.slogan,"TAB='admin';switchTab()",true);
+  add('About copy','Admin → The RX approach',DB.settings.aboutText,"TAB='admin';switchTab()",true);
+  add('Feature cards','Admin → Feature cards',DB.settings.aboutCards,"TAB='admin';switchTab()",true);
+  add('Quote','Admin → Quote',DB.settings.quoteText,"TAB='admin';switchTab()",true);
+  (DB.coaches||[]).filter(c=>c.active!==false).forEach(c=>{
+    add('Bio — '+c.name,'Coaches → '+c.name,c.bio,`openCoach('${c.id}')`);
+    add('Tagline — '+c.name,'Coaches → '+c.name,c.tagline,`openCoach('${c.id}')`);
+  });
+  (DB.events||[]).filter(e=>e.active!==false&&eventAdvertisable(e)).forEach(e=>{
+    add('Event — '+String(e.title||'').slice(0,28),'Events → '+String(e.title||'').slice(0,20),e.title,`openEvent('${e.id}')`);
+    add('Event details','Events → '+String(e.title||'').slice(0,20),e.detail,`openEvent('${e.id}')`);
+  });
+  return rows;
+}
+function mlGapsHtml(){
+  const rows=mlGaps();
+  if(!rows.length)return `<div class="clienttag">Everything visitors read has a version in all four languages. 🎉</div>`;
+  const real=rows.filter(r=>!r.safe).length;
+  return `<div class="clienttag" style="margin-bottom:8px">${real
+      ? `<b style="color:var(--red)">${real}</b> item${real===1?'':'s'} really will show English. The rest fall back to the app's own wording.`
+      : `Nothing shows English \u2014 everything without a translation falls back to the app's own wording.`}</div>
+    <div class="tblscroll"><table><thead><tr><th>Text</th><th>Still English in</th><th></th></tr></thead><tbody>
+    ${rows.map(r=>`<tr>
+      <td><b>${r.what}</b><div class="clienttag">${r.where}</div></td>
+      <td>${r.missing.map(m=>`<span class="pill ${r.safe?'':'red'}">${m}</span>`).join(' ')}
+        <div class="clienttag">${r.safe?'falls back to the built-in wording':'<b style="color:var(--red)">shows English</b>'}</div></td>
+      <td class="right"><button class="btn sm ${r.safe?'ghost':''}" onclick="${r.fix}">Open</button></td></tr>`).join('')}
+  </tbody></table></div>`;
+}
 function retrySync(){
   flash('Retrying…');
   cloudPush().then(()=>{ renderAdmin(); flash(Object.keys(syncFails).length?'Still failing — check the error above':'Cloud save succeeded ✅'); });
@@ -8437,6 +8480,11 @@ function renderAdmin(){
         <button class="btn sm" onclick="saveSportsList()">Save sports</button>
         <button class="btn ghost sm" onclick="clearSportsList()">Restore default list</button>
       </div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h3>Translation coverage</h3>
+      <div class="clienttag" style="margin-bottom:8px">Anything below is still shown in English to visitors reading in that language. The <b style="color:var(--txt)">slogan, About copy, cards and quote</b> fall back to the app's own translated wording, so they are safe to leave. A <b style="color:var(--txt)">coach bio</b> or an <b style="color:var(--txt)">event</b> has nothing generic to fall back on — those really do stay English until someone writes them.</div>
+      ${mlGapsHtml()}
     </div>
     <div class="panel" style="margin-top:16px">
       <h3>Home page — slogan</h3>
