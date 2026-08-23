@@ -1177,6 +1177,42 @@ const ZH={
   'Highlights':'精彩集锦',
   'Book':'预约',
   'SESSIONS COACHED':'已完成课程',
+  'Basketball':'篮球',
+  'Soccer':'足球',
+  'Baseball':'棒球',
+  'Softball':'垒球',
+  'Football':'橄榄球',
+  'Track & Field':'田径',
+  'Tennis':'网球',
+  'Golf':'高尔夫',
+  'Volleyball':'排球',
+  'Swimming':'游泳',
+  'Lacrosse':'长曲棍球',
+  'Ice Hockey':'冰球',
+  'Field Hockey':'曲棍球',
+  'Wrestling':'摔跤',
+  'Badminton':'羽毛球',
+  'Table Tennis':'乒乓球',
+  'Boxing':'拳击',
+  'Martial Arts':'武术',
+  'Gymnastics':'体操',
+  'Cycling':'自行车',
+  'Skating':'滑冰',
+  'Skiing':'滑雪',
+  'Climbing':'攀岩',
+  'Rowing':'赛艇',
+  'Strength & Conditioning':'力量与体能',
+  'Cricket':'板球',
+  'Rugby':'橄榄球联合',
+  'Archery':'射箭',
+  'Dance':'舞蹈',
+  'Surfing':'冲浪',
+  'Fencing':'击剑',
+  'Water Polo':'水球',
+  'Ultimate':'极限飞盘',
+  'Skateboarding':'滑板',
+  'Pickleball':'匹克球',
+  'Training':'训练',
   'Join':'注册',
   'TBC':'待定',
   'Group & weekend classes':'团课与周末课程',
@@ -1353,6 +1389,42 @@ const KO={
   'Highlights':'하이라이트',
   'Book':'예약',
   'SESSIONS COACHED':'진행한 세션',
+  'Basketball':'농구',
+  'Soccer':'축구',
+  'Baseball':'야구',
+  'Softball':'소프트볼',
+  'Football':'미식축구',
+  'Track & Field':'육상',
+  'Tennis':'테니스',
+  'Golf':'골프',
+  'Volleyball':'배구',
+  'Swimming':'수영',
+  'Lacrosse':'라크로스',
+  'Ice Hockey':'아이스하키',
+  'Field Hockey':'필드하키',
+  'Wrestling':'레슬링',
+  'Badminton':'배드민턴',
+  'Table Tennis':'탁구',
+  'Boxing':'복싱',
+  'Martial Arts':'무술',
+  'Gymnastics':'체조',
+  'Cycling':'사이클링',
+  'Skating':'스케이팅',
+  'Skiing':'스키',
+  'Climbing':'클라이밍',
+  'Rowing':'조정',
+  'Strength & Conditioning':'근력·컨디셔닝',
+  'Cricket':'크리켓',
+  'Rugby':'럭비',
+  'Archery':'양궁',
+  'Dance':'댄스',
+  'Surfing':'서핑',
+  'Fencing':'펜싱',
+  'Water Polo':'수구',
+  'Ultimate':'얼티밋',
+  'Skateboarding':'스케이트보드',
+  'Pickleball':'피클볼',
+  'Training':'트레이닝',
   'Join':'가입',
   'TBC':'미정',
   'Group & weekend classes':'그룹 및 주말 클래스',
@@ -1524,6 +1596,42 @@ const JA={
   'Highlights':'ハイライト',
   'Book':'予約',
   'SESSIONS COACHED':'実施セッション',
+  'Basketball':'バスケットボール',
+  'Soccer':'サッカー',
+  'Baseball':'野球',
+  'Softball':'ソフトボール',
+  'Football':'アメフト',
+  'Track & Field':'陸上',
+  'Tennis':'テニス',
+  'Golf':'ゴルフ',
+  'Volleyball':'バレーボール',
+  'Swimming':'水泳',
+  'Lacrosse':'ラクロス',
+  'Ice Hockey':'アイスホッケー',
+  'Field Hockey':'ホッケー',
+  'Wrestling':'レスリング',
+  'Badminton':'バドミントン',
+  'Table Tennis':'卓球',
+  'Boxing':'ボクシング',
+  'Martial Arts':'武道',
+  'Gymnastics':'体操',
+  'Cycling':'サイクリング',
+  'Skating':'スケート',
+  'Skiing':'スキー',
+  'Climbing':'クライミング',
+  'Rowing':'ボート',
+  'Strength & Conditioning':'筋力・コンディショニング',
+  'Cricket':'クリケット',
+  'Rugby':'ラグビー',
+  'Archery':'アーチェリー',
+  'Dance':'ダンス',
+  'Surfing':'サーフィン',
+  'Fencing':'フェンシング',
+  'Water Polo':'水球',
+  'Ultimate':'アルティメット',
+  'Skateboarding':'スケートボード',
+  'Pickleball':'ピックルボール',
+  'Training':'トレーニング',
   'Join':'登録',
   'TBC':'未定',
   'Group & weekend classes':'グループ・週末クラス',
@@ -2796,6 +2904,10 @@ function coachIcon(id){
   const c=(typeof id==='object'&&id)?id:coachById(id);
   return c?sportIcon(c.sport):'🏅';
 }
+/* The sport's name in the reader's language. sportLabel() gives the canonical English label,
+   which is right for storage and matching; this is what a visitor should actually see. Falls
+   back to the English label for anything not in the dictionary. */
+function sportName(sp){ const lab=sportLabel(sp); return lab?t(lab):''; }
 function sportIcon(sp){
   const k=sportKey(sp), row=SPORT_CATALOG.find(r=>r[0]===k);
   return row?row[2]:'🏅';
@@ -3161,7 +3273,7 @@ function lpHighlightsHtml(){
      grow a tab that does nothing. */
   const sportTabs=sports.length>1?`<div class="lp-sporttabs">${sports.map(sp=>`
     <button class="lp-sporttab${sportKey(sp)===sportKey(lpGalSport)?' on':''}" onclick="lpGalPickSport('${sp.replace(/'/g,"\\'")}')">
-      ${sportIcon(sp)} ${sp}<span>${lpHighlights().filter(h=>sportKey(hlSport(h))===sportKey(sp)).length}</span></button>`).join('')}</div>`:'';
+      ${sportIcon(sp)} ${sportName(sp)||sp}<span>${lpHighlights().filter(h=>sportKey(hlSport(h))===sportKey(sp)).length}</span></button>`).join('')}</div>`:'';
   const tabs=`<div class="lp-months">${months.map(k=>`
     <button class="lp-month${k===lpGalMonth?' on':''}" onclick="lpGalPick('${k}')">
       ${lpMonthLabel(k)}<span>${lpGalItems(k,lpGalSport).length}</span></button>`).join('')}</div>`;
@@ -3402,7 +3514,7 @@ function lpCoachCards(){
         ${photo}
         <div style="min-width:0">
           <div class="lp-coach-name">${c.name}${founder?'<span class="lp-badge">'+t('FOUNDER')+'</span>':''}</div>
-          <div class="lp-coach-sport">${sportLabel(c.sport)||'Basketball'}${c.affiliation?' · '+mlText(c.affiliation):''}</div>
+          <div class="lp-coach-sport">${sportName(c.sport)||t('Basketball')}${c.affiliation?' · '+mlText(c.affiliation):''}</div>
         </div>
       </div>
       ${c.tagline?`<div class="lp-coach-tag">${c.tagline}</div>`:''}
@@ -3424,7 +3536,7 @@ function lpLiveSportsHtml(){
   if(!live.length)return '';
   return `<div class="lp-live reveal">
     <span class="lp-live-lab">${t('Training now')}</span>
-    ${live.map(sp=>`<span class="lp-live-chip">${sportIcon(sp)} ${sp}</span>`).join('')}
+    ${live.map(sp=>`<span class="lp-live-chip">${sportIcon(sp)} ${sportName(sp)||sp}</span>`).join('')}
   </div>`;
 }
 /* Sports we advertise. Any sport with an active coach is live; the rest read "coming soon" —
@@ -3456,7 +3568,7 @@ function lpPlanCards(){
     const allTbc=!rates.length;
     const lo=rates.length?Math.min.apply(null,rates):0, hi=rates.length?Math.max.apply(null,rates):0;
     const unit=ty==='1on1'?t('1 hour'):t('per player');
-    const sports=[...new Set(coaches.filter(c=>coachOffersType(c.id,ty)).map(c=>sportLabel(c.sport)))];
+    const sports=[...new Set(coaches.filter(c=>coachOffersType(c.id,ty)).map(c=>sportLabel(c.sport)))];   // canonical for matching
     return `<div class="lp-plan${m.hot?' hot':''}">
       <div class="lp-ico">${m.ico}</div><h3>${m.title?t(m.title):typeLabel(ty)}</h3>
       <div class="lp-cost">${allTbc?t('TBC'):`${hi>lo?`<small>${t('from')} </small>`:''}${money(lo)}`} <small>· ${allTbc?'':unit+' · '}${ty!=='1on1'?t('up to')+' '+typeMax(ty):(allTbc?'':'')}</small></div>
@@ -3476,7 +3588,7 @@ function lpSportChips(){
   const soon=advertised.filter(sp=>!live[sportKey(sp)]);
   const chip=(sp,i,on)=>`<div class="lp-sport ${on?'on':''} reveal" style="animation-delay:${i*70}ms">
       <span class="lp-sport-ico">${sportIcon(sp)}</span>
-      <b>${sp}</b><span>${on?t('Now training'):t('Coming soon')}</span></div>`;
+      <b>${sportName(sp)||sp}</b><span>${on?t('Now training'):t('Coming soon')}</span></div>`;
   // Two labelled groups rather than one mixed grid: with ten chips it was not obvious at a glance
   // which sports a parent could actually book today.
   let out='';
@@ -4092,6 +4204,8 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    ============================================================================ */
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Sport names are translated</b> — 篮球 / 농구 / バスケットボール rather than \u201cBasketball\u201d — on the coach cards, the sports rail, the Training-now strip, the highlights tabs, the client\u2019s sport picker and the coach profile. All 35 sports in the catalogue, in all three languages. The canonical English label is still what gets stored and matched on; only what a visitor reads changes.',
+   'Language tabs extended to the rest of the owner-written text: <b>coach tagline and bio</b>, and <b>event title and details</b>. Those have no built-in translation to fall back on — a bio is personal to the coach and an event name is specific — so a language left blank shows the English, which is stated under each field.',
    '<b>Every Admin text box now has a tab per language.</b> The About copy, feature cards, quote and slogan each get <b>English / 中文 / 한국어 / 日本語</b> tabs, with a dot marking the ones you have filled in. Leave a tab blank and those visitors see the English. Expecting the owner to type <span class="mono">[zh]</span> markers by hand was the flaw in the previous approach — nobody did, so custom copy stayed English for every visitor while the headings around it translated, which reads as a broken site rather than a setting nobody had used.',
    'And the fallback changed, which is the part that actually fixes the half-translated page: when a language has no text of yours, the app now uses <b>its own translated wording</b> rather than showing your English. A 中文 visitor previously read English body copy under Chinese headings; now the page reads in one language whether or not you have filled every tab. Fill a tab and yours takes over for that language.',
    'Existing text is safe: whatever is there now loads into the English tab, and a field with only English is still stored as plain text rather than gaining markers. Nothing needs re-entering.',
@@ -4282,9 +4396,9 @@ function renderAbout(){
   const photoBlock = co.photo?`<img src="${co.photo}" alt="${co.name}" style="width:96px;height:96px;object-fit:cover;border-radius:16px;margin-bottom:14px">`:'';
   $('#view-about').innerHTML = `
    <div class="hero">
-     <span class="badge">${sportIcon(co.sport)} ${co.tagline||((sportLabel(co.sport)||'Basketball')+' Training')}</span>
+     <span class="badge">${sportIcon(co.sport)} ${mlText(co.tagline)||((sportName(co.sport)||t('Basketball'))+' '+t('Training'))}</span>
      ${photoBlock}
-     <h2>${co.name}<br>${sportLabel(co.sport)||'Basketball'} Training</h2>
+     <h2>${co.name}<br>${sportName(co.sport)||t('Basketball')} ${t('Training')}</h2>
      <p>${co.bio||''}</p>
      <div class="row" style="margin-top:22px">
        <button class="btn" onclick="TAB='booking';switchTab()">📱 ${AUTH==='coach'?'My Bookings':'Book a Session'}</button>
@@ -4672,7 +4786,7 @@ function renderBookingClient(){
               const on=(pickSport||'').toLowerCase()===sp.toLowerCase();
               const n=coachesForSport(sp).length;
               return `<button type="button" class="sporttile${on?' on':''}" onclick="pickSportChange('${sp.replace(/'/g,"\\'")}')">
-                <span class="ico">${sportIcon(sp)}</span><b>${sp}</b>
+                <span class="ico">${sportIcon(sp)}</span><b>${sportName(sp)||sp}</b>
                 <span class="n">${n} ${n===1?t('coach'):t('coaches')}</span></button>`;
             }).join('')}</div></div>`:''}
           <div class="field"><label class="f">${t('Coach')}</label>
@@ -6603,12 +6717,15 @@ function openCoach(id){
   openModal(isCoach?'Edit my profile & rates':(id?'Edit Coach':'Add Coach'),`
     ${pendBox}
     ${isCoach?'':`<div class="field"><label class="f">Full name *</label><input id="coName" value="${g('name')}"></div>`}
-    <div class="field"><label class="f">Tagline (under the name on the profile)</label><input id="coTag" value="${g('tagline')}" placeholder="e.g. Lexington, MA · AAU Level Training"></div>
+    <div class="field"><label class="f">Tagline (under the name on the profile)</label>
+      ${mlEditor('coTag',(p&&p.tagline!=null)?p.tagline:(c.tagline||''),1,'e.g. Lexington, MA · Player-led training')}</div>
     <div class="row">
       <div class="field"><label class="f">Affiliation</label><input id="coAff" value="${g('affiliation')}" placeholder="e.g. AAU"></div>
       <div class="field"><label class="f">Affiliation detail</label><input id="coAffSub" value="${g('affiliationSub')}" placeholder="e.g. Middlesex Magic"></div>
     </div>
-    <div class="field"><label class="f">About / bio (shown to clients)</label><textarea id="coBio">${gArea('bio')}</textarea>
+    <div class="field"><label class="f">About / bio (shown to clients)</label>
+      ${mlEditor('coBio',(p&&p.bio!=null)?p.bio:(c.bio||''),6,'')}
+      <div class="clienttag" style="margin-top:4px">A bio is personal to the coach, so there is no built-in translation to fall back on — a language left blank shows the English.</div>
       <div class="clienttag" style="margin-top:4px">Optional — write it in more than one language by starting a line with <b style="color:var(--txt)">[en]</b>, <b style="color:var(--txt)">[zh]</b>, <b style="color:var(--txt)">[ko]</b> or <b style="color:var(--txt)">[ja]</b>. Each visitor sees their own language (English if theirs is missing). Leave it plain and it shows as typed to everyone.</div></div>
     <div class="field"><label class="f">Photo</label>
       <div class="row" style="gap:10px;align-items:center">
@@ -6723,7 +6840,7 @@ function saveCoach(id){
     c.phone=($('#coPhone')?$('#coPhone').value:'').trim();
     c.carrier=$('#coCarrier')?$('#coCarrier').value:'';
     c.email=($('#coEmail')?$('#coEmail').value:'').trim();
-    c.pending={tagline:$('#coTag').value,bio:$('#coBio').value,affiliation:$('#coAff').value,affiliationSub:$('#coAffSub').value,photo:$('#coPhoto').value,rate1on1:r1,rateGroup:rG,rateCond:rC,rateTbc,rateTbc};
+    c.pending={tagline:mlRead('coTag'),bio:mlRead('coBio'),affiliation:$('#coAff').value,affiliationSub:$('#coAffSub').value,photo:$('#coPhoto').value,rate1on1:r1,rateGroup:rG,rateCond:rC,rateTbc,rateTbc};
     save();closeModal();flash('Contact info updated · other changes sent to owner for approval ⏳');refreshOwner();return;
   }
   const name=($('#coName').value||'').trim();if(!name)return flash('Name is required',true);
@@ -6734,7 +6851,7 @@ function saveCoach(id){
   // Fall back to what the coach already is, never to Basketball — the Sport input is hidden
   // when a coach edits their own profile, so a hard default would quietly reset their sport.
   const rawSport=($('#coSport')?$('#coSport').value:'').trim()||prevSport;
-  const obj={name,sport:sportLabel(rawSport)||rawSport,tagline:$('#coTag').value,bio:$('#coBio').value,affiliation:$('#coAff').value,affiliationSub:$('#coAffSub').value,photo:$('#coPhoto').value,pwd:($('#coPwd').value||'coach').trim(),active:$('#coActive').checked,phone:($('#coPhone')?$('#coPhone').value:''),carrier:($('#coCarrier')?$('#coCarrier').value:''),email:($('#coEmail')?$('#coEmail').value.trim():''),rate1on1:r1,rateGroup:rG,rateCond:rC,
+  const obj={name,sport:sportLabel(rawSport)||rawSport,tagline:mlRead('coTag'),bio:mlRead('coBio'),affiliation:$('#coAff').value,affiliationSub:$('#coAffSub').value,photo:$('#coPhoto').value,pwd:($('#coPwd').value||'coach').trim(),active:$('#coActive').checked,phone:($('#coPhone')?$('#coPhone').value:''),carrier:($('#coCarrier')?$('#coCarrier').value:''),email:($('#coEmail')?$('#coEmail').value.trim():''),rate1on1:r1,rateGroup:rG,rateCond:rC,
     family:fam,shareType:($('#coShareType')?$('#coShareType').value:'pct'),shareVal:(fam?0:(+($('#coShareVal')?$('#coShareVal').value:0)||0)),
     created:(($('#coCreated')&&$('#coCreated').value)||todayISO())};
   if(id){Object.assign(coachById(id),obj);}
@@ -7395,8 +7512,10 @@ function openEvent(id){
        ${coachIcon(c)} ${c.name}</label>`).join('')
     ||'<div class="clienttag">No active coaches yet.</div>';
   openModal(id?'Edit Event':'New Event',`
-    <div class="field"><label class="f">Title *</label><input id="evTitle" value="${(ev.title||'').replace(/"/g,'&quot;')}" placeholder="e.g. Workshop with a D2 Guard"></div>
-    <div class="field"><label class="f">Details (shown to clients)</label><textarea id="evDetail">${ev.detail||''}</textarea>
+    <div class="field"><label class="f">Title *</label>
+      ${mlEditor('evTitle',ev.title,1,'e.g. Workshop with a D2 Guard')}</div>
+    <div class="field"><label class="f">Details (shown to clients)</label>
+      ${mlEditor('evDetail',ev.detail,5,'')}
       <div class="clienttag" style="margin-top:4px">Optional — write it in more than one language by starting a line with <b style="color:var(--txt)">[en]</b>, <b style="color:var(--txt)">[zh]</b>, <b style="color:var(--txt)">[ko]</b> or <b style="color:var(--txt)">[ja]</b>. Each visitor sees their own language (English if theirs is missing). Leave it plain and it shows as typed to everyone.</div></div>
     <div class="row">
       <div class="field"><label class="f">Date</label><input type="date" id="evDate" value="${ev.date||todayISO()}"></div>
@@ -7457,10 +7576,10 @@ async function uploadEventVideo(input){
   }catch(e){flash('Upload failed: '+e.message,true);}
 }
 function saveEvent(id){
-  const title=($('#evTitle').value||'').trim();if(!title)return flash('Title is required',true);
+  const title=mlRead('evTitle').trim();if(!title)return flash('Title is required',true);
   const video=safeUrl($('#evVideo')?$('#evVideo').value:'');
   if(video&&!videoEmbed(video))return flash('That video link doesn\'t look like a URL — it should start with https://',true);
-  const obj={title,detail:$('#evDetail').value,date:$('#evDate').value,time:$('#evTime').value,location:$('#evLoc').value,coachIds:$$('.evCoachCb').filter(cb=>cb.checked).map(cb=>cb.value),price:Math.max(0,+$('#evPrice').value||0),capacity:Math.max(0,Math.round(+$('#evCap').value||0)),active:$('#evActive').checked,featured:!!($('#evFeatured')&&$('#evFeatured').checked),video};
+  const obj={title,detail:mlRead('evDetail'),date:$('#evDate').value,time:$('#evTime').value,location:$('#evLoc').value,coachIds:$$('.evCoachCb').filter(cb=>cb.checked).map(cb=>cb.value),price:Math.max(0,+$('#evPrice').value||0),capacity:Math.max(0,Math.round(+$('#evCap').value||0)),active:$('#evActive').checked,featured:!!($('#evFeatured')&&$('#evFeatured').checked),video};
   if(id){Object.assign(eventById(id),obj);}
   else{obj.id=uid();obj.created=todayISO();DB.events.push(obj);}
   // an event's video can double as the public Highlights reel
@@ -8386,7 +8505,7 @@ function renderAdmin(){
           ondragover="dragOver(event,'highlight')" ondragleave="dragLeave(event)"
           ondrop="dropOnHighlight(event,'${h.id}')">
           <td style="width:26px" class="muted grab" title="Drag to reorder">⠿</td>
-          <td><input value="${(h.title||'').replace(/"/g,'&quot;')}" onchange="updHighlight('${h.id}','title',this.value)"></td>
+          <td><input value="${(h.title||'').replace(/"/g,'&quot;')}" onchange="updHighlight('${h.id}','title',this.value)" title="Use [en] / [zh] / [ko] / [ja] on separate lines for a caption in more than one language"></td>
           <td style="width:160px"><select onchange="updHighlight('${h.id}','sport',this.value)">
             ${hlSportOptions().map(sp=>`<option value="${sp}" ${sportKey(sp)===sportKey(hlSport(h))?'selected':''}>${sportIcon(sp)} ${sp}</option>`).join('')}
           </select></td>
