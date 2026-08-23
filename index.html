@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<!-- The whole app is this one file, so a cached copy means a stale app. Always revalidate. -->
+<meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>RX.TRAINING</title>
 <meta name="theme-color" content="#ffffff">
@@ -4202,8 +4204,10 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
+const BUILD='2026-08-23 03:50 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   'Added a <b>build stamp</b>, shown on this page and beside the Admin heading. The whole app is one file, so a browser holding a cached copy means a stale app — and that is indistinguishable from a change not working. If the stamp is older than your last deploy, you are looking at a cached file: pull down to refresh, or close and reopen the app. The page also now tells the browser to revalidate rather than reuse its copy.',
    '<b>Sport names are translated</b> — 篮球 / 농구 / バスケットボール rather than \u201cBasketball\u201d — on the coach cards, the sports rail, the Training-now strip, the highlights tabs, the client\u2019s sport picker and the coach profile. All 35 sports in the catalogue, in all three languages. The canonical English label is still what gets stored and matched on; only what a visitor reads changes.',
    'Language tabs extended to the rest of the owner-written text: <b>coach tagline and bio</b>, and <b>event title and details</b>. Those have no built-in translation to fall back on — a bio is personal to the coach and an event name is specific — so a language left blank shows the English, which is stated under each field.',
    '<b>Every Admin text box now has a tab per language.</b> The About copy, feature cards, quote and slogan each get <b>English / 中文 / 한국어 / 日本語</b> tabs, with a dot marking the ones you have filled in. Leave a tab blank and those visitors see the English. Expecting the owner to type <span class="mono">[zh]</span> markers by hand was the flaw in the previous approach — nobody did, so custom copy stayed English for every visitor while the headings around it translated, which reads as a broken site rather than a setting nobody had used.',
@@ -4372,6 +4376,7 @@ function renderChangelog(){
     <div class="sub">What changed in RX.TRAINING and when. Entries marked <b>Fix</b> came out of something found in production — worth reading before changing that area again.</div>
     <div class="stats" style="margin-bottom:16px">
       <div class="stat"><div class="k">Current version</div><div class="v">${cur.v}</div><div class="d muted">${cur.t}</div></div>
+      <div class="stat"><div class="k">This file was built</div><div class="v" style="font-size:17px">${BUILD}</div><div class="d muted">if this is old, the browser is serving a cached copy</div></div>
       <div class="stat"><div class="k">Released</div><div class="v" style="font-size:20px">${fmtDate(cur.d)}</div><div class="d muted">${CHANGELOG.length} releases logged</div></div>
       <div class="stat"><div class="k">Changes recorded</div><div class="v">${CHANGELOG.reduce((n,r)=>n+r.items.length,0)}</div><div class="d muted">across all versions</div></div>
       <div class="stat"><div class="k">Fixes</div><div class="v">${CHANGELOG.reduce((n,r)=>n+r.items.filter(i=>/<b>Fix/.test(i)).length,0)}</div><div class="d muted">from live issues</div></div>
@@ -8333,7 +8338,7 @@ function saveDefCPwd(){const v=($('#defCPwd').value||'').trim();if(v.length<4)re
 function renderAdmin(){
   $('#view-admin').innerHTML=`
     <h1 class="page">Admin</h1>
-    <div class="sub">Pricing and access settings.</div>
+    <div class="sub">Pricing and access settings. <span class="pill" title="When this copy of the app was built. If it is older than your last deploy, the browser is serving a cached file — pull down to refresh, or close and reopen the app.">⚙ build ${BUILD}</span></div>
     ${(()=>{
       const names=Object.keys(syncFails);
       if(!names.length)return '';
