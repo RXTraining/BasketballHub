@@ -569,15 +569,26 @@
      Solid colour rather than a gradient: at this weight gradient text goes patchy, and #3f6a00
      measures 6.5:1 on white, which matters more now the text no longer counts as "large". */
   .lp-slogan{font-size:clamp(15px,2.5vw,23px);font-weight:400;letter-spacing:.4px;
-    margin:2px 0 20px;line-height:1.4;color:#3f6a00;position:relative;display:inline-block;
-    padding-bottom:11px}
+    margin:10px 0 38px;line-height:1.45;color:#3f6a00;position:relative;display:inline-block;
+    padding-bottom:15px}
+  /* Each word lifts into place on its own beat — enough to catch the eye on arrival without
+     turning the strap line into a performance. */
+  .lp-sw{display:inline-block;opacity:0;transform:translateY(.55em) scale(.96);
+    filter:blur(3px);animation:swIn .62s cubic-bezier(.2,.75,.3,1) forwards}
+  @keyframes swIn{to{opacity:1;transform:none;filter:blur(0)}}
   .lp-slogan em{font-style:normal;font-weight:700;color:#2f6b12}
+  /* the volt rule draws itself after the words have landed, then breathes gently */
   .lp-slogan::after{content:"";position:absolute;left:50%;transform:translateX(-50%) scaleX(0);
-    bottom:0;width:74px;height:4px;border-radius:999px;
+    bottom:0;width:88px;height:4px;border-radius:999px;
     background:linear-gradient(90deg,var(--lp-volt),var(--lp-volt-d));
-    transform-origin:center;animation:sloganRule .6s .3s cubic-bezier(.2,.8,.3,1) forwards}
+    transform-origin:center;
+    animation:sloganRule .55s cubic-bezier(.2,.8,.3,1) forwards, sloganBreathe 3.4s 1.2s ease-in-out infinite}
   @keyframes sloganRule{to{transform:translateX(-50%) scaleX(1)}}
+  @keyframes sloganBreathe{
+    0%,100%{transform:translateX(-50%) scaleX(1);opacity:1}
+    50%{transform:translateX(-50%) scaleX(1.5);opacity:.75}}
   @media(prefers-reduced-motion:reduce){
+    .lp-sw{opacity:1;transform:none;filter:none;animation:none}
     .lp-slogan::after{animation:none;transform:translateX(-50%) scaleX(1)}}
   /* "Training now" strip: the sports with a coach, named in the hero. */
   /* pull-to-refresh indicator, parked above the top edge of the scroller */
@@ -591,7 +602,7 @@
   .ptr.spinning .ptr-spin{animation:ptrSpin .7s linear infinite}
   @keyframes ptrSpin{to{transform:rotate(360deg)}}
   @media(prefers-reduced-motion:reduce){.ptr.spinning .ptr-spin{animation:none}}
-  .lp-live{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin:0 0 22px}
+  .lp-live{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin:4px 0 26px}
   .lp-live-lab{font-size:10.5px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:var(--lp-mut)}
   .lp-live-chip{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:800;
     color:#2f6b12;background:var(--a1b);border:1.5px solid var(--lp-volt-d);border-radius:999px;padding:6px 14px}
@@ -3216,6 +3227,25 @@ function sloganText(){
   const custom=mlText((DB.settings.slogan||'').trim());
   return custom||t('SLOGAN');
 }
+/* The slogan, split so each word can arrive on its own beat.
+   Chinese, Japanese and Korean are written without spaces, so those are split per character —
+   splitting on whitespace would animate the whole line as one lump. If the owner has written
+   HTML into the slogan we leave it whole rather than shredding their tags. */
+function sloganHtml(){
+  const txt=sloganText();
+  if(!txt)return '';
+  if(txt.indexOf('<')>=0)return `<span class="lp-sw" style="animation-delay:0ms">${txt}</span>`;
+  const spaced=/\s/.test(txt);
+  const parts=spaced?txt.split(/(\s+)/):Array.from(txt);
+  // characters need a shorter beat than words, or a 13-character line takes nearly two seconds
+  const step=spaced?95:55;
+  let i=0;
+  return parts.map(pt=>{
+    if(/^\s+$/.test(pt))return pt;
+    const d=(i++)*step;
+    return `<span class="lp-sw" style="animation-delay:${d}ms">${pt}</span>`;
+  }).join('');
+}
 function aboutCardsHtml(){
   lpCardSeq=0;
   const custom=mlText(DB.settings.aboutCards||'').trim();
@@ -3436,7 +3466,7 @@ function renderLanding(){
   <div class="lp-wrap">
     <header class="lp-hero">
       <h1 class="lp-h1 reveal">RX<i class="lp-dot" id="lpBall" data-ball="🏀"></i>TRAINING</h1>
-      <div class="lp-slogan reveal">${sloganText()}</div>
+      <div class="lp-slogan reveal">${sloganHtml()}</div>
       ${lpLiveSportsHtml()}
       <div class="lp-cta reveal">
         <button class="lp-btn solid lp-big" onclick="${AUTH?'closeHome()':`openAuth('book')`}">${AUTH?t('Back to app'):t('Book a session →')}</button>
@@ -4008,7 +4038,8 @@ const CHANGELOG=[
    'Event registrations now show each player the way the Customers table does — avatar, name, and <b>age/level · parent</b> underneath — plus a tappable phone number, so you are not cross-referencing two screens to reach a family.',
    '<b>Print sign-in sheet</b> button on the registrations dialog. One clean page per event: title, date, location, headcount, how many still owe, then the players sorted alphabetically with age/level, guardian, phone, payment state and an empty box to tick on the day. The table header repeats on every page and no row splits across a page break.',
    'Removed the “Train like you play” strap line — the slogan carries that job now, and two lines of brand copy under the wordmark was one too many.',
-   'The slogan sits under the wordmark as a light strap line — 400 weight at up to 23px against the wordmark\'s 900 at 78px, so it supports the logo rather than competing with it. The brand colour appears as a short volt rule beneath the text that wipes in on load; an earlier highlighter bar behind the words read as a strikethrough and was removed. Motion is disabled for anyone who has asked for reduced motion.',
+   'The slogan is animated and given room to breathe. Each word lifts and sharpens into place on its own beat, then the volt rule draws itself beneath and breathes gently — enough to catch the eye without turning the strap line into a performance. The gap to the sports strip below it nearly doubled; the two were crowding each other.',
+   'Chinese, Japanese and Korean are written without spaces, so those slogans animate per character rather than arriving as one lump — with a shorter beat, since a thirteen-character line would otherwise take nearly two seconds to settle. A slogan containing HTML is animated whole rather than having its tags shredded, and anyone who has asked for reduced motion sees the finished state immediately.',
    '<b>Colour across the whole app.</b> Eight accent hues, each paired with a tint to sit on. Header stats, section kickers and feature-card icons cycle through them on the home page; in the app, page titles carry a gradient, section headings gain a coloured tick, each active tab keeps its own hue, and the About-page stat tiles are individually coloured.',
    'Every one of the 30 resulting colour pairs was measured at or above WCAG AA — as text on its tint, as text on white, and as white on a filled button — so a hue can be used anywhere without re-checking. Gradient text falls back to a solid colour where <span class="mono">background-clip</span> is unsupported.',
  ]},
