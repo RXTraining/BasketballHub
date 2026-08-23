@@ -2608,10 +2608,24 @@ function sessionCashAmt(s){
   return s.customerIds.reduce((a,id)=>{const p=custPay(s,id);return a+((p.paid&&p.paidVia==='cash')?priceOf(s)/n:0);},0);
 }
 /* amount still owed for this session — for a group, only the unpaid players' shares */
+/* Money is owed only once the session has actually been DELIVERED.
+   A session booked for next week is not a debt — nobody has had anything yet, and counting it
+   inflated the outstanding figure with work that has not happened. Only completed sessions are
+   counted; cancelled and unpriced ones never were. */
+function sessionOwed(s){ return !!s && s.status==='completed'; }
+/* What a session WOULD be worth if it were owed — used to show the value of booked-but-unpaid
+   work without counting it as a debt. */
+function sessionOutstandingRaw(s){
+  if(!s||s.status==='cancelled'||!sessionPriced(s))return 0;
+  if(s.type==='1on1')return s.paid?0:priceOf(s);
+  const n=s.customerIds.length||1;
+  return s.customerIds.reduce((a,id)=>a+(custPay(s,id).paid?0:priceOf(s)/n),0);
+}
 function sessionOutstandingAmt(s){
-  // An unpriced session cannot be "owed" — nobody has agreed what it costs. It shows as TBC in
-  // the lists and is counted the moment the owner enters a figure.
-  if(s.status==='cancelled'||!sessionPriced(s))return 0;
+  if(!sessionOwed(s))return 0;
+  // An unpriced session cannot be "owed" either — nobody has agreed what it costs. It shows as
+  // TBC in the lists and is counted the moment the owner enters a figure.
+  if(!sessionPriced(s))return 0;
   if(s.type==='1on1') return s.paid?0:priceOf(s);
   const n=s.customerIds.length||1;
   return s.customerIds.reduce((a,id)=>a+(custPay(s,id).paid?0:priceOf(s)/n),0);
@@ -4004,6 +4018,8 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    ============================================================================ */
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Outstanding now counts only sessions that have actually been delivered.</b> A session booked for next week is not a debt — nobody has had anything yet — and counting it inflated the figure with work that had not happened. Only <b>completed</b> sessions are counted; pending requests, future bookings, cancellations and unpriced sessions are all excluded. The change is at the source, so the headline figure, the table and the Excel export all agree.',
+   'Booked-but-unpaid work has not vanished: the Outstanding panel says how many upcoming sessions there are and what they are worth, as a note rather than a debt.',
    '<b>Outstanding payments can be filtered to one client.</b> The picker lists only people who actually owe something, each with their total, biggest debt first — and a pill beside it shows the amount due for whatever is selected. Choosing <i>Everyone</i> shows the full figure and how many clients it is spread across, so the question \u201chow much does this family owe me\u201d is one tap rather than a scan down the table.',
    'The Outstanding table now shows the <b>session time</b> under the date, and sorts by date then time — two sessions on the same day were previously indistinguishable. A group session lists each unpaid player separately, so filtering to a client shows only their share.',
    '<b>Highlights are grouped by sport, then by month.</b> The home page gallery gains a row of sport tabs above the month tabs, each showing how many items it holds; picking a sport filters the months beneath it. The row only appears when there is more than one sport, so a single-sport gallery is unchanged. Uploads and links carry a sport, set on the upload form and changeable per row in Admin, and the Admin list is ordered the same way the home page groups it so dragging rearranges what you are actually looking at.',
@@ -7937,7 +7953,8 @@ function renderFinance(){
      client and totalled. Built before the markup so the filter and the total read the same list. */
   const unpaidList=(()=>{
     const out=[];
-    S.filter(s=>s.status!=='cancelled').forEach(s=>{
+    // same rule as sessionOutstandingAmt(): delivered, then unpaid
+    S.filter(sessionOwed).forEach(s=>{
       if(s.type!=='1on1'&&s.customerIds.length>1){
         s.customerIds.forEach(cid=>{
           const p=custPay(s,cid); if(p.paid)return;
@@ -7963,6 +7980,9 @@ function renderFinance(){
   const owedTotal=owedRows.reduce((a,r)=>a+(r.amt||0),0);
   const unpaidRows=owedRows.length?owedRows.map(r=>r.html).join('')
     :`<tr><td colspan="6"><div class="empty">${owedCust?'Nothing outstanding for this client 🎉':'All caught up — nothing outstanding! 🎉'}</div></td></tr>`;
+  // Booked-but-unpaid work is worth knowing about — it just is not a debt yet.
+  const upcomingUnpaid=S.filter(s=>s.status==='scheduled'&&!sessionFullyPaid(s)&&sessionPriced(s));
+  const upcomingValue=upcomingUnpaid.reduce((a,s)=>a+sessionOutstandingRaw(s),0);
   /* Only clients who actually owe something appear in the picker — a list of every client would
      mostly be people with nothing due. */
   const owedPeople=[...new Set(unpaidList.map(r=>r.cid).filter(Boolean))]
@@ -8071,7 +8091,10 @@ function renderFinance(){
             <span class="pill ${owedTotal>0?'red':'green'}">${money(owedTotal)} due</span>
           </div>
         </div>
-        ${owedCust?`<div class="clienttag" style="padding:0 6px 6px">Showing <b style="color:var(--txt)">${(custById(owedCust)||{}).name||''}</b> only · <a href="#" onclick="setOwedCust('');return false" style="color:var(--accent);font-weight:800">show everyone</a></div>`:''}
+        <div class="clienttag" style="padding:0 6px 8px">
+          Sessions <b style="color:var(--txt)">delivered but not yet paid</b>. Booked sessions in the future are not a debt until they happen${upcomingUnpaid.length?` — <b style="color:var(--txt)">${upcomingUnpaid.length}</b> upcoming session${upcomingUnpaid.length===1?'':'s'} worth <b style="color:var(--txt)">${money(upcomingValue)}</b> ${upcomingUnpaid.length===1?'is':'are'} not counted here`:''}.
+          ${owedCust?`<br>Showing <b style="color:var(--txt)">${(custById(owedCust)||{}).name||''}</b> only · <a href="#" onclick="setOwedCust('');return false" style="color:var(--accent);font-weight:800">show everyone</a>`:''}
+        </div>
         <table><thead><tr><th>Date</th><th>Coach</th><th>Client</th><th>Type</th><th class="right">Amount</th><th></th></tr></thead><tbody>${unpaidRows}</tbody></table>
       </div>
       <div class="panel" style="padding:6px 14px;overflow-x:auto">
