@@ -1756,6 +1756,17 @@ function mlSetEn(id,txt){
   if(el){ el.value=txt; const w=document.getElementById(id+'_wrap');
     if(w){const b=w.querySelector('.mlseg button'); if(b)mlTab(id,'en',b);} el.focus(); }
 }
+/* The owner's text for the CURRENT language only — '' when they have not written one.
+   Deliberately does NOT fall back to their English, because the caller can do better: the app
+   already ships a translated default for these fields. Falling back to English meant a 中文
+   visitor read English body copy under Chinese headings, which is what made the page look
+   half-translated. Now they get the built-in Chinese instead, until the owner writes their own. */
+function mlForLang(str){
+  const raw=(str==null?'':String(str)).trim();
+  if(!raw)return '';
+  if(!/^\s*\[(en|zh|ko|ja)\]/mi.test(raw))return LANG==='en'?raw:'';   // plain text = English only
+  return (mlParse(raw)[LANG]||'').trim();
+}
 function mlText(str){
   const raw=(str==null?'':String(str));
   if(!/^\s*\[(en|zh|ko|ja)\]/mi.test(raw))return raw;
@@ -3315,7 +3326,7 @@ const DEFAULT_SLOGAN='We plant the seed of sport';
 /* The brand line. Owner-written text wins; mlText() means they can give each language its own
    wording rather than showing the English to everyone. */
 function sloganText(){
-  const custom=mlText((DB.settings.slogan||'').trim());
+  const custom=mlForLang(DB.settings.slogan);
   return custom||t('SLOGAN');
 }
 /* The slogan, split so each word can arrive on its own beat.
@@ -3339,7 +3350,7 @@ function sloganHtml(){
 }
 function aboutCardsHtml(){
   lpCardSeq=0;
-  const custom=mlText(DB.settings.aboutCards||'').trim();
+  const custom=mlForLang(DB.settings.aboutCards);
   if(custom){
     return custom.split(/\n/).map(l=>l.trim()).filter(Boolean).map(line=>{
       const p=line.split('|').map(x=>x.trim());
@@ -3353,15 +3364,15 @@ function aboutCardsHtml(){
        + lpCardHtml('🔥',t('Never give up'),t('CARD_GRIT'));
 }
 function aboutQuoteHtml(co){
-  const q=(DB.settings.quoteText||'').trim();
-  const by=(DB.settings.quoteBy||'').trim();
+  const q=mlForLang(DB.settings.quoteText);
+  const by=mlText(DB.settings.quoteBy||'').trim();   // a person's name, not copy — keep the fallback
   return `<div class="lp-quote">
         <p>${q||t('QUOTE')}</p>
         <cite>— ${by||((co.name||'Raymond Xu')+', '+t('Founder')+' · Middlesex Magic (AAU)')}</cite>
       </div>`;
 }
 function aboutParas(co){
-  const custom=mlText(DB.settings.aboutText||'').trim();
+  const custom=mlForLang(DB.settings.aboutText);
   if(custom){
     return custom.split(/\n\s*\n/).map((para,i)=>
       `<p class="lp-p"${i?' style="margin-top:12px"':''}>${para.trim().replace(/\n/g,'<br>')}</p>`).join('');
@@ -4082,6 +4093,7 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
    '<b>Every Admin text box now has a tab per language.</b> The About copy, feature cards, quote and slogan each get <b>English / 中文 / 한국어 / 日本語</b> tabs, with a dot marking the ones you have filled in. Leave a tab blank and those visitors see the English. Expecting the owner to type <span class="mono">[zh]</span> markers by hand was the flaw in the previous approach — nobody did, so custom copy stayed English for every visitor while the headings around it translated, which reads as a broken site rather than a setting nobody had used.',
+   'And the fallback changed, which is the part that actually fixes the half-translated page: when a language has no text of yours, the app now uses <b>its own translated wording</b> rather than showing your English. A 中文 visitor previously read English body copy under Chinese headings; now the page reads in one language whether or not you have filled every tab. Fill a tab and yours takes over for that language.',
    'Existing text is safe: whatever is there now loads into the English tab, and a field with only English is still stored as plain text rather than gaining markers. Nothing needs re-entering.',
    '<b>Fix:</b> the language button did nothing when you were <i>signed in and viewing the home page</i> through the header logo. It decided what to repaint by asking whether anyone was signed in, rather than what was actually on screen — so it refreshed the app hidden underneath and left the visible page in the old language. It now repaints whatever is showing, and the app behind it too, so both are right when you go back.',
    '<b>Fix:</b> the page jumped to the top on every save and every background sync. A scroll-to-top meant for tab switching had been added one function too far up, into the refresh that also runs on saves and on the 45-second poll — so it yanked you away mid-read. It now runs only when the tab actually changes.',
@@ -8306,7 +8318,7 @@ function renderAdmin(){
       <h3>Home page — slogan</h3>
       <div class="panel" style="background:var(--a3b);border-color:var(--a3);padding:11px;margin-bottom:12px">
         <b class="small">🌐 Your own words cannot be translated automatically</b>
-        <div class="clienttag" style="margin-top:4px">Headings and buttons are translated by the app, but anything you write here is shown exactly as typed — so a visitor reading in 中文 sees your English until you fill in the 中文 tab. Every box below has a tab per language, and a <b style="color:var(--txt)">●</b> marks the ones you have written. Leave a tab blank and those visitors get the English.</div>
+        <div class="clienttag" style="margin-top:4px">Headings and buttons are translated by the app, but anything you write here is shown exactly as typed. Every box below has a tab per language, and a <b style="color:var(--txt)">●</b> marks the ones you have written.<br><b style="color:var(--txt)">Leave a tab blank and those visitors see the app's own translated wording</b> — not your English. So the page always reads in one language, even before you have filled every tab.</div>
       </div>
       <div class="clienttag" style="margin-bottom:8px">The brand line under <b style="color:var(--txt)">RX•TRAINING</b>. Blank uses the built-in wording, which is translated into 中文 / 한국어 / 日本語. Write your own and it shows as typed — or give each language its own line with <b style="color:var(--txt)">[en]</b> / <b style="color:var(--txt)">[zh]</b> / <b style="color:var(--txt)">[ko]</b> / <b style="color:var(--txt)">[ja]</b>.</div>
       <div class="field">${mlEditor('adSlogan',DB.settings.slogan,1,DEFAULT_SLOGAN)}</div>
