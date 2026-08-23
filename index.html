@@ -2053,6 +2053,8 @@ function normalize(d){
   // Widened the advertised list. The second test upgrades installs still carrying the original
   // five-sport default; anything the owner has edited is left alone.
   if(d.settings.slogan==null)d.settings.slogan='';
+  if(!d.contributors)d.contributors=[];
+  if(!d.contributions)d.contributions=[];
   if(!d.settings.sports||d.settings.sports.trim()==='Basketball, Soccer, Tennis, Golf, Track')
     d.settings.sports=DEFAULT_SPORTS;
   // video shown in the home page Highlights section; blank falls back to the built-in AAU reel
@@ -2141,7 +2143,7 @@ function normalize(d){
 function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.parse(r);}catch(e){}return normalize(d);}
 
 /* ----- relational mapping (separate tables in Supabase) ----- */
-function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl,hl){
+function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl,hl,cbs,cbl){
   const d={};
   d.settings={rate1on1:st?Number(st.rate1on1):30,rateGroup:st?Number(st.rate_group):20,rateCond:(st&&st.rate_cond!=null)?Number(st.rate_cond):'',defaultClientPwd:st?(st.default_client_pwd||'rxtraining'):'rxtraining',ownerPwd:st?(st.owner_pwd||''):'',notifyEmails:st?(st.notify_emails||''):'',ejService:st?(st.ej_service||''):'',ejTemplate:st?(st.ej_template||''):'',ejKey:st?(st.ej_key||''):'',zellePhone:st?(st.zelle_phone||''):'',activityPush:(st&&st.activity_push)||'important',activitySeenAt:(st&&st.activity_seen_at)||'',sports:(st&&st.sports)||'Basketball, Soccer, Tennis, Golf, Track',slogan:(st&&st.slogan)||'',highlightVideo:(st&&st.highlight_video)||'',highlightTitle:(st&&st.highlight_title)||'',aboutText:(st&&st.about_text)||'',aboutCards:(st&&st.about_cards)||'',quoteText:(st&&st.quote_text)||'',quoteBy:(st&&st.quote_by)||'',groupMinPlayers:(st&&st.group_min_players)||2,groupFormHours:(st&&st.group_form_hours)||48,homeAddress:st?(st.home_address||'1 Granger Pond Way'):'1 Granger Pond Way',mileageRate:st&&st.mileage_rate!=null?Number(st.mileage_rate):0.70};
   d.coaches=(coa||[]).map(c=>({id:c.id,name:c.name,tagline:c.tagline||'',bio:c.bio||'',affiliation:c.affiliation||'',affiliationSub:c.affiliation_sub||'',photo:c.photo||'',pwd:c.pwd||'',active:c.active!==false,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',
@@ -2159,6 +2161,9 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
   d.eventRegs=(regs||[]).map(r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||''}));
   d.messages=(msgs||[]).map(m=>({id:m.id,peerType:m.peer_type||'client',clientId:m.client_id||'',coachId:m.coach_id||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',readOwner:m.read_owner===true,readClient:m.read_client===true,readCoach:m.read_coach===true}));
   d.highlights=(hl||[]).map(h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',sport:h.sport||'',active:h.active!==false,type:h.type||'',ord:(h.ord!=null?h.ord:null)}));
+  d.contributors=(cbs||[]).map(c=>({id:c.id,name:c.name||'',role:c.role||'',rate:Number(c.rate||0)}));
+  d.contributions=(cbl||[]).map(x=>({id:x.id,contributorId:x.contributor_id||'',date:x.date||'',
+    hours:Number(x.hours||0),cat:x.cat||'Other',note:x.note||''}));
   d.skills=(sk||[]).map(k=>({id:k.id,sport:k.sport||'Basketball',name:k.name||'',ord:k.ord||0,active:k.active!==false}));
   d.skillLog=(sl||[]).map(e=>({id:e.id,customerId:e.customer_id||'',skillId:e.skill_id||'',ts:e.ts||'',
     by:e.by_role||'',byId:e.by_id||'',byName:e.by_name||'',note:e.note||'',media:e.media||[],level:e.level||'',editedBy:e.edited_by||''}));
@@ -2225,7 +2230,10 @@ async function fetchCloud(){
   try{const l1=await supa.from('skill_log').select('*'); if(l1&&!l1.error)sl=l1;}catch(e){}
   let hl={data:[]};
   try{const h1=await supa.from('highlights').select('*'); if(h1&&!h1.error)hl=h1;}catch(e){}
-  return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data,avail.data,coa.data,evs.data,regs.data,msgs.data,acts.data,sk.data,sl.data,hl.data);
+  let cbs={data:[]}, cbl={data:[]};
+  try{const c1=await supa.from('contributors').select('*'); if(c1&&!c1.error)cbs=c1;}catch(e){}
+  try{const c2=await supa.from('contributions').select('*'); if(c2&&!c2.error)cbl=c2;}catch(e){}
+  return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data,avail.data,coa.data,evs.data,regs.data,msgs.data,acts.data,sk.data,sl.data,hl.data,cbs.data,cbl.data);
 }
 async function bootLoad(){
   const cfg=getSupaCfg();
@@ -2256,6 +2264,8 @@ function dataSig(d){return JSON.stringify({
   // returns early — which silently stopped the badge updating for activity
   hl:(d.highlights||[]).map(x=>[x.id,x.url,x.title,x.date,x.active,x.type,x.ord,x.sport]),
   sk:(d.skills||[]).map(x=>[x.id,x.name,x.sport,x.ord,x.active]),
+  cb:(d.contributors||[]).map(x=>[x.id,x.name,x.role,x.rate]),
+  cl:(d.contributions||[]).map(x=>[x.id,x.contributorId,x.date,x.hours,x.cat]),
   sl:(d.skillLog||[]).length+':'+(d.skillLog||[]).reduce((m,e)=>(e.ts||'')>m?(e.ts||''):m,''),
   act:(d.activity||[]).length+':'+(d.activity||[]).reduce((m,a)=>(a.ts||'')>m?(a.ts||''):m,''),
   as:d.settings&&d.settings.activitySeenAt,
@@ -2636,6 +2646,8 @@ async function cloudPush(){
     await push('highlights',()=>syncTable('highlights',(DB.highlights||[]).map(highlightRow)));
     await push('skills',()=>syncTable('skills',(DB.skills||[]).map(skillRow)));
     await push('skill_log',()=>syncTable('skill_log',(DB.skillLog||[]).map(skillLogRow)));
+    await push('contributors',()=>syncTable('contributors',(DB.contributors||[]).map(c=>({id:c.id,name:c.name||'',role:c.role||'',rate:Number(c.rate||0)}))));
+    await push('contributions',()=>syncTable('contributions',(DB.contributions||[]).map(x=>({id:x.id,contributor_id:x.contributorId||null,date:x.date||null,hours:Number(x.hours||0),cat:x.cat||'',note:x.note||''}))));
     fails.forEach(n=>{});                       // keep syncFails as written above
     Object.keys(syncFails).forEach(n=>{ if(fails.indexOf(n)<0)delete syncFails[n]; });  // cleared on success
     try{localStorage.setItem('rx_syncfails',JSON.stringify(syncFails));}catch(e){}
@@ -4206,9 +4218,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-23 19:33 UTC';
+const BUILD='2026-08-23 19:51 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Unpaid family time now counts as an expense.</b> The business has been running on work nobody invoices for \u2014 building this app, driving to sessions, chasing payments, helping on court \u2014 and leaving it out made the profit look better than it was. <b>P&amp;L \u2192 Unpaid family time</b> holds the people who put those hours in, each with an hourly rate, and a log of the time. Every entry posts as a real expense, so net profit is now after labour everywhere.',
+   'Because that cost never leaves the bank, the P&amp;L shows <b>Cash profit</b> beside net profit \u2014 the figure that reconciles with the account. Rates live on the person, not the entry, so correcting a rate re-values the whole history; time logged for somebody with no rate set is tracked but charged at nothing.',
    '<b>Event money owed is now visible.</b> Event revenue counts registrations marked <b>paid</b>, so an event with ten registered and four paid reported $80 — correct, but it read as though the event only earned $80 when really $120 had not been collected. Unpaid registrations for events that have already happened now appear on the <b>Outstanding</b> table alongside sessions, with a Mark paid button.',
    'The Events table shows collected and unpaid side by side (<b>$80</b> with <i>$120 unpaid</i> beneath), the registrations dialog says how much is still owed, and there is a <b>Mark all remaining paid</b> button for when a class settles up together. Cancelled registrations are excluded, and a future event is not counted as owed \u2014 the same rule sessions follow.',
    '<b>Coach pay can be set on the session itself.</b> The share deal on a coach\u2019s profile covers the ordinary case but cannot express what a weekend class actually costs: a flat fee to whoever ran it regardless of takings, plus assistant fees to whoever helped. The session editor now has a <b>Coach pay</b> panel — add any number of people with an amount and a note, and those amounts replace the deal for that session only. Leave it empty and nothing changes.',
@@ -7914,6 +7928,7 @@ function clientEventBanner(){
    MESSAGES (owner <-> client chat)
    ============================================================ */
 let ownerThread=null, chatThreadKey=null;   // ownerThread = {type:'client'|'coach', id} or null
+function attrEsc(s){return escapeHtml(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function escapeHtml(s){return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function fmtChatTime(iso){try{return new Date(iso).toLocaleString('en-US',{timeZone:TZ,month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
 function peerName(type,id){return type==='coach'?coachName(id):(custById(id)?custById(id).name:'client');}
@@ -8222,7 +8237,9 @@ function plExpenseLines(){
   return expenseOccurrences(DB.expenses||[]).map(e=>({
     date:e.date, amount:Number(e.amount)||0, cat:e.cat||'Other',
     coachId:e.coachId||'', recurring:(e.freq&&e.freq!=='once')||false,
-    kind: isAutoExpense(e) ? 'auto' : ((e.coachId&&e.coachId!=='owner') ? 'coach' : 'fixed')
+    kind: /^labour-/.test(e.id||'') ? 'labour'
+        : isAutoExpense(e) ? 'auto'
+        : ((e.coachId&&e.coachId!=='owner') ? 'coach' : 'fixed')
   })).filter(e=>e.date&&e.amount>0);
 }
 /* months from oldest to newest across a window ending this month */
@@ -8254,6 +8271,145 @@ function plBarRows(rows,total){
     <td style="min-width:130px"><div class="bar"><i style="width:${total?Math.max(2,r.v/total*100):0}%"></i></div></td>
     <td class="right"><b>${money(r.v)}</b><div class="clienttag">${total?(r.v/total*100).toFixed(1):0}%</div></td></tr>`).join('');
 }
+/* ---- Unpaid family time: people, rates, and the log ---------------------- */
+function contribSorted(){
+  return (DB.contributions||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+}
+function labourPanelHtml(from,to){
+  const people=(DB.contributors||[]);
+  const all=contribSorted();
+  const win=all.filter(x=>{const k=(x.date||'').slice(0,7);return k>=from&&k<=to;});
+  const hrs=win.reduce((a,x)=>a+(Number(x.hours)||0),0);
+  const val=win.reduce((a,x)=>a+contribValue(x),0);
+
+  const byPerson=people.map(c=>{
+    const mine=win.filter(x=>x.contributorId===c.id);
+    return {c, h:mine.reduce((a,x)=>a+(Number(x.hours)||0),0), v:mine.reduce((a,x)=>a+contribValue(x),0)};
+  }).sort((a,b)=>b.v-a.v);
+
+  const byCat={}; win.forEach(x=>{const k=x.cat||'Other'; byCat[k]=(byCat[k]||0)+contribValue(x);});
+  const catRows=Object.keys(byCat).map(k=>({k,v:byCat[k]})).sort((a,b)=>b.v-a.v);
+
+  return `<div class="panel" style="margin-top:16px">
+    <div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+      <div>
+        <h3 style="margin:0">Unpaid family time</h3>
+        <div class="sub" style="margin:4px 0 0">The work nobody invoices for &mdash; building this app, driving, admin, helping on court.
+        Every hour logged here is valued at that person&rsquo;s rate and counted as a real expense, so net profit is honest about what the business actually costs.</div>
+      </div>
+      <div class="row" style="gap:8px">
+        <button class="btn sm" onclick="editContributor('')">+ Person</button>
+        <button class="btn sm primary" onclick="logContribution('')" ${people.length?'':'disabled title="Add a person first"'}>+ Log time</button>
+      </div>
+    </div>
+
+    <div class="stats" style="margin-top:12px">
+      <div class="stat"><div class="k">Hours given</div><div class="v">${hrs.toFixed(1)}</div><div class="d muted">in this period</div></div>
+      <div class="stat"><div class="k">What it was worth</div><div class="v">${money(val)}</div><div class="d muted">counted as expense</div></div>
+      <div class="stat"><div class="k">People</div><div class="v">${people.length}</div><div class="d muted">${byPerson.filter(x=>x.h>0).length} active this period</div></div>
+    </div>
+
+    <h3 style="margin-top:18px">Who</h3>
+    <table><thead><tr><th>Person</th><th>Role</th><th class="right">Rate</th><th class="right">Hours</th><th class="right">Value</th><th></th></tr></thead><tbody>
+      ${byPerson.map(x=>`<tr>
+        <td><b>${attrEsc(x.c.name||'—')}</b></td>
+        <td class="muted">${attrEsc(x.c.role||'—')}</td>
+        <td class="right">${Number(x.c.rate)>0?money(x.c.rate)+'/h':'<span class="muted">not set</span>'}</td>
+        <td class="right">${x.h?x.h.toFixed(1):'<span class="muted">0</span>'}</td>
+        <td class="right"><b>${money(x.v)}</b></td>
+        <td class="right"><button class="btn xs" onclick="editContributor('${x.c.id}')">Edit</button></td></tr>`).join('')
+        ||'<tr><td colspan="6"><div class="empty">Nobody added yet. Add the people who put unpaid hours in.</div></td></tr>'}
+    </tbody></table>
+
+    ${catRows.length?`<h3 style="margin-top:18px">What the time went on</h3>
+    <table><thead><tr><th>Kind of work</th><th></th><th class="right">Value</th></tr></thead>
+      <tbody>${plBarRows(catRows,val)}</tbody></table>`:''}
+
+    <h3 style="margin-top:18px">Log <span class="muted" style="font-weight:400;font-size:12px">&mdash; newest first, whole history</span></h3>
+    <table><thead><tr><th>Date</th><th>Person</th><th>Work</th><th class="right">Hours</th><th class="right">Value</th><th></th></tr></thead><tbody>
+      ${all.slice(0,60).map(x=>`<tr>
+        <td>${fmtDate(x.date)}</td>
+        <td><b>${attrEsc(contributorName(x.contributorId))}</b></td>
+        <td>${attrEsc(x.cat||'Other')}${x.note?`<div class="clienttag">${attrEsc(x.note)}</div>`:''}</td>
+        <td class="right">${(Number(x.hours)||0).toFixed(1)}</td>
+        <td class="right">${money(contribValue(x))}</td>
+        <td class="right"><button class="btn xs" onclick="logContribution('${x.id}')">Edit</button>
+          <button class="btn xs danger" onclick="delContribution('${x.id}')">Delete</button></td></tr>`).join('')
+        ||'<tr><td colspan="6"><div class="empty">No time logged yet.</div></td></tr>'}
+    </tbody></table>
+    ${all.length>60?`<div class="sub">Showing the most recent 60 of ${all.length}.</div>`:''}
+  </div>`;
+}
+function editContributor(id){
+  const c=contributorById(id)||{id:'',name:'',role:'',rate:''};
+  openModal((c.id?'Edit person':'Add person'),`
+    <label>Name</label><input id="cbName" value="${attrEsc(c.name||'')}" placeholder="e.g. Raymond&rsquo;s dad">
+    <label>Role</label><input id="cbRole" value="${attrEsc(c.role||'')}" placeholder="e.g. app development, logistics">
+    <label>Hourly rate (USD)</label><input id="cbRate" type="number" min="0" step="1" value="${c.rate===''||c.rate==null?'':c.rate}" placeholder="what this hour is worth">
+    <div class="sub">Every hour logged for this person is valued at this rate and posted as an expense. Change the rate and past entries re-value with it &mdash; it is derived, never frozen.</div>
+    <div class="row" style="justify-content:space-between;margin-top:14px">
+      <div>${c.id?`<button class="btn danger" onclick="delContributor('${c.id}')">Delete</button>`:''}</div>
+      <div class="row" style="gap:8px"><button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="saveContributor('${c.id}')">Save</button></div>
+    </div>`);
+}
+function saveContributor(id){
+  const name=($('#cbName').value||'').trim();
+  if(!name){alert('Give the person a name.');return;}
+  const rateRaw=($('#cbRate').value||'').trim();
+  const rate=rateRaw===''?0:Math.max(0,Number(rateRaw)||0);
+  if(!DB.contributors)DB.contributors=[];
+  let c=contributorById(id);
+  if(!c){ c={id:uid()}; DB.contributors.push(c); }
+  c.name=name; c.role=($('#cbRole').value||'').trim(); c.rate=rate;
+  save(); closeModal(); flash('Saved'); renderPL();
+}
+function delContributor(id){
+  const used=(DB.contributions||[]).filter(x=>x.contributorId===id).length;
+  if(used&&!confirm('This person has '+used+' logged entr'+(used===1?'y':'ies')+'. Deleting removes them and every entry, and the expenses go with it. Continue?'))return;
+  DB.contributors=(DB.contributors||[]).filter(c=>c.id!==id);
+  (DB.contributions||[]).filter(x=>x.contributorId===id).forEach(x=>upsertAutoExpense(null,labourExpenseId(x.id)));
+  DB.contributions=(DB.contributions||[]).filter(x=>x.contributorId!==id);
+  save(); closeModal(); flash('Removed'); renderPL();
+}
+function logContribution(id){
+  const x=(DB.contributions||[]).find(v=>v.id===id)||{id:'',contributorId:(DB.contributors[0]||{}).id,date:todayISO(),hours:'',cat:LABOUR_CATS[0],note:''};
+  openModal((x.id?'Edit logged time':'Log time'),`
+    <label>Person</label><select id="lgWho">${(DB.contributors||[]).map(c=>
+      `<option value="${c.id}" ${c.id===x.contributorId?'selected':''}>${attrEsc(c.name)}${Number(c.rate)>0?' — '+money(c.rate)+'/h':' — rate not set'}</option>`).join('')}</select>
+    <label>Date</label><input id="lgDate" type="date" value="${x.date||todayISO()}">
+    <label>Kind of work</label><select id="lgCat">${LABOUR_CATS.map(c=>
+      `<option ${c===(x.cat||'')?'selected':''}>${c}</option>`).join('')}</select>
+    <label>Hours</label><input id="lgHrs" type="number" min="0" step="0.25" value="${x.hours===''||x.hours==null?'':x.hours}" placeholder="e.g. 2.5">
+    <label>Note <span class="muted">(optional)</span></label><input id="lgNote" value="${attrEsc(x.note||'')}" placeholder="what it was for">
+    <div class="sub" id="lgPrev"></div>
+    <div class="row" style="justify-content:flex-end;gap:8px;margin-top:14px">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="saveContribution('${x.id}')">Save</button></div>`);
+  const prev=()=>{const c=contributorById($('#lgWho').value); const h=Number($('#lgHrs').value)||0;
+    $('#lgPrev').innerHTML=(c&&Number(c.rate)>0)
+      ? 'Posts as an expense of <b>'+money(h*Number(c.rate))+'</b>.'
+      : 'This person has no rate set, so nothing will be charged. Set a rate to count the time.';};
+  ['#lgWho','#lgHrs'].forEach(k=>{const n=$(k); if(n){n.oninput=prev;n.onchange=prev;}});
+  prev();
+}
+function saveContribution(id){
+  const hours=Math.max(0,Number($('#lgHrs').value)||0);
+  if(!hours){alert('Enter how many hours.');return;}
+  const date=$('#lgDate').value||todayISO();
+  if(!DB.contributions)DB.contributions=[];
+  let x=DB.contributions.find(v=>v.id===id);
+  if(!x){ x={id:uid()}; DB.contributions.push(x); }
+  x.contributorId=$('#lgWho').value; x.date=date; x.hours=hours;
+  x.cat=$('#lgCat').value; x.note=($('#lgNote').value||'').trim();
+  save(); closeModal(); flash('Logged '+hours+'h'); renderPL();
+}
+function delContribution(id){
+  if(!confirm('Delete this logged time? The matching expense goes with it.'))return;
+  upsertAutoExpense(null,labourExpenseId(id));
+  DB.contributions=(DB.contributions||[]).filter(x=>x.id!==id);
+  save(); flash('Deleted'); renderPL();
+}
 function renderPL(){
   const el=$('#view-pl'); if(!el)return;
   const months=plMonths(plRange), from=months[0], to=months[months.length-1];
@@ -8262,6 +8418,10 @@ function renderPL(){
   const exp=plExpenseLines().filter(inWin).filter(r=>inScope(r.coachId));
   const R=rev.reduce((a,r)=>a+r.amount,0), E=exp.reduce((a,r)=>a+r.amount,0), N=R-E;
   const margin=R?(N/R*100):0;
+  /* Labour is real cost but not cash out the door, so the bank will never match N.
+     Carry the cash figure alongside it rather than making the operator do the sum. */
+  const L=exp.filter(x=>x.kind==='labour').reduce((a,x)=>a+x.amount,0);
+  const CASH=R-(E-L);
 
   const byMonth=months.map(k=>{
     const r=rev.filter(x=>x.date.slice(0,7)===k).reduce((a,x)=>a+x.amount,0);
@@ -8272,7 +8432,8 @@ function renderPL(){
 
   const kinds=[['fixed','Fixed / overhead','Rent, gear, anything that exists whether or not anyone trains'],
                ['coach','Coach-attributed','Entered by hand against a coach'],
-               ['auto','Per-session (auto)','Mileage and coach payouts, derived from sessions']];
+               ['auto','Per-session (auto)','Mileage and coach payouts, derived from sessions'],
+               ['labour','Unpaid family time','Hours worked without an invoice, valued at each person\u2019s rate']];
   const expByKind=kinds.map(([k,lab,note])=>({k,lab,note,v:exp.filter(x=>x.kind===k).reduce((a,x)=>a+x.amount,0)}));
   const expByCat={}; exp.forEach(x=>{expByCat[x.cat]=(expByCat[x.cat]||0)+x.amount;});
   const catRows=Object.keys(expByCat).map(k=>({k,v:expByCat[k]})).sort((a,b)=>b.v-a.v);
@@ -8287,7 +8448,8 @@ function renderPL(){
     <div class="stats">
       <div class="stat"><div class="k">Revenue</div><div class="v">${money(R)}</div><div class="d muted">cash received</div></div>
       <div class="stat"><div class="k">Expenses</div><div class="v">${money(E)}</div><div class="d muted">${expByKind.filter(x=>x.v>0).length} kind(s)</div></div>
-      <div class="stat"><div class="k">Net profit</div><div class="v" style="color:${N>=0?'var(--green)':'var(--red)'}">${money(N)}</div><div class="d muted">${margin.toFixed(1)}% margin</div></div>
+      <div class="stat"><div class="k">Net profit</div><div class="v" style="color:${N>=0?'var(--green)':'var(--red)'}">${money(N)}</div><div class="d muted">${margin.toFixed(1)}% margin${L>0?' · after unpaid time':''}</div></div>
+      ${L>0?`<div class="stat"><div class="k">Cash profit</div><div class="v" style="color:${CASH>=0?'var(--green)':'var(--red)'}">${money(CASH)}</div><div class="d muted">what the bank sees</div></div>`:''}
       <div class="stat"><div class="k">Best month</div><div class="v" style="font-size:20px">${best&&best.k?plMonthLabel(best.k):'—'}</div><div class="d muted">${best?money(best.n):''} net</div></div>
     </div>
 
@@ -8333,7 +8495,9 @@ function renderPL(){
         <table><thead><tr><th>Category</th><th></th><th class="right">Spent</th></tr></thead>
           <tbody>${plBarRows(catRows,E)}</tbody></table>
       </div>
-    </div>`;
+    </div>
+
+    ${labourPanelHtml(from,to)}`;
   try{ drawPLChart(byMonth); }catch(e){ console.warn('P&L chart failed:',e&&e.message); }
 }
 function renderFinance(){
@@ -9249,9 +9413,35 @@ function saveMileage(){
    coach switched family<->partner, mileage cleared). This is why they're recomputed from
    scratch on every save rather than patched at each call site.
    ============================================================================ */
+/* ---- Unpaid family time ---------------------------------------------------
+   The business runs on work nobody invoices for: building this app, driving to sessions, chasing
+   payments, helping on court. Leaving it out makes the profit look better than it is, because it
+   is really profit borrowed against somebody's evenings.
+
+   Each contributor carries an hourly rate; each logged block of time becomes a real expense, so
+   net profit is after labour everywhere. The trade-off is deliberate and worth stating: the P&L
+   no longer equals the bank balance, so the P&L page also shows CASH profit beside it — the
+   figure that reconciles. */
+const LABOUR_CATS=['App development','Driving & logistics','Admin & scheduling','Coaching & on-court help','Other'];
+function labourExpenseId(id){return 'labour-'+id;}
+function contributorById(id){return (DB.contributors||[]).find(c=>c.id===id);}
+function contributorName(id){const c=contributorById(id);return c?c.name:'—';}
+function contribValue(x){
+  const c=contributorById(x&&x.contributorId);
+  return Math.round(((Number(x&&x.hours)||0)*(c?Number(c.rate)||0:0))*100)/100;
+}
+function syncLabourExpenses(){
+  (DB.contributions||[]).forEach(x=>{
+    const eid=labourExpenseId(x.id), amt=contribValue(x);
+    if(amt<=0){ upsertAutoExpense(null,eid); return; }
+    upsertAutoExpense({id:eid,coachId:'owner',date:x.date,cat:'Unpaid time',amount:amt,
+      note:contributorName(x.contributorId)+' · '+(x.cat||'Other')+' · '+(Number(x.hours)||0)+'h'+(x.note?(' — '+x.note):''),
+      freq:'once'},eid);
+  });
+}
 function gasExpenseId(sessionId){return 'gas-'+sessionId;}
 function payoutExpenseId(sessionId,coachId){return 'payout-'+sessionId+(coachId?('-'+coachId):'');}
-function isAutoExpense(e){return !!e&&/^(gas|payout)-/.test(e.id||'');}
+function isAutoExpense(e){return !!e&&/^(gas|payout|labour)-/.test(e.id||'');}
 /* ---- Who actually gets paid for a session ---------------------------------
    The share deal on a coach's profile covers the ordinary case. It cannot express what a weekend
    class often costs: a flat fee to the coach who ran it regardless of takings, plus assistant
@@ -9347,6 +9537,8 @@ function resyncAutoExpenses(){
     live.add(payoutExpenseId(s.id));
     sessionPayouts(s).forEach(x=>live.add(payoutExpenseId(s.id,x.coachId)));   // one row per person
   });
+  syncLabourExpenses();
+  (DB.contributions||[]).forEach(x=>live.add(labourExpenseId(x.id)));
   DB.expenses=DB.expenses.filter(e=>!isAutoExpense(e)||live.has(e.id));
 }
 function openExpense(id){
