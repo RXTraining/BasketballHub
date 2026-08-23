@@ -466,6 +466,8 @@
   .flash.show{transform:translateX(-50%) translateY(0)}
   .flash.warn{background:var(--yellow);color:#ffffff}
   .seg{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+  .mlseg{margin-bottom:8px}
+  .mlseg button b{font-size:11px}
   .seg button{background:var(--panel2);border:1px solid var(--line);color:var(--muted);padding:8px 14px;
     border-radius:999px;cursor:pointer;font-weight:600;font-size:13px}
   .seg button.active{background:var(--accent);color:#111;border-color:transparent}
@@ -1699,6 +1701,61 @@ function t(s){const d=LANGDICT[LANG];return (d&&d[s])?d[s]:s;}
    A marker must start its own line; everything under it belongs to that language. Text with no
    markers is returned unchanged, so nothing written before this existed breaks. Falls back to
    English, then to whatever block exists. */
+/* ---- Per-language editing of owner-written text ---------------------------
+   mlText() reads the [en]/[zh]/[ko]/[ja] markers at display time. Expecting the owner to TYPE
+   those markers was the flaw: nobody did, so custom About copy and feature cards stayed English
+   for every visitor while the surrounding headings translated — which reads as a broken site.
+   These helpers give each field a tab per language and write the marker format for you. */
+const ML_LANGS=[['en','English'],['zh','中文'],['ko','한국어'],['ja','日本語']];
+function mlParse(str){
+  const raw=(str==null?'':String(str));
+  const out={en:'',zh:'',ko:'',ja:''};
+  if(!/^\s*\[(en|zh|ko|ja)\]/mi.test(raw)){ out.en=raw; return out; }   // plain text = English
+  let cur=null,buf=[];
+  raw.split(/\r?\n/).forEach(line=>{
+    const m=line.match(/^\s*\[(en|zh|ko|ja)\]\s?(.*)$/i);
+    if(m){ if(cur)out[cur]=buf.join('\n').trim(); cur=m[1].toLowerCase(); buf=[m[2]]; }
+    else buf.push(line);
+  });
+  if(cur)out[cur]=buf.join('\n').trim();
+  return out;
+}
+function mlBuild(vals){
+  const filled=ML_LANGS.filter(([k])=>((vals[k]||'').trim()));
+  if(!filled.length)return '';
+  // English only? store it plainly — no need to litter the field with markers
+  if(filled.length===1&&filled[0][0]==='en')return (vals.en||'').trim();
+  return filled.map(([k])=>'['+k+'] '+(vals[k]||'').trim()).join('\n');
+}
+/* One field per language, one visible at a time. A dot on the tab means that language is filled. */
+function mlEditor(id,value,rows,ph){
+  const v=mlParse(value);
+  const esc=x=>(x||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  return `<div class="mlwrap" id="${id}_wrap">
+    <div class="seg mlseg" style="margin-bottom:8px">${ML_LANGS.map(([k,lab],i)=>
+      `<button type="button" class="${i?'':'active'}" onclick="mlTab('${id}','${k}',this)">${lab}${(v[k]||'').trim()?' <b style="color:var(--accent)">●</b>':''}</button>`).join('')}</div>
+    ${ML_LANGS.map(([k],i)=> rows>1
+      ? `<textarea id="${id}_${k}" rows="${rows}" ${i?'style="display:none"':''} placeholder="${ph||''}">${esc(v[k])}</textarea>`
+      : `<input id="${id}_${k}" ${i?'style="display:none"':''} value="${(v[k]||'').replace(/"/g,'&quot;')}" placeholder="${ph||''}">`).join('')}
+    <div class="clienttag" style="margin-top:5px">Leave a language blank and visitors using it see the <b style="color:var(--txt)">English</b> version.</div>
+  </div>`;
+}
+function mlTab(id,k,btn){
+  ML_LANGS.forEach(([l])=>{const el=document.getElementById(id+'_'+l); if(el)el.style.display=(l===k)?'':'none';});
+  const w=document.getElementById(id+'_wrap');
+  if(w)[...w.querySelectorAll('.mlseg button')].forEach(b=>b.classList.toggle('active',b===btn));
+}
+function mlRead(id){
+  const vals={};
+  ML_LANGS.forEach(([k])=>{const el=document.getElementById(id+'_'+k); vals[k]=el?el.value:'';});
+  return mlBuild(vals);
+}
+/* drop text into the English field — used by the "load the default wording" buttons */
+function mlSetEn(id,txt){
+  const el=document.getElementById(id+'_en');
+  if(el){ el.value=txt; const w=document.getElementById(id+'_wrap');
+    if(w){const b=w.querySelector('.mlseg button'); if(b)mlTab(id,'en',b);} el.focus(); }
+}
 function mlText(str){
   const raw=(str==null?'':String(str));
   if(!/^\s*\[(en|zh|ko|ja)\]/mi.test(raw))return raw;
@@ -4024,6 +4081,8 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    ============================================================================ */
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Every Admin text box now has a tab per language.</b> The About copy, feature cards, quote and slogan each get <b>English / 中文 / 한국어 / 日本語</b> tabs, with a dot marking the ones you have filled in. Leave a tab blank and those visitors see the English. Expecting the owner to type <span class="mono">[zh]</span> markers by hand was the flaw in the previous approach — nobody did, so custom copy stayed English for every visitor while the headings around it translated, which reads as a broken site rather than a setting nobody had used.',
+   'Existing text is safe: whatever is there now loads into the English tab, and a field with only English is still stored as plain text rather than gaining markers. Nothing needs re-entering.',
    '<b>Fix:</b> the language button did nothing when you were <i>signed in and viewing the home page</i> through the header logo. It decided what to repaint by asking whether anyone was signed in, rather than what was actually on screen — so it refreshed the app hidden underneath and left the visible page in the old language. It now repaints whatever is showing, and the app behind it too, so both are right when you go back.',
    '<b>Fix:</b> the page jumped to the top on every save and every background sync. A scroll-to-top meant for tab switching had been added one function too far up, into the refresh that also runs on saves and on the 45-second poll — so it yanked you away mid-read. It now runs only when the tab actually changes.',
    '<b>Outstanding now counts only sessions that have actually been delivered.</b> A session booked for next week is not a debt — nobody has had anything yet — and counting it inflated the figure with work that had not happened. Only <b>completed</b> sessions are counted; pending requests, future bookings, cancellations and unpriced sessions are all excluded. The change is at the source, so the headline figure, the table and the Excel export all agree.',
@@ -8245,8 +8304,12 @@ function renderAdmin(){
     </div>
     <div class="panel" style="margin-top:16px">
       <h3>Home page — slogan</h3>
+      <div class="panel" style="background:var(--a3b);border-color:var(--a3);padding:11px;margin-bottom:12px">
+        <b class="small">🌐 Your own words cannot be translated automatically</b>
+        <div class="clienttag" style="margin-top:4px">Headings and buttons are translated by the app, but anything you write here is shown exactly as typed — so a visitor reading in 中文 sees your English until you fill in the 中文 tab. Every box below has a tab per language, and a <b style="color:var(--txt)">●</b> marks the ones you have written. Leave a tab blank and those visitors get the English.</div>
+      </div>
       <div class="clienttag" style="margin-bottom:8px">The brand line under <b style="color:var(--txt)">RX•TRAINING</b>. Blank uses the built-in wording, which is translated into 中文 / 한국어 / 日本語. Write your own and it shows as typed — or give each language its own line with <b style="color:var(--txt)">[en]</b> / <b style="color:var(--txt)">[zh]</b> / <b style="color:var(--txt)">[ko]</b> / <b style="color:var(--txt)">[ja]</b>.</div>
-      <div class="field"><input id="adSlogan" value="${(DB.settings.slogan||'').replace(/"/g,'&quot;')}" placeholder="${DEFAULT_SLOGAN}"></div>
+      <div class="field">${mlEditor('adSlogan',DB.settings.slogan,1,DEFAULT_SLOGAN)}</div>
       <div class="clienttag" style="margin:-4px 0 12px">Showing now: <b style="color:var(--txt)">${sloganText()}</b></div>
       <div class="row" style="gap:8px">
         <button class="btn sm" onclick="saveSlogan()">Save slogan</button>
@@ -8257,7 +8320,7 @@ function renderAdmin(){
     <div class="panel" style="margin-top:16px">
       <h3>Home page — “The RX approach” text</h3>
       <div class="clienttag" style="margin-bottom:8px">The About section on rxtraining.org. Leave blank to use the built-in wording (which is translated into 中文 / 한국어 / 日本語). Anything you write here is shown exactly as typed, in every language.<br>Separate paragraphs with a <b style="color:var(--txt)">blank line</b>. Basic HTML like &lt;b&gt;bold&lt;/b&gt; works.</div>
-      <div class="field"><textarea id="aboutTxt" rows="10" placeholder="Leave blank to use the default wording…">${(DB.settings.aboutText||'').replace(/</g,'&lt;')}</textarea>
+      <div class="field">${mlEditor('aboutTxt',DB.settings.aboutText,10,'Leave blank to use the default wording…')}
       <div class="clienttag" style="margin-top:4px">Optional — write it in more than one language by starting a line with <b style="color:var(--txt)">[en]</b>, <b style="color:var(--txt)">[zh]</b>, <b style="color:var(--txt)">[ko]</b> or <b style="color:var(--txt)">[ja]</b>. Each visitor sees their own language (English if theirs is missing). Leave it plain and it shows as typed to everyone.</div></div>
       <div class="row" style="gap:8px">
         <button class="btn sm" onclick="saveAboutText()">Save About text</button>
@@ -8267,7 +8330,7 @@ function renderAdmin(){
 
       <h3 style="margin-top:22px">Home page — feature cards</h3>
       <div class="clienttag" style="margin-bottom:8px">The four cards under the About text. <b style="color:var(--txt)">One card per line</b>, written as <b style="color:var(--txt)">icon | title | text</b>. Add or remove lines to change how many cards appear. Blank = built-in (translated) cards.</div>
-      <div class="field"><textarea id="aboutCards" rows="6" placeholder="⚡ | Active AAU competitor | Our coaches still compete…">${(DB.settings.aboutCards||'').replace(/</g,'&lt;')}</textarea></div>
+      <div class="field">${mlEditor('aboutCards',DB.settings.aboutCards,6,'⚡ | Coached by active competitors | Our coaches still compete…')}</div>
       <div class="row" style="gap:8px">
         <button class="btn sm" onclick="saveAboutCards()">Save cards</button>
         <button class="btn ghost sm" onclick="loadDefaultCards()">Load the default cards</button>
@@ -8276,7 +8339,7 @@ function renderAdmin(){
 
       <h3 style="margin-top:22px">Home page — quote</h3>
       <div class="clienttag" style="margin-bottom:8px">The dark quote panel. Wrap words in <b style="color:var(--txt)">&lt;em&gt;…&lt;/em&gt;</b> to highlight them in green. Blank = built-in (translated) quote.</div>
-      <div class="field"><textarea id="quoteTxt" rows="4" placeholder="We're not only teaching kids basketball…">${(DB.settings.quoteText||'').replace(/</g,'&lt;')}</textarea></div>
+      <div class="field">${mlEditor('quoteTxt',DB.settings.quoteText,4,"We're not only teaching kids a sport…")}</div>
       <div class="field"><label class="f">Attribution</label>
         <input id="quoteBy" value="${(DB.settings.quoteBy||'').replace(/"/g,'&quot;')}" placeholder="Raymond Xu, Founder · Middlesex Magic (AAU)"></div>
       <div class="row" style="gap:8px">
@@ -8628,11 +8691,11 @@ function delSkill(id){
   save(); flash('Skill removed'); openSkillAdmin(k.sport);
 }
 function saveSlogan(){
-  DB.settings.slogan=($('#adSlogan').value||'').trim();
+  DB.settings.slogan=mlRead('adSlogan');
   save(); flash(DB.settings.slogan?'Slogan saved':'Using the built-in slogan again'); renderAdmin();
 }
 function loadDefaultSlogan(){
-  const el=$('#adSlogan'); if(el){el.value=DEFAULT_SLOGAN;el.focus();}
+  mlSetEn('adSlogan',DEFAULT_SLOGAN);
   flash('Default loaded — edit it, then press Save');
 }
 function clearSlogan(){
@@ -8651,7 +8714,7 @@ function clearSportsList(){
   save(); flash('Default sports restored'); renderAdmin();
 }
 function saveAboutText(){
-  DB.settings.aboutText=($('#aboutTxt').value||'').trim();
+  DB.settings.aboutText=mlRead('aboutTxt');
   save();
   flash(DB.settings.aboutText?'About text saved':'Using the built-in wording again');
   renderAdmin();
@@ -8662,7 +8725,7 @@ function loadDefaultAbout(){
   const co=(activeCoaches()[0])||{};
   const def=[tf('ABOUT_P1',{name:co.name||'Raymond Xu'}),t('ABOUT_P2'),t('ABOUT_P3')]
     .join('\n\n').replace(/<\/?b>/g,'');
-  const el=$('#aboutTxt'); if(el){el.value=def;el.focus();}
+  mlSetEn('aboutTxt',def);
   flash('Default wording loaded — edit it, then press Save');
 }
 function clearAboutText(){
@@ -8671,7 +8734,7 @@ function clearAboutText(){
   save(); flash('Restored the built-in wording'); renderAdmin();
 }
 function saveAboutCards(){
-  DB.settings.aboutCards=($('#aboutCards').value||'').trim();
+  DB.settings.aboutCards=mlRead('aboutCards');
   save(); flash(DB.settings.aboutCards?'Cards saved':'Using the built-in cards again'); renderAdmin();
 }
 function loadDefaultCards(){
@@ -8680,7 +8743,7 @@ function loadDefaultCards(){
              ['🧠',t('Game IQ first'),t('CARD_IQ')],
              ['🔥',t('Never give up'),t('CARD_GRIT')]]
     .map(r=>r.join(' | ')).join('\n');
-  const el=$('#aboutCards'); if(el){el.value=def;el.focus();}
+  mlSetEn('aboutCards',def);
   flash('Default cards loaded — edit them, then press Save');
 }
 function clearAboutCards(){
@@ -8688,13 +8751,13 @@ function clearAboutCards(){
   DB.settings.aboutCards=''; save(); flash('Restored the built-in cards'); renderAdmin();
 }
 function saveQuote(){
-  DB.settings.quoteText=($('#quoteTxt').value||'').trim();
+  DB.settings.quoteText=mlRead('quoteTxt');
   DB.settings.quoteBy=($('#quoteBy').value||'').trim();
   save(); flash(DB.settings.quoteText?'Quote saved':'Using the built-in quote again'); renderAdmin();
 }
 function loadDefaultQuote(){
   const co=(activeCoaches()[0])||{};
-  const q=$('#quoteTxt'); if(q){q.value=t('QUOTE');q.focus();}
+  mlSetEn('quoteTxt',t('QUOTE'));
   const b=$('#quoteBy'); if(b)b.value=(co.name||'Raymond Xu')+', '+t('Founder')+' · Middlesex Magic (AAU)';
   flash('Default quote loaded — edit it, then press Save');
 }
