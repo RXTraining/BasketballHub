@@ -4004,6 +4004,8 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    ============================================================================ */
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Outstanding payments can be filtered to one client.</b> The picker lists only people who actually owe something, each with their total, biggest debt first — and a pill beside it shows the amount due for whatever is selected. Choosing <i>Everyone</i> shows the full figure and how many clients it is spread across, so the question \u201chow much does this family owe me\u201d is one tap rather than a scan down the table.',
+   'The Outstanding table now shows the <b>session time</b> under the date, and sorts by date then time — two sessions on the same day were previously indistinguishable. A group session lists each unpaid player separately, so filtering to a client shows only their share.',
    '<b>Highlights are grouped by sport, then by month.</b> The home page gallery gains a row of sport tabs above the month tabs, each showing how many items it holds; picking a sport filters the months beneath it. The row only appears when there is more than one sport, so a single-sport gallery is unchanged. Uploads and links carry a sport, set on the upload form and changeable per row in Admin, and the Admin list is ordered the same way the home page groups it so dragging rearranges what you are actually looking at.',
    'Highlights saved before this have no sport recorded. Rather than stranding them in an \u201cOther\u201d bucket they fall back to the first sport the business runs, so nothing disappears from the gallery — re-file any of them from the new Sport column in Admin. Sport names use the same forgiving matching as everywhere else, so a highlight filed under \u201cRunning\u201d appears under Track &amp; Field.',
    '<b>Slogan:</b> “We plant the seed of sport” now sits under the RX•TRAINING wordmark on the home page, in a volt-to-blue gradient. Editable in <b>Admin → Home page — slogan</b>, with the same <b>[en]/[zh]/[ko]/[ja]</b> markers as the other free-text fields, so each language can have its own wording. Blank uses the built-in translated version.',
@@ -7931,28 +7933,42 @@ function renderFinance(){
   // One row per session for 1:1 (unchanged), but one row PER UNPAID PLAYER for groups — so a
   // group where Yanyan already paid and Rick hasn't shows only Rick here, with his own share
   // and his own Cash/Credit action, not the whole session.
-  const unpaidRows=(()=>{
+  /* Every unpaid line, tagged with WHO owes it and HOW MUCH, so the table can be filtered to one
+     client and totalled. Built before the markup so the filter and the total read the same list. */
+  const unpaidList=(()=>{
     const out=[];
     S.filter(s=>s.status!=='cancelled').forEach(s=>{
       if(s.type!=='1on1'&&s.customerIds.length>1){
         s.customerIds.forEach(cid=>{
           const p=custPay(s,cid); if(p.paid)return;
           const c=custById(cid);
-          out.push({date:s.date,html:`<tr>
-            <td>${fmtDate(s.date)}</td><td>${coachIcon(s.coachId)} ${coachName(s.coachId)}</td><td>${c?c.name:'—'}<div class="clienttag">Group w/ ${custNames(s.customerIds.filter(x=>x!==cid))}</div></td>
+          const n=Math.max(1,s.customerIds.length);
+          out.push({date:s.date,time:s.time||'',cid,amt:sessionPriced(s)?priceOf(s)/n:0,html:`<tr>
+            <td>${fmtDate(s.date)}${s.time?`<div class="clienttag">${fmtT(s.time)}</div>`:''}</td><td>${coachIcon(s.coachId)} ${coachName(s.coachId)}</td><td>${c?c.name:'—'}<div class="clienttag">Group w/ ${custNames(s.customerIds.filter(x=>x!==cid))}</div></td>
             <td>Group</td><td class="right">${shareLabel(s)}</td>
             <td class="right"><div class="actions">${c&&creditsFor(c,s.type)>0?`<button class="btn sm ghost" onclick="setGroupPay('${s.id}','${cid}',true,'package')">Credit</button>`:''}<button class="btn sm" onclick="setGroupPay('${s.id}','${cid}',true,'cash')">Cash</button></div></td></tr>`});
         });
       } else if(!s.paid){
-        out.push({date:s.date,html:`<tr>
-          <td>${fmtDate(s.date)}</td><td>${coachIcon(s.coachId)} ${coachName(s.coachId)}</td><td>${custNames(s.customerIds)}</td>
+        out.push({date:s.date,time:s.time||'',cid:(s.customerIds[0]||''),amt:sessionPriced(s)?priceOf(s):0,html:`<tr>
+          <td>${fmtDate(s.date)}${s.time?`<div class="clienttag">${fmtT(s.time)}</div>`:''}</td><td>${coachIcon(s.coachId)} ${coachName(s.coachId)}</td><td>${custNames(s.customerIds)}</td>
           <td>${typeShort(s.type)}</td><td class="right">${priceLabel(s)}</td>
           <td class="right"><div class="actions">${sessionHasCredit(s)?`<button class="btn sm ghost" onclick="payCredit('${s.id}')">🎟️ Credit</button>`:`<button class="btn sm ghost" style="opacity:.5" title="No prepaid ${typeShort(s.type)} credit — tap to sell a package" onclick="openSellPackage('${s.customerIds[0]||''}','${s.type}')">🎟️ Sell credit</button>`}<button class="btn sm" onclick="payCash('${s.id}')">Cash</button></div></td></tr>`});
       }
     });
-    out.sort((a,b)=>a.date.localeCompare(b.date));
-    return out.length?out.map(r=>r.html).join(''):'<tr><td colspan="6"><div class="empty">All caught up — nothing outstanding! 🎉</div></td></tr>';
+    out.sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
+    return out;
   })();
+  // filtered view — owedCust is '' for everyone
+  const owedRows=unpaidList.filter(r=>!owedCust||r.cid===owedCust);
+  const owedTotal=owedRows.reduce((a,r)=>a+(r.amt||0),0);
+  const unpaidRows=owedRows.length?owedRows.map(r=>r.html).join('')
+    :`<tr><td colspan="6"><div class="empty">${owedCust?'Nothing outstanding for this client 🎉':'All caught up — nothing outstanding! 🎉'}</div></td></tr>`;
+  /* Only clients who actually owe something appear in the picker — a list of every client would
+     mostly be people with nothing due. */
+  const owedPeople=[...new Set(unpaidList.map(r=>r.cid).filter(Boolean))]
+    .map(id=>({id,name:(custById(id)||{}).name||'—',
+               amt:unpaidList.filter(r=>r.cid===id).reduce((a,r)=>a+(r.amt||0),0)}))
+    .sort((a,b)=>b.amt-a.amt);
 
   const manualRows=CE.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>{const cn=e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in';return `<tr>
     <td>${fmtDate(e.date)}</td><td>${coachIcon(e.coachId)} ${coachName(e.coachId)}</td><td>${cn}</td><td class="muted">${e.qty||1}× ${typeShort(e.type)} (cash)${e.note?' · '+e.note:''}</td><td class="right">${money(e.amount)}</td>
@@ -8045,7 +8061,17 @@ function renderFinance(){
 
     <div class="twocol" style="margin-top:16px">
       <div class="panel" style="padding:6px 14px;overflow-x:auto">
-        <div class="row" style="justify-content:space-between;align-items:center;padding:12px 6px 0"><h3 style="margin:0">Outstanding payments</h3></div>
+        <div class="row" style="justify-content:space-between;align-items:center;padding:12px 6px 0;gap:10px;flex-wrap:wrap">
+          <h3 style="margin:0">Outstanding payments</h3>
+          <div class="row" style="gap:8px;align-items:center;margin:0">
+            <select class="coachsel" style="max-width:230px" onchange="setOwedCust(this.value)">
+              <option value="">Everyone — ${money(unpaidList.reduce((a,r)=>a+(r.amt||0),0))} across ${owedPeople.length} client${owedPeople.length===1?'':'s'}</option>
+              ${owedPeople.map(o=>`<option value="${o.id}" ${owedCust===o.id?'selected':''}>${o.name} — ${money(o.amt)}</option>`).join('')}
+            </select>
+            <span class="pill ${owedTotal>0?'red':'green'}">${money(owedTotal)} due</span>
+          </div>
+        </div>
+        ${owedCust?`<div class="clienttag" style="padding:0 6px 6px">Showing <b style="color:var(--txt)">${(custById(owedCust)||{}).name||''}</b> only · <a href="#" onclick="setOwedCust('');return false" style="color:var(--accent);font-weight:800">show everyone</a></div>`:''}
         <table><thead><tr><th>Date</th><th>Coach</th><th>Client</th><th>Type</th><th class="right">Amount</th><th></th></tr></thead><tbody>${unpaidRows}</tbody></table>
       </div>
       <div class="panel" style="padding:6px 14px;overflow-x:auto">
@@ -8056,6 +8082,10 @@ function renderFinance(){
     </div>`;
   drawCashChart(months.map(monthLabel),rev,exp,prof);
 }
+/* Which client the Outstanding table is filtered to; '' means everyone. Kept outside the render
+   so it survives the repaint that follows marking something paid. */
+let owedCust='';
+function setOwedCust(id){ owedCust=id||''; renderFinance(); }
 function retrySync(){
   flash('Retrying…');
   cloudPush().then(()=>{ renderAdmin(); flash(Object.keys(syncFails).length?'Still failing — check the error above':'Cloud save succeeded ✅'); });
