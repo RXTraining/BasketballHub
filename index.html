@@ -4218,9 +4218,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-23 19:51 UTC';
+const BUILD='2026-08-25 00:23 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Posted availability can now be edited.</b> Until now a window could only be deleted and re-created once it was approved, which lost the bookings\u2019 context. Owner and coach both get an <b>Edit</b> button on every upcoming window \u2014 date, times, slot length, location and session type. A coach editing an already-approved window sends it back for approval, so approval keeps meaning something.',
+   'Changing or removing a window never moves or cancels a booking \u2014 they are separate records. What it can do is strand one: leave a session sitting at a time the coach no longer offers. Every edit now measures exactly which bookings would fall outside the new window, lists them by client and time, and asks you to confirm \u2014 the same weight as cancelling a session. Deleting a window with bookings warns the same way; an empty window just goes.',
    '<b>Unpaid family time now counts as an expense.</b> The business has been running on work nobody invoices for \u2014 building this app, driving to sessions, chasing payments, helping on court \u2014 and leaving it out made the profit look better than it was. <b>P&amp;L \u2192 Unpaid family time</b> holds the people who put those hours in, each with an hourly rate, and a log of the time. Every entry posts as a real expense, so net profit is now after labour everywhere.',
    'Because that cost never leaves the bank, the P&amp;L shows <b>Cash profit</b> beside net profit \u2014 the figure that reconciles with the account. Rates live on the person, not the entry, so correcting a rate re-values the whole history; time logged for somebody with no rate set is tracked but charged at nothing.',
    '<b>Event money owed is now visible.</b> Event revenue counts registrations marked <b>paid</b>, so an event with ten registered and four paid reported $80 — correct, but it read as though the event only earned $80 when really $120 had not been collected. Unpaid registrations for events that have already happened now appear on the <b>Outstanding</b> table alongside sessions, with a Mark paid button.',
@@ -7145,7 +7147,7 @@ function renderAvailability(){
   const rows=upcoming.map(a=>`<tr>
     <td><b>${fmtDate(a.date)}</b><div class="clienttag">${DOW[new Date(a.date+'T00:00').getDay()]}</div></td>${showCoach?`<td>${coachIcon(a.coachId)} ${coachName(a.coachId)}</td>`:''}<td>${fmtT(a.start)} – ${fmtT(a.end)}${a.sessionType?`<div style="margin-top:4px"><span class="pill green">${availTypeLabel(a)}</span></div>`:''}<div style="margin-top:6px;display:flex;flex-wrap:wrap">${slotChipsHtml(a)}</div></td><td>${a.slotMin} min</td><td>${a.location||'—'}</td>
     <td>${a.approved!==false?'<span class="pill green">Open</span>':'<span class="pill yellow">⏳ Pending</span>'}</td>
-    <td class="right"><div class="actions">${(AUTH==='owner'&&a.approved===false)?`<button class="btn sm" onclick="approveAvailability('${a.id}')">Approve</button>`:''}<button class="iconbtn" onclick="delAvailability('${a.id}')">✕</button></div></td></tr>`).join('')
+    <td class="right"><div class="actions">${(AUTH==='owner'&&a.approved===false)?`<button class="btn sm" onclick="approveAvailability('${a.id}')">Approve</button>`:''}${canEditAvail(a)?`<button class="btn sm" onclick="editAvailability('${a.id}')">Edit</button>`:''}<button class="iconbtn" onclick="delAvailability('${a.id}')">✕</button></div></td></tr>`).join('')
     ||`<tr><td colspan="${showCoach?7:6}"><div class="empty">No upcoming availability — add a date below.</div></td></tr>`;
   const locOpt=DB.locations.map(l=>`<option>${l.name}</option>`).join('')||'<option value="">Add a location first</option>';
   const isCoach=AUTH==='coach';
@@ -7258,7 +7260,103 @@ function addAvailability(){
   save();flash(isCoach?'Added — awaiting owner approval ⏳':'Availability added 📅');renderAvailability();
 }
 function approveAvailability(id){const a=(DB.availability||[]).find(x=>x.id===id);if(!a)return;a.approved=true;save();flash('Availability approved ✅');renderAvailability();}
-function delAvailability(id){if(!confirm('Remove this availability window? Any open slots in it will no longer be bookable.'))return;DB.availability=DB.availability.filter(a=>a.id!==id);save();flash('Removed');renderAvailability();}
+/* ---- Editing a posted window ---------------------------------------------
+   A window and a session are separate records: the window says "I am free here", the session is
+   a real appointment with a client attached. Editing or removing the window therefore does NOT
+   move or cancel anything already booked inside it — the danger is the opposite, that a booking
+   is left stranded at a time the coach no longer offers. So every edit measures which bookings
+   would fall outside the new window and makes you say yes to that explicitly, the same weight of
+   confirmation as cancelling a session. An empty window carries no such risk and just goes. */
+const availMins=t=>{const p=String(t||'0:0').split(':').map(Number);return (p[0]||0)*60+(p[1]||0);};
+/* Mirrors slotsForRule exactly — a session only counts as inside a window if it lands on one of
+   the slot boundaries that window actually generates. */
+function sessionFitsWindow(s,w){
+  if(!s||!w||s.date!==w.date)return false;
+  const step=w.slotMin||60, st=availMins(w.start), en=availMins(w.end), t=availMins(s.time);
+  return t>=st && t+step<=en && ((t-st)%step)===0;
+}
+function availBookings(a){
+  const seen={}; const out=[];
+  slotsForRule(a).forEach(sl=>sl.sessions.forEach(s=>{if(!seen[s.id]){seen[s.id]=1;out.push(s);}}));
+  return out.sort((x,y)=>(x.time||'').localeCompare(y.time||''));
+}
+function sessLabel(s){
+  const who=(s.customerIds||[]).map(cid=>custById(cid)?custById(cid).name:'?').join(' + ')||'no client yet';
+  return fmtT(s.time)+' · '+who+' · '+typeShort(s.type);
+}
+function canEditAvail(a){ return !!a && (AUTH==='owner' || (AUTH==='coach' && a.coachId===coachAs)); }
+function editAvailability(id){
+  const a=(DB.availability||[]).find(x=>x.id===id); if(!a)return;
+  if(!canEditAvail(a))return flash('That window belongs to another coach',true);
+  const booked=availBookings(a), isCoach=AUTH==='coach';
+  openModal('Edit availability window',`
+    <div class="row" style="flex-wrap:wrap;gap:10px">
+      <div class="field"><label class="f">Date</label><input type="date" id="eaDate" value="${a.date}"></div>
+      <div class="field"><label class="f">Slot length</label><select id="eaSlot">${[30,45,60,90].map(m=>`<option value="${m}" ${(a.slotMin||60)===m?'selected':''}>${m} min</option>`).join('')}</select></div>
+      <div class="field"><label class="f">From</label><input type="time" id="eaStart" value="${a.start}"></div>
+      <div class="field"><label class="f">To</label><input type="time" id="eaEnd" value="${a.end}"></div>
+      <div class="field"><label class="f">Location</label><select id="eaLoc">${DB.locations.map(l=>`<option ${a.location===l.name?'selected':''}>${l.name}</option>`).join('')||'<option value="">Add a location first</option>'}</select></div>
+      <div class="field"><label class="f">This window is for</label><select id="eaType">
+        <option value="" ${!a.sessionType?'selected':''}>1:1 and group time</option>
+        ${TYPE_ORDER.filter(t=>typeIsDedicated(t)).map(t=>`<option value="${t}" ${a.sessionType===t?'selected':''}>${typeIcon(t)} ${typeDef(t).label}</option>`).join('')}
+      </select></div>
+    </div>
+    ${booked.length?`<div class="panel" style="border-color:var(--yellow);margin-top:12px">
+      <b class="small">⚠ ${booked.length} booking${booked.length===1?'':'s'} already inside this window</b>
+      <div style="margin-top:6px;font-size:13px">${booked.map(s=>`<div style="padding:3px 0">${escapeHtml(sessLabel(s))}</div>`).join('')}</div>
+      <div class="sub" style="margin-top:8px">Changing the window does not move these — they keep their times. Anything left outside the new window stays booked at a time you no longer offer, so you will be asked to confirm before it happens.</div>
+    </div>`:''}
+    ${(isCoach&&a.approved!==false)?`<div class="sub" style="margin-top:10px">This window is already approved. Editing it sends it back for approval.</div>`:''}
+    <div class="row" style="justify-content:flex-end;gap:8px;margin-top:14px">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="saveAvailability('${a.id}')">Save changes</button>
+    </div>`);
+}
+function saveAvailability(id){
+  const a=(DB.availability||[]).find(x=>x.id===id); if(!a)return;
+  if(!canEditAvail(a))return flash('That window belongs to another coach',true);
+  const date=$('#eaDate').value; if(!date)return flash('Pick a date',true);
+  const start=$('#eaStart').value, end=$('#eaEnd').value;
+  if(!start||!end)return flash('Set both a start and an end time',true);
+  if(availMins(end)<=availMins(start))return flash('The end time has to be after the start',true);
+  const loc=$('#eaLoc').value; if(!loc)return flash('Add a location first (Locations tab)',true);
+  const next={date,start,end,slotMin:+$('#eaSlot').value,location:loc,
+              sessionType:($('#eaType')?$('#eaType').value:''),coachId:a.coachId};
+  if(availMins(end)-availMins(start)<next.slotMin)
+    return flash('The window is shorter than one '+next.slotMin+'-minute slot',true);
+
+  const booked=availBookings(a);
+  const stranded=booked.filter(s=>!sessionFitsWindow(s,next));
+  if(stranded.length){
+    const msg='This change leaves '+stranded.length+' booking'+(stranded.length===1?'':'s')+
+      ' outside the window:\n\n'+stranded.map(s=>'  • '+fmtDate(s.date)+' '+sessLabel(s)).join('\n')+
+      '\n\nThose sessions are NOT cancelled or moved — they stay exactly as they are, but at a time '+
+      'this window no longer covers. Reschedule or cancel them in Booking if that is wrong.\n\nApply the change?';
+    if(!confirm(msg))return;
+  }
+  Object.assign(a,next);
+  let backToPending=false;
+  if(AUTH==='coach'&&a.approved!==false){ a.approved=false; backToPending=true; }
+  save(); closeModal();
+  flash(backToPending?'Updated — sent for approval again':'Window updated'+(stranded.length?' · '+stranded.length+' booking(s) now outside it':''));
+  renderAvailability();
+}
+function delAvailability(id){
+  const a=(DB.availability||[]).find(x=>x.id===id); if(!a)return;
+  if(!canEditAvail(a))return flash('That window belongs to another coach',true);
+  const booked=availBookings(a);
+  if(booked.length){
+    const msg=booked.length+' session'+(booked.length===1?' is':'s are')+' booked in this window:\n\n'+
+      booked.map(s=>'  • '+fmtDate(s.date)+' '+sessLabel(s)).join('\n')+
+      '\n\nRemoving the window does NOT cancel them — they stay booked, but the time stops being '+
+      'offered to anyone else. If you meant to call the sessions off, cancel them in Booking instead.'+
+      '\n\nRemove the window anyway?';
+    if(!confirm(msg))return;
+  }else if(!confirm('Remove this window? The open slots in it stop being bookable.'))return;
+  DB.availability=DB.availability.filter(x=>x.id!==id);
+  save(); flash(booked.length?'Window removed — '+booked.length+' booking(s) kept':'Removed');
+  renderAvailability();
+}
 
 /* Which session types a posted window is for.
    A window marked for a weekend class serves ONLY that class, so a client picking "Weekend Open
