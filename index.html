@@ -434,6 +434,11 @@
   .modal .head h3{font-size:17px}
   .modal .body{padding:20px}
   .modal .foot{padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+  .modal.full{padding:0;align-items:stretch;justify-content:stretch}
+  .modal.full .box{max-width:none;width:100%;height:100%;max-height:100%;border-radius:0;display:flex;flex-direction:column}
+  .modal.full .body{flex:1;overflow:auto}
+  .modal.full .head{position:sticky;top:0;background:var(--panel);z-index:2}
+  .modal.full .foot{position:sticky;bottom:0;background:var(--panel)}
   .x{background:transparent;border:0;color:var(--muted);font-size:22px;cursor:pointer;line-height:1}
 
   /* Was an orange wash with #d9d9de body text — near-white copy on a near-white panel,
@@ -1282,7 +1287,7 @@ const ZH={
   'To buy a package, ask the Owner — your used/total balance updates automatically.':'购买套餐请联系管理员 — 已用/总数会自动更新。',
   'Today':'今天','Pending — awaiting confirmation':'待确认','Your booked sessions':'已预约课程',
   'No booked sessions yet — request one ←':'暂无已预约课程 — 去预约 ←','Your events':'我的活动',
-  'left':'剩余','used':'已用','completed':'已完成','Prepaid':'已预付','Unpaid':'未付款','Pending':'待确认','Booked':'已预约',
+  'left':'剩余','used':'已用','completed':'已完成','Prepaid':'已预付','Unpaid':'未付款','to refund':'待退款','Pending':'待确认','Booked':'已预约',
   'Completed':'已完成','Cancelled':'已取消','Check In':'签到','✓ Checked in':'✓ 已签到','Cancel':'取消',
   '📅 Add to calendar':'📅 加入日历','Coach feedback:':'教练反馈：',
   'tap one to select':'点击选择','Register a session and manage your upcoming sessions.':'预约并管理您的课程。',
@@ -1494,7 +1499,7 @@ const KO={
   'To buy a package, ask the Owner — your used/total balance updates automatically.':'패키지 구매는 관리자에게 문의하세요 — 사용/총 잔액은 자동으로 업데이트됩니다.',
   'Today':'오늘','Pending — awaiting confirmation':'확인 대기 중','Your booked sessions':'예약된 수업',
   'No booked sessions yet — request one ←':'아직 예약된 수업이 없습니다 — 예약하세요 ←','Your events':'내 이벤트',
-  'left':'남음','used':'사용','completed':'완료','Prepaid':'선불','Unpaid':'미결제','Pending':'대기','Booked':'예약됨',
+  'left':'남음','used':'사용','completed':'완료','Prepaid':'선불','Unpaid':'미결제','to refund':'환불 예정','Pending':'대기','Booked':'예약됨',
   'Completed':'완료','Cancelled':'취소됨','Check In':'체크인','✓ Checked in':'✓ 체크인 완료','Cancel':'취소',
   '📅 Add to calendar':'📅 캘린더에 추가','Coach feedback:':'코치 피드백:',
   'tap one to select':'선택하려면 탭하세요',
@@ -1701,7 +1706,7 @@ const JA={
   'To buy a package, ask the Owner — your used/total balance updates automatically.':'パッケージ購入は管理者へ — 使用/合計残高は自動更新されます。',
   'Today':'今日','Pending — awaiting confirmation':'確認待ち','Your booked sessions':'予約済みセッション',
   'No booked sessions yet — request one ←':'予約済みセッションはありません — 予約してください ←','Your events':'マイイベント',
-  'left':'残り','used':'使用','completed':'完了','Prepaid':'前払い','Unpaid':'未払い','Pending':'保留','Booked':'予約済み',
+  'left':'残り','used':'使用','completed':'完了','Prepaid':'前払い','Unpaid':'未払い','to refund':'返金予定','Pending':'保留','Booked':'予約済み',
   'Completed':'完了','Cancelled':'キャンセル','Check In':'チェックイン','✓ Checked in':'✓ チェックイン済み','Cancel':'キャンセル',
   '📅 Add to calendar':'📅 カレンダーに追加','Coach feedback:':'コーチからのフィードバック：',
   'tap one to select':'タップして選択',
@@ -2083,6 +2088,17 @@ function normalize(d){
       c.creditsTotal={'1on1':Math.max(pk['1on1'],(oldRem['1on1']||0)+usedD('1on1')),'group':Math.max(pk['group'],(oldRem['group']||0)+usedD('group'))};
     }
     if(c.credits)delete c.credits;
+    /* Packages now carry the credits. Whatever the old aggregate held ON TOP of the packages was
+       a manual grant, so keep only that difference — and stamp _v so a second load cannot subtract
+       the packages twice. */
+    if(!c.creditsTotal||c.creditsTotal._v!==2){
+      const before=c.creditsTotal||{}, after={_v:2};
+      const sold={}; (c.packages||[]).forEach(p=>{sold[p.type]=(sold[p.type]||0)+(Number(p.qty)||0);});
+      Object.keys(before).forEach(k=>{ if(k==='_v')return;
+        const extra=(Number(before[k])||0)-(sold[k]||0);
+        if(extra>0)after[k]=extra; });
+      c.creditsTotal=after;
+    }
     if(!c.pwd)c.pwd=d.settings.defaultClientPwd;
     if(c.approved===undefined)c.approved=true;
     if(c.suspended===undefined)c.suspended=false;
@@ -2722,7 +2738,30 @@ function computePrice(type,dur,n,coachId){
   const h=(dur||60)/60;const rate=coachRate(coachId,type);
   return Math.round(type==='1on1'?rate*h:rate*h*(n||1));
 }
-function totalFor(c,type){return (c&&c.creditsTotal&&c.creditsTotal[type])||0;}
+/* ---- Credits live on the packages -----------------------------------------
+   `creditsTotal` used to be an aggregate kept in step with the packages by hand, which is the
+   classic way for two numbers to drift apart. Packages are now the source of truth: the credits a
+   client holds are simply the sessions they bought. Whatever `creditsTotal` still carries beyond
+   that is treated as a manual adjustment — credits granted without a sale, a goodwill make-good,
+   a migrated opening balance — and normalize() converts it once (marked _v:2) so it can never be
+   counted twice. */
+function pkgAdjust(c,type){ return (c&&c.creditsTotal&&Number(c.creditsTotal[type]))||0; }
+function packagesOf(c,type){
+  const ord=p=>(p.date||'')+'#'+p.id;                    // oldest purchase drawn down first
+  return ((c&&c.packages)||[]).filter(p=>p.type===type).slice().sort((a,b)=>ord(a).localeCompare(ord(b)));
+}
+function pkgLabel(p){ return (p.qty||0)+'× '+typeShort(p.type)+(p.date?' · '+fmtDate(p.date):''); }
+function totalFor(c,type){ return packagesOf(c,type).reduce((a,p)=>a+(Number(p.qty)||0),0)+pkgAdjust(c,type); }
+/* The credits a client holds, in the order they get used: every package expanded into its slots,
+   oldest first, then any manual adjustment last. */
+function creditSlots(c,type){
+  const out=[];
+  packagesOf(c,type).forEach(p=>{ const q=Math.max(0,Number(p.qty)||0);
+    for(let i=1;i<=q;i++)out.push({pkgId:p.id,label:pkgLabel(p),n:i,of:q}); });
+  const adj=pkgAdjust(c,type);
+  for(let i=1;i<=adj;i++)out.push({pkgId:'',label:t('Adjustment'),n:i,of:adj});
+  return out;
+}
 /* Per-customer payment status within a session. Group sessions can have a mixed s.pay map
    (one player on a credit, another paying cash, another not yet paid); 1:1 sessions and any
    group session nobody has split yet just fall back to the session-level paid/paidVia, which
@@ -2755,7 +2794,9 @@ function cancelledByLabel(s){
    Nothing is stored per allocation: "used" is counted from completed package-paid sessions
    across the whole pool, so the balance is always derived and can never drift out of step with
    the sessions themselves. */
-const CREDIT_POOLS=[['1on1'],['group','openrun','cond']];
+/* Each session type keeps its own credits. Group and the weekend classes were briefly shared;
+   they are separate again, so a Group 10-pack buys Group sessions and nothing else. */
+const CREDIT_POOLS=[['1on1'],['group'],['openrun'],['cond']];
 function creditPool(type){ return CREDIT_POOLS.find(p=>p.indexOf(type)>=0)||[type]; }
 function poolLabel(type){
   const p=creditPool(type);
@@ -2797,14 +2838,26 @@ function creditUse(s,custId){
       &&x.status==='completed'&&custPay(x,custId).paidVia==='package')
     .sort((a,b)=>ord(a).localeCompare(ord(b)));
   const n=list.findIndex(x=>x.id===s.id)+1; if(!n)return null;
-  const total=poolTotal(c,s.type);
-  return {n,total,over:n>total,label:poolLabel(s.type)};
+  const slots=creditSlots(c,s.type), total=slots.length, slot=slots[n-1];
+  return {n,total,over:!slot,label:poolLabel(s.type),
+          pkg:slot?slot.label:'',pkgN:slot?slot.n:0,pkgOf:slot?slot.of:0};
 }
 function creditUseHtml(s,custId){
   const u=creditUse(s,custId); if(!u)return '';
-  return u.over
-    ? `<span class="pill red" title="${attrEsc(u.label)}: all ${u.total} credits were already used, so nothing covers this one">${escapeHtml(u.label)} ${u.n}/${u.total} · ${t('over')}</span>`
-    : `<span class="credit">${escapeHtml(u.label)} ${u.n}/${u.total}</span>`;
+  if(u.over)return `<span class="pill red" title="All ${u.total} ${attrEsc(u.label)} credit(s) were already used, so nothing covers this one">${escapeHtml(u.label)} ${u.n}/${u.total} · ${t('over')}</span>`;
+  return `<span class="credit" title="${attrEsc(u.label)} — credit ${u.n} of ${u.total} overall">${escapeHtml(u.pkg)} · ${u.pkgN}/${u.pkgOf}</span>`;
+}
+/* A cancelled session owes nothing, so it must never wear an "unpaid" badge — that reads as a
+   debt the client does not have. The only thing worth saying is whether money needs giving back.
+   The Booking table already worked this way; this is the same rule for every other screen. */
+function payPillHtml(s,custId){
+  if(s&&s.status==='cancelled')
+    return (s.paidWas>0) ? '<span class="pill red">↩ '+money(s.paidWas)+' '+t('to refund')+'</span>'
+                         : '<span class="muted">—</span>';
+  const p=custPay(s,custId);
+  return custSettled(s,custId)
+    ? '<span class="pill green">'+(p.paidVia==='package'?t('Prepaid'):(t('Paid')+(p.paidVia&&p.paidVia!=='cash'?' · '+p.paidVia:'')))+'</span>'
+    : '<span class="pill red">'+t('Unpaid')+'</span>';
 }
 /* Paid AND backed by something real. A package payment with no credit behind it is not settled. */
 function custSettled(s,custId){
@@ -4111,7 +4164,7 @@ function exportExcel(){
   add('Locations',DB.locations.map(l=>({Name:l.name,Address:l.address,Sessions:DB.sessions.filter(s=>s.location===l.name).length})));
   add('Booking & Schedule',sortSessions(DB.sessions).map(s=>({Date:s.date,Time:s.time,Coach:coachName(s.coachId),Clients:custNames(s.customerIds),
     Type:typeShort(s.type),Players:s.customerIds.length,Duration:s.dur,Location:s.location,Status:s.status,
-    'Checked in':s.checkedIn?'Yes':'No',Payment:sessionFullyPaid(s)?(s.type!=='1on1'?'paid (all players)':(s.paidVia||'paid')):(s.type==='group'&&s.customerIds.some(cid=>custPay(s,cid).paid)?'partially paid':'unpaid'),Price:s.price,Notes:s.notes,Feedback:s.feedback||'',Attachments:(s.media||[]).length})));
+    'Checked in':s.checkedIn?'Yes':'No',Payment:s.status==='cancelled'?(s.paidWas>0?'cancelled — '+money(s.paidWas)+' to refund':'cancelled'):(sessionFullyPaid(s)?(s.type!=='1on1'?'paid (all players)':(s.paidVia||'paid')):(s.type==='group'&&s.customerIds.some(cid=>custPay(s,cid).paid)?'partially paid':'unpaid')),Price:s.price,Notes:s.notes,Feedback:s.feedback||'',Attachments:(s.media||[]).length})));
   add('Packages',DB.customers.flatMap(c=>c.packages.map(p=>({Client:c.name,Coach:coachName(p.coachId),Date:p.date,Type:typeShort(p.type),Sessions:p.qty,Amount:p.amount}))));
   add('Expenses',DB.expenses.map(e=>({Date:e.date,'Attributed to':coachName(e.coachId),Category:e.cat,Note:e.note,Amount:e.amount,Frequency:e.freq||'once'})));
   add('Cash income',[
@@ -4232,10 +4285,14 @@ try{
   new MutationObserver(()=>{ clearTimeout(_wrapT); _wrapT=setTimeout(()=>{wrapTables();freezeAll();},40); })
     .observe(document.documentElement,{childList:true,subtree:true});
 }catch(e){}
-function openModal(title,body,foot){$('#mTitle').textContent=title;$('#mBody').innerHTML=body;
-  $('#mFoot').innerHTML=foot||'';$('#modal').classList.add('show');
+function openModal(title,body,foot,opts){$('#mTitle').textContent=title;$('#mBody').innerHTML=body;
+  $('#mFoot').innerHTML=foot||'';
+  // A dialog that is really a working screen (the session editor) fills the window instead of
+  // sitting in a small box — otherwise half of it is behind a scrollbar on a laptop.
+  $('#modal').classList.toggle('full',!!(opts&&opts.full));
+  $('#modal').classList.add('show');
   wrapTables($('#mBody')); setTimeout(()=>freezeAll(),0);}
-function closeModal(){$('#modal').classList.remove('show');}
+function closeModal(){$('#modal').classList.remove('show');$('#modal').classList.remove('full');}
 let __delTarget='',__delYes=null;
 function confirmByName(kind,name,onYes,extraWarn){
   __delTarget=(name||'').trim().toLowerCase();__delYes=onYes;
@@ -4261,9 +4318,14 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-27 00:45 UTC';
+const BUILD='2026-08-27 01:13 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>A cancelled session no longer reads as \u201cunpaid\u201d anywhere.</b> Nothing is owed on a session that did not happen, so the badge said a debt existed that did not. Cancelled rows now show a plain dash \u2014 or <b>\u21a9 $40 to refund</b> where money had already been taken. Fixed on the owner\u2019s customer history, the client\u2019s session cards and the spreadsheet export; the Booking table already behaved this way, and all four now share one function so they cannot drift apart again.',
+   '<b>Credits belong to the package that was sold, and each session type has its own.</b> Group, Weekend Open Run, Weekend Running/Conditioning and 1:1 no longer share \u2014 a Group 10-pack buys Group sessions and nothing else. Sessions draw down the <b>oldest package first</b>, so each package fills up in turn and you can see exactly which one paid for which session.',
+   'The old <i>creditsTotal</i> number kept alongside the packages is gone as a source of truth \u2014 two numbers maintained by hand is how they drift apart. Credits are now simply the packages sold. Anything the old total held beyond the packages is converted once into an <b>extra credits</b> adjustment on the customer form, for goodwill sessions or a balance carried over from before.',
+   'The customer card lists every package with a <b>used / bought</b> bar, and the session history names the package each session drew from. <b>Watch after this update:</b> anyone who used a group credit on a weekend class will now show those sessions as unpaid \u2014 that is the separation working, but check Outstanding before chasing anybody.',
+   'The owner&rsquo;s session editor now fills the screen instead of opening in a small box, so the client list, notes and media all fit without fighting a scrollbar.',
    '<b>Fixed: sessions past the end of a package read as paid.</b> Credits used to be counted with a cap \u2014 once a client had used all ten, an eleventh session marked <i>package</i> still showed as PAID and never appeared as money owed. That is why Yanyan had no cash outstanding despite the credits being gone. Credits are now consumed in date order, and any completed session beyond the number actually bought counts as <b>unpaid</b> until another package is sold or the cash is taken.',
    'Every completed session now says which credit it used \u2014 <b>Group &amp; weekend classes 5/10</b> \u2014 on the client&rsquo;s Payments table and on the owner&rsquo;s customer session history. Sessions with nothing left to cover them are flagged <b>over</b> in red, and the package summary says how many are beyond the package rather than quietly showing 10/10.',
    'The owner&rsquo;s customer session history gained a <b>Screenshot</b> button. It rebuilds the whole table off-screen at full width \u2014 every row, no scrollbar, no buttons \u2014 and saves it as one PNG, so the picture holds the entire history rather than whatever fitted on the screen.',
@@ -4802,7 +4864,7 @@ function clientCard(s){
   return `<div class="panel" style="margin-bottom:12px">
     <div class="row" style="justify-content:space-between;align-items:center">
       <div>
-        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} <span class="pill">${coachIcon(s.coachId)} ${coachName(s.coachId)}</span> ${my.paid?'<span class="pill green">'+(my.paidVia==='package'?t('Prepaid'):t('Paid'))+'</span>':'<span class="pill red">'+t('Unpaid')+'</span>'} ${s.status==='pending'?'<span class="pill yellow">'+t('Pending')+'</span>':s.status==='scheduled'?'<span class="pill blue">'+t('Booked')+'</span>':s.status==='completed'?'<span class="pill green">'+t('Completed')+'</span>':s.status==='cancelled'?cancelledByLabel(s):''}
+        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${typePill(s)} <span class="pill">${coachIcon(s.coachId)} ${coachName(s.coachId)}</span> ${payPillHtml(s,clientAs)} ${s.status==='pending'?'<span class="pill yellow">'+t('Pending')+'</span>':s.status==='scheduled'?'<span class="pill blue">'+t('Booked')+'</span>':s.status==='completed'?'<span class="pill green">'+t('Completed')+'</span>':s.status==='cancelled'?cancelledByLabel(s):''}
         <div class="clienttag" style="margin-top:4px">${s.dur} min · 📍 ${s.location||'TBD'}${others>0?' · with '+others+' other player'+(others>1?'s':''):''}</div>
       </div>
       <div class="actions">
@@ -6136,7 +6198,7 @@ function openSession(id,returnCust,preset){
     ${(id&&s.paid)?`<button class="btn ghost" title="Manually post a payment-received message to the client's chat, even if one wasn't auto-sent" onclick="manualPaymentConfirm('${id}')">✅ Confirm payment to client</button>`:''}
     ${id?`<button class="btn ghost" onclick="saveSession('${id}',true)">📧 Save & email client</button>`:''}
     <button class="btn ghost" onclick="closeSessionEditor()">Cancel</button>
-    <button class="btn" onclick="saveSession('${id||''}')">Save</button>`);
+    <button class="btn" onclick="saveSession('${id||''}')">Save</button>`,{full:AUTH==='owner'});
   renderMediaPrev();
 }
 function closeSessionEditor(){const rc=sessionReturnCust;sessionReturnCust=null;if(rc&&custById(rc))viewCustomer(rc);else closeModal();}
@@ -6566,13 +6628,26 @@ async function shotCustomerHistory(id){
 function viewCustomer(id){
   const c=custById(id);
   const sess=sortSessions(DB.sessions.filter(s=>s.customerIds.includes(c.id))).reverse();
-  const hist=sess.map(s=>{const p=custPay(s,c.id);return `<tr><td>${fmtDT(s.date,s.time)}<div class="clienttag">📍 ${s.location||''}</div></td><td>${typeShort(s.type)}</td>
+  const hist=sess.map(s=>{return `<tr><td>${fmtDT(s.date,s.time)}<div class="clienttag">📍 ${s.location||''}</div></td><td>${typeShort(s.type)}</td>
     <td><span class="pill ${s.status==='completed'?'green':s.status==='cancelled'?'red':'yellow'}">${s.status}</span>${s.status==='cancelled'&&s.cancelledBy?`<div class="clienttag">by ${s.cancelledBy}</div>`:''}</td>
-    <td>${custSettled(s,c.id)?'<span class="pill green">'+(p.paidVia==='package'?'pkg':'paid')+'</span>':'<span class="pill red">unpaid</span>'}${s.type!=='1on1'&&s.customerIds.length>1?`<button class="iconbtn" title="Manage each player's payment" onclick="openGroupPay('${s.id}')">⋯</button>`:''}</td>
+    <td>${payPillHtml(s,c.id)}${(s.status!=='cancelled'&&s.type!=='1on1'&&s.customerIds.length>1)?`<button class="iconbtn" title="Manage each player's payment" onclick="openGroupPay('${s.id}')">⋯</button>`:''}</td>
     <td>${creditUseHtml(s,c.id)||'<span class="muted">—</span>'}</td>
     <td class="right">${shareLabel(s)}</td>
     <td class="right"><button class="iconbtn" onclick="openSession('${s.id}','${id}')">Edit</button></td></tr>`;}).join('')||'<tr><td colspan="7"><div class="empty">No sessions yet.</div></td></tr>';
-  const pkgs=c.packages.length?c.packages.slice().reverse().map(p=>`<tr><td>${fmtDate(p.date)}</td><td>${p.qty}× ${typeShort(p.type)}</td><td class="right">${money(p.amount)}</td><td class="right"><button class="iconbtn" onclick="openPackage('${id}','${p.id}')">Edit</button></td></tr>`).join(''):'<tr><td colspan="4"><div class="empty">No packages.</div></td></tr>';
+  /* How far into each package the client has got — the oldest package is drawn down first, so
+     these fill up in order rather than all moving together. */
+  const pkgUse={};
+  TYPE_ORDER.forEach(ty=>{
+    const slots=creditSlots(c,ty), used=poolUsedRaw(c,ty);
+    slots.slice(0,used).forEach(sl=>{ if(sl.pkgId)pkgUse[sl.pkgId]=(pkgUse[sl.pkgId]||0)+1; });
+  });
+  const pkgs=c.packages.length?c.packages.slice().sort((a,b)=>((b.date||'')+b.id).localeCompare((a.date||'')+a.id)).map(p=>{
+    const u=pkgUse[p.id]||0, q=Number(p.qty)||0, done=u>=q;
+    return `<tr><td>${fmtDate(p.date)}</td><td>${p.qty}× ${typeShort(p.type)}<div class="clienttag">${coachName(p.coachId)}</div></td>
+      <td><b style="color:${done?'var(--muted)':'var(--accent)'}">${u}/${q}</b> used<div class="bar" style="margin-top:4px;max-width:120px"><i style="width:${q?Math.round(u/q*100):0}%"></i></div></td>
+      <td class="right">${money(p.amount)}</td>
+      <td class="right"><button class="iconbtn" onclick="openPackage('${id}','${p.id}')">Edit</button></td></tr>`;
+  }).join(''):'<tr><td colspan="5"><div class="empty">No packages.</div></td></tr>';
   const credLine=(lab,ty)=>{
     if(poolTotal(c,ty)<=0)return '';
     const over=poolOver(c,ty);
@@ -6607,10 +6682,10 @@ function viewCustomer(id){
     </div>
     <div class="panel" style="background:var(--panel2);margin:6px 0 14px">
       <div class="row" style="justify-content:space-between;align-items:center">
-        <div><b>Prepaid sessions</b> <span class="clienttag">(${completedCount(c)} completed · used = completed)</span>${CREDIT_POOLS.some(pl=>poolTotal(c,pl[0])>0)?CREDIT_POOLS.map(pl=>credLine(poolLabel(pl[0]),pl[0])).join(''):'<div class="clienttag" style="margin-top:4px">No package yet.</div>'}</div>
+        <div><b>Prepaid sessions</b> <span class="clienttag">(oldest package used first)</span>${CREDIT_POOLS.some(pl=>poolTotal(c,pl[0])>0)?CREDIT_POOLS.map(pl=>credLine(poolLabel(pl[0]),pl[0])).join(''):'<div class="clienttag" style="margin-top:4px">No package yet.</div>'}</div>
         <button class="btn sm" onclick="openSellPackage('${id}')">+ Sell package</button>
       </div>
-      <table style="margin-top:10px"><thead><tr><th>Date</th><th>Package</th><th class="right">Paid</th><th></th></tr></thead><tbody>${pkgs}</tbody></table>
+      <table style="margin-top:10px"><thead><tr><th>Date</th><th>Package</th><th>Used</th><th class="right">Paid</th><th></th></tr></thead><tbody>${pkgs}</tbody></table>
     </div>
     <div class="row" style="justify-content:space-between;align-items:center;margin:6px 0 8px">
       <h3 style="margin:0">Session history</h3>
@@ -6653,8 +6728,6 @@ function savePackage(id){
   if(!c)return flash('Pick a client',true);
   const type=$('#pkType').value;const qty=+$('#pkQty').value;const amt=+$('#pkAmt').value;
   if(!qty||qty<1)return flash('Enter a session count',true);
-  if(!c.creditsTotal)c.creditsTotal={};
-  c.creditsTotal[type]=totalFor(c,type)+qty;
   const pkgCoach=$('#pkCoach')?$('#pkCoach').value:targetCoach();
   c.packages.push({id:uid(),coachId:pkgCoach,type,qty,amount:amt,date:$('#pkDate').value});
   save();flash(qty+'× '+typeShort(type)+' package sold 🎟️');
@@ -6680,16 +6753,12 @@ function savePackageEdit(cid,pid){
   const c=custById(cid);const p=c.packages.find(x=>x.id===pid);
   const nt=$('#epType').value, nq=+$('#epQty').value||0, na=+$('#epAmt').value||0, nd=$('#epDate').value;
   if(nq<1)return flash('Sessions must be at least 1',true);
-  if(!c.creditsTotal)c.creditsTotal={};
-  c.creditsTotal[p.type]=Math.max(0,(c.creditsTotal[p.type]||0)-p.qty);
-  c.creditsTotal[nt]=(c.creditsTotal[nt]||0)+nq;
   p.type=nt;p.qty=nq;p.amount=na;p.date=nd;
   save();flash('Package updated');viewCustomer(cid);
 }
 function delPackageEntry(cid,pid){
-  if(!confirm('Delete this package? Total credits will decrease.'))return;
-  const c=custById(cid);const p=c.packages.find(x=>x.id===pid);
-  if(c.creditsTotal)c.creditsTotal[p.type]=Math.max(0,(c.creditsTotal[p.type]||0)-p.qty);
+  if(!confirm('Delete this package? The credits it carried go with it, and any session that used one will show as unpaid.'))return;
+  const c=custById(cid);
   c.packages=c.packages.filter(x=>x.id!==pid);
   save();flash('Package removed');viewCustomer(cid);
 }
@@ -6714,12 +6783,12 @@ function openCustomer(id){
     <div class="field" style="max-width:220px"><label class="f">Joined date</label><input type="date" id="cCreated" value="${id?(c.created||todayISO()):todayISO()}"><div class="clienttag" style="margin-top:4px">Used for recruiting stats.</div></div>
     <div class="field"><label class="f">Notes</label><textarea id="cNotes">${c.notes||''}</textarea></div>
     <div class="panel" style="background:var(--panel2);padding:14px;margin-bottom:14px">
-      <b class="small">Prepaid credit totals</b>
+      <b class="small">Extra credits — not from a package</b>
       <div class="row" style="margin-top:10px">
-        ${TYPE_ORDER.map(ty=>`<div class="field" style="margin-bottom:0"><label class="f">${typeShort(ty)} — total sessions</label>
-          <input type="number" class="cTotType" data-type="${ty}" min="0" value="${id?totalFor(c,ty):0}"></div>`).join('')}
+        ${TYPE_ORDER.map(ty=>`<div class="field" style="margin-bottom:0"><label class="f">${typeShort(ty)} — extra</label>
+          <input type="number" class="cTotType" data-type="${ty}" min="0" value="${id?pkgAdjust(c,ty):0}"></div>`).join('')}
       </div>
-      <div class="clienttag" style="margin-top:8px">${id?('Balance now: '+CREDIT_POOLS.map(pl=>poolLabel(pl[0])+' '+poolUsed(c,pl[0])+'/'+poolTotal(c,pl[0])).join(' · ')+'. '):''}Used is counted automatically from package-paid sessions — change it by editing a session's payment in the history.
+      <div class="clienttag" style="margin-top:8px">${id?('Holding now: '+TYPE_ORDER.filter(ty=>totalFor(c,ty)>0).map(ty=>typeShort(ty)+' '+poolUsedRaw(c,ty)+'/'+totalFor(c,ty)).join(' · ')+'. '):''}Credits come from the packages you sell — use these boxes only for a goodwill session or a balance carried over from before. Used is counted automatically from package-paid sessions.
         <br><b style="color:var(--txt)">Group</b>, <b style="color:var(--txt)">Open Run</b> and <b style="color:var(--txt)">Conditioning</b> totals add into one shared balance; a credit bought for any of them can pay for any of them.</div>
     </div>
     <div class="field"><label class="f">Client login password</label>
@@ -6741,7 +6810,8 @@ function saveCustomer(id){
   // Read whatever inputs the form rendered. The old code wrote a fixed {1on1,group} object,
   // so saving a customer silently deleted any weekend-class credits they held.
   const credits={};
-  $$('.cTotType').forEach(el=>{credits[el.dataset.type]=Math.max(0,Math.round(+el.value||0));});
+  $$('.cTotType').forEach(el=>{const v=Math.max(0,Math.round(+el.value||0)); if(v)credits[el.dataset.type]=v;});
+  credits._v=2;   // already in adjustment form — normalize() must not subtract the packages again
   const pwd=($('#cPwd').value||'').trim()||DB.settings.defaultClientPwd;
   const created=($('#cCreated')&&$('#cCreated').value)||todayISO();
   const dupName=DB.customers.some(x=>x.id!==id&&(x.name||'').trim().toLowerCase()===name.toLowerCase());
