@@ -2746,9 +2746,17 @@ function computePrice(type,dur,n,coachId){
    a migrated opening balance — and normalize() converts it once (marked _v:2) so it can never be
    counted twice. */
 function pkgAdjust(c,type){ return (c&&c.creditsTotal&&Number(c.creditsTotal[type]))||0; }
+const pkgOrd=p=>(p.date||'')+'#'+p.id;                   // oldest purchase drawn down first
+/* Exactly this type — what totalFor() counts, so poolTotal() can add the pool up without
+   counting the same package once per member type. */
 function packagesOf(c,type){
-  const ord=p=>(p.date||'')+'#'+p.id;                    // oldest purchase drawn down first
-  return ((c&&c.packages)||[]).filter(p=>p.type===type).slice().sort((a,b)=>ord(a).localeCompare(ord(b)));
+  return ((c&&c.packages)||[]).filter(p=>p.type===type).slice().sort((a,b)=>pkgOrd(a).localeCompare(pkgOrd(b)));
+}
+/* Every package the pool can draw on, in purchase order — a weekend class reaches a group
+   package here, which is the whole point of pooling. */
+function poolPackages(c,type){
+  const pool=creditPool(type);
+  return ((c&&c.packages)||[]).filter(p=>pool.indexOf(p.type)>=0).slice().sort((a,b)=>pkgOrd(a).localeCompare(pkgOrd(b)));
 }
 function pkgLabel(p){ return (p.qty||0)+'× '+typeShort(p.type)+(p.date?' · '+fmtDate(p.date):''); }
 function totalFor(c,type){ return packagesOf(c,type).reduce((a,p)=>a+(Number(p.qty)||0),0)+pkgAdjust(c,type); }
@@ -2756,11 +2764,11 @@ function totalFor(c,type){ return packagesOf(c,type).reduce((a,p)=>a+(Number(p.q
    oldest first, then any manual adjustment last. */
 function creditSlots(c,type){
   const out=[];
-  packagesOf(c,type).forEach(p=>{ const q=Math.max(0,Number(p.qty)||0);
+  poolPackages(c,type).forEach(p=>{ const q=Math.max(0,Number(p.qty)||0);
     for(let i=1;i<=q;i++)out.push({pkgId:p.id,label:pkgLabel(p),n:i,of:q}); });
-  const adj=pkgAdjust(c,type);
-  for(let i=1;i<=adj;i++)out.push({pkgId:'',label:t('Adjustment'),n:i,of:adj});
-  return out;
+  creditPool(type).forEach(ty=>{ const adj=pkgAdjust(c,ty);
+    for(let i=1;i<=adj;i++)out.push({pkgId:'',label:t('Adjustment')+' · '+typeShort(ty),n:i,of:adj}); });
+  return out;   // length always equals poolTotal(c,type)
 }
 /* Per-customer payment status within a session. Group sessions can have a mixed s.pay map
    (one player on a credit, another paying cash, another not yet paid); 1:1 sessions and any
@@ -2794,9 +2802,10 @@ function cancelledByLabel(s){
    Nothing is stored per allocation: "used" is counted from completed package-paid sessions
    across the whole pool, so the balance is always derived and can never drift out of step with
    the sessions themselves. */
-/* Each session type keeps its own credits. Group and the weekend classes were briefly shared;
-   they are separate again, so a Group 10-pack buys Group sessions and nothing else. */
-const CREDIT_POOLS=[['1on1'],['group'],['openrun'],['cond']];
+/* Group and the two weekend classes share one pool of credits: they are all the same
+   pay-per-head format, so a Group 10-pack covers a Weekend Open Run or a Running/Conditioning
+   class just as well. 1:1 stays on its own — it is a different price and a different thing. */
+const CREDIT_POOLS=[['1on1'],['group','openrun','cond']];
 function creditPool(type){ return CREDIT_POOLS.find(p=>p.indexOf(type)>=0)||[type]; }
 function poolLabel(type){
   const p=creditPool(type);
@@ -4318,9 +4327,10 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-27 01:13 UTC';
+const BUILD='2026-08-27 01:23 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Group and the weekend classes share credits again.</b> They are the same pay-per-head format, so a Group pack now covers a Weekend Open Run or a Running/Conditioning class \u2014 Yanyan\u2019s weekend running comes off his group credits. <b>1:1 stays separate</b>: different price, different thing. The per-package tracking from the last release is unchanged, so a weekend session still names the package it drew from and packages are still used oldest-first.',
    '<b>A cancelled session no longer reads as \u201cunpaid\u201d anywhere.</b> Nothing is owed on a session that did not happen, so the badge said a debt existed that did not. Cancelled rows now show a plain dash \u2014 or <b>\u21a9 $40 to refund</b> where money had already been taken. Fixed on the owner\u2019s customer history, the client\u2019s session cards and the spreadsheet export; the Booking table already behaved this way, and all four now share one function so they cannot drift apart again.',
    '<b>Credits belong to the package that was sold, and each session type has its own.</b> Group, Weekend Open Run, Weekend Running/Conditioning and 1:1 no longer share \u2014 a Group 10-pack buys Group sessions and nothing else. Sessions draw down the <b>oldest package first</b>, so each package fills up in turn and you can see exactly which one paid for which session.',
    'The old <i>creditsTotal</i> number kept alongside the packages is gone as a source of truth \u2014 two numbers maintained by hand is how they drift apart. Credits are now simply the packages sold. Anything the old total held beyond the packages is converted once into an <b>extra credits</b> adjustment on the customer form, for goodwill sessions or a balance carried over from before.',
@@ -6637,8 +6647,8 @@ function viewCustomer(id){
   /* How far into each package the client has got — the oldest package is drawn down first, so
      these fill up in order rather than all moving together. */
   const pkgUse={};
-  TYPE_ORDER.forEach(ty=>{
-    const slots=creditSlots(c,ty), used=poolUsedRaw(c,ty);
+  CREDIT_POOLS.forEach(pl=>{                       // once per pool — not once per type in it
+    const slots=creditSlots(c,pl[0]), used=poolUsedRaw(c,pl[0]);
     slots.slice(0,used).forEach(sl=>{ if(sl.pkgId)pkgUse[sl.pkgId]=(pkgUse[sl.pkgId]||0)+1; });
   });
   const pkgs=c.packages.length?c.packages.slice().sort((a,b)=>((b.date||'')+b.id).localeCompare((a.date||'')+a.id)).map(p=>{
@@ -6788,7 +6798,7 @@ function openCustomer(id){
         ${TYPE_ORDER.map(ty=>`<div class="field" style="margin-bottom:0"><label class="f">${typeShort(ty)} — extra</label>
           <input type="number" class="cTotType" data-type="${ty}" min="0" value="${id?pkgAdjust(c,ty):0}"></div>`).join('')}
       </div>
-      <div class="clienttag" style="margin-top:8px">${id?('Holding now: '+TYPE_ORDER.filter(ty=>totalFor(c,ty)>0).map(ty=>typeShort(ty)+' '+poolUsedRaw(c,ty)+'/'+totalFor(c,ty)).join(' · ')+'. '):''}Credits come from the packages you sell — use these boxes only for a goodwill session or a balance carried over from before. Used is counted automatically from package-paid sessions.
+      <div class="clienttag" style="margin-top:8px">${id?('Holding now: '+CREDIT_POOLS.filter(pl=>poolTotal(c,pl[0])>0).map(pl=>poolLabel(pl[0])+' '+poolUsedRaw(c,pl[0])+'/'+poolTotal(c,pl[0])).join(' · ')+'. '):''}Credits come from the packages you sell — use these boxes only for a goodwill session or a balance carried over from before. Used is counted automatically from package-paid sessions.
         <br><b style="color:var(--txt)">Group</b>, <b style="color:var(--txt)">Open Run</b> and <b style="color:var(--txt)">Conditioning</b> totals add into one shared balance; a credit bought for any of them can pay for any of them.</div>
     </div>
     <div class="field"><label class="f">Client login password</label>
