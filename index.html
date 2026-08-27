@@ -4327,7 +4327,7 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-27 01:23 UTC';
+const BUILD='2026-08-27 01:26 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
    '<b>Group and the weekend classes share credits again.</b> They are the same pay-per-head format, so a Group pack now covers a Weekend Open Run or a Running/Conditioning class \u2014 Yanyan\u2019s weekend running comes off his group credits. <b>1:1 stays separate</b>: different price, different thing. The per-package tracking from the last release is unchanged, so a weekend session still names the package it drew from and packages are still used oldest-first.',
@@ -4335,7 +4335,7 @@ const CHANGELOG=[
    '<b>Credits belong to the package that was sold, and each session type has its own.</b> Group, Weekend Open Run, Weekend Running/Conditioning and 1:1 no longer share \u2014 a Group 10-pack buys Group sessions and nothing else. Sessions draw down the <b>oldest package first</b>, so each package fills up in turn and you can see exactly which one paid for which session.',
    'The old <i>creditsTotal</i> number kept alongside the packages is gone as a source of truth \u2014 two numbers maintained by hand is how they drift apart. Credits are now simply the packages sold. Anything the old total held beyond the packages is converted once into an <b>extra credits</b> adjustment on the customer form, for goodwill sessions or a balance carried over from before.',
    'The customer card lists every package with a <b>used / bought</b> bar, and the session history names the package each session drew from. <b>Watch after this update:</b> anyone who used a group credit on a weekend class will now show those sessions as unpaid \u2014 that is the separation working, but check Outstanding before chasing anybody.',
-   'The owner&rsquo;s session editor now fills the screen instead of opening in a small box, so the client list, notes and media all fit without fighting a scrollbar.',
+   'The owner&rsquo;s <b>session editor and customer card</b> now fill the screen instead of opening in a small box, so the client list, packages, credit bars and the whole session history fit without fighting a scrollbar. The title bar and the Save row stay pinned while the middle scrolls.',
    '<b>Fixed: sessions past the end of a package read as paid.</b> Credits used to be counted with a cap \u2014 once a client had used all ten, an eleventh session marked <i>package</i> still showed as PAID and never appeared as money owed. That is why Yanyan had no cash outstanding despite the credits being gone. Credits are now consumed in date order, and any completed session beyond the number actually bought counts as <b>unpaid</b> until another package is sold or the cash is taken.',
    'Every completed session now says which credit it used \u2014 <b>Group &amp; weekend classes 5/10</b> \u2014 on the client&rsquo;s Payments table and on the owner&rsquo;s customer session history. Sessions with nothing left to cover them are flagged <b>over</b> in red, and the package summary says how many are beyond the package rather than quietly showing 10/10.',
    'The owner&rsquo;s customer session history gained a <b>Screenshot</b> button. It rebuilds the whole table off-screen at full width \u2014 every row, no scrollbar, no buttons \u2014 and saves it as one PNG, so the picture holds the entire history rather than whatever fitted on the screen.',
@@ -6706,7 +6706,7 @@ function viewCustomer(id){
     </div>
     <div id="custHist"><div style="overflow-x:auto"><table><thead><tr><th>When</th><th>Type</th><th>Status</th><th>Pay</th><th>Credit used</th><th class="right">Share</th><th></th></tr></thead><tbody>${hist}</tbody></table></div></div>
     <p class="muted small" style="margin-top:8px">Editing a session here updates the client's "My Sessions" too.</p>
-  `,`<button class="btn ghost" onclick="copyClientLink('${id}')">🔗 Client link</button><button class="btn ghost" onclick="openClientSkills('${id}')">🎯 Skills</button><button class="btn ghost" onclick="openCustomer('${id}')">Edit</button><button class="btn" onclick="closeModal()">Close</button>`);
+  `,`<button class="btn ghost" onclick="copyClientLink('${id}')">🔗 Client link</button><button class="btn ghost" onclick="openClientSkills('${id}')">🎯 Skills</button><button class="btn ghost" onclick="openCustomer('${id}')">Edit</button><button class="btn" onclick="closeModal()">Close</button>`,{full:AUTH==='owner'});
 }
 /* preType preselects the session type when this is opened from a payment screen. Without it the
    owner sells a 1:1 package to settle a conditioning session and the Credit button still refuses
