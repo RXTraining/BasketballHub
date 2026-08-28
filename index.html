@@ -1302,7 +1302,7 @@ const ZH={
   'To buy a package, ask the Owner — your used/total balance updates automatically.':'购买套餐请联系管理员 — 已用/总数会自动更新。',
   'Today':'今天','Pending — awaiting confirmation':'待确认','Your booked sessions':'已预约课程',
   'No booked sessions yet — request one ←':'暂无已预约课程 — 去预约 ←','Your events':'我的活动',
-  'left':'剩余','used':'已用','completed':'已完成','Age':'年龄','yrs':'岁','Invite a friend':'邀请朋友','Invite':'邀请','Coach':'教练','Prepaid':'已预付','Unpaid':'未付款','to refund':'待退款','Pending':'待确认','Booked':'已预约',
+  'left':'剩余','used':'已用','completed':'已完成','Age':'年龄','yrs':'岁','Invite a friend':'邀请朋友','Invite':'邀请','Coach':'教练','Going ahead — room for more':'已成班 · 仍有名额','more to go ahead':'人即可成班','to go ahead':'才能成班','Prepaid':'已预付','Unpaid':'未付款','to refund':'待退款','Pending':'待确认','Booked':'已预约',
   'Completed':'已完成','Cancelled':'已取消','Check In':'签到','✓ Checked in':'✓ 已签到','Cancel':'取消',
   '📅 Add to calendar':'📅 加入日历','Coach feedback:':'教练反馈：',
   'tap one to select':'点击选择','Register a session and manage your upcoming sessions.':'预约并管理您的课程。',
@@ -1514,7 +1514,7 @@ const KO={
   'To buy a package, ask the Owner — your used/total balance updates automatically.':'패키지 구매는 관리자에게 문의하세요 — 사용/총 잔액은 자동으로 업데이트됩니다.',
   'Today':'오늘','Pending — awaiting confirmation':'확인 대기 중','Your booked sessions':'예약된 수업',
   'No booked sessions yet — request one ←':'아직 예약된 수업이 없습니다 — 예약하세요 ←','Your events':'내 이벤트',
-  'left':'남음','used':'사용','completed':'완료','Age':'나이','yrs':'세','Invite a friend':'친구 초대','Invite':'초대','Coach':'코치','Prepaid':'선불','Unpaid':'미결제','to refund':'환불 예정','Pending':'대기','Booked':'예약됨',
+  'left':'남음','used':'사용','completed':'완료','Age':'나이','yrs':'세','Invite a friend':'친구 초대','Invite':'초대','Coach':'코치','Going ahead — room for more':'진행 확정 · 자리 있음','more to go ahead':'명 더 필요','to go ahead':'진행하려면','Prepaid':'선불','Unpaid':'미결제','to refund':'환불 예정','Pending':'대기','Booked':'예약됨',
   'Completed':'완료','Cancelled':'취소됨','Check In':'체크인','✓ Checked in':'✓ 체크인 완료','Cancel':'취소',
   '📅 Add to calendar':'📅 캘린더에 추가','Coach feedback:':'코치 피드백:',
   'tap one to select':'선택하려면 탭하세요',
@@ -1721,7 +1721,7 @@ const JA={
   'To buy a package, ask the Owner — your used/total balance updates automatically.':'パッケージ購入は管理者へ — 使用/合計残高は自動更新されます。',
   'Today':'今日','Pending — awaiting confirmation':'確認待ち','Your booked sessions':'予約済みセッション',
   'No booked sessions yet — request one ←':'予約済みセッションはありません — 予約してください ←','Your events':'マイイベント',
-  'left':'残り','used':'使用','completed':'完了','Age':'年齢','yrs':'歳','Invite a friend':'友達を招待','Invite':'招待','Coach':'コーチ','Prepaid':'前払い','Unpaid':'未払い','to refund':'返金予定','Pending':'保留','Booked':'予約済み',
+  'left':'残り','used':'使用','completed':'完了','Age':'年齢','yrs':'歳','Invite a friend':'友達を招待','Invite':'招待','Coach':'コーチ','Going ahead — room for more':'開催決定 · 空きあり','more to go ahead':'人で開催','to go ahead':'開催に必要','Prepaid':'前払い','Unpaid':'未払い','to refund':'返金予定','Pending':'保留','Booked':'予約済み',
   'Completed':'完了','Cancelled':'キャンセル','Check In':'チェックイン','✓ Checked in':'✓ チェックイン済み','Cancel':'キャンセル',
   '📅 Add to calendar':'📅 カレンダーに追加','Coach feedback:':'コーチからのフィードバック：',
   'tap one to select':'タップして選択',
@@ -4362,9 +4362,10 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-28 01:59 UTC';
+const BUILD='2026-08-28 02:03 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   'Renamed the group status pill from <i>Running \u2014 room for more</i> to <b>Going ahead \u2014 room for more</b>. \u201cRunning\u201d was a poor word to pick in an app that also has a Running sport and a Weekend Running/Conditioning class \u2014 on a basketball group it read as the sport rather than as \u201cthis session is happening\u201d. The forming pill says <b>Needs 1 more to go ahead</b> for the same reason.',
    'The separate <b>Join a group</b> panel is gone \u2014 it repeated the card above it: same heading, same coach, same session, same buttons. Every open group now lives in that one card: the soonest in full, the rest listed compactly underneath. Two screens describing the same thing is how they end up disagreeing.',
    'While merging them: the top card never showed a join request already waiting, so it kept offering <i>Ask to join</i> for a group you had already asked about. Both places now share one function and show <b>\u23f3 Pending approval</b> with a Withdraw button.',
    'The join panel was naming the coach <b>three times</b> \u2014 in the heading, on every row, and again in the coach block. The panel only ever lists one coach, so the coach now appears once at the top with photo and affiliation, and the rows carry only what differs between them: time, length, place, price and who is already in.',
@@ -5365,8 +5366,11 @@ function groupJoinBtns(s,big){
 function groupRunPill(s){
   const n=(s.customerIds||[]).length;
   return isForming(s)
-    ? `<span class="pill yellow" title="${t('Needs at least')} ${groupMin()} ${t('players')} ${t('to run')}">${t('Needs')} ${groupMin()-n} ${t('more to run')}</span>`
-    : `<span class="pill blue">${t('Running — room for more')}</span>`;
+    /* "Running" was a bad word to choose in an app that also has a Running sport and a Weekend
+       Running/Conditioning class — on a basketball group it read as the sport. This pill is about
+       whether the session goes ahead, so say that. */
+    ? `<span class="pill yellow" title="${t('Needs at least')} ${groupMin()} ${t('players')} ${t('to go ahead')}">${t('Needs')} ${groupMin()-n} ${t('more to go ahead')}</span>`
+    : `<span class="pill blue">${t('Going ahead — room for more')}</span>`;
 }
 /* A compact row for the other groups, listed inside the same card as the headline one. */
 function groupRowHtml(s){
