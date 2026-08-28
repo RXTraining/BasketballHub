@@ -1302,7 +1302,7 @@ const ZH={
   'To buy a package, ask the Owner — your used/total balance updates automatically.':'购买套餐请联系管理员 — 已用/总数会自动更新。',
   'Today':'今天','Pending — awaiting confirmation':'待确认','Your booked sessions':'已预约课程',
   'No booked sessions yet — request one ←':'暂无已预约课程 — 去预约 ←','Your events':'我的活动',
-  'left':'剩余','used':'已用','completed':'已完成','Age':'年龄','yrs':'岁','Invite a friend':'邀请朋友','Invite':'邀请','Coach':'教练','Going ahead — room for more':'已成班 · 仍有名额','more to go ahead':'人即可成班','to go ahead':'才能成班','Full':'已满','left':'剩余','Prepaid':'已预付','Unpaid':'未付款','to refund':'待退款','Pending':'待确认','Booked':'已预约',
+  'left':'剩余','used':'已用','completed':'已完成','Age':'年龄','yrs':'岁','Invite a friend':'邀请朋友','Invite':'邀请','Coach':'教练','Going ahead — room for more':'已成班 · 仍有名额','more to go ahead':'人即可成班','to go ahead':'才能成班','Full':'已满','left':'剩余','cancel':'取消','Prepaid':'已预付','Unpaid':'未付款','to refund':'待退款','Pending':'待确认','Booked':'已预约',
   'Completed':'已完成','Cancelled':'已取消','Check In':'签到','✓ Checked in':'✓ 已签到','Cancel':'取消',
   '📅 Add to calendar':'📅 加入日历','Coach feedback:':'教练反馈：',
   'tap one to select':'点击选择','Register a session and manage your upcoming sessions.':'预约并管理您的课程。',
@@ -1514,7 +1514,7 @@ const KO={
   'To buy a package, ask the Owner — your used/total balance updates automatically.':'패키지 구매는 관리자에게 문의하세요 — 사용/총 잔액은 자동으로 업데이트됩니다.',
   'Today':'오늘','Pending — awaiting confirmation':'확인 대기 중','Your booked sessions':'예약된 수업',
   'No booked sessions yet — request one ←':'아직 예약된 수업이 없습니다 — 예약하세요 ←','Your events':'내 이벤트',
-  'left':'남음','used':'사용','completed':'완료','Age':'나이','yrs':'세','Invite a friend':'친구 초대','Invite':'초대','Coach':'코치','Going ahead — room for more':'진행 확정 · 자리 있음','more to go ahead':'명 더 필요','to go ahead':'진행하려면','Full':'마감','left':'남음','Prepaid':'선불','Unpaid':'미결제','to refund':'환불 예정','Pending':'대기','Booked':'예약됨',
+  'left':'남음','used':'사용','completed':'완료','Age':'나이','yrs':'세','Invite a friend':'친구 초대','Invite':'초대','Coach':'코치','Going ahead — room for more':'진행 확정 · 자리 있음','more to go ahead':'명 더 필요','to go ahead':'진행하려면','Full':'마감','left':'남음','cancel':'취소','Prepaid':'선불','Unpaid':'미결제','to refund':'환불 예정','Pending':'대기','Booked':'예약됨',
   'Completed':'완료','Cancelled':'취소됨','Check In':'체크인','✓ Checked in':'✓ 체크인 완료','Cancel':'취소',
   '📅 Add to calendar':'📅 캘린더에 추가','Coach feedback:':'코치 피드백:',
   'tap one to select':'선택하려면 탭하세요',
@@ -1721,7 +1721,7 @@ const JA={
   'To buy a package, ask the Owner — your used/total balance updates automatically.':'パッケージ購入は管理者へ — 使用/合計残高は自動更新されます。',
   'Today':'今日','Pending — awaiting confirmation':'確認待ち','Your booked sessions':'予約済みセッション',
   'No booked sessions yet — request one ←':'予約済みセッションはありません — 予約してください ←','Your events':'マイイベント',
-  'left':'残り','used':'使用','completed':'完了','Age':'年齢','yrs':'歳','Invite a friend':'友達を招待','Invite':'招待','Coach':'コーチ','Going ahead — room for more':'開催決定 · 空きあり','more to go ahead':'人で開催','to go ahead':'開催に必要','Full':'満員','left':'残り','Prepaid':'前払い','Unpaid':'未払い','to refund':'返金予定','Pending':'保留','Booked':'予約済み',
+  'left':'残り','used':'使用','completed':'完了','Age':'年齢','yrs':'歳','Invite a friend':'友達を招待','Invite':'招待','Coach':'コーチ','Going ahead — room for more':'開催決定 · 空きあり','more to go ahead':'人で開催','to go ahead':'開催に必要','Full':'満員','left':'残り','cancel':'キャンセル','Prepaid':'前払い','Unpaid':'未払い','to refund':'返金予定','Pending':'保留','Booked':'予約済み',
   'Completed':'完了','Cancelled':'キャンセル','Check In':'チェックイン','✓ Checked in':'✓ チェックイン済み','Cancel':'キャンセル',
   '📅 Add to calendar':'📅 カレンダーに追加','Coach feedback:':'コーチからのフィードバック：',
   'tap one to select':'タップして選択',
@@ -4362,9 +4362,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-28 02:58 UTC';
+const BUILD='2026-08-28 03:06 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>\u201cLaunch a group\u201d now sticks.</b> Changing sport or coach re-renders the booking panel, and the session-type dropdown had no remembered state \u2014 so it fell back to 1:1 every time. A client who pressed <i>Launch a group</i> and then browsed a few coaches was quietly requesting a 1:1. The choice is now remembered across re-renders, with a line under the dropdown saying <b>Starting a group</b> and a cancel link.',
+   'It only changes when the client changes it: picking another type, pressing cancel, or sending the request. If they land on a coach who does not run groups it steps aside for that coach rather than forcing a type they cannot teach \u2014 and says so \u2014 then resumes when they move to a coach who does.',
    'Reworded the <b>Launch a group</b> card. The button now says <b>Pick a coach and time</b> rather than the vaguer \u201cStart a group\u201d, so it names the next step. And the reason to train in a group is no longer that it is cheaper \u2014 it is what a group teaches: <i>reading a teammate, talking through a play, and competing against somebody who is trying to beat you</i>. Leading on price invites families to shop on price; the per-player figure is still shown as plain information.',
    'Both event tickers \u2014 the one on the home page and the one on the client&rsquo;s My Sessions \u2014 now say <b>how many places are left</b>: <i>3 left</i>, turning orange under four and red when the event is <b>Full</b>. Just the number remaining; the capacity is not the reader\u2019s problem, only whether they can still get in. Events with no capacity set say nothing rather than implying a limit, and cancelled registrations give their place back.',
    '<b>Weekend Open Run and Weekend Running/Conditioning now default to 60 minutes</b>, like everything else, so the coach\u2019s hourly rate is the price each player pays. They were 90, which quietly billed one and a half times the advertised rate.',
@@ -5004,8 +5006,11 @@ function renderBookingClient(){
             <select id="rqCoach" onchange="pickCoachChange(this.value)">${coachesByJoined(coachesForSport(pickSport)).map(co=>`<option value="${co.id}" ${pickCoach===co.id?'selected':''}>${co.name}</option>`).join('')||'<option value="">No coaches available</option>'}</select></div>
           ${coachMiniProfile(coachById(pickCoach))}
           <div class="field"><label class="f">${t('Session type')}</label>
-            <select id="rqType" onchange="reqSel=[];renderOpenSlots()">${typesForCoach(pickCoach).map(ty=>
-              `<option value="${ty}">${typeLabel(ty)} (${rateLabel(pickCoach,ty)}${isRateTbc(pickCoach,ty)?'':(ty==='1on1'?t('/hr'):t('/player'))})${ty!=='1on1'?' · '+t('up to')+' '+typeMax(ty):''}</option>`).join('')}</select></div>
+            <select id="rqType" onchange="rqTypeChanged(this.value)">${typesForCoach(pickCoach).map(ty=>
+              `<option value="${ty}" ${rqTypeWanted()===ty?'selected':''}>${typeLabel(ty)} (${rateLabel(pickCoach,ty)}${isRateTbc(pickCoach,ty)?'':(ty==='1on1'?t('/hr'):t('/player'))})${ty!=='1on1'?' · '+t('up to')+' '+typeMax(ty):''}</option>`).join('')}</select>
+            ${groupIntent?`<div class="clienttag" style="margin-top:5px">${typesForCoach(pickCoach).indexOf('group')>=0
+                ? '👥 '+t('Starting a group — this stays selected while you look around.')+` <a href="#" onclick="event.preventDefault();cancelGroupIntent()">${t('cancel')}</a>`
+                : '⚠ '+coachName(pickCoach)+' '+t('does not run group sessions — pick another coach or cancel.')+` <a href="#" onclick="event.preventDefault();cancelGroupIntent()">${t('cancel')}</a>`}</div>`:''}</div>
           <div class="field"><label class="f">${coachName(pickCoach)} — tap as many times as you'd like to request</label><div id="openSlots" class="slotlist"></div></div>
           <div class="field"><label class="f">${t('Comment (optional)')}</label><textarea id="rqComment" placeholder="…"></textarea></div>
           <button class="btn" id="rqSubmitBtn" style="width:100%" onclick="submitRequest()">${t('Request Session')}</button>
@@ -5433,14 +5438,38 @@ function groupCtaHtml(){
       <br><span style="opacity:.95">${t('Training together builds what a solo session cannot: reading a teammate, talking through a play, and competing against somebody who is trying to beat you.')}</span></div>
     <button class="btn" onclick="startAGroup()">${t('Pick a coach and time')}</button>`);
 }
-/* Drops the client into the booking form with Group already chosen — the point of the button is
-   to remove the step where they have to know that "Group" is a session type. */
+/* ---- "I want a group" is a decision, not a dropdown value --------------------
+   Switching sport or coach re-renders the booking panel, and the type <select> had no selected
+   state — so it fell back to 1:1 every time. A client who pressed "Launch a group" and then
+   browsed coaches quietly ended up requesting a 1:1.
+
+   rqTypeWanted() is the remembered answer. It survives re-renders and only changes when the
+   client changes it: by picking another type, by cancelling the group intent, or by sending the
+   request. If the coach they land on does not offer groups it steps aside for that coach rather
+   than forcing a type the coach cannot teach. */
+let groupIntent=false, rqTypePick='';
+function rqTypeWanted(coachId){
+  const offered=typesForCoach(coachId||pickCoach);
+  if(groupIntent&&offered.indexOf('group')>=0)return 'group';
+  if(rqTypePick&&offered.indexOf(rqTypePick)>=0)return rqTypePick;
+  return offered[0]||'1on1';
+}
+function rqTypeChanged(v){
+  rqTypePick=v;
+  if(v!=='group')groupIntent=false;      // chose something else on purpose: intent is spent
+  reqSel=[]; renderBookingClient();       // rebuilds the panel, which re-renders the slots too
+}
 function startAGroup(){
-  const sel=$('#rqType');
-  if(sel&&[...sel.options].some(o=>o.value==='group')){ sel.value='group'; reqSel=[]; renderOpenSlots(); }
-  const f=$('#rqCoach')||sel;
+  groupIntent=true; rqTypePick='group'; reqSel=[];
+  renderBookingClient();
+  const f=$('#rqCoach')||$('#rqType');
   if(f&&f.scrollIntoView)f.scrollIntoView({behavior:'smooth',block:'center'});
   flash(t('Choose your coach, then tap the times that suit you — others can join the group you start.'));
+}
+function cancelGroupIntent(){
+  groupIntent=false; rqTypePick=''; reqSel=[];
+  renderBookingClient();
+  flash(t('Back to picking any session type.'));
 }
 /* Shown on the client's own pending group card once the cutoff has passed and nobody joined:
    keep the slot as a 1:1 at the 1:1 price, or drop it. Nothing is re-priced or cancelled without
@@ -5902,7 +5931,7 @@ function submitRequest(){
   });
   if(!created.length&&!joined.length){reqSel=[];renderOpenSlots();return flash('Those times were just taken — please pick another',true);}
   created.forEach(s=>DB.sessions.push(s));
-  reqSel=[];
+  reqSel=[]; groupIntent=false; rqTypePick='';   // the intent has been acted on
   save();pushRows('sessions',created.concat(joined).map(sessRow));
   joined.forEach(g=>{ logAct('group_join_request',fmtDT(g.date,g.time)+' · '+coachName(coachId),g.id);
                       notifyOwnerJoin(g,custById(cid)); });
