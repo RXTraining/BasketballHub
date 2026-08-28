@@ -305,6 +305,8 @@
   .gcta .btn{background:#fff;color:#14361a;border:0;font-weight:800}
   .gcta .btn.ghost{background:rgba(0,0,0,.34);color:#fff;border:1px solid rgba(255,255,255,.75)}
   .gcta .btn.ghost:hover{background:rgba(0,0,0,.46)}
+  /* armed: the client has chosen to start a group and the booking form is holding that choice */
+  .gcta .btn.on{background:#0e2a12;color:#fff;box-shadow:inset 0 0 0 2px rgba(255,255,255,.85)}
   .btn.sm{padding:7px 12px;font-size:12.5px}
   .btn.danger{background:var(--panel2);color:var(--red);border:1px solid var(--line)}
   .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;
@@ -1070,6 +1072,8 @@
         <p class="muted small" id="clientHint">Enter your name and password (or open your personal link).</p>
         <input id="loginClient" placeholder="Your full name" autocomplete="off" onkeydown="if(event.key==='Enter')clientLoginPick()">
         <input type="password" id="loginClientPwd" placeholder="Your password" style="margin-top:10px" onkeydown="if(event.key==='Enter')clientLoginPick()">
+        <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="loginRemember" checked style="width:auto"><span id="rememberLbl">Keep me signed in on this device</span></label>
         <button class="btn" id="playerSignInBtn" style="width:100%;margin-top:14px" onclick="clientLoginPick()">Sign in as player</button>
         <button class="btn ghost" id="signupOpenBtn" style="width:100%;margin-top:10px" onclick="openSignup()">New here? Create an account</button>
       </div>
@@ -1077,6 +1081,8 @@
         <p class="muted small" id="coachHint">Coaches: sign in with your name and the password set by the owner.</p>
         <input id="loginCoach" placeholder="Your name" autocomplete="off" onkeydown="if(event.key==='Enter')coachLoginPick()">
         <input type="password" id="loginCoachPwd" placeholder="Your password" style="margin-top:10px" onkeydown="if(event.key==='Enter')coachLoginPick()">
+        <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="loginRememberCoach" checked style="width:auto"><span id="rememberCoachLbl">Keep me signed in on this device</span></label>
         <button class="btn" id="coachSignInBtn" style="width:100%;margin-top:14px" onclick="coachLoginPick()">Sign in as coach</button>
       </div>
     </div>
@@ -1302,7 +1308,7 @@ const ZH={
   'To buy a package, ask the Owner — your used/total balance updates automatically.':'购买套餐请联系管理员 — 已用/总数会自动更新。',
   'Today':'今天','Pending — awaiting confirmation':'待确认','Your booked sessions':'已预约课程',
   'No booked sessions yet — request one ←':'暂无已预约课程 — 去预约 ←','Your events':'我的活动',
-  'left':'剩余','used':'已用','completed':'已完成','Age':'年龄','yrs':'岁','Invite a friend':'邀请朋友','Invite':'邀请','Coach':'教练','Going ahead — room for more':'已成班 · 仍有名额','more to go ahead':'人即可成班','to go ahead':'才能成班','Full':'已满','left':'剩余','cancel':'取消','Prepaid':'已预付','Unpaid':'未付款','to refund':'待退款','Pending':'待确认','Booked':'已预约',
+  'left':'剩余','used':'已用','completed':'已完成','Age':'年龄','yrs':'岁','Invite a friend':'邀请朋友','Invite':'邀请','Coach':'教练','Going ahead — room for more':'已成班 · 仍有名额','more to go ahead':'人即可成班','to go ahead':'才能成班','Full':'已满','left':'剩余','cancel':'取消','Keep me signed in on this device':'在此设备保持登录','Starting a group':'正在发起小组课','tap to cancel':'点击取消','Prepaid':'已预付','Unpaid':'未付款','to refund':'待退款','Pending':'待确认','Booked':'已预约',
   'Completed':'已完成','Cancelled':'已取消','Check In':'签到','✓ Checked in':'✓ 已签到','Cancel':'取消',
   '📅 Add to calendar':'📅 加入日历','Coach feedback:':'教练反馈：',
   'tap one to select':'点击选择','Register a session and manage your upcoming sessions.':'预约并管理您的课程。',
@@ -1514,7 +1520,7 @@ const KO={
   'To buy a package, ask the Owner — your used/total balance updates automatically.':'패키지 구매는 관리자에게 문의하세요 — 사용/총 잔액은 자동으로 업데이트됩니다.',
   'Today':'오늘','Pending — awaiting confirmation':'확인 대기 중','Your booked sessions':'예약된 수업',
   'No booked sessions yet — request one ←':'아직 예약된 수업이 없습니다 — 예약하세요 ←','Your events':'내 이벤트',
-  'left':'남음','used':'사용','completed':'완료','Age':'나이','yrs':'세','Invite a friend':'친구 초대','Invite':'초대','Coach':'코치','Going ahead — room for more':'진행 확정 · 자리 있음','more to go ahead':'명 더 필요','to go ahead':'진행하려면','Full':'마감','left':'남음','cancel':'취소','Prepaid':'선불','Unpaid':'미결제','to refund':'환불 예정','Pending':'대기','Booked':'예약됨',
+  'left':'남음','used':'사용','completed':'완료','Age':'나이','yrs':'세','Invite a friend':'친구 초대','Invite':'초대','Coach':'코치','Going ahead — room for more':'진행 확정 · 자리 있음','more to go ahead':'명 더 필요','to go ahead':'진행하려면','Full':'마감','left':'남음','cancel':'취소','Keep me signed in on this device':'이 기기에서 로그인 유지','Starting a group':'그룹 개설 중','tap to cancel':'취소하려면 탭','Prepaid':'선불','Unpaid':'미결제','to refund':'환불 예정','Pending':'대기','Booked':'예약됨',
   'Completed':'완료','Cancelled':'취소됨','Check In':'체크인','✓ Checked in':'✓ 체크인 완료','Cancel':'취소',
   '📅 Add to calendar':'📅 캘린더에 추가','Coach feedback:':'코치 피드백:',
   'tap one to select':'선택하려면 탭하세요',
@@ -1721,7 +1727,7 @@ const JA={
   'To buy a package, ask the Owner — your used/total balance updates automatically.':'パッケージ購入は管理者へ — 使用/合計残高は自動更新されます。',
   'Today':'今日','Pending — awaiting confirmation':'確認待ち','Your booked sessions':'予約済みセッション',
   'No booked sessions yet — request one ←':'予約済みセッションはありません — 予約してください ←','Your events':'マイイベント',
-  'left':'残り','used':'使用','completed':'完了','Age':'年齢','yrs':'歳','Invite a friend':'友達を招待','Invite':'招待','Coach':'コーチ','Going ahead — room for more':'開催決定 · 空きあり','more to go ahead':'人で開催','to go ahead':'開催に必要','Full':'満員','left':'残り','cancel':'キャンセル','Prepaid':'前払い','Unpaid':'未払い','to refund':'返金予定','Pending':'保留','Booked':'予約済み',
+  'left':'残り','used':'使用','completed':'完了','Age':'年齢','yrs':'歳','Invite a friend':'友達を招待','Invite':'招待','Coach':'コーチ','Going ahead — room for more':'開催決定 · 空きあり','more to go ahead':'人で開催','to go ahead':'開催に必要','Full':'満員','left':'残り','cancel':'キャンセル','Keep me signed in on this device':'この端末でログインを保持','Starting a group':'グループを開始中','tap to cancel':'タップで取消','Prepaid':'前払い','Unpaid':'未払い','to refund':'返金予定','Pending':'保留','Booked':'予約済み',
   'Completed':'完了','Cancelled':'キャンセル','Check In':'チェックイン','✓ Checked in':'✓ チェックイン済み','Cancel':'キャンセル',
   '📅 Add to calendar':'📅 カレンダーに追加','Coach feedback:':'コーチからのフィードバック：',
   'tap one to select':'タップして選択',
@@ -3197,7 +3203,40 @@ function switchTab(){
   refreshOwner();
   saveSess();
 }
-function saveSess(){try{sessionStorage.setItem('rx_sess',JSON.stringify({auth:AUTH,clientAs,coachAs,mgCoach,pickCoach,pickSport,tab:TAB}));}catch(e){}}
+function saveSess(){
+  const body=JSON.stringify({auth:AUTH,clientAs,coachAs,mgCoach,pickCoach,pickSport,tab:TAB});
+  try{sessionStorage.setItem('rx_sess',body);}catch(e){}
+  // Mirror into localStorage only while "keep me signed in" is on. sessionStorage dies with the
+  // tab, which is why everyone was retyping their password every visit.
+  try{ if(localStorage.getItem('rx_keep')==='1')localStorage.setItem('rx_sess',body); }catch(e){}
+}
+/* Remembering someone is remembering WHO they are, never their password. A stored password can
+   be read by anything with access to this browser profile; a remembered identity is no weaker
+   than the personal sign-in link already sent by email, and it can be revoked by signing out. */
+function setRemember(on){
+  try{
+    if(on)localStorage.setItem('rx_keep','1');
+    else {localStorage.removeItem('rx_keep');localStorage.removeItem('rx_sess');}
+  }catch(e){}
+}
+function forgetDevice(){ setRemember(false); }
+function readSess(){
+  let ss=null;
+  try{ss=JSON.parse(sessionStorage.getItem('rx_sess'));}catch(e){}
+  if(ss&&ss.auth)return ss;
+  try{ if(localStorage.getItem('rx_keep')==='1')ss=JSON.parse(localStorage.getItem('rx_sess')); }catch(e){}
+  // An account that has since been suspended or un-approved must not walk back in on a stale
+  // session — check the live record, not the stored one.
+  if(ss&&ss.auth==='client'){
+    const c=custById(ss.clientAs);
+    if(!c||c.approved===false||c.suspended){ forgetDevice(); return null; }
+  }
+  if(ss&&ss.auth==='coach'){
+    const co=coachById(ss.coachAs);
+    if(!co||co.active===false){ forgetDevice(); return null; }
+  }
+  return ss;
+}
 function refreshOwner(){if(AUTH==='owner')try{alertUnfilledGroups();}catch(e){}
   const f={about:renderAbout,booking:renderBooking,past:renderPast,journey:renderJourney,skills:renderSkills,money:renderMoney,events:renderEvents,messages:renderMessages,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,pl:renderPL,activity:renderActivity,admin:renderAdmin}[TAB];if(f)f();if(TAB!=='messages'&&(AUTH==='owner'||AUTH==='client'))renderTabs();if(AUTH==='owner')renderWhoami();}
 
@@ -3232,7 +3271,7 @@ function initAuth(){
   ensureTokens();
   const m=location.hash.match(/[#&]c=([a-z0-9]+)/i);
   if(m){const c=DB.customers.find(x=>x.token===m[1]);if(c)pendingClient=c.id;}
-  let ss=null;try{ss=JSON.parse(sessionStorage.getItem('rx_sess'));}catch(e){}
+  const ss=readSess();
   if(ss&&ss.auth==='owner'){AUTH='owner';ROLE='owner';mgCoach=ss.mgCoach||'all';TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();enterApp();return;}
   if(ss&&ss.auth==='coach'&&coachById(ss.coachAs)){AUTH='coach';ROLE='coach';coachAs=ss.coachAs;TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();enterApp();return;}
   if(ss&&ss.auth==='client'&&custById(ss.clientAs)){AUTH='client';ROLE='client';clientAs=ss.clientAs;pickCoach=ss.pickCoach||defaultCoachId();pickSport=ss.pickSport||null;syncSportCoach();TAB=ss.tab||'booking';$('#login').classList.remove('show');closeAuth();renderWhoami();switchTab();startPolling();enterApp();
@@ -3249,6 +3288,9 @@ function applyLoginLang(){
   set('playerSignInBtn',t('Sign in as player'));
   set('signupOpenBtn',t('New here? Create an account'));
   const cs=$('#coachSignInBtn');if(cs)cs.textContent=t('Sign in as coach');
+  let keep=true; try{keep=localStorage.getItem('rx_keep')!==null?localStorage.getItem('rx_keep')==='1':true;}catch(e){}
+  ['loginRemember','loginRememberCoach'].forEach(id=>{const b=$('#'+id);if(b)b.checked=keep;});
+  ['rememberLbl','rememberCoachLbl'].forEach(id=>{const e=$('#'+id);if(e)e.textContent=t('Keep me signed in on this device');});
   const lc=$('#loginClient');if(lc)lc.placeholder=t('Your full name');
   const lp=$('#loginClientPwd');if(lp)lp.placeholder=t('Your password');
   const lco=$('#loginCoach');if(lco)lco.placeholder=t('Your name');
@@ -4111,6 +4153,7 @@ function clientLoginPick(){
   if(!c)return flash('Incorrect password',true);
   if(c.approved===false)return flash(t('Your account is awaiting owner approval.'),true);
   if(c.suspended)return flash(t('Your account is suspended. Please contact your coach.'),true);
+  setRemember(!$('#loginRemember')||$('#loginRemember').checked);
   loginAsClient(c.id);
   if(pwd===DB.settings.defaultClientPwd)flash('Tip: set your own password via “Change password”.');
 }
@@ -4122,6 +4165,7 @@ function coachLoginPick(){
   if(!matches.length)return flash('No active coach found with that name',true);
   const co=matches.find(x=>(x.pwd||'')===pwd);
   if(!co)return flash('Incorrect password',true);
+  setRemember(!$('#loginRememberCoach')||$('#loginRememberCoach').checked);
   loginAsCoach(co.id);
 }
 function loginAsClient(id){
@@ -4144,6 +4188,7 @@ function loginAsCoach(id){
 function signOut(){
   AUTH=null;ROLE='owner';pendingClient=null;coachAs=null;pickCoach=null;stopPolling();
   try{sessionStorage.removeItem('rx_sess');}catch(e){}
+  forgetDevice();                         // signing out is how you un-remember a shared device
   try{ if('clearAppBadge' in navigator)navigator.clearAppBadge(); document.title='RX.TRAINING'; }catch(e){}
   if(location.hash) history.replaceState(null,'',location.pathname+location.search);
   showLogin();
@@ -4362,9 +4407,12 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-28 03:06 UTC';
+const BUILD='2026-08-28 03:14 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   'The <b>Launch a group</b> button now shows when it is armed \u2014 it turns dark with a ring and reads <b>\u2713 Starting a group \u00b7 tap to cancel</b>, so the choice is visible on the card as well as under the dropdown, and the same button undoes it.',
+   '<b>Stay signed in.</b> The session was kept in <span class="mono">sessionStorage</span>, which is discarded when the tab or app closes \u2014 which is why everyone retyped their password every visit. A <b>Keep me signed in on this device</b> tick on the player and coach sign-in now carries it over, for as long as they want. Signing out forgets the device, which is the way to clear a shared phone.',
+   'To be clear about what is stored: the <b>password is never saved</b>, only who you are \u2014 no weaker than the personal sign-in link already sent by email, and revocable by signing out. A remembered session is also re-checked against the live record on every load, so an account suspended or un-approved in the meantime cannot walk back in on it.',
    '<b>\u201cLaunch a group\u201d now sticks.</b> Changing sport or coach re-renders the booking panel, and the session-type dropdown had no remembered state \u2014 so it fell back to 1:1 every time. A client who pressed <i>Launch a group</i> and then browsed a few coaches was quietly requesting a 1:1. The choice is now remembered across re-renders, with a line under the dropdown saying <b>Starting a group</b> and a cancel link.',
    'It only changes when the client changes it: picking another type, pressing cancel, or sending the request. If they land on a coach who does not run groups it steps aside for that coach rather than forcing a type they cannot teach \u2014 and says so \u2014 then resumes when they move to a coach who does.',
    'Reworded the <b>Launch a group</b> card. The button now says <b>Pick a coach and time</b> rather than the vaguer \u201cStart a group\u201d, so it names the next step. And the reason to train in a group is no longer that it is cheaper \u2014 it is what a group teaches: <i>reading a teammate, talking through a play, and competing against somebody who is trying to beat you</i>. Leading on price invites families to shop on price; the per-player figure is still shown as plain information.',
@@ -5436,7 +5484,7 @@ function groupCtaHtml(){
     <h3 style="margin:4px 0 2px;font-size:20px">${t('Launch a group')}</h3>
     <div class="lede" style="margin-bottom:10px">${t('No group is forming yet — pick your coach and a time to start one, and other families can ask to join.')}
       <br><span style="opacity:.95">${t('Training together builds what a solo session cannot: reading a teammate, talking through a play, and competing against somebody who is trying to beat you.')}</span></div>
-    <button class="btn" onclick="startAGroup()">${t('Pick a coach and time')}</button>`);
+    <button class="btn${groupIntent?' on':''}" onclick="${groupIntent?'cancelGroupIntent()':'startAGroup()'}">${groupIntent?'✓ '+t('Starting a group')+' · '+t('tap to cancel'):t('Pick a coach and time')}</button>`);
 }
 /* ---- "I want a group" is a decision, not a dropdown value --------------------
    Switching sport or coach re-renders the booking panel, and the type <select> had no selected
