@@ -4362,10 +4362,10 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-28 02:49 UTC';
+const BUILD='2026-08-28 02:51 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
-   'Both event tickers \u2014 the one on the home page and the one on the client&rsquo;s My Sessions \u2014 now say <b>how many places are left</b>: <i>3 of 12 left</i>, turning orange under four and red when the event is <b>Full</b>. Scarcity is the reason a scrolling banner earns its space. Events with no capacity set say nothing rather than implying a limit, and cancelled registrations give their place back.',
+   'Both event tickers \u2014 the one on the home page and the one on the client&rsquo;s My Sessions \u2014 now say <b>how many places are left</b>: <i>3 left</i>, turning orange under four and red when the event is <b>Full</b>. Just the number remaining; the capacity is not the reader\u2019s problem, only whether they can still get in. Events with no capacity set say nothing rather than implying a limit, and cancelled registrations give their place back.',
    '<b>Weekend Open Run and Weekend Running/Conditioning now default to 60 minutes</b>, like everything else, so the coach\u2019s hourly rate is the price each player pays. They were 90, which quietly billed one and a half times the advertised rate.',
    '<b>Fixed: the duration field could not be edited.</b> Snapping the duration to the type\u2019s default was running on every keystroke, not just when the type changed \u2014 so typing 90 reverted to 60 immediately, because 90 looked like \u201cstill a default\u201d. The snap now lives on the type dropdown, and once you touch the duration it is yours: switching type afterwards leaves your number alone.',
    'Renamed the group status pill from <i>Running \u2014 room for more</i> to <b>Going ahead \u2014 room for more</b>. \u201cRunning\u201d was a poor word to pick in an app that also has a Running sport and a Weekend Running/Conditioning class \u2014 on a basketball group it read as the sport rather than as \u201cthis session is happening\u201d. The forming pill says <b>Needs 1 more to go ahead</b> for the same reason.',
@@ -8029,18 +8029,18 @@ const eventById=id=>(DB.events||[]).find(e=>e.id===id);
 function eventRegsFor(eid){return (DB.eventRegs||[]).filter(r=>r.eventId===eid&&r.status!=='cancelled');}
 function eventSpotsLeft(ev){if(!ev.capacity)return Infinity;return Math.max(0,ev.capacity-eventRegsFor(ev.id).length);}
 /* Places left, said the same way everywhere it appears. An event with no capacity set has no
-   limit, so it says nothing rather than claiming infinite room — and the last few places are
-   worth shouting about, which is the whole reason for putting this in a ticker. */
+   limit, so it says nothing rather than claiming infinite room. Just the number left — the
+   capacity is not the reader's problem, only whether they can still get in. */
 function eventLeftHtml(ev){
   if(!ev||!ev.capacity)return '';
   const left=eventSpotsLeft(ev);
   if(left<=0)return `<span class="pill red">${t('Full')}</span>`;
-  return `<span class="pill ${left<=3?'orange':'green'}">${left} ${t('of')} ${ev.capacity} ${t('left')}</span>`;
+  return `<span class="pill ${left<=3?'orange':'green'}">${left} ${t('left')}</span>`;
 }
 function eventLeftText(ev){
   if(!ev||!ev.capacity)return '';
   const left=eventSpotsLeft(ev);
-  return left<=0?t('Full'):(left+' '+t('of')+' '+ev.capacity+' '+t('left'));
+  return left<=0?t('Full'):(left+' '+t('left'));
 }
 function eventRevenue(ev){return eventRegsFor(ev.id).filter(r=>r.paid).length*(ev.price||0);}
 /* Money registered people still owe. Revenue counts PAID registrations, so an event with 10
