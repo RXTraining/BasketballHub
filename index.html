@@ -4362,9 +4362,10 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-28 02:51 UTC';
+const BUILD='2026-08-28 02:58 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   'Reworded the <b>Launch a group</b> card. The button now says <b>Pick a coach and time</b> rather than the vaguer \u201cStart a group\u201d, so it names the next step. And the reason to train in a group is no longer that it is cheaper \u2014 it is what a group teaches: <i>reading a teammate, talking through a play, and competing against somebody who is trying to beat you</i>. Leading on price invites families to shop on price; the per-player figure is still shown as plain information.',
    'Both event tickers \u2014 the one on the home page and the one on the client&rsquo;s My Sessions \u2014 now say <b>how many places are left</b>: <i>3 left</i>, turning orange under four and red when the event is <b>Full</b>. Just the number remaining; the capacity is not the reader\u2019s problem, only whether they can still get in. Events with no capacity set say nothing rather than implying a limit, and cancelled registrations give their place back.',
    '<b>Weekend Open Run and Weekend Running/Conditioning now default to 60 minutes</b>, like everything else, so the coach\u2019s hourly rate is the price each player pays. They were 90, which quietly billed one and a half times the advertised rate.',
    '<b>Fixed: the duration field could not be edited.</b> Snapping the duration to the type\u2019s default was running on every keystroke, not just when the type changed \u2014 so typing 90 reverted to 60 immediately, because 90 looked like \u201cstill a default\u201d. The snap now lives on the type dropdown, and once you touch the duration it is yours: switching type afterwards leaves your number alone.',
@@ -5428,8 +5429,9 @@ function groupCtaHtml(){
   return box('linear-gradient(135deg,var(--a3),var(--a6,var(--a1)))',`
     <div class="eyebrow">${t('TRAIN TOGETHER')}</div>
     <h3 style="margin:4px 0 2px;font-size:20px">${t('Launch a group')}</h3>
-    <div class="lede" style="margin-bottom:10px">${t('No group is forming yet. Pick a time and start one — other families can then ask to join yours, and everybody trains for less than a 1:1.')}</div>
-    <button class="btn" onclick="startAGroup()">${t('Start a group')}</button>`);
+    <div class="lede" style="margin-bottom:10px">${t('No group is forming yet — pick your coach and a time to start one, and other families can ask to join.')}
+      <br><span style="opacity:.95">${t('Training together builds what a solo session cannot: reading a teammate, talking through a play, and competing against somebody who is trying to beat you.')}</span></div>
+    <button class="btn" onclick="startAGroup()">${t('Pick a coach and time')}</button>`);
 }
 /* Drops the client into the booking form with Group already chosen — the point of the button is
    to remove the step where they have to know that "Group" is a session type. */
@@ -5438,7 +5440,7 @@ function startAGroup(){
   if(sel&&[...sel.options].some(o=>o.value==='group')){ sel.value='group'; reqSel=[]; renderOpenSlots(); }
   const f=$('#rqCoach')||sel;
   if(f&&f.scrollIntoView)f.scrollIntoView({behavior:'smooth',block:'center'});
-  flash(t('Pick a time below and send the request — others can join it.'));
+  flash(t('Choose your coach, then tap the times that suit you — others can join the group you start.'));
 }
 /* Shown on the client's own pending group card once the cutoff has passed and nobody joined:
    keep the slot as a 1:1 at the 1:1 price, or drop it. Nothing is re-priced or cancelled without
