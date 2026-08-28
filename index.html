@@ -4362,9 +4362,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-28 01:54 UTC';
+const BUILD='2026-08-28 01:59 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   'The separate <b>Join a group</b> panel is gone \u2014 it repeated the card above it: same heading, same coach, same session, same buttons. Every open group now lives in that one card: the soonest in full, the rest listed compactly underneath. Two screens describing the same thing is how they end up disagreeing.',
+   'While merging them: the top card never showed a join request already waiting, so it kept offering <i>Ask to join</i> for a group you had already asked about. Both places now share one function and show <b>\u23f3 Pending approval</b> with a Withdraw button.',
    'The join panel was naming the coach <b>three times</b> \u2014 in the heading, on every row, and again in the coach block. The panel only ever lists one coach, so the coach now appears once at the top with photo and affiliation, and the rows carry only what differs between them: time, length, place, price and who is already in.',
    '<b>Session length</b> is now on the group card up top \u2014 <i>Aug 29, 8:00 AM \u00b7 60 min \u00b7 Lexington Central Court</i> \u2014 not just on the rows below. Length is what sets the per-player price, so it belongs next to the price.',
    '<b>Fixed: unreadable text on the group card.</b> The card sets white text on a colour gradient, but <span class="mono">.pill</span> and <span class="mono">.btn.ghost</span> carry a pale background of their own \u2014 so the player names and the <b>Invite a friend</b> button were white on near-white, about <b>1.1:1</b> contrast. Anything on the card now sits on a dark translucent backing, giving 8.7:1 to 11:1. The colours moved out of the markup into one <span class="mono">.gcta</span> rule, so there is a single place to keep this right.',
@@ -5004,7 +5006,6 @@ function renderBookingClient(){
           <button class="btn" id="rqSubmitBtn" style="width:100%" onclick="submitRequest()">${t('Request Session')}</button>
           <p class="muted small" style="margin-top:10px"><b style="color:var(--txt)">${t('All times are Boston (ET).')||'All times are Boston (ET).'}</b></p>
         </div>
-        ${openGroupsHtml()}
         <div class="panel" style="margin-top:16px"><h3>${t('Your packages')}</h3>${pkgHist}
           <p class="muted small" style="margin-top:8px">${t('To buy a package, ask the Owner — your used/total balance updates automatically.')}</p></div>
       </div>
@@ -5179,17 +5180,10 @@ function groupStateLabel(s){
           txt:n+' '+t('of')+' '+max+' · '+left+' '+t('spot(s) left')};
 }
 function groupStatePill(s){ const g=groupStateLabel(s); return `<span class="pill ${g.cls}">${g.txt}</span>`; }
-/* Group sessions of this coach that the given client could still join. */
-function openGroupsFor(coachId,cid){
-  const now=todayISO();
-  return DB.sessions.filter(s=>groupJoinable(s) && s.coachId===coachId
-      && !(s.customerIds||[]).includes(cid))
-    .sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
-}
 function myJoinPending(s,cid){return (s.joinReq||[]).includes(cid);}
-/* Every group a client could join, whichever coach is running it. openGroupsFor() is scoped to
-   one coach because it sits under the coach picker; the call to action needs the whole picture,
-   or a client whose default coach has nothing sees "no groups" while one is forming next door. */
+/* Every group a client could join, whichever coach is running it — not just the coach currently
+   selected in the picker, or a client whose coach has nothing would see "no groups" while one is
+   forming next door. */
 function allOpenGroups(cid){
   const now=todayISO();
   return DB.sessions.filter(s=>groupJoinable(s) && !(s.customerIds||[]).includes(cid))
@@ -5360,6 +5354,31 @@ function coachBlockHtml(coachId){
     </div></div>`;
 }
 function groupCoachHtml(s){ return coachBlockHtml(s&&s.coachId); }
+/* Ask to join / withdraw, in one place — the headline group and the ones listed under it were
+   drifting apart, and the headline never showed a request already waiting. */
+function groupJoinBtns(s,big){
+  const z=big?'':' sm';
+  return myJoinPending(s,clientAs)
+    ? `<span class="pill yellow">${t('⏳ Pending approval')}</span><button class="btn ghost${z}" onclick="cancelJoinRequest('${s.id}')">${t('Withdraw')}</button>`
+    : `<button class="btn${z}" onclick="requestJoinGroup('${s.id}')">${t('Ask to join')}${big?' — '+fmtDT(s.date,s.time):''}</button>`;
+}
+function groupRunPill(s){
+  const n=(s.customerIds||[]).length;
+  return isForming(s)
+    ? `<span class="pill yellow" title="${t('Needs at least')} ${groupMin()} ${t('players')} ${t('to run')}">${t('Needs')} ${groupMin()-n} ${t('more to run')}</span>`
+    : `<span class="pill blue">${t('Running — room for more')}</span>`;
+}
+/* A compact row for the other groups, listed inside the same card as the headline one. */
+function groupRowHtml(s){
+  return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.25);flex-wrap:wrap">
+    <div style="min-width:0;flex:1">
+      <b>${fmtDT(s.date,s.time)}</b> ${groupStatePill(s)} ${groupRunPill(s)}
+      <div class="clienttag" style="margin-top:3px">📍 ${escapeHtml(s.location||'TBD')} · ${s.dur||defaultDur('group')} ${t('min')} · ${shareLabel(s)} ${t('per player')} · ${coachIcon(s.coachId)} ${escapeHtml(coachName(s.coachId))}</div>
+      <div style="margin-top:5px">${rosterHtml(s,clientAs)}</div>
+    </div>
+    <div class="actions">${groupJoinBtns(s)}<button class="btn ghost sm" onclick="inviteToGroup('${s.id}')">${t('Invite')}</button></div>
+  </div>`;
+}
 function groupCtaHtml(){
   if(!clientAs)return '';
   const open=allOpenGroups(clientAs);
@@ -5378,13 +5397,14 @@ function groupCtaHtml(){
         ${t('Next up')}: <b>${fmtDT(soonest.date,soonest.time)}</b> · ${soonest.dur||defaultDur('group')} ${t('min')}${soonest.location?' · 📍 '+escapeHtml(soonest.location):''} · ${filled}/${typeMax('group')} ${t('players')} · <b>${shareLabel(soonest)}</b> ${t('per player')}${spots?` · <b>${spots} ${t('spot(s) left')}</b>`:''}
       </div>
       ${groupCoachHtml(soonest)}
-      <div style="margin:10px 0">${rosterHtml(soonest,clientAs)}</div>
+      <div style="margin:10px 0">${groupRunPill(soonest)} ${rosterHtml(soonest,clientAs)}</div>
       <div class="actions">
-        <button class="btn" onclick="requestJoinGroup('${soonest.id}')">${t('Ask to join')} — ${fmtDT(soonest.date,soonest.time)}</button>
+        ${groupJoinBtns(soonest,true)}
         <button class="btn ghost" onclick="inviteToGroup('${soonest.id}')">${t('Invite a friend')}</button>
-        ${open.length>1?`<button class="btn ghost" onclick="jumpToGroups()">${t('See all')} ${open.length}</button>`:''}
       </div>
-      ${waiting?`<div class="clienttag" style="margin-top:8px">${t('You already have')} ${waiting} ${t('join request waiting for approval.')}</div>`:''}`);
+      ${open.length>1?`<div style="margin-top:12px"><div class="eyebrow" style="margin-bottom:2px">${t('Other groups with room')}</div>
+        ${open.slice(1).map(groupRowHtml).join('')}</div>`:''}
+      <p class="clienttag" style="margin-top:10px">${t('You can see who is already in each group so you know who your child would be training with. Only signed-in families see this — never the public page.')}</p>`);
   }
   if(mine.length){
     const g=mine[0];
@@ -5412,43 +5432,6 @@ function startAGroup(){
   const f=$('#rqCoach')||sel;
   if(f&&f.scrollIntoView)f.scrollIntoView({behavior:'smooth',block:'center'});
   flash(t('Pick a time below and send the request — others can join it.'));
-}
-function jumpToGroups(){
-  const el=document.getElementById('openGroupsPanel');
-  if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'start'});
-}
-function openGroupsHtml(){
-  if(!clientAs)return '';
-  const cid=pickCoach||defaultCoachId();
-  const list=openGroupsFor(cid,clientAs);
-  if(!list.length){
-    return `<div class="panel" style="margin-top:16px">
-      <h3>${t('Join a group')}</h3>
-      <div class="clienttag">${t('No groups with open spots right now. Request a Group time above and other players can join yours.')}</div></div>`;
-  }
-  const rows=list.map(s=>{
-    const n=(s.customerIds||[]).length;
-    const mine=myJoinPending(s,clientAs);
-    const forming=isForming(s);
-    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);flex-wrap:wrap">
-      <div style="min-width:0;flex:1">
-        <b>${fmtDT(s.date,s.time)}</b>
-        ${groupStatePill(s)}
-        ${forming?`<span class="pill yellow" title="${t('Needs at least')} ${groupMin()} ${t('players')} ${t('to run')}">${t('Needs')} ${groupMin()-n} ${t('more to run')}</span>`:`<span class="pill blue">${t('Running — room for more')}</span>`}
-        <div class="clienttag" style="margin-top:3px">📍 ${s.location||'TBD'} · ${s.dur} ${t('min')} · <b style="color:var(--txt)">${shareLabel(s)}</b> ${t('per player')}</div>
-        <div style="margin-top:5px">${rosterHtml(s,clientAs)}</div>
-      </div>
-      <div class="actions">${mine
-        ? `<span class="pill yellow">${t('⏳ Pending approval')}</span><button class="btn ghost sm" onclick="cancelJoinRequest('${s.id}')">${t('Withdraw')}</button>`
-        : `<button class="btn sm" onclick="requestJoinGroup('${s.id}')">${t('Ask to join')}</button>`}<button class="btn ghost sm" onclick="inviteToGroup('${s.id}')">${t('Invite')}</button></div>
-    </div>`;
-  }).join('');
-  return `<div class="panel" style="margin-top:16px" id="openGroupsPanel">
-    <h3>${t('Join a group')}</h3>
-    ${coachBlockHtml(cid)}
-    <div class="clienttag" style="margin:8px 0 6px">${t('Groups with room for more players. You keep your own payment and credits — you only share the session.')}</div>
-    ${rows}
-    <p class="muted small" style="margin-top:10px">${t('You can see who is already in each group so you know who your child would be training with. Only signed-in families see this — never the public page.')}</p></div>`;
 }
 /* Shown on the client's own pending group card once the cutoff has passed and nobody joined:
    keep the slot as a 1:1 at the 1:1 price, or drop it. Nothing is re-priced or cancelled without
