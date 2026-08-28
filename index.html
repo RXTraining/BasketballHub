@@ -4362,9 +4362,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-28 02:03 UTC';
+const BUILD='2026-08-28 02:31 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Weekend Open Run and Weekend Running/Conditioning now default to 60 minutes</b>, like everything else, so the coach\u2019s hourly rate is the price each player pays. They were 90, which quietly billed one and a half times the advertised rate.',
+   '<b>Fixed: the duration field could not be edited.</b> Snapping the duration to the type\u2019s default was running on every keystroke, not just when the type changed \u2014 so typing 90 reverted to 60 immediately, because 90 looked like \u201cstill a default\u201d. The snap now lives on the type dropdown, and once you touch the duration it is yours: switching type afterwards leaves your number alone.',
    'Renamed the group status pill from <i>Running \u2014 room for more</i> to <b>Going ahead \u2014 room for more</b>. \u201cRunning\u201d was a poor word to pick in an app that also has a Running sport and a Weekend Running/Conditioning class \u2014 on a basketball group it read as the sport rather than as \u201cthis session is happening\u201d. The forming pill says <b>Needs 1 more to go ahead</b> for the same reason.',
    'The separate <b>Join a group</b> panel is gone \u2014 it repeated the card above it: same heading, same coach, same session, same buttons. Every open group now lives in that one card: the soonest in full, the rest listed compactly underneath. Two screens describing the same thing is how they end up disagreeing.',
    'While merging them: the top card never showed a join request already waiting, so it kept offering <i>Ask to join</i> for a group you had already asked about. Both places now share one function and show <b>\u23f3 Pending approval</b> with a Withdraw button.',
@@ -5131,9 +5133,9 @@ const SOLO_DUR=60;
 /* How long a session runs by default, per type.
    This decides the price, because a group is billed rate x hours x players — so each player pays
    rate x hours. At 90 minutes a $20/hr coach came out at $30 a head, which read as a mistake next
-   to a dropdown saying "$20/player". A group is an hour, like a 1:1. The weekend classes are
-   genuinely longer sessions and stay at 90, so they bill at 1.5x the hourly rate per player. */
-const DEFAULT_DUR={'1on1':60,'group':60,'openrun':90,'cond':90};
+   to a dropdown saying "$20/player". Everything defaults to an hour, so the advertised rate is
+   the price. These are only DEFAULTS — any session can be set to any length in the editor. */
+const DEFAULT_DUR={'1on1':60,'group':60,'openrun':60,'cond':60};
 function defaultDur(type){ return DEFAULT_DUR[type]||60; }
 function soloPriceFor(s){return computePrice('1on1',SOLO_DUR,1,s.coachId);}
 function groupMin(){return Math.max(2,+DB.settings.groupMinPlayers||2);}
@@ -6346,6 +6348,7 @@ function openSession(id,returnCust,preset){
   const pcoach=(preset&&preset.coachId)||targetCoach();
   const blank={id:'',coachId:pcoach,customerIds:returnCust?[returnCust]:[],type:'1on1',date:(preset&&preset.date)||todayISO(),time:(preset&&preset.time)||'16:00',dur:60,price:computePrice('1on1',60,1,pcoach),status:'scheduled',paid:false,paidVia:'',checkedIn:false,location:(preset&&preset.location)||(DB.locations[0]?DB.locations[0].name:''),notes:''};
   const s = id?DB.sessions.find(x=>x.id===id):blank;
+  sDurTouched=false;                      // a fresh editor trusts the type defaults again
   const opts = DB.customers.map(c=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 4px;cursor:pointer"><input type="checkbox" class="sCustCb" value="${c.id}" ${s.customerIds.includes(c.id)?'checked':''} style="width:auto" onchange="recalcPrice()"><span>${c.name}${totalFor(c,'1on1')||totalFor(c,'group')?' · 1:1 '+creditsFor(c,'1on1')+' left':''}</span></label>`).join('')||'<div class="clienttag">No customers yet — add one in the Customers tab first.</div>';
   const payVal = s.paid?(s.paidVia||'cash'):'';
   editMedia=(s.media||[]).slice();
@@ -6354,7 +6357,7 @@ function openSession(id,returnCust,preset){
     <div class="field"><label class="f">Client(s) — tick one for a 1:1, up to ${MAX_GROUP} for a group, ${MAX_WEEKEND} for a weekend class</label>
       <div id="sCustBox" style="max-height:160px;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px">${opts}</div></div>
     <div class="row">
-      <div class="field"><label class="f">Type</label><select id="sType" onchange="recalcPrice()">
+      <div class="field"><label class="f">Type</label><select id="sType" onchange="sessionTypeChanged()">
         <option value="1on1" ${s.type==='1on1'?'selected':''}>1:1 Private</option>
         <option value="group" ${s.type==='group'?'selected':''}>Group / 1:N (max ${MAX_GROUP})</option>
         ${TYPE_ORDER.filter(typeIsDedicated).filter(ty=>coachOffersType(s.coachId||targetCoach(),ty)||s.type===ty)
@@ -6369,7 +6372,7 @@ function openSession(id,returnCust,preset){
         return `<div class="clienttag" style="margin-top:6px;color:var(--yellow)">⚠ ${n} players in a ${typeShort(s.type)} (max ${typeMax(s.type)}).${
           fit.length?` <a href="#" onclick="switchSessionType('${id}','${fit[0]}');return false" style="color:var(--accent);font-weight:800">Switch to ${typeDef(fit[0]).label} →</a>`:''}</div>`;
       })()}</div>
-      <div class="field"><label class="f">Duration (min)</label><input type="number" id="sDur" value="${s.dur}" onchange="recalcPrice()"></div>
+      <div class="field"><label class="f">Duration (min)</label><input type="number" id="sDur" value="${s.dur}" min="15" step="15" oninput="sDurTouched=true;recalcPrice()" onchange="sDurTouched=true;recalcPrice()"></div>
     </div>
     <div class="row">
       <div class="field"><label class="f">Date</label><input type="date" id="sDate" value="${s.date}"></div>
@@ -6485,15 +6488,21 @@ function payoutDelRow(btn){
   if(!$$('.payoutRow').length&&$('#sPayouts'))$('#sPayouts').innerHTML='<div class="clienttag" id="sPayoutEmpty">Using each coach\'s share deal.</div>';
   payoutTotal();
 }
+/* Set as soon as the owner edits the duration by hand, so changing the type afterwards leaves
+   their number alone. Cleared every time the editor opens. */
+let sDurTouched=false;
+/* Changing the TYPE moves the duration to that type's default. This has to live on the type
+   control, NOT inside recalcPrice(): recalcPrice also runs when the duration changes, so snapping
+   there made the field impossible to edit — typing 90 reverted to 60 on the next keystroke,
+   because 90 looked like "still a default". */
+function sessionTypeChanged(){
+  const durEl=$('#sDur'), typeEl=$('#sType');
+  if(durEl&&typeEl&&!sDurTouched)durEl.value=defaultDur(typeEl.value);
+  recalcPrice();
+}
 function recalcPrice(){
   const type=$('#sType').value;
-  /* Switching type moves the duration to that type's default — but only if what is there is
-     still a default. A number the owner typed on purpose is never overwritten. */
   const durEl=$('#sDur');
-  if(durEl){
-    const cur=+durEl.value||0;
-    if(TYPE_ORDER.some(k=>DEFAULT_DUR[k]===cur) && cur!==defaultDur(type)) durEl.value=defaultDur(type);
-  }
   const dur=+((durEl&&durEl.value)||0)||60;
   const n=Math.max(1,$$('.sCustCb').filter(cb=>cb.checked).length);
   const cid=(AUTH==='coach')?coachAs:($('#sCoach')?$('#sCoach').value:targetCoach());
