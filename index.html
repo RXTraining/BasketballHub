@@ -290,6 +290,21 @@
     padding:11px 18px;border-radius:10px;cursor:pointer;font-size:14px;transition:.15s}
   .btn:hover{background:#3f6a00}   /* darker, not lighter — white ink needs the contrast */
   .btn.ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
+  /* ---- group call-to-action card ------------------------------------------
+     The card sits on a saturated gradient, but .pill and .btn.ghost both carry a PALE background
+     of their own. Setting colour:#fff on the parent therefore produced white text on a near-white
+     chip — invisible. Anything sitting on this card gets a dark translucent backing instead, so
+     white text always has a dark surface underneath whatever the gradient is doing behind it. */
+  .gcta{color:#fff;border:0}
+  .gcta h3{color:#fff}
+  .gcta .eyebrow{font-size:12px;font-weight:800;letter-spacing:.08em;opacity:.9}
+  .gcta .lede{font-size:13px;line-height:1.5;color:rgba(255,255,255,.96)}
+  .gcta .clienttag{color:rgba(255,255,255,.9)}
+  .gcta .pill,.gcta .credit{background:rgba(0,0,0,.34);color:#fff;border:1px solid rgba(255,255,255,.5)}
+  .gcta .pill.green{background:rgba(0,0,0,.34);color:#fff;border-color:rgba(255,255,255,.75)}
+  .gcta .btn{background:#fff;color:#14361a;border:0;font-weight:800}
+  .gcta .btn.ghost{background:rgba(0,0,0,.34);color:#fff;border:1px solid rgba(255,255,255,.75)}
+  .gcta .btn.ghost:hover{background:rgba(0,0,0,.46)}
   .btn.sm{padding:7px 12px;font-size:12.5px}
   .btn.danger{background:var(--panel2);color:var(--red);border:1px solid var(--line)}
   .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;
@@ -4347,9 +4362,12 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-28 01:44 UTC';
+const BUILD='2026-08-28 01:54 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   'The join panel was naming the coach <b>three times</b> \u2014 in the heading, on every row, and again in the coach block. The panel only ever lists one coach, so the coach now appears once at the top with photo and affiliation, and the rows carry only what differs between them: time, length, place, price and who is already in.',
+   '<b>Session length</b> is now on the group card up top \u2014 <i>Aug 29, 8:00 AM \u00b7 60 min \u00b7 Lexington Central Court</i> \u2014 not just on the rows below. Length is what sets the per-player price, so it belongs next to the price.',
+   '<b>Fixed: unreadable text on the group card.</b> The card sets white text on a colour gradient, but <span class="mono">.pill</span> and <span class="mono">.btn.ghost</span> carry a pale background of their own \u2014 so the player names and the <b>Invite a friend</b> button were white on near-white, about <b>1.1:1</b> contrast. Anything on the card now sits on a dark translucent backing, giving 8.7:1 to 11:1. The colours moved out of the markup into one <span class="mono">.gcta</span> rule, so there is a single place to keep this right.',
    '<b>Age on group rosters.</b> Clients now carry an optional <b>Age</b>, set by you on the customer card or by the family themselves in <i>Edit my info</i>. It shows beside the name on every group roster \u2014 <b>Jackie Chen · 12 yrs · AAU U14</b> \u2014 so a parent can see whether the group suits their child. Blank shows nothing rather than a guess.',
    '<b>Invite a friend.</b> Every group carries an Invite button that opens the phone&rsquo;s share sheet (or copies the text) with the time, coach, location, spots left, price per player and a sign-up link \u2014 ready to send by text or WeChat. <b>It is a message the family sends themselves, not an in-app message to another client:</b> an in-app invite would need to show every client your whole roster, which is a real privacy cost for a small convenience. This way it also reaches families who have not signed up yet.',
    'The <b>coach is now named on every group</b> \u2014 photo, name and affiliation on the client call to action and join list, and <i>Coach Raymond Xu</i> in the home page ticker. It is the first thing a parent asks about and it was missing.',
@@ -5326,62 +5344,65 @@ async function inviteToGroup(id){
     `<button class="btn" onclick="(function(){var i=document.getElementById('invTxt');i.select();try{document.execCommand('copy');}catch(e){}flash('${t('Copied')} 📋');})()">${t('Copy')}</button>
      <button class="btn ghost" onclick="closeModal()">${t('Close')}</button>`);
 }
-/* The coach behind a group — the thing a parent asks about first. */
-function groupCoachHtml(s,opts){
-  const co=coachById(s.coachId); if(!co)return '';
+/* The coach behind a group — the thing a parent asks about first.
+   Takes a coach id, because the join panel is scoped to ONE coach and shows this once at the top
+   rather than repeating the same face on every row. */
+function coachBlockHtml(coachId){
+  const co=coachById(coachId); if(!co)return '';
   const sub=[co.affiliation,co.tagline].filter(Boolean).join(' · ');
-  const light=opts&&opts.light;
+  // Colour is the card's job now (.gcta), not this function's — one place to get contrast right.
   return `<div style="display:flex;align-items:center;gap:8px;margin-top:6px">
     ${co.photo?`<img src="${attrEsc(co.photo)}" alt="" style="width:30px;height:30px;border-radius:50%;object-fit:cover;flex:0 0 auto">`
               :`<span style="font-size:20px">${coachIcon(co.id)}</span>`}
     <div style="min-width:0">
-      <b style="${light?'color:#fff':''}">${t('Coach')} ${escapeHtml(co.name)}</b>
-      ${sub?`<div class="clienttag" style="${light?'color:rgba(255,255,255,.85)':''}">${escapeHtml(sub)}</div>`:''}
+      <b>${t('Coach')} ${escapeHtml(co.name)}</b>
+      ${sub?`<div class="clienttag">${escapeHtml(sub)}</div>`:''}
     </div></div>`;
 }
+function groupCoachHtml(s){ return coachBlockHtml(s&&s.coachId); }
 function groupCtaHtml(){
   if(!clientAs)return '';
   const open=allOpenGroups(clientAs);
   const mine=DB.sessions.filter(s=>s.type==='group'&&(s.customerIds||[]).includes(clientAs)
       &&(s.status==='pending'||s.status==='scheduled')&&s.date>=todayISO());
   const waiting=DB.sessions.filter(s=>myJoinPending(s,clientAs)).length;
-  const box=(bg,body)=>`<div class="panel" style="background:${bg};border:0;margin-bottom:16px;color:#fff">${body}</div>`;
+  const box=(bg,body)=>`<div class="panel gcta" style="background:${bg};margin-bottom:16px">${body}</div>`;
 
   if(open.length){
     const soonest=open[0], spots=groupSpots(soonest), filled=(soonest.customerIds||[]).length;
     return box('linear-gradient(135deg,var(--a1),var(--a3))',`
-      <div style="font-size:12px;font-weight:800;letter-spacing:.08em;opacity:.85">${t('TRAIN TOGETHER')}</div>
-      <h3 style="margin:4px 0 2px;color:#fff;font-size:20px">${t('Join a group')}</h3>
-      <div style="font-size:13px;opacity:.92;margin-bottom:10px">
+      <div class="eyebrow">${t('TRAIN TOGETHER')}</div>
+      <h3 style="margin:4px 0 2px;font-size:20px">${t('Join a group')}</h3>
+      <div class="lede" style="margin-bottom:10px">
         ${open.length===1?t('A group has room for you — it stays open until it is full.'):open.length+' '+t('groups have room right now.')}
-        ${t('Next up')}: <b>${fmtDT(soonest.date,soonest.time)}</b> · ${filled}/${typeMax('group')} ${t('players')} · <b>${shareLabel(soonest)}</b> ${t('per player')}${spots?` · <b>${spots} ${t('spot(s) left')}</b>`:''}
+        ${t('Next up')}: <b>${fmtDT(soonest.date,soonest.time)}</b> · ${soonest.dur||defaultDur('group')} ${t('min')}${soonest.location?' · 📍 '+escapeHtml(soonest.location):''} · ${filled}/${typeMax('group')} ${t('players')} · <b>${shareLabel(soonest)}</b> ${t('per player')}${spots?` · <b>${spots} ${t('spot(s) left')}</b>`:''}
       </div>
-      ${groupCoachHtml(soonest,{light:true})}
+      ${groupCoachHtml(soonest)}
       <div style="margin:10px 0">${rosterHtml(soonest,clientAs)}</div>
       <div class="actions">
-        <button class="btn" style="background:#fff;color:var(--a1);border:0" onclick="requestJoinGroup('${soonest.id}')">${t('Ask to join')} — ${fmtDT(soonest.date,soonest.time)}</button>
-        <button class="btn ghost" style="color:#fff;border-color:rgba(255,255,255,.6)" onclick="inviteToGroup('${soonest.id}')">${t('Invite a friend')}</button>
-        ${open.length>1?`<button class="btn ghost" style="color:#fff;border-color:rgba(255,255,255,.6)" onclick="jumpToGroups()">${t('See all')} ${open.length}</button>`:''}
+        <button class="btn" onclick="requestJoinGroup('${soonest.id}')">${t('Ask to join')} — ${fmtDT(soonest.date,soonest.time)}</button>
+        <button class="btn ghost" onclick="inviteToGroup('${soonest.id}')">${t('Invite a friend')}</button>
+        ${open.length>1?`<button class="btn ghost" onclick="jumpToGroups()">${t('See all')} ${open.length}</button>`:''}
       </div>
-      ${waiting?`<div style="font-size:12px;opacity:.9;margin-top:8px">${t('You already have')} ${waiting} ${t('join request waiting for approval.')}</div>`:''}`);
+      ${waiting?`<div class="clienttag" style="margin-top:8px">${t('You already have')} ${waiting} ${t('join request waiting for approval.')}</div>`:''}`);
   }
   if(mine.length){
     const g=mine[0];
     return box('linear-gradient(135deg,var(--a3),var(--a1))',`
-      <div style="font-size:12px;font-weight:800;letter-spacing:.08em;opacity:.85">${t('YOUR GROUP')}</div>
-      <h3 style="margin:4px 0 2px;color:#fff;font-size:20px">${t('Your group is open — invite a friend')}</h3>
-      <div style="font-size:13px;opacity:.92;margin-bottom:10px">
-        <b>${fmtDT(g.date,g.time)}</b> · ${(g.customerIds||[]).length}/${typeMax('group')} ${t('players')} · <b>${shareLabel(g)}</b> ${t('per player')}.
+      <div class="eyebrow">${t('YOUR GROUP')}</div>
+      <h3 style="margin:4px 0 2px;font-size:20px">${t('Your group is open — invite a friend')}</h3>
+      <div class="lede" style="margin-bottom:10px">
+        <b>${fmtDT(g.date,g.time)}</b> · ${g.dur||defaultDur('group')} ${t('min')}${g.location?' · 📍 '+escapeHtml(g.location):''} · ${(g.customerIds||[]).length}/${typeMax('group')} ${t('players')} · <b>${shareLabel(g)}</b> ${t('per player')}.
         ${t('Other families can see it and ask to join.')}</div>
-      ${groupCoachHtml(g,{light:true})}
+      ${groupCoachHtml(g)}
       <div style="margin:10px 0">${rosterHtml(g,clientAs)}</div>
-      <button class="btn" style="background:#fff;color:var(--a3);border:0" onclick="inviteToGroup('${g.id}')">${t('Invite a friend')}</button>`);
+      <button class="btn" onclick="inviteToGroup('${g.id}')">${t('Invite a friend')}</button>`);
   }
   return box('linear-gradient(135deg,var(--a3),var(--a6,var(--a1)))',`
-    <div style="font-size:12px;font-weight:800;letter-spacing:.08em;opacity:.85">${t('TRAIN TOGETHER')}</div>
-    <h3 style="margin:4px 0 2px;color:#fff;font-size:20px">${t('Launch a group')}</h3>
-    <div style="font-size:13px;opacity:.92;margin-bottom:10px">${t('No group is forming yet. Pick a time and start one — other families can then ask to join yours, and everybody trains for less than a 1:1.')}</div>
-    <button class="btn" style="background:#fff;color:var(--a3);border:0" onclick="startAGroup()">${t('Start a group')}</button>`);
+    <div class="eyebrow">${t('TRAIN TOGETHER')}</div>
+    <h3 style="margin:4px 0 2px;font-size:20px">${t('Launch a group')}</h3>
+    <div class="lede" style="margin-bottom:10px">${t('No group is forming yet. Pick a time and start one — other families can then ask to join yours, and everybody trains for less than a 1:1.')}</div>
+    <button class="btn" onclick="startAGroup()">${t('Start a group')}</button>`);
 }
 /* Drops the client into the booking form with Group already chosen — the point of the button is
    to remove the step where they have to know that "Group" is a session type. */
@@ -5414,8 +5435,7 @@ function openGroupsHtml(){
         <b>${fmtDT(s.date,s.time)}</b>
         ${groupStatePill(s)}
         ${forming?`<span class="pill yellow" title="${t('Needs at least')} ${groupMin()} ${t('players')} ${t('to run')}">${t('Needs')} ${groupMin()-n} ${t('more to run')}</span>`:`<span class="pill blue">${t('Running — room for more')}</span>`}
-        <div class="clienttag" style="margin-top:3px">📍 ${s.location||'TBD'} · ${s.dur} ${t('min')} · <b style="color:var(--txt)">${shareLabel(s)}</b> ${t('per player')} · ${coachIcon(s.coachId)} ${coachName(s.coachId)}</div>
-        ${groupCoachHtml(s)}
+        <div class="clienttag" style="margin-top:3px">📍 ${s.location||'TBD'} · ${s.dur} ${t('min')} · <b style="color:var(--txt)">${shareLabel(s)}</b> ${t('per player')}</div>
         <div style="margin-top:5px">${rosterHtml(s,clientAs)}</div>
       </div>
       <div class="actions">${mine
@@ -5424,8 +5444,9 @@ function openGroupsHtml(){
     </div>`;
   }).join('');
   return `<div class="panel" style="margin-top:16px" id="openGroupsPanel">
-    <h3>${t('Join a group')} — ${coachIcon(cid)} ${coachName(cid)}</h3>
-    <div class="clienttag" style="margin-bottom:6px">${t('Groups with room for more players. You keep your own payment and credits — you only share the session.')}</div>
+    <h3>${t('Join a group')}</h3>
+    ${coachBlockHtml(cid)}
+    <div class="clienttag" style="margin:8px 0 6px">${t('Groups with room for more players. You keep your own payment and credits — you only share the session.')}</div>
     ${rows}
     <p class="muted small" style="margin-top:10px">${t('You can see who is already in each group so you know who your child would be training with. Only signed-in families see this — never the public page.')}</p></div>`;
 }
