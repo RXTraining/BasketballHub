@@ -4430,10 +4430,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 04:38 UTC';
+const BUILD='2026-08-29 04:46 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
-   '<b>Cash &amp; other income now includes event places paid in cash</b>, which were missing \u2014 so the panel did not add up to the Revenue card. Credit-paid places stay out, because that money is already listed as the package it came from.',
+   'Every Finance table now reads <b>newest first</b>. Cash, Packages and Expenses already did; <b>Outstanding payments</b> was sorted oldest-first, so the four tables disagreed about which way time ran.',
+   '<b>Cash &amp; other income now includes event places paid in cash</b>, which were missing \u2014 so the panel did not add up to the Revenue card. Credit-paid places stay out, because that money is already listed as the package it came from. The table is also merged into one date order: it used to be three lists glued end to end (manual cash, then sessions, then events), so an event on the 22nd appeared below a session from the 1st, at the bottom of a scroll box, and looked like it was missing.',
    'Every Finance table carries its <b>total in the heading</b>: Cash &amp; other income, Package revenue, Outstanding payments and Expenses. Reading a column to find out what it sums to was work the page should have done.',
    '<b>Revenue by session type</b> is replaced by the same <b>Where the revenue came from</b> breakdown the P&amp;L uses \u2014 same Sport / Session type / Coach / Client / Source tabs, same tap-through to the individual entries. It reads from one shared source, so Finance and the P&amp;L can no longer disagree about where the money came from.',
    'Renamed the P&amp;L revenue <b>Source</b> rows, because \u201cSession\u201d read as <i>all</i> sessions when it only ever meant sessions paid in <b>cash</b>. They are now <b>Package (prepaid)</b>, <b>Cash \u2014 session</b>, <b>Cash \u2014 event</b> and <b>Cash \u2014 other</b>, so the cash lines group together and the prepaid one is plainly separate.',
@@ -9776,7 +9777,9 @@ function renderFinance(){
           <button class="iconbtn" title="Open registrations" onclick="viewEventRegs('${ev.id}')">Open</button>
         </div></td></tr>`});
     });
-    out.sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
+    // Newest first, like every other Finance table. (Oldest-first put the longest-overdue debt at
+    // the top, which had its own logic — but four tables reading in two directions is worse.)
+    out.sort((a,b)=>(b.date+(b.time||'')).localeCompare(a.date+(a.time||'')));
     return out;
   })();
   // filtered view — owedCust is '' for everyone
@@ -9794,29 +9797,38 @@ function renderFinance(){
                amt:unpaidList.filter(r=>r.cid===id).reduce((a,r)=>a+(r.amt||0),0)}))
     .sort((a,b)=>b.amt-a.amt);
 
-  const manualRows=CE.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>{const cn=e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in';return `<tr>
-    <td>${fmtDate(e.date)}</td><td>${coachIcon(e.coachId)} ${coachName(e.coachId)}</td><td>${cn}</td><td class="muted">${e.qty||1}× ${typeShort(e.type)} (cash)${e.note?' · '+e.note:''}</td><td class="right">${money(e.amount)}</td>
-    <td class="right"><div class="actions"><button class="iconbtn" onclick="openCashEntry('${e.id}')">Edit</button><button class="iconbtn" onclick="delCashEntry('${e.id}')">✕</button></div></td></tr>`}).join('');
-  const cashSessRows=cashSess.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(s=>`<tr>
-    <td>${fmtDate(s.date)}</td><td>${coachIcon(s.coachId)} ${coachName(s.coachId)}</td><td>${custNames(s.customerIds)}</td><td class="muted">${typeShort(s.type)} session${s.type!=='1on1'&&!sessionFullyPaid(s)?' · partial':''}</td><td class="right">${money(sessionCashAmt(s))}</td>
-    <td class="right"><button class="iconbtn" onclick="${s.type!=='1on1'&&s.customerIds.length>1?`openGroupPay('${s.id}')`:`openSession('${s.id}')`}">Edit</button></td></tr>`).join('');
+  /* One date-ordered list. These used to be three lists glued together — manual cash, then cash
+     sessions, then events — so an event on the 22nd appeared below a session from the 1st, at the
+     bottom of a scroll box, and looked missing. */
+  const cashItems=[];
+  CE.forEach(e=>{ const cn=e.customerId&&custById(e.customerId)?custById(e.customerId).name:'Walk-in';
+    cashItems.push({date:e.date,html:`<tr>
+      <td>${fmtDate(e.date)}</td><td>${coachIcon(e.coachId)} ${coachName(e.coachId)}</td><td>${escapeHtml(cn)}</td>
+      <td class="muted">${e.qty||1}× ${typeShort(e.type)} (cash)${e.note?' · '+escapeHtml(e.note):''}</td>
+      <td class="right">${money(e.amount)}</td>
+      <td class="right"><div class="actions"><button class="iconbtn" onclick="openCashEntry('${e.id}')">Edit</button><button class="iconbtn" onclick="delCashEntry('${e.id}')">✕</button></div></td></tr>`}); });
+  cashSess.forEach(s=>{ cashItems.push({date:s.date,html:`<tr>
+      <td>${fmtDate(s.date)}</td><td>${coachIcon(s.coachId)} ${coachName(s.coachId)}</td><td>${custNames(s.customerIds)}</td>
+      <td class="muted">${typeShort(s.type)} session${s.type!=='1on1'&&!sessionFullyPaid(s)?' · partial':''}</td>
+      <td class="right">${money(sessionCashAmt(s))}</td>
+      <td class="right"><button class="iconbtn" onclick="${s.type!=='1on1'&&s.customerIds.length>1?`openGroupPay('${s.id}')`:`openSession('${s.id}')`}">Edit</button></td></tr>`}); });
   /* Event places paid in cash are cash income and were missing from this table, so the panel did
      not add up to the Revenue card. Credit-paid places are excluded — that money is already here
      as the package it came out of. */
   const evCashRegs=(DB.eventRegs||[]).filter(r=>r.paid&&r.paidVia!=='package'&&r.status!=='cancelled')
     .map(r=>({r,ev:eventById(r.eventId)}))
-    .filter(x=>x.ev&&x.ev.price&&(eventCoachIds(x.ev).length?eventCoachIds(x.ev).some(inScope):inScope('')))
-    .sort((a,b)=>((b.ev.date||'')).localeCompare(a.ev.date||''));
-  const evCashRows=evCashRegs.map(x=>`<tr>
-    <td>${fmtDate(x.ev.date)}</td><td>${eventCoachHtml(x.ev)||'<span class="muted">—</span>'}</td>
-    <td>${escapeHtml((custById(x.r.customerId)||{}).name||'—')}</td>
-    <td class="muted">🎉 ${escapeHtml(mlText(x.ev.title))}</td>
-    <td class="right">${money(x.ev.price)}</td>
-    <td class="right"><button class="iconbtn" onclick="viewEventRegs('${x.ev.id}')">Open</button></td></tr>`).join('');
+    .filter(x=>x.ev&&x.ev.price&&(eventCoachIds(x.ev).length?eventCoachIds(x.ev).some(inScope):inScope('')));
+  evCashRegs.forEach(x=>{ cashItems.push({date:x.ev.date||'',html:`<tr style="background:var(--panel2)">
+      <td>${fmtDate(x.ev.date)}</td><td>${eventCoachHtml(x.ev)||'<span class="muted">—</span>'}</td>
+      <td>${escapeHtml((custById(x.r.customerId)||{}).name||'—')}</td>
+      <td class="muted">🎉 ${escapeHtml(mlText(x.ev.title))}</td>
+      <td class="right">${money(x.ev.price)}</td>
+      <td class="right"><button class="iconbtn" onclick="viewEventRegs('${x.ev.id}')">Open</button></td></tr>`}); });
   const cashTotal=CE.reduce((a,e)=>a+e.amount,0)
     + cashSess.reduce((a,s)=>a+sessionCashAmt(s),0)
     + evCashRegs.reduce((a,x)=>a+(x.ev.price||0),0);
-  const cashRows=(manualRows+cashSessRows+evCashRows)||'<tr><td colspan="6"><div class="empty">No cash income yet.</div></td></tr>';
+  cashItems.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const cashRows=cashItems.map(x=>x.html).join('')||'<tr><td colspan="6"><div class="empty">No cash income yet.</div></td></tr>';
 
   const pkgRows=allPkgs.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>`<tr><td>${fmtDate(p.date)}</td><td>${coachIcon(p.coachId)} ${coachName(p.coachId)}</td><td>${p.cust}</td><td class="muted">${p.qty}× ${typeShort(p.type)}</td><td class="right">${money(p.amount)}</td>
     <td class="right"><button class="iconbtn" onclick="openPackage('${p.custId}','${p.id}')">Edit</button></td></tr>`).join('')||'<tr><td colspan="6"><div class="empty">No packages sold.</div></td></tr>';
