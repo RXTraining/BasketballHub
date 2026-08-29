@@ -1943,7 +1943,11 @@ function setLang(l){
 function langToggleHtml(){return '<select class="coachsel" title="Language" onchange="setLang(this.value)">'+Object.keys(LANG_NAMES).map(k=>'<option value="'+k+'" '+(LANG===k?'selected':'')+'>'+LANG_NAMES[k]+'</option>').join('')+'</select>';}
 const $ = (s,el=document)=>el.querySelector(s);
 const $$ = (s,el=document)=>[...el.querySelectorAll(s)];
-const money = n => '$'+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+/* Cents are shown only when there are cents. Rounding to whole dollars made columns stop adding
+   up: a 15% cut of $35 is $29.75, and four of those displayed as "$30" looked like $120 against a
+   real total of $119. Whole amounts still read as "$35", so nothing gains noise it did not have. */
+const money = n => { const v=Number(n)||0, d=(Math.abs(v%1)>1e-9)?2:0;
+  return '$'+v.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); };
 const fmtDate = d => d? new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
 const fmtDT = (d,t)=> d? new Date(d+'T'+(t||'00:00')).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
 /* ---- Everything is anchored to Boston (US Eastern), regardless of the device's timezone ---- */
@@ -4407,9 +4411,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 01:04 UTC';
+const BUILD='2026-08-29 01:14 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Fixed: money was rounded to whole dollars, so columns stopped adding up.</b> A 15% cut of $35 is <b>$29.75</b>, which displayed as \u201c$30\u201d \u2014 four of those looked like $120 against a real $119, and an expense list showing five \u201c$30\u201d rows totalled $149. Cents are now shown when there are cents; whole amounts still read as <i>$35</i>, so nothing gains noise it did not have.',
+   '<b>Fixed: Revenue by session type only listed 1:1 and Group.</b> It was written before the weekend classes existed, so money taken for a Weekend Open Run or Running/Conditioning counted towards <i>Revenue (collected)</i> but was missing from the breakdown \u2014 the two figures disagreed by exactly the weekend takings. Every type that earned anything is now listed, with a <b>Total</b> row so the two can be checked against each other at a glance.',
    '<b>Fixed: hand-set coach payouts were not removed when a session stopped being delivered.</b> Un-completing or cancelling a session with per-session payouts left the payout expense standing, so the business kept being charged for work that never happened. The computed payouts were always cleared correctly; only the hand-set ones leaked. Worth re-checking any coach total that looks too high.',
    'The P&amp;L expense panel gained a <b>By person</b> breakdown, and every row opens the individual entries behind it \u2014 date, category and the note explaining each figure. \u201cWhy is the expense to X this much?\u201d now has an answer on screen instead of needing the Expenses list added up by hand.',
    'Tidied the <b>Launch a group</b> card: <b>TRAIN TOGETHER</b> is now the heading beside the accent bar, and the duplicate heading underneath is gone. The button reads <b>Launch a group</b> and, once pressed, turns dark with a ring and becomes <b>\u2713 Pick a coach and time \u00b7 tap to cancel</b> \u2014 it names the next step only once that step is actually next, and the same button undoes it.',
@@ -9354,8 +9360,18 @@ function renderFinance(){
       </div>
       <div class="panel">
         <h3>Revenue by session type</h3>
-        <div class="barrow"><div class="lab">1:1 Private</div><div class="bar"><i style="width:${byType['1on1']/maxType*100}%"></i></div><div class="val">${money(byType['1on1'])}</div></div>
-        <div class="barrow"><div class="lab">Group / 1:N</div><div class="bar"><i style="width:${byType['group']/maxType*100}%"></i></div><div class="val">${money(byType['group'])}</div></div>
+        ${/* Only 1:1 and Group were ever printed, so money taken for a weekend class was counted in
+             the Revenue card but missing from this list — the two figures disagreed by exactly the
+             weekend takings. Every type with revenue is listed, and the total is shown so the two
+             can be checked against each other at a glance. */''}
+        ${(()=>{const shown=TYPE_ORDER.filter(ty=>byType[ty]>0);
+          const list=shown.length?shown:['1on1','group'];
+          return list.map(ty=>`<div class="barrow"><div class="lab">${typeIcon(ty)} ${typeLabel(ty)}</div>
+            <div class="bar"><i style="width:${maxType?byType[ty]/maxType*100:0}%"></i></div>
+            <div class="val">${money(byType[ty])}</div></div>`).join('');})()}
+        <div class="barrow" style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px">
+          <div class="lab"><b>Total</b></div><div class="bar"></div>
+          <div class="val"><b>${money(TYPE_ORDER.reduce((a,ty)=>a+(byType[ty]||0),0))}</b></div></div>
         <div class="panel" style="background:var(--panel2);margin-top:16px;padding:14px">
           <div class="clienttag">Prepaid liability (sessions owed)</div>
           <div style="font-size:20px;font-weight:900;margin-top:4px">${remCredits} sessions · ${money(creditValue)}</div>
