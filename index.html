@@ -4430,9 +4430,10 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 04:22 UTC';
+const BUILD='2026-08-29 04:26 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>An event payment can be changed after the fact.</b> The Cash / Credit buttons only appeared on an <i>unpaid</i> registration, so a place already marked paid had no route to a credit \u2014 which is precisely the correction most often needed, since cash was the only option before credits existed. A paid row now offers the other method plus an <b>\u21a9 undo</b> back to unpaid, and the credit is taken or returned cleanly each time.',
    'The client&rsquo;s <b>Payments</b> page: the flat <i>All payments</i> list is gone \u2014 it repeated the table below it \u2014 and in its place are two charts side by side, <b>Payments by period</b> and <b>Payments by type</b> (package, cash, event). They filter each other: tap a type and the period bars show only that type, tap a period and the type bars show only that period. Each chart keeps its own bars, so a selection narrows the view without hiding the thing you just tapped.',
    'The table below is now <b>Your sessions &amp; events</b> \u2014 one date-ordered list of everything the family owes or has paid, sessions and event places together, each with its status and the credit it used. Two separate tables meant adding up two places to answer \u201cwhat do we owe\u201d.',
    '<b>Events are now part of My Journey.</b> A workshop or camp sat in the record until the day it happened and then vanished. Attended events appear on the timeline beside the sessions, in date order, with the host coaches and whether the player was checked in \u2014 plus an <b>Events</b> count in the header. A player who has only ever been to an event now has a journey rather than an empty page.',
@@ -8642,10 +8643,19 @@ function viewEventRegs(id){
     <td>${r.checkedIn?'<span class="pill green">✓ In</span>':'—'}</td>
     <td class="right"><div class="actions">
       ${r.status==='pending'?`<button class="btn sm" onclick="eventRegApprove('${r.id}')">Approve</button>`:''}
-      ${ev.price&&!r.paid?`<button class="iconbtn" onclick="eventRegPay('${r.id}')">Cash</button>
-        ${creditsFor(custById(r.customerId),'group')>0
+      ${!ev.price?'':(()=>{
+        /* The payment method has to be changeable after the fact, not only on the way in — a place
+           marked cash by mistake had no route back to a credit, which is exactly what happened. */
+        const hasCred=creditsFor(custById(r.customerId),'group')>0;
+        const cashBtn=`<button class="iconbtn" title="Paid in cash" onclick="eventRegPay('${r.id}')">💵 Cash</button>`;
+        const credBtn=hasCred
           ? `<button class="iconbtn" title="Use one of their group credits" onclick="eventRegCredit('${r.id}')">🎟️ Credit</button>`
-          : `<button class="iconbtn" style="opacity:.5" title="No group credit left — tap to sell a package" onclick="openSellPackage('${r.customerId}','group')">🎟️ Sell credit</button>`}`:''}
+          : `<button class="iconbtn" style="opacity:.5" title="No group credit left — tap to sell a package" onclick="openSellPackage('${r.customerId}','group')">🎟️ Sell credit</button>`;
+        if(!r.paid)return cashBtn+credBtn;
+        // already paid: offer the OTHER method, plus a way back to unpaid
+        return (r.paidVia==='package'?cashBtn:credBtn)
+          +`<button class="iconbtn" title="Mark unpaid again" onclick="eventRegUnpay('${r.id}')">↩</button>`;
+      })()}
       <button class="iconbtn" onclick="eventRegCheckin('${r.id}')">${r.checkedIn?'Undo in':'Check in'}</button>
       <button class="iconbtn" onclick="eventRegRemove('${r.id}')">✕</button>
     </div></td></tr>`;}).join('')||'<tr><td colspan="6"><div class="empty">No registrations yet.</div></td></tr>';
@@ -8735,6 +8745,15 @@ function eventRegCreditUse(r){
   const n=list.findIndex(x=>x.id===r.id)+1; if(!n)return null;
   const slots=creditSlots(c,'group'), slot=slots[n-1];
   return {n,total:slots.length,over:!slot,pkg:slot?slot.label:''};
+}
+/* Back to unpaid — and if it was on a credit, that credit returns to the balance because
+   creditConsumers() only counts places that are still marked paid by package. */
+function eventRegUnpay(id){
+  const r=(DB.eventRegs||[]).find(x=>x.id===id); if(!r)return;
+  const was=r.paidVia;
+  r.paid=false; r.paidVia='';
+  save(); flash(was==='package'?'Credit returned 🎟️':'Marked unpaid');
+  viewEventRegs(r.eventId);
 }
 function eventRegCheckin(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;r.checkedIn=!r.checkedIn;save();viewEventRegs(r.eventId);}
 function eventRegRemove(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;if(!confirm('Remove this registration?'))return;const eid=r.eventId;r.status='cancelled';save();flash('Removed');viewEventRegs(eid);}
