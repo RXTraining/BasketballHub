@@ -4411,9 +4411,12 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 01:57 UTC';
+const BUILD='2026-08-29 02:10 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Coaches can see what they have earned but not been paid.</b> Pay accrues only on money actually collected \u2014 correct for the books, but it left a coach with no idea what was owed to them. A <b>Waiting on payment</b> figure and an <b>Earned, not yet paid</b> table now show every completed session whose client still owes, what the client owes, and what the coach gets when it lands. A part-paid group nets off whatever has already accrued, so nothing is counted twice.',
+   '<b>Event and assistant fees now show up as the coach\u2019s own money.</b> Their pay total says how much of it came from events, the session-by-session table lists event fees beside session pay, and an assistant who is paid for an event without being listed as a host now sees that event on their schedule \u2014 previously it was missing from the record of a day they had worked.',
+   'On the owner side, <b>Finance \u2192 Coach comparison</b> splits <b>Session pay</b> from <b>Event pay</b> per coach, and the P&amp;L expense breakdown separates <b>Session coach pay</b>, <b>Event coach pay</b> and <b>Mileage</b> instead of lumping all three into one \u201cper-session (auto)\u201d line.',
    '<b>Payout history, session by session.</b> Finance \u2192 Coach comparison gained a <b>Payouts</b> button per coach: every line that made up their total \u2014 date, session type, which clients, how much was collected, and what they were paid \u2014 with mileage and event fees included and a total at the bottom.',
    '<b>A coach can now see what they earn, not just what was collected.</b> Their money tab headlined <i>Total collected</i> \u2014 the gross taken from clients, which is not their pay. Somebody on a 15% split saw <b>$35</b> for a session that earns them <b>$29.75</b>. <b>Your pay</b> now leads, with the collected figure kept alongside as context, and the same session-by-session table underneath.',
    'Both views read the derived expense rows rather than recomputing the split, so what a coach sees and what the owner owes are the same numbers by construction and cannot drift apart.',
@@ -4833,7 +4836,11 @@ function renderBookingTable(){
      "shadow session" got created next to each one — and that double-counted the takings. They are
      read-only here: an event is edited on the Events tab, not as a session. */
   const evList=(DB.events||[]).filter(ev=>ev.active!==false&&ev.date)
-    .filter(ev=>eventCoachIds(ev).length?eventCoachIds(ev).some(inScope):inScope(''))
+    /* An assistant is paid for the event without being listed as a host, so scope on the payout
+       list too — otherwise the event they worked is missing from their own schedule. */
+    .filter(ev=>eventCoachIds(ev).some(inScope)
+             || eventPayouts(ev).some(x=>inScope(x.coachId))
+             || (!eventCoachIds(ev).length&&inScope('')))
     .filter(ev=>{
       if(bookFilter==='upcoming')return eventUpcoming(ev);
       if(bookFilter==='past')return !eventUpcoming(ev);
@@ -8135,6 +8142,8 @@ function renderMoney(){
      not what they are paid. Somebody on a 15% split saw $35 for a session that earns them $29.75.
      Their own pay leads now; what the business collected stays as context. */
   const myPay=isCoach?coachPayoutTotal(targetId):0;
+  const myPending=isCoach?coachPendingTotal(targetId):0;
+  const myEventPay=isCoach?coachPayoutRows(targetId).filter(r=>r.kind==='evpay').reduce((a,r)=>a+r.amount,0):0;
   const bucketHtml=buckets.length?buckets.map(b=>`<div class="barrow"><div class="lab" style="width:140px">${b.label}</div><div class="bar"><i style="width:${b.total/maxB*100}%"></i></div><div class="val">${money(b.total)}<div class="clienttag" style="text-align:right">${b.n}</div></div></div>`).join(''):'<div class="empty">—</div>';
   const detail=items.length?items.map(i=>`<tr><td>${fmtDate(i.date)}</td><td>${i.label}</td><td class="right">${money(i.amount)}</td></tr>`).join(''):'<tr><td colspan="3"><div class="empty">—</div></td></tr>';
   const sessStatusRows=isCoach?'':(()=>{
@@ -8152,7 +8161,8 @@ function renderMoney(){
     <h1 class="page">${title}</h1>
     <div class="sub">${isCoach?'What you have earned, and what was collected from clients for your sessions.':t('All money you\'ve paid, grouped by period.')} <b style="color:var(--txt)">Boston (ET).</b></div>
     <div class="stats">
-      ${isCoach?`<div class="stat"><div class="k">Your pay</div><div class="v" style="color:var(--green)">${money(myPay)}</div><div class="d muted">after the business's share</div></div>`:''}
+      ${isCoach?`<div class="stat"><div class="k">Your pay</div><div class="v" style="color:var(--green)">${money(myPay)}</div><div class="d muted">${myEventPay>0?money(myEventPay)+' of it from events':"after the business's share"}</div></div>`:''}
+      ${isCoach&&myPending>0?`<div class="stat"><div class="k">Waiting on payment</div><div class="v" style="color:var(--yellow,#8a6d00)">${money(myPending)}</div><div class="d muted">sessions done, client yet to pay</div></div>`:''}
       <div class="stat"><div class="k">${isCoach?'Collected from clients':t('Total paid')}</div><div class="v">${money(total)}</div><div class="d muted">${items.length} ${t('payment(s) all-time')}</div></div>
     </div>
     <div class="panel" style="margin-top:16px">
@@ -8162,6 +8172,10 @@ function renderMoney(){
       </div>
       ${bucketHtml}
     </div>
+    ${isCoach&&myPending>0?`<div class="panel" style="margin-top:16px;padding:6px 14px;overflow-x:auto;border-color:var(--yellow)">
+      <h3 style="padding:12px 6px 4px">Earned, not yet paid</h3>
+      ${coachPendingTableHtml(targetId)}
+    </div>`:''}
     ${isCoach?`<div class="panel" style="margin-top:16px;padding:6px 14px;overflow-x:auto">
       <h3 style="padding:12px 6px 4px">Your pay, session by session</h3>
       ${coachPayoutTableHtml(targetId,{mine:true})}
@@ -8982,7 +8996,9 @@ function plExpenseLines(){
     date:e.date, amount:Number(e.amount)||0, cat:e.cat||'Other',
     coachId:e.coachId||'', recurring:(e.freq&&e.freq!=='once')||false,
     kind: /^labour-/.test(e.id||'') ? 'labour'
-        : isAutoExpense(e) ? 'auto'
+        : /^evpay-/.test(e.id||'')  ? 'event'
+        : /^gas-/.test(e.id||'')    ? 'gas'
+        : isAutoExpense(e)          ? 'auto'
         : ((e.coachId&&e.coachId!=='owner') ? 'coach' : 'fixed')
   })).filter(e=>e.date&&e.amount>0);
 }
@@ -9071,6 +9087,43 @@ function coachPayoutRows(coachId){
     .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 }
 function coachPayoutTotal(coachId){ return coachPayoutRows(coachId).reduce((a,r)=>a+r.amount,0); }
+/* ---- Work done, money not in yet -------------------------------------------
+   Payout accrues only on money actually collected, which is right for the books but left a coach
+   with no idea what they had earned but not been paid. These are the completed sessions whose
+   clients still owe: what the payout WILL be, less anything already accrued on a part-paid group.
+   Nothing here is an expense — it is a forecast, and it is labelled as one. */
+function coachPendingRows(coachId){
+  if(!coachId)return [];
+  const out=[];
+  DB.sessions.filter(s=>s.coachId===coachId&&s.status==='completed'&&sessionPriced(s)).forEach(s=>{
+    if(hasCustomPayouts(s))return;                 // a hand-set fee is owed in full regardless
+    if(isFamilyCoach(coachId))return;              // in-house: no payout at all
+    const owed=sessionOutstandingAmt(s); if(owed<=0)return;
+    const full=priceOf(s);
+    const wouldBe=Math.round((full-ownerCutAmt(s,full))*100)/100;
+    const accrued=(DB.expenses||[]).filter(e=>e.id===payoutExpenseId(s.id)).reduce((a,e)=>a+e.amount,0);
+    const pending=Math.round((wouldBe-accrued)*100)/100;
+    if(pending>0.004)out.push({date:s.date,what:typeShort(s.type),who:custNames(s.customerIds)||'—',
+      owed:owed,pending:pending,ref:s.id});
+  });
+  /* Event fees are not listed here: they accrue the moment the event has happened, whether or not
+     every registration has been paid, so they are never "pending". */
+  return out.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+}
+function coachPendingTotal(coachId){ return coachPendingRows(coachId).reduce((a,r)=>a+r.pending,0); }
+function coachPendingTableHtml(coachId){
+  const rows=coachPendingRows(coachId), tot=rows.reduce((a,r)=>a+r.pending,0);
+  if(!rows.length)return '<div class="empty">Nothing outstanding — every completed session has been paid for.</div>';
+  return `<table><thead><tr><th>Date</th><th>Session</th><th>Player(s)</th>
+      <th class="right">Client still owes</th><th class="right">Your pay when it lands</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td>${fmtDate(r.date)}</td><td>${escapeHtml(r.what)}</td><td>${escapeHtml(r.who)}</td>
+      <td class="right" style="color:var(--red)">${money(r.owed)}</td>
+      <td class="right"><b>${money(r.pending)}</b></td></tr>`).join('')}
+    <tr style="border-top:2px solid var(--line)"><td><b>Total</b></td><td></td><td></td><td></td>
+      <td class="right"><b>${money(tot)}</b></td></tr>
+  </tbody></table>
+  <p class="muted small" style="margin-top:8px">These sessions are done but the client has not paid yet. The figures move into <b>Your pay</b> as the money is collected.</p>`;
+}
 /* The same table for both audiences: the owner checking what they owe, and the coach checking
    what they earned. */
 function coachPayoutTableHtml(coachId,opts){
@@ -9255,7 +9308,9 @@ function renderPL(){
 
   const kinds=[['fixed','Fixed / overhead','Rent, gear, anything that exists whether or not anyone trains'],
                ['coach','Coach-attributed','Entered by hand against a coach'],
-               ['auto','Per-session (auto)','Mileage and coach payouts, derived from sessions'],
+               ['auto','Session coach pay','Each coach\u2019s share of what their sessions collected'],
+               ['event','Event coach pay','Host and assistant fees for events \u2014 set per event'],
+               ['gas','Mileage','Round trips for in-house coaches, derived from each session'],
                ['labour','Unpaid family time','Hours worked without an invoice, valued at each person\u2019s rate']];
   const expByKind=kinds.map(([k,lab,note])=>({k,lab,note,v:exp.filter(x=>x.kind===k).reduce((a,x)=>a+x.amount,0)}));
   const expByCat={}; exp.forEach(x=>{expByCat[x.cat]=(expByCat[x.cat]||0)+x.amount;});
@@ -9494,12 +9549,15 @@ function renderFinance(){
     }).sort((a,b)=>b.rev-a.rev);
     compareHtml=`<div class="panel" style="margin-bottom:16px;overflow-x:auto">
       <h3>Coach comparison</h3>
-      <table><thead><tr><th>Coach</th><th>Arrangement</th><th class="right">Revenue</th><th class="right">Expenses</th><th class="right">Business keeps</th><th class="right">Completed</th><th class="right">Upcoming</th><th></th></tr></thead>
+      <table><thead><tr><th>Coach</th><th>Arrangement</th><th class="right">Revenue</th><th class="right">Session pay</th><th class="right">Event pay</th><th class="right">Expenses</th><th class="right">Business keeps</th><th class="right">Completed</th><th class="right">Upcoming</th><th></th></tr></thead>
       <tbody>${rows.map(r=>`<tr><td><b>${r.co.name}</b><div class="clienttag">1:1 ${rateLabel(r.co.id,'1on1')} · Grp ${money(coachRate(r.co.id,'group'))}</div></td>
         <td>${r.co.family===true
           ? '<span class="pill green">In-house</span><div class="clienttag">keeps 100% · pays gas</div>'
           : `<span class="pill orange">Partner</span><div class="clienttag">business takes ${r.co.shareType==='flat'?money(r.co.shareVal||0)+'/session':(r.co.shareVal||0)+'%'}</div>`}</td>
-        <td class="right">${money(r.rev)}</td><td class="right">${money(r.exp)}</td>
+        <td class="right">${money(r.rev)}</td>
+        <td class="right">${money(coachPayoutRows(r.co.id).filter(x=>x.kind!=='evpay').reduce((a,x)=>a+x.amount,0))}</td>
+        <td class="right">${money(coachPayoutRows(r.co.id).filter(x=>x.kind==='evpay').reduce((a,x)=>a+x.amount,0))}</td>
+        <td class="right">${money(r.exp)}</td>
         <td class="right" style="color:${r.profit>=0?'var(--green)':'var(--red)'}">${money(r.profit)}</td>
         <td class="right">${r.done}</td><td class="right">${r.upc}</td>
         <td class="right"><div class="actions"><button class="iconbtn" title="Every payout, session by session" onclick="openCoachPayouts('${r.co.id}')">Payouts</button><button class="iconbtn" onclick="setMgCoach('${r.co.id}')">View</button></div></td></tr>`).join('')}</tbody></table>
