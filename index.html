@@ -4430,9 +4430,14 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 04:26 UTC';
+const BUILD='2026-08-29 04:38 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Cash &amp; other income now includes event places paid in cash</b>, which were missing \u2014 so the panel did not add up to the Revenue card. Credit-paid places stay out, because that money is already listed as the package it came from.',
+   'Every Finance table carries its <b>total in the heading</b>: Cash &amp; other income, Package revenue, Outstanding payments and Expenses. Reading a column to find out what it sums to was work the page should have done.',
+   '<b>Revenue by session type</b> is replaced by the same <b>Where the revenue came from</b> breakdown the P&amp;L uses \u2014 same Sport / Session type / Coach / Client / Source tabs, same tap-through to the individual entries. It reads from one shared source, so Finance and the P&amp;L can no longer disagree about where the money came from.',
+   'Renamed the P&amp;L revenue <b>Source</b> rows, because \u201cSession\u201d read as <i>all</i> sessions when it only ever meant sessions paid in <b>cash</b>. They are now <b>Package (prepaid)</b>, <b>Cash \u2014 session</b>, <b>Cash \u2014 event</b> and <b>Cash \u2014 other</b>, so the cash lines group together and the prepaid one is plainly separate.',
+   'Nothing was ever double-counted \u2014 a package is revenue on the day it is sold, so a session or event place later paid from that package adds nothing. The panel now says so in a line under the list, which is where the question gets asked.',
    '<b>An event payment can be changed after the fact.</b> The Cash / Credit buttons only appeared on an <i>unpaid</i> registration, so a place already marked paid had no route to a credit \u2014 which is precisely the correction most often needed, since cash was the only option before credits existed. A paid row now offers the other method plus an <b>\u21a9 undo</b> back to unpaid, and the credit is taken or returned cleanly each time.',
    'The client&rsquo;s <b>Payments</b> page: the flat <i>All payments</i> list is gone \u2014 it repeated the table below it \u2014 and in its place are two charts side by side, <b>Payments by period</b> and <b>Payments by type</b> (package, cash, event). They filter each other: tap a type and the period bars show only that type, tap a period and the type bars show only that period. Each chart keeps its own bars, so a selection narrows the view without hiding the thing you just tapped.',
    'The table below is now <b>Your sessions &amp; events</b> \u2014 one date-ordered list of everything the family owes or has paid, sessions and event places together, each with its status and the credit it used. Two separate tables meant adding up two places to answer \u201cwhat do we owe\u201d.',
@@ -9138,6 +9143,10 @@ function sendBroadcast(){
    FINANCE
    ============================================================ */
 let finRange='6m';
+/* Finance shows the same revenue breakdown as the P&L, with the same dimensions and the same
+   tap-through, so the two pages answer "where did it come from" identically. */
+let finDim='type';
+function setFinDim(d){ finDim=d; renderFinance(); }
 function monthKey(d){return d.slice(0,7);}
 /* Expand recurring (monthly/yearly) expenses into individual occurrences from their start date
    up to the current month, so ongoing charges are counted in every period. One-time expenses
@@ -9178,18 +9187,18 @@ function plRevenueLines(){
     const n=Math.max(1,(s.customerIds||[]).length);
     (s.customerIds||[]).forEach(cid=>{
       const p=custPay(s,cid); if(!(p.paid&&p.paidVia==='cash'))return;
-      out.push({date:s.date,amount:sessionPriced(s)?priceOf(s)/n:0,src:'Session',
+      out.push({date:s.date,amount:sessionPriced(s)?priceOf(s)/n:0,src:'Cash — session',
         sport:coachSport(s.coachId),type:typeShort(s.type),coachId:s.coachId||'',custId:cid});
     });
   });
   // prepaid packages — revenue on the day they were sold
   (DB.customers||[]).forEach(c=>(c.packages||[]).forEach(p=>{
-    out.push({date:p.date,amount:Number(p.amount)||0,src:'Package',
+    out.push({date:p.date,amount:Number(p.amount)||0,src:'Package (prepaid)',
       sport:coachSport(p.coachId),type:typeShort(p.type),coachId:p.coachId||'',custId:c.id});
   }));
   // walk-in / manual cash
   (DB.cashEntries||[]).forEach(e=>{
-    out.push({date:e.date,amount:Number(e.amount)||0,src:'Cash entry',
+    out.push({date:e.date,amount:Number(e.amount)||0,src:'Cash — other',
       sport:coachSport(e.coachId),type:typeShort(e.type),coachId:e.coachId||'',custId:e.customerId||''});
   });
   // event registrations that have been paid
@@ -9199,7 +9208,7 @@ function plRevenueLines(){
     const host=(eventCoachIds(ev)[0]||'');
     /* coachId is deliberately blank: see the note on eventInc. The host is still recorded for the
        sport breakdown, but the money is the business's, not the coach's. */
-    out.push({date:ev.date||r.created||todayISO(),amount:Number(ev.price)||0,src:'Event',
+    out.push({date:ev.date||r.created||todayISO(),amount:Number(ev.price)||0,src:'Cash — event',
       sport:host?coachSport(host):'—',type:'Event',coachId:'',custId:r.customerId||''});
   });
   return out.filter(r=>r.date&&r.amount>0);
@@ -9625,6 +9634,7 @@ function renderPL(){
         <div class="seg" style="margin-bottom:10px">${PL_DIMS.map(([d,lab])=>`<button class="${plDim===d?'active':''}" onclick="setPlDim('${d}')">${lab}</button>`).join('')}</div>
         <table><thead><tr><th>${(PL_DIMS.find(x=>x[0]===plDim)||[])[1]}</th><th></th><th class="right">Revenue</th></tr></thead>
           <tbody>${plBarRows(dimRows,R)}</tbody></table>
+        ${plDim==='src'?`<div class="clienttag" style="margin-top:10px">Nothing here is counted twice. A package is revenue on the day you sell it, so a session or event place later paid <b style="color:var(--txt)">from</b> that package adds nothing — only places paid in cash appear as cash.</div>`:''}
       </div>
       <div class="panel">
         <h3>Where the money went</h3>
@@ -9698,21 +9708,15 @@ function renderFinance(){
   EXo.forEach(e=>{const k=monthKey(e.date);expByM[k]=(expByM[k]||0)+e.amount;});
   const rev=months.map(m=>revByM[m]||0), exp=months.map(m=>expByM[m]||0), prof=months.map((m,i)=>rev[i]-exp[i]);
 
-  // Seeded from TYPE_ORDER: with a fixed two-key object, a conditioning session hit
-  // `undefined + amount` and turned the whole revenue-by-type panel into NaN.
-  const byType={}; TYPE_ORDER.forEach(ty=>byType[ty]=0);
-  cashSess.forEach(s=>{byType[s.type]=(byType[s.type]||0)+sessionCashAmt(s);});
-  allPkgs.forEach(p=>{byType[p.type]=(byType[p.type]||0)+p.amount;});
-  /* Revenue has four sources; this panel counted two. Manually entered cash and event tickets
-     both landed in "Revenue (collected)" with no row to appear in, so the breakdown came up short
-     by exactly those amounts and there was no way to see where the difference had gone. */
-  let otherRev=0;
-  CE.forEach(e=>{ const ty=e.type; if(ty&&byType[ty]!=null)byType[ty]+=e.amount; else otherRev+=e.amount; });
-  const revLines=TYPE_ORDER.filter(ty=>byType[ty]>0).map(ty=>({k:typeIcon(ty)+' '+typeLabel(ty),v:byType[ty]}));
-  if(eventInc>0)revLines.push({k:'🎉 '+t('Events'),v:eventInc});
-  if(otherRev>0)revLines.push({k:'💵 '+t('Other cash'),v:otherRev});
-  const revLineTotal=revLines.reduce((a,r)=>a+r.v,0);
-  const maxType=Math.max.apply(null,revLines.map(r=>r.v).concat([1]));
+  /* The same source of truth the P&L uses, so Finance and P&L cannot disagree about where the
+     money came from — and it inherits the tap-through to the individual entries for free.
+     Restricted to the months on screen and to the coach in scope. */
+  const finFrom=months[0], finTo=months[months.length-1];
+  const finLines=plRevenueLines()
+    .filter(r=>{const k=(r.date||'').slice(0,7); return k>=finFrom&&k<=finTo;})
+    .filter(r=>inScope(r.coachId));
+  const finRows=plGroup(finLines,finDim);
+  const finRevTotal=finLines.reduce((a,r)=>a+r.amount,0);
 
   const expRows=EX.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>`<tr>
     <td>${fmtDate(e.date)}${(e.freq&&e.freq!=='once')?` <span class="pill blue">↻ ${FREQ_LABEL[e.freq]}</span>`:''}</td><td>${e.coachId==='owner'?'🏢':coachIcon(e.coachId)} ${coachName(e.coachId)}</td><td>${e.cat}${isAutoExpense(e)?' <span class="pill blue">auto</span>':''}</td><td class="muted">${e.note||''}</td>
@@ -9796,7 +9800,23 @@ function renderFinance(){
   const cashSessRows=cashSess.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(s=>`<tr>
     <td>${fmtDate(s.date)}</td><td>${coachIcon(s.coachId)} ${coachName(s.coachId)}</td><td>${custNames(s.customerIds)}</td><td class="muted">${typeShort(s.type)} session${s.type!=='1on1'&&!sessionFullyPaid(s)?' · partial':''}</td><td class="right">${money(sessionCashAmt(s))}</td>
     <td class="right"><button class="iconbtn" onclick="${s.type!=='1on1'&&s.customerIds.length>1?`openGroupPay('${s.id}')`:`openSession('${s.id}')`}">Edit</button></td></tr>`).join('');
-  const cashRows=(manualRows+cashSessRows)||'<tr><td colspan="6"><div class="empty">No cash income yet.</div></td></tr>';
+  /* Event places paid in cash are cash income and were missing from this table, so the panel did
+     not add up to the Revenue card. Credit-paid places are excluded — that money is already here
+     as the package it came out of. */
+  const evCashRegs=(DB.eventRegs||[]).filter(r=>r.paid&&r.paidVia!=='package'&&r.status!=='cancelled')
+    .map(r=>({r,ev:eventById(r.eventId)}))
+    .filter(x=>x.ev&&x.ev.price&&(eventCoachIds(x.ev).length?eventCoachIds(x.ev).some(inScope):inScope('')))
+    .sort((a,b)=>((b.ev.date||'')).localeCompare(a.ev.date||''));
+  const evCashRows=evCashRegs.map(x=>`<tr>
+    <td>${fmtDate(x.ev.date)}</td><td>${eventCoachHtml(x.ev)||'<span class="muted">—</span>'}</td>
+    <td>${escapeHtml((custById(x.r.customerId)||{}).name||'—')}</td>
+    <td class="muted">🎉 ${escapeHtml(mlText(x.ev.title))}</td>
+    <td class="right">${money(x.ev.price)}</td>
+    <td class="right"><button class="iconbtn" onclick="viewEventRegs('${x.ev.id}')">Open</button></td></tr>`).join('');
+  const cashTotal=CE.reduce((a,e)=>a+e.amount,0)
+    + cashSess.reduce((a,s)=>a+sessionCashAmt(s),0)
+    + evCashRegs.reduce((a,x)=>a+(x.ev.price||0),0);
+  const cashRows=(manualRows+cashSessRows+evCashRows)||'<tr><td colspan="6"><div class="empty">No cash income yet.</div></td></tr>';
 
   const pkgRows=allPkgs.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>`<tr><td>${fmtDate(p.date)}</td><td>${coachIcon(p.coachId)} ${coachName(p.coachId)}</td><td>${p.cust}</td><td class="muted">${p.qty}× ${typeShort(p.type)}</td><td class="right">${money(p.amount)}</td>
     <td class="right"><button class="iconbtn" onclick="openPackage('${p.custId}','${p.id}')">Edit</button></td></tr>`).join('')||'<tr><td colspan="6"><div class="empty">No packages sold.</div></td></tr>';
@@ -9865,20 +9885,14 @@ function renderFinance(){
         </div>
       </div>
       <div class="panel">
-        <h3>Revenue by session type</h3>
-        ${/* Only 1:1 and Group were ever printed, so money taken for a weekend class was counted in
-             the Revenue card but missing from this list — the two figures disagreed by exactly the
-             weekend takings. Every type with revenue is listed, and the total is shown so the two
-             can be checked against each other at a glance. */''}
-        ${revLines.map(r=>`<div class="barrow"><div class="lab">${r.k}</div>
-            <div class="bar"><i style="width:${maxType?r.v/maxType*100:0}%"></i></div>
-            <div class="val">${money(r.v)}</div></div>`).join('')
-          ||'<div class="empty">No revenue in this period.</div>'}
+        <h3>Where the revenue came from</h3>
+        <div class="seg" style="margin-bottom:10px">${PL_DIMS.map(([d,lab])=>`<button class="${finDim===d?'active':''}" onclick="setFinDim('${d}')">${lab}</button>`).join('')}</div>
+        <table><thead><tr><th>${(PL_DIMS.find(x=>x[0]===finDim)||[])[1]}</th><th></th><th class="right">Revenue</th></tr></thead>
+          <tbody>${plBarRows(finRows,finRevTotal)}</tbody></table>
         <div class="barrow" style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px">
           <div class="lab"><b>Total</b></div><div class="bar"></div>
-          <div class="val"><b>${money(revLineTotal)}</b></div></div>
-        ${Math.abs(revLineTotal-revenue)>0.005?`<div class="clienttag" style="color:var(--red);margin-top:6px">
-          ⚠ ${money(Math.abs(revenue-revLineTotal))} of the ${money(revenue)} collected is not accounted for above — tell Claude.</div>`:''}
+          <div class="val"><b>${money(finRevTotal)}</b></div></div>
+        ${finDim==='src'?`<div class="clienttag" style="margin-top:10px">Nothing here is counted twice. A package is revenue on the day you sell it, so a session or event place later paid <b style="color:var(--txt)">from</b> that package adds nothing.</div>`:''}
         <div class="panel" style="background:var(--panel2);margin-top:16px;padding:14px">
           <div class="clienttag">Prepaid liability (sessions owed)</div>
           <div style="font-size:20px;font-weight:900;margin-top:4px">${remCredits} sessions · ${money(creditValue)}</div>
@@ -9891,12 +9905,12 @@ function renderFinance(){
     <div class="twocol" style="margin-top:16px">
       <div class="panel" style="padding:6px 14px;overflow-x:auto">
         <div class="row" style="justify-content:space-between;align-items:center;padding:12px 6px 0">
-          <h3 style="margin:0">Cash & other income</h3><button class="btn sm" onclick="openCashEntry()">+ Add cash</button></div>
+          <h3 style="margin:0">Cash &amp; other income <span class="pill green">${money(cashTotal)}</span></h3><button class="btn sm" onclick="openCashEntry()">+ Add cash</button></div>
         <table><thead><tr><th>Date</th><th>Coach</th><th>Source</th><th>Note</th><th class="right">Amount</th><th></th></tr></thead><tbody>${cashRows}</tbody></table>
         <div class="clienttag" style="padding:6px">Session payments edit via their session; manual cash is editable here.</div>
       </div>
       <div class="panel" style="padding:6px 14px;overflow-x:auto">
-        <div class="row" style="justify-content:space-between;align-items:center;padding:12px 6px 0"><h3 style="margin:0">Package revenue</h3><button class="btn sm" onclick="openSellPackage()">+ Add package</button></div>
+        <div class="row" style="justify-content:space-between;align-items:center;padding:12px 6px 0"><h3 style="margin:0">Package revenue <span class="pill green">${money(allPkgs.reduce((a,p)=>a+(Number(p.amount)||0),0))}</span></h3><button class="btn sm" onclick="openSellPackage()">+ Add package</button></div>
         <table><thead><tr><th>Date</th><th>Coach</th><th>Client</th><th>Package</th><th class="right">Amount</th><th></th></tr></thead><tbody>${pkgRows}</tbody></table>
         <div class="clienttag" style="padding:6px">Edit a package to adjust its amount and the client's credit total.</div>
       </div>
@@ -9905,7 +9919,7 @@ function renderFinance(){
     <div class="twocol" style="margin-top:16px">
       <div class="panel" style="padding:6px 14px;overflow-x:auto">
         <div class="row" style="justify-content:space-between;align-items:center;padding:12px 6px 0;gap:10px;flex-wrap:wrap">
-          <h3 style="margin:0">Outstanding payments</h3>
+          <h3 style="margin:0">Outstanding payments <span class="pill ${owedTotal>0?'red':'green'}">${money(owedTotal)}</span></h3>
           <div class="row" style="gap:8px;align-items:center;margin:0">
             <select class="coachsel" style="max-width:230px" onchange="setOwedCust(this.value)">
               <option value="">Everyone — ${money(unpaidList.reduce((a,r)=>a+(r.amt||0),0))} across ${owedPeople.length} client${owedPeople.length===1?'':'s'}</option>
@@ -9922,7 +9936,7 @@ function renderFinance(){
       </div>
       <div class="panel" style="padding:6px 14px;overflow-x:auto">
         <div class="row" style="justify-content:space-between;align-items:center;padding:12px 6px 0">
-          <h3 style="margin:0">Expenses</h3><button class="btn sm" onclick="openExpense()">+ Add</button></div>
+          <h3 style="margin:0">Expenses <span class="pill red">${money(EXo.reduce((a,e)=>a+e.amount,0))}</span></h3><button class="btn sm" onclick="openExpense()">+ Add</button></div>
         <table><thead><tr><th>Date</th><th>Coach</th><th>Category</th><th>Note</th><th class="right">Amount</th><th></th></tr></thead><tbody>${expRows}</tbody></table>
       </div>
     </div>`;
