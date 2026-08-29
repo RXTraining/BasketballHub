@@ -4430,9 +4430,10 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 16:23 UTC';
+const BUILD='2026-08-29 16:40 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Fixed: iPhone HEIC photos could be uploaded in a format most browsers cannot display.</b> Photos are converted to JPEG, but the conversion was only kept <i>if it saved space</i> \u2014 and HEIC is efficient enough that the JPEG is often larger, so the conversion was thrown away and the raw <span class="mono">.HEIC</span> went up. Safari showed it; Chrome, Edge, Firefox and Android showed nothing. HEIC is now always converted, whatever the size. If a HEIC cannot be converted at all it is refused with an explanation rather than uploaded broken.',
    '<b>Fixed: photos picked on an iPhone were silently rejected.</b> iOS hands back an <b>empty file type</b> for anything chosen through the Files app or iCloud Photos, and the uploader decided photo-versus-video from that field alone \u2014 so those files failed the check and were dropped. It now falls back to the file extension, so a <span class="mono">.HEIC</span> or <span class="mono">.MOV</span> with no declared type uploads correctly.',
    '<b>And it now tells you what happened.</b> Failures were reported only by a flash message, which is gone in three seconds and easy to miss on a phone \u2014 hence \u201cI selected my photos and nothing happened\u201d. Each file now leaves a line under the upload button (uploading \u2026 / \u2713 uploaded as a draft / \u2715 with the actual reason), and if nothing at all got through you get a dialog rather than a vanished toast.',
    '<b>Finance now shows what the business owes its coaches</b>, beside what clients owe the business \u2014 the two are mirror images and only one of them was on the dashboard. Tap the card for a per-coach breakdown of still-owed and already-paid, with a link straight to each coach&rsquo;s payout list.',
@@ -6525,8 +6526,17 @@ function upLogReset(n){
   box.innerHTML='<b class="small">Upload — '+n+' file'+(n===1?'':'s')+' selected</b>';
   box.style.display='';
 }
+/* Is this an iPhone photo that only Safari can display? */
+function isHeic(f){
+  return /image\/hei[cf]/i.test((f&&f.type)||'') || /\.(heic|heif)$/i.test((f&&f.name)||'');
+}
 async function compressImage(file,maxDim=1600,quality=0.8){
   try{
+    /* HEIC must be converted even when the JPEG comes out LARGER. HEIC is far more efficient than
+       JPEG, so "only keep it if it saved space" quietly threw the conversion away and uploaded the
+       raw .HEIC — which Safari renders and Chrome, Edge, Firefox and Android do not. Compatibility
+       beats file size for a photo the whole club is meant to see. */
+    const mustConvert=isHeic(file);
     const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(file);});
     let w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
     if(Math.max(w,h)>maxDim){const s=maxDim/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);}
@@ -6534,7 +6544,8 @@ async function compressImage(file,maxDim=1600,quality=0.8){
     cv.getContext('2d').drawImage(img,0,0,w,h);
     URL.revokeObjectURL(img.src);
     const blob=await new Promise(res=>cv.toBlob(res,'image/jpeg',quality));
-    return (blob && blob.size<file.size)?blob:null;
+    if(!blob)return null;
+    return (mustConvert || blob.size<file.size) ? blob : null;
   }catch(e){return null;}
 }
 /* Number of uploads still in flight. addMediaFiles is async — it awaits the upload and only THEN
@@ -10487,7 +10498,15 @@ async function uploadHighlightVideo(input){
          're-record, or export/convert to MP4 (H.264) first.\n\nUpload it anyway?'))continue;
     }
     let up=f, ctype=fileMime(f,kind), name=f.name||(isImg?'photo.jpg':'clip.mp4');
-    if(isImg){const c=await compressImage(f,1800,0.86); if(c){up=c;ctype='image/jpeg';name=name.replace(/\.[^.]+$/,'')+'.jpg';}}
+    if(isImg){
+      const c=await compressImage(f,1800,0.86);
+      if(c){ up=c; ctype='image/jpeg'; name=name.replace(/\.[^.]+$/,'')+'.jpg'; }
+      else if(isHeic(f)){
+        failed++;
+        upLog('<span style="color:var(--red)">\u2715 '+escapeHtml(name)+'</span> — this iPhone HEIC photo could not be converted, and most browsers cannot display HEIC. Set Camera \u2192 Formats \u2192 Most Compatible, or export it as JPG.');
+        continue;
+      }
+    }
     flash('Uploading '+name+'…');
     upLog('\u2191 '+escapeHtml(name)+' — uploading '+Math.max(1,Math.round(up.size/1048576))+'MB\u2026');
     try{
