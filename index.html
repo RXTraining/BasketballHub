@@ -4430,9 +4430,10 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 15:22 UTC';
+const BUILD='2026-08-29 15:31 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Finance now shows what the business owes its coaches</b>, beside what clients owe the business \u2014 the two are mirror images and only one of them was on the dashboard. Tap the card for a per-coach breakdown of still-owed and already-paid, with a link straight to each coach&rsquo;s payout list.',
    '<b>Fixed: a session that already ran this morning was still advertised as coming up.</b> Both the events ticker and the group join list compared <i>dates</i> only, so anything earlier today still counted as upcoming \u2014 a 9am class was still being offered at 11am. Starring an event made it worse: featured events were deliberately exempt from the start time, which was meant to protect a to-be-confirmed date and instead stopped the clock entirely.',
    'Featured now means shown more prominently and tolerant of a TBC date \u2014 it no longer ignores the time. An event or group with no time set still runs all day, which is the leniency that was actually wanted.',
    '<b>Fixed: a recurring expense lost its description on every occurrence but the first.</b> Two $25 rows for the same Supabase subscription read differently \u2014 one said <i>Supabase database pro-plan</i>, the other just <i>Fixed / overhead</i>. The expense list dropped the note and then tried to find it again by matching on date, which cannot work for a monthly charge: only the first occurrence carries the date the row was actually saved with. The note travels with each occurrence now.',
@@ -9354,6 +9355,123 @@ function showExpenseDetail(dim,key){
     </tbody></table>`,
     `<button class="btn" onclick="closeModal()">Close</button>`,{full:AUTH==='owner'});
 }
+/* ---- What a coach is actually paid ----------------------------------------
+   Read from the expense rows rather than recomputed, so the coach's view and the owner's books are
+   the same numbers by construction. Each row is traced back to the session or event that produced
+   it. Ids are uid()-based (base36, no dashes), so splitting on '-' is safe. */
+function coachPayoutRows(coachId){
+  if(!coachId)return [];
+  return (DB.expenses||[]).filter(e=>e.coachId===coachId&&isAutoExpense(e)&&!/^labour-/.test(e.id||''))
+    .map(e=>{
+      const p=(e.id||'').split('-'), kind=p[0];
+      const row={id:e.id,date:e.date,amount:Number(e.amount)||0,cat:e.cat||'',note:e.note||'',
+                 kind:kind,what:'',who:'',collected:null,ref:''};
+      if(kind==='evpay'){
+        const ev=eventById(p[1]);
+        row.what=ev?('🎉 '+mlText(ev.title)):'Event';
+        row.who=ev?(eventRegsFor(ev.id).length+' registered'):'';
+        row.collected=ev?eventRevenue(ev):null; row.ref=p[1];
+      }else{
+        const sess=(DB.sessions||[]).find(x=>x.id===p[1]);
+        row.ref=p[1];
+        if(sess){
+          row.what=(kind==='gas'?'⛽ Mileage · ':'')+typeShort(sess.type);
+          row.who=custNames(sess.customerIds)||'—';
+          row.collected=(kind==='gas')?null:sessionPaidAmt(sess);
+        }else{ row.what=(kind==='gas'?'⛽ Mileage':'Coach payout'); }
+      }
+      return row;
+    })
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+}
+function coachPayoutTotal(coachId){ return coachPayoutRows(coachId).reduce((a,r)=>a+r.amount,0); }
+/* ---- Handing the money over ------------------------------------------------
+   A payout row says the business owes the coach. Settling is a separate fact: it records that the
+   money actually moved. Kept as a list of expense ids in settings rather than a flag on the
+   expense, because the expenses are derived and rebuilt on every save. */
+function settledSet(){ return new Set((DB.settings&&DB.settings.payoutsSettled)||[]); }
+function isSettled(id){ return settledSet().has(id); }
+function togglePayoutSettled(id,coachId){
+  /* Stored in settings.payouts_settled. If that column does not exist yet the cloud save fails and
+     the tick is lost on the next refresh — silently, which is the worst way to lose a record of
+     money changing hands. Refuse up front instead. */
+  if(typeof syncFails!=='undefined'&&syncFails&&syncFails.settings){
+    return flash('Cannot record this yet — the settings table failed to save. Run supabase-setup.sql, then try again.',true);
+  }
+  const set=settledSet();
+  if(set.has(id))set.delete(id); else set.add(id);
+  DB.settings.payoutsSettled=[...set];
+  save();
+  if(AUTH==='owner'){ refreshOwner(); if(coachId)openCoachPayouts(coachId); }
+  else renderMoney();
+}
+function coachOwedTotal(coachId){
+  return coachPayoutRows(coachId).filter(r=>!isSettled(r.id)).reduce((a,r)=>a+r.amount,0);
+}
+function coachPaidTotal(coachId){
+  return coachPayoutRows(coachId).filter(r=>isSettled(r.id)).reduce((a,r)=>a+r.amount,0);
+}
+/* The mirror of Outstanding: that is what clients owe the business, this is what the business owes
+   its coaches. Both are debts; only one of them was on the dashboard. */
+function coachesOwedList(){
+  return (DB.coaches||[]).filter(c=>inScope(c.id))
+    .map(c=>({c,owed:coachOwedTotal(c.id),paid:coachPaidTotal(c.id)}))
+    .filter(x=>x.owed>0||x.paid>0)
+    .sort((a,b)=>b.owed-a.owed);
+}
+function coachesOwedTotal(){ return coachesOwedList().reduce((a,x)=>a+x.owed,0); }
+function showCoachesOwed(){
+  const list=coachesOwedList(), tot=list.reduce((a,x)=>a+x.owed,0);
+  openModal('Owed to coaches — '+money(tot),
+    `<table><thead><tr><th>Coach</th><th class="right">Still owed</th><th class="right">Already paid</th><th></th></tr></thead><tbody>
+      ${list.map(x=>`<tr>
+        <td>${coachIcon(x.c.id)} <b>${escapeHtml(x.c.name)}</b></td>
+        <td class="right"><b style="color:${x.owed>0?'var(--red)':'var(--muted)'}">${money(x.owed)}</b></td>
+        <td class="right">${money(x.paid)}</td>
+        <td class="right"><button class="btn sm" onclick="openCoachPayouts('${x.c.id}')">Payouts</button></td></tr>`).join('')
+        ||'<tr><td colspan="4"><div class="empty">Nothing owed to any coach.</div></td></tr>'}
+      <tr style="border-top:2px solid var(--line)"><td><b>Total</b></td>
+        <td class="right"><b>${money(tot)}</b></td>
+        <td class="right"><b>${money(list.reduce((a,x)=>a+x.paid,0))}</b></td><td></td></tr>
+    </tbody></table>
+    <p class="muted small" style="margin-top:8px">A coach earns the moment their session or event is marked <b>completed</b>. Open <b>Payouts</b> to tick off what you have actually handed over.</p>`,
+    `<button class="btn" onclick="closeModal()">Close</button>`,{full:AUTH==='owner'});
+}
+/* The same table for both audiences: the owner checking what they owe, and the coach checking what
+   they earned. The coach's view deliberately omits what the client was charged. */
+function coachPayoutTableHtml(coachId,opts){
+  const rows=coachPayoutRows(coachId), mine=opts&&opts.mine;
+  const owed=rows.filter(r=>!isSettled(r.id)).reduce((a,r)=>a+r.amount,0);
+  const paid=rows.filter(r=>isSettled(r.id)).reduce((a,r)=>a+r.amount,0);
+  return `<table><thead><tr><th>Date</th><th>Session</th><th>${mine?'Player(s)':'Client(s)'}</th>
+      <th class="right">${mine?'You earned':'Owed to coach'}</th><th>${mine?'Paid to you':'Paid'}</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr>
+      <td>${fmtDate(r.date)}</td>
+      <td>${escapeHtml(r.what)}${r.note?`<div class="clienttag">${escapeHtml(r.note)}</div>`:''}</td>
+      <td>${escapeHtml(r.who||'—')}</td>
+      <td class="right"><b>${money(r.amount)}</b></td>
+      <td>${isSettled(r.id)
+        ? `<span class="pill green">${mine?'✓ Received':'✓ Paid'}</span>${mine?'':`<button class="iconbtn" title="Undo" onclick="togglePayoutSettled('${r.id}','${coachId}')">↩</button>`}`
+        : (mine?'<span class="pill yellow">Awaiting payment</span>'
+               :`<button class="btn sm" onclick="togglePayoutSettled('${r.id}','${coachId}')">Mark paid</button>`)}</td></tr>`).join('')
+      ||`<tr><td colspan="5"><div class="empty">${mine?'Nothing yet. Pay appears as soon as a session or event you ran is marked completed.':'No payouts yet for this coach.'}</div></td></tr>`}
+    <tr style="border-top:2px solid var(--line)">
+      <td><b>Still owed</b></td><td></td><td></td>
+      <td class="right"><b style="color:${owed>0?'var(--red)':'var(--muted)'}">${money(owed)}</b></td>
+      <td class="clienttag">${money(paid)} already ${mine?'received':'paid'}</td></tr>
+  </tbody></table>
+  <p class="muted small" style="margin-top:8px">Pay is earned the moment a session or event is marked <b>completed</b>${mine?'':' — whether or not the client has paid'}.</p>`;
+}
+function openCoachPayouts(coachId){
+  const owed=coachOwedTotal(coachId);
+  openModal(coachName(coachId)+' — payouts',
+    `<div class="stats" style="margin-bottom:12px">
+      <div class="stat"><div class="k">You owe</div><div class="v" style="color:${owed>0?'var(--red)':'var(--green)'}">${money(owed)}</div><div class="d muted">${owed>0?'not handed over yet':'all settled'}</div></div>
+      <div class="stat"><div class="k">Already paid</div><div class="v">${money(coachPaidTotal(coachId))}</div><div class="d muted">ticked off below</div></div>
+      <div class="stat"><div class="k">Earned</div><div class="v">${money(coachPayoutTotal(coachId))}</div><div class="d muted">all completed work</div></div>
+    </div>`+coachPayoutTableHtml(coachId),
+    `<button class="btn" onclick="closeModal()">Close</button>`,{full:AUTH==='owner'});
+}
 /* ---- Unpaid family time: people, rates, and the log ---------------------- */
 function contribSorted(){
   return (DB.contributions||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
@@ -9817,7 +9935,8 @@ function renderFinance(){
     ${compareHtml}
     <div class="stats">
       <div class="stat"><div class="k">Revenue (collected)</div><div class="v">${money(revenue)}</div><div class="d" style="color:var(--green)">Cash ${money(cashRev)} + packages ${money(pkgRev)}</div></div>
-      <div class="stat"><div class="k">Outstanding</div><div class="v">${money(outstanding)}</div><div class="d" style="color:var(--red)">Awaiting payment</div></div>
+      <div class="stat"><div class="k">Outstanding</div><div class="v">${money(outstanding)}</div><div class="d" style="color:var(--red)">Clients owe you</div></div>
+      <div class="stat" style="cursor:pointer" onclick="showCoachesOwed()" title="Tap for the breakdown by coach"><div class="k">Owed to coaches</div><div class="v" style="color:${coachesOwedTotal()>0?'var(--red)':'var(--green)'}">${money(coachesOwedTotal())}</div><div class="d muted">${coachesOwedTotal()>0?'not paid over yet — tap':'all settled'}</div></div>
       <div class="stat"><div class="k">Expenses</div><div class="v">${money(expenses)}</div><div class="d muted">${(payoutTotal||gasTotal||eventPayTotal)
         ?[payoutTotal?'payouts '+money(payoutTotal):'',eventPayTotal?'event pay '+money(eventPayTotal):'',gasTotal?'gas '+money(gasTotal):''].filter(Boolean).join(' · ')
         :'Total costs'}</div></div>
