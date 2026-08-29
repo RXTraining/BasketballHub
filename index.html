@@ -4460,9 +4460,10 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 18:52 UTC';
+const BUILD='2026-08-29 19:14 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>iPhone uploads: the picker itself is the problem, so on iOS the app now avoids it.</b> Three things compound \u2014 <span class="mono">multiple</span> makes Safari transcode every selected HEIC before handing anything over (which can stall so long the sheet never closes), <span class="mono">accept=\"image/*\"</span> forces the Photos-library picker that \u201cPrivate Access\u201d restricts, and a re-render underneath detaches the input. On an iPhone the app now asks for <b>one file at a time</b> and offers <b>\ud83d\udcc1 Choose file</b>, which opens the plain iOS file sheet instead of the Photos picker. Other platforms keep multi-select.',
    '<b>Fixed: the iOS photo sheet did nothing when you tapped the tick.</b> While the picker is open the page underneath is still live, and a background refresh re-renders it \u2014 which destroys the file input the picker was opened from. iOS then has nowhere to deliver the selection, so the tick does nothing and the sheet just sits there. Taking a photo with the camera is quick enough to usually beat the next refresh; browsing a library is not, which is why one worked and the other did not. The page no longer repaints while a picker is open.',
    'Also stopped hiding file inputs with <span class="mono">display:none</span>, which some iOS versions treat as a reason not to deliver the file at all. They are now hidden but still laid out.',
    '<b>Fixed: on an iPhone, photos chosen from the library did nothing while the camera worked.</b> The uploader reset the file input as soon as the handler started. A photo taken with the camera is a real temporary file and survives that; a photo from the library is a lazy handle onto a Photos asset, and clearing the input can invalidate it before it has been read \u2014 so the upload got nothing, silently. The input is now cleared only after every file has been read.',
@@ -5080,8 +5081,7 @@ function openCoachStatus(id){
     ${paySection}
     <div class="field"><label class="f">📣 Feedback to client — shown on their My Sessions</label><textarea id="csFeedback" placeholder="How did it go? Progress, tips, next focus...">${s.feedback||''}</textarea></div>
     <div class="field"><label class="f">📎 Photos / videos for client</label>
-      <input type="file" accept="image/*" multiple onchange="addMediaFiles(this)">
-      <input type="file" accept="video/*" onchange="addMediaFiles(this)" style="margin-top:6px">
+      <div class="row" style="gap:8px;flex-wrap:wrap">${filePickHtml('addMediaFiles')}</div>
       <div id="sMediaPrev" style="margin-top:8px"></div>
       <div class="clienttag" style="margin-top:4px">Shown to the client with this session. Photos are compressed automatically. Videos up to ${MAX_VIDEO_MB}MB — but a trimmed 1080p clip (~30MB) uploads faster and plays without buffering on a phone.</div></div>
     <p class="muted small">Status, cash payment, feedback and media can be updated here — other session details are managed by the owner. Changes sync to the owner and the client.</p>
@@ -6044,8 +6044,7 @@ function editSkillEntry(id){
     <div class="field"><label class="f">Progress note — the client sees this</label>
       <textarea id="seNote">${escapeHtml(e.note||'')}</textarea></div>
     <div class="field"><label class="f">📎 Attachments</label>
-      <input type="file" accept="image/*" multiple onchange="addMediaFiles(this)">
-      <input type="file" accept="video/*" onchange="addMediaFiles(this)" style="margin-top:6px">
+      <div class="row" style="gap:8px;flex-wrap:wrap">${filePickHtml('addMediaFiles')}</div>
       <div id="sMediaPrev" style="margin-top:8px"></div>
       <div class="clienttag" style="margin-top:4px">Remove an attachment with the ✕ on its thumbnail.</div></div>
   `,`<button class="btn danger" onclick="delSkillLog('${id}',true)">Delete</button>
@@ -6083,8 +6082,7 @@ function openSkillLog(cid,preselect,backToBoard){
     <div class="field"><label class="f">What did they achieve? — the client sees this</label>
       <textarea id="slNote" placeholder="e.g. Can now chain crossover into a pull-up off the left hand, 7/10 reps."></textarea></div>
     <div class="field"><label class="f">📎 Photo / video evidence (optional)</label>
-      <input type="file" accept="image/*" multiple onchange="addMediaFiles(this)">
-      <input type="file" accept="video/*" onchange="addMediaFiles(this)" style="margin-top:6px">
+      <div class="row" style="gap:8px;flex-wrap:wrap">${filePickHtml('addMediaFiles')}</div>
       <div id="sMediaPrev" style="margin-top:8px"></div></div>
     <p class="muted small">Each entry is one step on the timeline for that skill — add a new one each time they move forward, rather than editing the old one.</p>
   `,`<button class="btn ghost" onclick="${backToBoard?`openClientSkills('${cid}')`:'closeModal()'}">Cancel</button>
@@ -6527,6 +6525,31 @@ function videoHtml(url,width){
     : `<video src="${e.src}" controls playsinline preload="metadata" style="display:block;width:${w};max-width:100%;max-height:70vh;height:auto;border-radius:10px;margin:6px auto 0;background:#000"></video>`;
 }
 // Downscale + re-encode a photo before upload to cut storage & (repeated) view egress.
+/* ---- Picking files on an iPhone --------------------------------------------
+   Three things make the iOS picker fail, and they compound:
+     * `multiple` — confirming several photos makes Safari transcode them all before handing them
+       over. With HEIC originals that can stall long enough that the sheet never dismisses.
+     * `accept="image/*"` — pushes Safari into the Photos-library picker, which under "Private
+       Access" only resolves photos already granted. Without accept, iOS shows its plain action
+       sheet (Photo Library / Take Photo / Choose File) which does not have that problem.
+     * a file input that gets re-rendered while the sheet is open (fixed separately).
+   So on iOS we ask for ONE file at a time and offer an accept-less "Choose file" as the escape
+   hatch. On everything else the multi-select picker is fine and stays. */
+const IS_IOS = (function(){
+  try{ return /iP(hone|od|ad)/.test(navigator.userAgent)
+      || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }catch(e){ return false; }
+})();
+/* Build the file buttons for a place that accepts media. `fn` is the change handler name. */
+function filePickHtml(fn,opts){
+  const o=opts||{}, cls=o.cls||'btn ghost sm';
+  if(IS_IOS){
+    return `<label class="${cls}" style="cursor:pointer">📷 ${o.photoLabel||'Photo'}<input type="file" accept="image/*" class="hidefile" onchange="${fn}(this)"></label>
+      <label class="${cls}" style="cursor:pointer">🎬 ${o.videoLabel||'Video'}<input type="file" accept="video/*" class="hidefile" onchange="${fn}(this)"></label>
+      <label class="${cls}" style="cursor:pointer" title="If the photo picker will not respond, use this — it opens the plain iOS file sheet">📁 Choose file<input type="file" class="hidefile" onchange="${fn}(this)"></label>`;
+  }
+  return `<label class="${cls}" style="cursor:pointer">📷 ${o.photoLabel||'Photos'}<input type="file" accept="image/*" multiple class="hidefile" onchange="${fn}(this)"></label>
+    <label class="${cls}" style="cursor:pointer">🎬 ${o.videoLabel||'Video'}<input type="file" accept="video/*" class="hidefile" onchange="${fn}(this)"></label>`;
+}
 /* ---- Working out what a file actually is -----------------------------------
    iOS hands back an EMPTY f.type for anything picked through the Files app or iCloud Photos, and
    sometimes for HEIC straight from the camera roll. Both upload paths decided image-vs-video from
@@ -6746,8 +6769,7 @@ function openSession(id,returnCust,preset){
     <div class="field"><label class="f">Notes (internal — not shown to client)</label><textarea id="sNotes">${s.notes||''}</textarea></div>
     <div class="field"><label class="f">📣 Feedback to client — shown on their My Sessions</label><textarea id="sFeedback" placeholder="How did it go? Progress, tips, next focus...">${s.feedback||''}</textarea></div>
     <div class="field"><label class="f">📎 Photos / videos for client</label>
-      <input type="file" accept="image/*" multiple onchange="addMediaFiles(this)">
-      <input type="file" accept="video/*" onchange="addMediaFiles(this)" style="margin-top:6px">
+      <div class="row" style="gap:8px;flex-wrap:wrap">${filePickHtml('addMediaFiles')}</div>
       <div id="sMediaPrev" style="margin-top:8px"></div>
       <div class="clienttag" style="margin-top:4px">Saved on this device with the session and shown to the client. Keep files small — large videos may exceed browser storage.</div></div>
     <p class="muted small">Marking payment as "package credit" counts one used session against the client's prepaid total. Manage venues in the Locations tab.</p>
@@ -7603,6 +7625,7 @@ function openCoach(id){
       <div class="row" style="gap:10px;align-items:center">
         <img id="coPhotoPrev" src="${g('photo')||''}" alt="" style="width:56px;height:56px;border-radius:10px;object-fit:cover;background:var(--panel2);${g('photo')?'':'display:none'}" onerror="this.style.display='none'">
         <label class="btn ghost sm" style="cursor:pointer">⬆ Upload photo<input type="file" accept="image/*" class="hidefile" onchange="uploadCoachPhoto(this)"></label>
+        ${IS_IOS?'<label class="btn ghost sm" style="cursor:pointer" title="If the photo picker will not respond">📁 Choose file<input type="file" class="hidefile" onchange="uploadCoachPhoto(this)"></label>':''}
       </div>
       <input id="coPhoto" value="${g('photo')}" placeholder="…or paste a direct image link (ends in .jpg/.png)" style="margin-top:8px">
       <div class="clienttag" style="margin-top:4px">Upload a photo, or paste a <b>direct image link</b>. iCloud/Google Photos <i>share</i> links won't work — they're web pages, not image files.</div></div>
@@ -8683,6 +8706,7 @@ function openEvent(id){
       <input id="evVideo" value="${safeUrl(ev.video||'')}" placeholder="Paste a YouTube / Vimeo / Drive link…">
       <div class="row" style="gap:8px;align-items:center;margin-top:6px">
         <label class="btn ghost sm" style="cursor:pointer">⬆ …or upload a video<input type="file" accept="video/*" class="hidefile" onchange="uploadEventVideo(this)"></label>
+        ${IS_IOS?'<label class="btn ghost sm" style="cursor:pointer" title="If the picker will not respond">📁 Choose file<input type="file" class="hidefile" onchange="uploadEventVideo(this)"></label>':''}
         <span class="clienttag">Uploads up to ${MAX_VIDEO_MB}MB. For long footage an (unlisted) YouTube link streams better on phones.</span>
       </div>
       <div id="evVideoPrev" style="margin-top:8px">${videoHtml(ev.video||'','280px')}</div>
@@ -9124,8 +9148,7 @@ function chatThreadHtml(type,id){
     ${AUTH==='owner'?`<div class="field" style="margin-bottom:6px"><input id="chatVideoLink" placeholder="🎬 Paste a video link (YouTube / Vimeo / Drive) — optional"></div>`:''}
     <div class="row" style="gap:8px;align-items:flex-end">
       <textarea id="chatInput" placeholder="${t('Type a message…')}" style="flex:1;min-height:46px;resize:vertical"></textarea>
-      <label class="btn ghost" title="Attach a photo" style="cursor:pointer">📷<input type="file" accept="image/*" multiple class="hidefile" onchange="addMediaFiles(this)"></label>
-      <label class="btn ghost" title="Attach a video" style="cursor:pointer">🎬<input type="file" accept="video/*" class="hidefile" onchange="addMediaFiles(this)"></label>
+      ${filePickHtml('addMediaFiles',{cls:'btn ghost',photoLabel:'',videoLabel:''})}
       <button class="btn" onclick="sendMessage()">${t('Send')}</button>
     </div>`;
 }
@@ -9222,8 +9245,7 @@ function openBroadcast(){
     <div class="field"><label class="f">🎬 Video link (YouTube / Vimeo / Drive)</label>
       <input id="bcLink" placeholder="https://youtu.be/…"></div>
     <div class="field"><label class="f">…or upload a video / photo</label>
-      <input type="file" accept="image/*" multiple onchange="addMediaFiles(this)">
-      <input type="file" accept="video/*" onchange="addMediaFiles(this)" style="margin-top:6px">
+      <div class="row" style="gap:8px;flex-wrap:wrap">${filePickHtml('addMediaFiles')}</div>
       <div id="sMediaPrev" style="margin-top:8px"></div>
       <div class="clienttag" style="margin-top:4px">Uploads up to ${MAX_VIDEO_MB}MB. Longer or higher-quality footage is better on YouTube (unlisted works) — paste the link above; it streams adaptively so clients on slow connections aren't left buffering.</div></div>
     <div class="field"><label class="f">Send to (${active.length} active client${active.length>1?'s':''})</label>
@@ -10396,10 +10418,10 @@ function renderAdmin(){
       <div class="field" style="margin-top:10px"><label class="f">Video link</label>
         <input id="nhUrl" placeholder="Paste a YouTube / Vimeo / Drive link…"></div>
       <div class="row" style="gap:8px;align-items:center;margin-top:-4px">
-        <label class="btn ghost sm" style="cursor:pointer">📷 Photos<input type="file" accept="image/*" multiple class="hidefile" onchange="uploadHighlightVideo(this)"></label>
-        <label class="btn ghost sm" style="cursor:pointer">🎬 Video<input type="file" accept="video/*" class="hidefile" onchange="uploadHighlightVideo(this)"></label>
+        ${filePickHtml('uploadHighlightVideo')}
         <button class="btn sm" onclick="addHighlight()">+ Add highlight</button>
       </div>
+      ${IS_IOS?`<div class="clienttag" style="margin-top:6px">On iPhone, pick <b style="color:var(--txt)">one photo at a time</b>. If the photo sheet will not close when you tap the tick, use <b style="color:var(--txt)">📁 Choose file</b> \u2014 it opens the plain iOS file sheet, which does not have that fault.</div>`:''}
       <div id="upLog" class="clienttag" style="display:none;margin-top:8px;padding:8px 10px;background:var(--panel2);border-radius:8px;font-size:12.5px"></div>
       <div id="hiPrev" style="margin-top:10px"></div>
     </div>
@@ -10586,7 +10608,10 @@ async function uploadHighlightVideo(input){
       upLog('<span style="color:var(--red)">\u2715 '+escapeHtml(name)+'</span> — '+escapeHtml(e.message||'upload failed'));
       flash('Upload failed: '+e.message,true);}
   }
-  try{ input.value=''; }catch(e){}          // safe now: every file has been read
+  /* Clear only now that every file has been read — and it MUST be cleared, or picking the same
+     photo again fires no change event at all, which looks exactly like "it worked once and never
+     again". */
+  try{ input.value=''; }catch(e){}
   if(added){ save(); flash(added+' item'+(added>1?'s':'')+' uploaded as DRAFT — press Publish to show on the home page'); }
   /* Nothing got through, so say so loudly. A toast that has already faded is why "I selected my
      photos and nothing happened" was the whole of the feedback. */
