@@ -2816,7 +2816,6 @@ function custPay(s,custId){
   if(s.type!=='1on1' && s.pay && s.pay[custId]) return s.pay[custId];
   return {paid:!!s.paid, paidVia:s.paidVia||'', requested:!!s.paymentRequested};
 }
-function usedFor(c,type){if(!c)return 0;const done=DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.type===type&&s.status==='completed'&&custPay(s,c.id).paidVia==='package').length;return Math.min(totalFor(c,type),done);}
 function completedCount(c){return DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status==='completed').length;}
 function bookedCount(c){return DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status==='scheduled'&&s.date>=todayISO()).length;}
 /* integrity tally: how many sessions each side cancelled */
@@ -2849,18 +2848,32 @@ function poolLabel(type){
 function poolTotal(c,type){ return creditPool(type).reduce((a,ty)=>a+totalFor(c,ty),0); }
 function poolUsed(c,type){
   if(!c)return 0;
-  const pool=creditPool(type);
-  const done=DB.sessions.filter(s=>s.customerIds.includes(c.id)&&pool.indexOf(s.type)>=0
-              &&s.status==='completed'&&custPay(s,c.id).paidVia==='package').length;
-  return Math.min(poolTotal(c,type),done);
+  // Must ask creditConsumers, not DB.sessions — event places consume credits too, and counting
+  // only sessions here left the balance saying 7 left after 4 had been used.
+  return Math.min(poolTotal(c,type),creditConsumers(c.id,type).length);
 }
 function creditsFor(c,type){ return Math.max(0,poolTotal(c,type)-poolUsed(c,type)); }
 /* Uncapped: how many package-paid sessions exist, whether or not a credit ever backed them. */
+/* Everything that consumes a credit from this pool, in the order it was used. Sessions and event
+   places both draw on it — an event place bought with a group credit has to actually take one, or
+   the credit is spent twice. Events draw on the GROUP pool; there is no such thing as an
+   event package. */
+function creditConsumers(custId,type){
+  const pool=creditPool(type), out=[];
+  (DB.sessions||[]).filter(x=>(x.customerIds||[]).includes(custId)&&pool.indexOf(x.type)>=0
+      &&x.status==='completed'&&custPay(x,custId).paidVia==='package')
+    .forEach(x=>out.push({key:(x.date||'')+'T'+(x.time||'')+'#'+x.id,id:x.id,kind:'session'}));
+  if(pool.indexOf('group')>=0){
+    (DB.eventRegs||[]).filter(r=>r.customerId===custId&&r.status!=='cancelled'
+        &&r.paid&&r.paidVia==='package')
+      .forEach(r=>{ const ev=eventById(r.eventId); if(!ev)return;
+        out.push({key:(ev.date||'')+'T'+(ev.time||'')+'#'+r.id,id:r.id,kind:'event',title:mlText(ev.title)}); });
+  }
+  return out.sort((a,b)=>a.key.localeCompare(b.key));
+}
 function poolUsedRaw(c,type){
   if(!c)return 0;
-  const pool=creditPool(type);
-  return DB.sessions.filter(s=>s.customerIds.includes(c.id)&&pool.indexOf(s.type)>=0
-    &&s.status==='completed'&&custPay(s,c.id).paidVia==='package').length;
+  return creditConsumers(c.id,type).length;
 }
 function poolOver(c,type){ return Math.max(0,poolUsedRaw(c,type)-poolTotal(c,type)); }
 
@@ -2876,11 +2889,7 @@ function creditUse(s,custId){
   if(!s||s.status!=='completed')return null;
   const c=custById(custId); if(!c)return null;
   if(custPay(s,custId).paidVia!=='package')return null;
-  const pool=creditPool(s.type);
-  const ord=x=>(x.date||'')+'T'+(x.time||'')+'#'+x.id;      // stable even for same-minute sessions
-  const list=DB.sessions.filter(x=>x.customerIds.includes(custId)&&pool.indexOf(x.type)>=0
-      &&x.status==='completed'&&custPay(x,custId).paidVia==='package')
-    .sort((a,b)=>ord(a).localeCompare(ord(b)));
+  const list=creditConsumers(custId,s.type);
   const n=list.findIndex(x=>x.id===s.id)+1; if(!n)return null;
   const slots=creditSlots(c,s.type), total=slots.length, slot=slots[n-1];
   return {n,total,over:!slot,label:poolLabel(s.type),
@@ -4241,7 +4250,7 @@ function exportExcel(){
   const cashSess=DB.sessions.reduce((a,s)=>a+sessionCashAmt(s),0);
   const pkgRev=DB.customers.flatMap(c=>c.packages).reduce((a,p)=>a+p.amount,0);
   const otherCash=DB.cashEntries.reduce((a,e)=>a+e.amount,0);
-  const eventInc=(DB.eventRegs||[]).filter(r=>r.paid&&r.status!=='cancelled').reduce((a,r)=>{const ev=eventById(r.eventId);return ev?a+(ev.price||0):a;},0);
+  const eventInc=(DB.eventRegs||[]).filter(r=>r.paid&&r.paidVia!=='package'&&r.status!=='cancelled').reduce((a,r)=>{const ev=eventById(r.eventId);return ev?a+(ev.price||0):a;},0);
   const expenses=expenseOccurrences(DB.expenses).reduce((a,e)=>a+e.amount,0);
   const outstanding=DB.sessions.reduce((a,s)=>a+sessionOutstandingAmt(s),0);
   const revenue=cashSess+pkgRev+otherCash+eventInc;
@@ -4421,9 +4430,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 03:50 UTC';
+const BUILD='2026-08-29 04:05 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>An event place can now be paid with a group credit.</b> It never could \u2014 <span class="mono">eventRegPay()</span> always wrote \u201ccash\u201d, and there was no credit path for events anywhere. The registrations table now offers <b>Cash</b> or <b>\ud83c\udfab Credit</b>, or a <i>Sell credit</i> shortcut when the family has none left, and shows which package the place came out of.',
+   'The place genuinely consumes a credit: sessions and event places are now counted from one ordered list, so a credit cannot be spent twice and the balance falls when the place is taken. And because that money arrived when the package was sold, a credit-paid place no longer counts again as event income \u2014 the same rule package-paid sessions already follow.',
    '<b>Revenue rows now open their detail, like the expense ones.</b> Tap any bar under <b>Where the revenue came from</b> \u2014 on any of Sport, Session type, Coach, Client or Source \u2014 and every entry behind it is listed: date, where the money came from, which family, which session type and the amount, with a total. The grouping and the detail share one key function, so a bar and its list can never disagree.',
    '<b>Fixed: tapping a name in the P&amp;L breakdown jumped to the top of the page instead of opening the detail.</b> The click handler is JavaScript written into an HTML attribute, and the name was quoted with double quotes \u2014 which closed the attribute early and left the rest of the call as stray markup. The handler never ran, so the click fell through to the link and scrolled the page. Names are now escaped for the attribute, so <b>By person</b> and <b>By category</b> open their entries as intended \u2014 including names with quotes or apostrophes.',
    '<b>Fixed: marking a payout as paid did not update the You owe column.</b> The dialog repainted but the page behind it did not, so the Coaches table kept the old figure until you changed tab \u2014 it looked as though the tick had done nothing. Both now refresh together.',
@@ -8531,11 +8542,18 @@ function viewEventRegs(id){
       <div class="clienttag">${(c&&c.level)||'—'}${c&&c.parent?' · '+c.parent:''}</div></div></div></td>
     <td>${c&&c.phone?`<a href="tel:${c.phone.replace(/[^0-9+]/g,'')}">${c.phone}</a>`:'<span class="muted">—</span>'}</td>
     <td>${r.status==='pending'?'<span class="pill yellow">⏳ Pending</span>':'<span class="pill green">Registered</span>'}</td>
-    <td>${r.paid?'<span class="pill green">Paid</span>':(ev.price?'<span class="pill red">Unpaid</span>':'<span class="pill">Free</span>')}</td>
+    <td>${r.paid
+      ? (r.paidVia==='package'
+          ? `<span class="pill green">🎟️ Credit</span>${(()=>{const u=eventRegCreditUse(r);return u?`<div class="clienttag">${escapeHtml(u.pkg||'')} · ${u.n}/${u.total}</div>`:'';})()}`
+          : '<span class="pill green">Paid</span>')
+      : (ev.price?'<span class="pill red">Unpaid</span>':'<span class="pill">Free</span>')}</td>
     <td>${r.checkedIn?'<span class="pill green">✓ In</span>':'—'}</td>
     <td class="right"><div class="actions">
       ${r.status==='pending'?`<button class="btn sm" onclick="eventRegApprove('${r.id}')">Approve</button>`:''}
-      ${ev.price&&!r.paid?`<button class="iconbtn" onclick="eventRegPay('${r.id}')">Mark paid</button>`:''}
+      ${ev.price&&!r.paid?`<button class="iconbtn" onclick="eventRegPay('${r.id}')">Cash</button>
+        ${creditsFor(custById(r.customerId),'group')>0
+          ? `<button class="iconbtn" title="Use one of their group credits" onclick="eventRegCredit('${r.id}')">🎟️ Credit</button>`
+          : `<button class="iconbtn" style="opacity:.5" title="No group credit left — tap to sell a package" onclick="openSellPackage('${r.customerId}','group')">🎟️ Sell credit</button>`}`:''}
       <button class="iconbtn" onclick="eventRegCheckin('${r.id}')">${r.checkedIn?'Undo in':'Check in'}</button>
       <button class="iconbtn" onclick="eventRegRemove('${r.id}')">✕</button>
     </div></td></tr>`;}).join('')||'<tr><td colspan="6"><div class="empty">No registrations yet.</div></td></tr>';
@@ -8607,6 +8625,25 @@ function eventMarkAllPaid(eid){
   save(); flash(due.length+' marked paid \u{1F4B5}'); viewEventRegs(eid);
 }
 function eventRegPay(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;r.paid=true;r.paidVia='cash';save();flash('Marked paid 💵');viewEventRegs(r.eventId);}
+/* An event place bought with a group credit. It really consumes one — creditConsumers() counts it
+   alongside the sessions — so the balance falls and the place cannot be paid for twice. */
+function eventRegCredit(id){
+  const r=(DB.eventRegs||[]).find(x=>x.id===id); if(!r)return;
+  const c=custById(r.customerId); if(!c)return;
+  if(creditsFor(c,'group')<=0)
+    return flash(c.name+' has no group credits left — sell a package or take the cash.',true);
+  r.paid=true; r.paidVia='package';
+  save(); flash('Paid with a group credit 🎟️');
+  logAct('credit_used',c.name+' · event place',r.eventId);
+  viewEventRegs(r.eventId);
+}
+function eventRegCreditUse(r){
+  const c=custById(r&&r.customerId); if(!c||r.paidVia!=='package')return null;
+  const list=creditConsumers(c.id,'group');
+  const n=list.findIndex(x=>x.id===r.id)+1; if(!n)return null;
+  const slots=creditSlots(c,'group'), slot=slots[n-1];
+  return {n,total:slots.length,over:!slot,pkg:slot?slot.label:''};
+}
 function eventRegCheckin(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;r.checkedIn=!r.checkedIn;save();viewEventRegs(r.eventId);}
 function eventRegRemove(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;if(!confirm('Remove this registration?'))return;const eid=r.eventId;r.status='cancelled';save();flash('Removed');viewEventRegs(eid);}
 
@@ -9045,7 +9082,8 @@ function plRevenueLines(){
       sport:coachSport(e.coachId),type:typeShort(e.type),coachId:e.coachId||'',custId:e.customerId||''});
   });
   // event registrations that have been paid
-  (DB.eventRegs||[]).filter(r=>r.paid&&r.status!=='cancelled').forEach(r=>{
+  // package-paid places were counted on the day the package was sold — see the note on eventInc
+  (DB.eventRegs||[]).filter(r=>r.paid&&r.paidVia!=='package'&&r.status!=='cancelled').forEach(r=>{
     const ev=eventById(r.eventId); if(!ev)return;
     const host=(eventCoachIds(ev)[0]||'');
     /* coachId is deliberately blank: see the note on eventInc. The host is still recorded for the
@@ -9519,8 +9557,10 @@ function renderFinance(){
      them made a coach's line look like it earned money it never did. So it is counted only in the
      all-coaches view. The fee they are paid still sits against them as a cost — which is the
      honest picture: the event earns for the business and costs the coach's fee. */
+  /* paidVia 'package' means the money arrived when the package was sold — counting it again here
+     would double it, exactly as it would for a package-paid session. */
   const eventInc=(scopeCoach()!=='all')?0
-    :(DB.eventRegs||[]).filter(r=>r.paid&&r.status!=='cancelled').reduce((a,r)=>{
+    :(DB.eventRegs||[]).filter(r=>r.paid&&r.paidVia!=='package'&&r.status!=='cancelled').reduce((a,r)=>{
       const ev=eventById(r.eventId); return ev?a+(ev.price||0):a;
     },0);
   const cashRev=sessCash+otherCash+eventInc;
