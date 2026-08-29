@@ -4488,9 +4488,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 20:01 UTC';
+const BUILD='2026-08-29 21:13 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Found it: <span class="mono">accept=\"image/*\"</span> was making Safari convert every camera photo before handing it over.</b> A screenshot uploaded fine and a camera photo hung on a spinning circle \u2014 the difference is that a screenshot is already a PNG, while a camera photo is HEIC, and <span class="mono">accept</span> makes Safari transcode it to JPEG first. That conversion is what stalled. On iPhone the photo button now carries <b>no accept attribute</b>: iOS shows its plain sheet and passes the original file straight through, and the app converts it itself in <span class="mono">compressImage()</span> where a failure is visible instead of silent.',
+   'It costs one extra tap on iPhone \u2014 the sheet asks Photo Library or Take Photo \u2014 and removes the hang. For anyone who would rather avoid HEIC altogether, <i>Settings \u2192 Camera \u2192 Formats \u2192 Most Compatible</i> records JPEG and sidesteps it. Desktop and Android keep the filtered multi-select picker, which has never had this problem.',
    '<b>The iPhone upload problem was iCloud, not the app.</b> The spinning circle on the selected photo is iOS downloading the original from iCloud \u2014 with <i>Optimise iPhone Storage</i> on, only small previews live on the phone, and the picker cannot hand anything over until the full file comes down. On cellular that can stall indefinitely, which is why the sheet sat there and X was the only way out, why the camera always worked (nothing to download), and why it succeeded once (that photo was already cached). Admin now says so on iPhone, with the fix: open the photo in Photos first so it downloads, then pick it.',
    '<b>The real reason iPhone uploads failed: the page was being reclaimed while the picker was open.</b> \u201cNo way back to the admin page\u201d is the tell \u2014 the page was not behind the sheet, it was gone. The app kept redrawing an animated favicon every 2.2 seconds forever, ran a second animation timer, and re-fetched every table on a poll \u2014 all of it continuing while the tab was hidden. That is the background work iOS reclaims a tab for, and it explains why it worked once and never again. Every timer now stops when the page is hidden or a picker is open.',
    'Belt and braces: the session is saved the moment a picker opens, so if iOS does reload the page you come back to the Admin tab rather than the sign-in screen. The paste box added earlier is now tucked behind a \u201cpicker not responding?\u201d disclosure \u2014 it is a fallback, not the way this is supposed to work.',
@@ -6576,9 +6578,14 @@ const IS_IOS = (function(){
 function filePickHtml(fn,opts){
   const o=opts||{}, cls=o.cls||'btn ghost sm';
   if(IS_IOS){
-    return `<label class="${cls}" style="cursor:pointer">📷 ${o.photoLabel||'Photo'}<input type="file" accept="image/*" class="hidefile" onchange="${fn}(this)"></label>
-      <label class="${cls}" style="cursor:pointer">🎬 ${o.videoLabel||'Video'}<input type="file" accept="video/*" class="hidefile" onchange="${fn}(this)"></label>
-      <label class="${cls}" style="cursor:pointer" title="If the photo picker will not respond, use this — it opens the plain iOS file sheet">📁 Choose file<input type="file" class="hidefile" onchange="${fn}(this)"></label>`;
+    /* NO accept attribute on the photo button — that is the whole fix.
+       With accept="image/*" Safari transcodes the picked HEIC to JPEG before handing it over, and
+       that conversion is what hangs with a spinner on a camera photo. A screenshot is already PNG,
+       so it needs no conversion and always worked — which is exactly the symptom.
+       Without accept, iOS shows its plain sheet and passes the original file straight through; we
+       convert it ourselves in compressImage(), where a failure is visible and recoverable. */
+    return `<label class="${cls}" style="cursor:pointer" title="Opens the iOS sheet — choose Photo Library or Take Photo">📷 ${o.photoLabel||'Photo'}<input type="file" class="hidefile" onchange="${fn}(this)"></label>
+      <label class="${cls}" style="cursor:pointer">🎬 ${o.videoLabel||'Video'}<input type="file" accept="video/*" class="hidefile" onchange="${fn}(this)"></label>`;
   }
   return `<label class="${cls}" style="cursor:pointer">📷 ${o.photoLabel||'Photos'}<input type="file" accept="image/*" multiple class="hidefile" onchange="${fn}(this)"></label>
     <label class="${cls}" style="cursor:pointer">🎬 ${o.videoLabel||'Video'}<input type="file" accept="video/*" class="hidefile" onchange="${fn}(this)"></label>`;
@@ -7657,8 +7664,9 @@ function openCoach(id){
     <div class="field"><label class="f">Photo</label>
       <div class="row" style="gap:10px;align-items:center">
         <img id="coPhotoPrev" src="${g('photo')||''}" alt="" style="width:56px;height:56px;border-radius:10px;object-fit:cover;background:var(--panel2);${g('photo')?'':'display:none'}" onerror="this.style.display='none'">
-        <label class="btn ghost sm" style="cursor:pointer">⬆ Upload photo<input type="file" accept="image/*" class="hidefile" onchange="uploadCoachPhoto(this)"></label>
-        ${IS_IOS?'<label class="btn ghost sm" style="cursor:pointer" title="If the photo picker will not respond">📁 Choose file<input type="file" class="hidefile" onchange="uploadCoachPhoto(this)"></label>':''}
+        ${IS_IOS
+          ? '<label class="btn ghost sm" style="cursor:pointer" title="Opens the iOS sheet — Photo Library or Take Photo">⬆ Upload photo<input type="file" class="hidefile" onchange="uploadCoachPhoto(this)"></label>'
+          : '<label class="btn ghost sm" style="cursor:pointer">⬆ Upload photo<input type="file" accept="image/*" class="hidefile" onchange="uploadCoachPhoto(this)"></label>'}
       </div>
       <input id="coPhoto" value="${g('photo')}" placeholder="…or paste a direct image link (ends in .jpg/.png)" style="margin-top:8px">
       <div class="clienttag" style="margin-top:4px">Upload a photo, or paste a <b>direct image link</b>. iCloud/Google Photos <i>share</i> links won't work — they're web pages, not image files.</div></div>
@@ -8739,7 +8747,7 @@ function openEvent(id){
       <input id="evVideo" value="${safeUrl(ev.video||'')}" placeholder="Paste a YouTube / Vimeo / Drive link…">
       <div class="row" style="gap:8px;align-items:center;margin-top:6px">
         <label class="btn ghost sm" style="cursor:pointer">⬆ …or upload a video<input type="file" accept="video/*" class="hidefile" onchange="uploadEventVideo(this)"></label>
-        ${IS_IOS?'<label class="btn ghost sm" style="cursor:pointer" title="If the picker will not respond">📁 Choose file<input type="file" class="hidefile" onchange="uploadEventVideo(this)"></label>':''}
+
         <span class="clienttag">Uploads up to ${MAX_VIDEO_MB}MB. For long footage an (unlisted) YouTube link streams better on phones.</span>
       </div>
       <div id="evVideoPrev" style="margin-top:8px">${videoHtml(ev.video||'','280px')}</div>
@@ -10455,9 +10463,8 @@ function renderAdmin(){
         <button class="btn sm" onclick="addHighlight()">+ Add highlight</button>
       </div>
       ${IS_IOS?`<div class="clienttag" style="margin-top:6px;background:var(--a6b);border-radius:8px;padding:8px 10px">
-        <b style="color:var(--txt)">A spinning circle on the photo means iCloud is still downloading it</b> \u2014 not an upload problem.
-        If your phone has <i>Settings \u2192 Photos \u2192 Optimise iPhone Storage</i>, originals live in iCloud and must come down first, which can stall on cellular.
-        Quickest fix: open the photo in the <b style="color:var(--txt)">Photos app</b> until it looks sharp, then come back and pick it \u2014 it is cached now and returns instantly. Wi-Fi helps too.
+        <b style="color:var(--txt)">\ud83d\udcf7 Photo</b> opens the iOS sheet \u2014 choose <b style="color:var(--txt)">Photo Library</b> or <b style="color:var(--txt)">Take Photo</b>. One tap more, but it hands the photo over as-is instead of asking Safari to convert it first, which is what used to hang on a spinning circle.
+        <br>If a camera photo still sticks, <i>Settings \u2192 Camera \u2192 Formats \u2192 <b style="color:var(--txt)">Most Compatible</b></i> makes the iPhone record JPEG instead of HEIC and avoids it entirely.
       </div>`:''}
       <details style="margin-top:8px">
         <summary class="clienttag" style="cursor:pointer">Photo picker not responding? Paste instead</summary>
