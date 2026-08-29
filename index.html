@@ -4414,9 +4414,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 02:34 UTC';
+const BUILD='2026-08-29 02:50 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   'Marking a coach as paid was buried in Finance behind the Coach comparison, which only appears in the All-coaches view. The <b>Coaches</b> tab now carries a <b>You owe</b> column and a <b>\ud83d\udcb5 Payouts</b> button on every row, and the dialog opens with <b>You owe / Already paid / Earned</b> before the line-by-line list. Paying people is a job you start from the list of people.',
+   'The coach&rsquo;s schedule no longer shows client money. The <b>Payment</b> and <b>Price</b> columns are gone, along with the <i>$35 to 1</i> payout tag and the event&rsquo;s takings and owed figures. A coach is paid a flat rate for the job \u2014 showing what the client was charged beside it invites exactly the wrong comparison. Their own pay is on the <b>My Earnings</b> page, where it belongs.',
    '<b>Coach pay is now a rate for the job, set per coach.</b> It used to be a share of whatever the client was charged, so a coach\u2019s pay moved with the price and with how much had been collected. Each coach now has a grid on their page: a figure per session type per number of players \u2014 <b>1:1 $30, 1:2 $30, 1:3 $35, 1:4 $40</b> by default, and any cell can be overridden for that coach. Blank falls back to the default, then to the nearest smaller group size that is set, so it never invents a rate above what was agreed.',
    '<b>Pay is earned when the session is completed, not when the client pays.</b> Chasing a client is the business&rsquo;s job; the coach did the work. A coach who had taught four sessions could previously see nothing owed because none of the clients had settled up.',
    'Because of that, the owner now records handing the money over: every payout line has a <b>Mark paid</b> button (and an undo). Settlement is kept in settings rather than on the expense, because the expense rows are derived and rebuilt on every save \u2014 a flag there would be wiped.',
@@ -4740,8 +4742,11 @@ function refundPill(s){
     ? '<span class="pill red" title="Collected in cash before this was cancelled">↩ '+money(s.paidWas)+' to refund</span>' : '';
 }
 function typePill(s){
-  if(s.status==='cancelled')return '<span class="pill">'+typeShort(s.type)+'</span>'+refundPill(s);
-  if(hasCustomPayouts(s))return '<span class="pill orange">'+typeShort(s.type)+' ('+(s.customerIds||[]).length+')</span>'+payoutPill(s);
+  /* payoutPill and refundPill are owner information: what was paid out, what needs refunding.
+     A coach's schedule shows what they are teaching, not the money behind it. */
+  const owner=AUTH!=='coach';
+  if(s.status==='cancelled')return '<span class="pill">'+typeShort(s.type)+'</span>'+(owner?refundPill(s):'');
+  if(hasCustomPayouts(s))return '<span class="pill orange">'+typeShort(s.type)+' ('+(s.customerIds||[]).length+')</span>'+(owner?payoutPill(s):'');
   if(s.type==='1on1')return '<span class="pill blue">1:1</span>';
   const n=(s.customerIds||[]).length;
   if(typeIsDedicated(s.type))return '<span class="pill green">'+typeIcon(s.type)+' '+typeShort(s.type)+' ('+n+')</span>';
@@ -4789,6 +4794,9 @@ function renderBookingOwner(){
 function renderBookingTable(){
   const now=todayISO();
   const showCoach=AUTH==='owner';
+  // Client payments and session prices are the owner's business; a coach is paid a flat rate and
+  // sees that on their Earnings page. Showing both invited the wrong comparison.
+  const showMoney=AUTH!=='coach';
   let list = sortSessions(DB.sessions.filter(s=>inScope(s.coachId)));
   if(bkChartFilter) list=list.filter(s=>periodKey(s.date,bkChartFilter.period).key===bkChartFilter.key);
   if(bookFilter==='upcoming') list=list.filter(s=>s.date>=now && s.status!=='cancelled' && s.status!=='completed');
@@ -4802,11 +4810,12 @@ function renderBookingTable(){
       s.status==='pending'?'<span class="pill yellow">Pending</span>':'<span class="pill blue">Scheduled</span>';
     const checkCell = s.checkedIn?'<span class="pill green">✓ In</span>':
       (s.date<=now && s.status!=='cancelled'?`<button class="iconbtn" onclick="ownerCheckIn('${s.id}')">Check in</button>`:'<span class="pill">—</span>');
-    let payCell;
+    let payCell='';   // only built when showMoney — see below
     /* Cancelled wins over everything. markCancelled() clears the flags going forward, but rows
        cancelled before that shipped still carry paid=true — deriving the cell from status fixes
        the history too, with no migration. */
-    if(s.status==='cancelled'){
+    if(!showMoney){ payCell=''; }
+    else if(s.status==='cancelled'){
       payCell=(s.paidWas>0)
         ? '<span class="pill red">↩ '+money(s.paidWas)+' to refund</span>'
         : '<span class="pill">—</span>';
@@ -4835,8 +4844,7 @@ function renderBookingTable(){
       ${showCoach?`<td>${coachIcon(s.coachId)} ${coachName(s.coachId)}</td>`:''}
       <td>${statusPill}</td>
       <td>${checkCell}</td>
-      <td>${payCell}</td>
-      <td class="right">${priceLabel(s)}</td>
+      ${showMoney?`<td>${payCell}</td><td class="right">${priceLabel(s)}</td>`:''}
       <td class="right"><div class="actions">${actionCell}</div></td>
     </tr>`});
   });
@@ -4864,10 +4872,10 @@ function renderBookingTable(){
       ${showCoach?`<td>${eventCoachHtml(ev)||'<span class="muted">—</span>'}</td>`:''}
       <td><span class="pill ${eventUpcoming(ev)?'blue':'green'}">${eventUpcoming(ev)?'Event · upcoming':'Event · done'}</span></td>
       <td><span class="pill">—</span></td>
-      <td>${ev.price
+      ${showMoney?`<td>${ev.price
         ? `<span class="pill ${owed>0?'yellow':'green'}">${money(eventRevenue(ev))} in</span>${owed>0?`<div class="clienttag" style="color:var(--red)">${money(owed)} owed</div>`:''}`
         : '<span class="pill">Free</span>'}</td>
-      <td class="right">${ev.price?money(ev.price):'Free'}${eventPayoutTotal(ev)>0?`<div class="clienttag">less ${money(eventPayoutTotal(ev))} pay</div>`:''}</td>
+      <td class="right">${ev.price?money(ev.price):'Free'}${eventPayoutTotal(ev)>0?`<div class="clienttag">less ${money(eventPayoutTotal(ev))} pay</div>`:''}</td>`:''}
       <td class="right"><div class="actions"><button class="btn sm ghost" onclick="viewEventRegs('${ev.id}')">Open</button></div></td>
     </tr>`});
   });
@@ -4882,8 +4890,8 @@ function renderBookingTable(){
     </div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
       <table>
-        <thead><tr><th>When</th><th>Client(s)</th>${showCoach?'<th>Coach</th>':''}<th>Status</th><th>Check-in</th><th>Payment</th><th class="right">Price</th><th></th></tr></thead>
-        <tbody>${rowsHtml||`<tr><td colspan="${showCoach?8:7}"><div class="empty">Nothing in this view.</div></td></tr>`}</tbody>
+        <thead><tr><th>When</th><th>Client(s)</th>${showCoach?'<th>Coach</th>':''}<th>Status</th><th>Check-in</th>${showMoney?'<th>Payment</th><th class="right">Price</th>':''}<th></th></tr></thead>
+        <tbody>${rowsHtml||`<tr><td colspan="${(showCoach?4:3)+(showMoney?4:2)}"><div class="empty">Nothing in this view.</div></td></tr>`}</tbody>
       </table>
     </div>`;
 }
@@ -6907,6 +6915,7 @@ const COACH_COLS=[
   {id:'completed',label:'Completed',num:true,get:c=>coachStats(c.id).done},
   {id:'sessions',label:'Sessions',num:true,get:c=>coachStats(c.id).total},
   {id:'cancels',label:'Cancels',num:true,get:c=>coachCancelCount(c.id)},
+  {id:'owed',label:'You owe',num:true,get:c=>coachOwedTotal(c.id)},
   {id:'joined',label:'Joined',get:c=>c.created||''}
 ];
 function sortRows(arr,cols,st){const col=cols.find(c=>c.id===st.col)||cols[0];const dir=st.dir==='desc'?-1:1;return arr.slice().sort((a,b)=>{const x=col.get(a),y=col.get(b);if(col.num)return ((+x||0)-(+y||0))*dir;return String(x).toLowerCase().localeCompare(String(y).toLowerCase())*dir;});}
@@ -7255,13 +7264,19 @@ function renderCoaches(){
       <td>${st.done}<div class="clienttag">completed</div></td>
       <td>${st.total}<div class="clienttag">${st.up} upcoming</div></td>
       <td>${cancelBadge(coachCancelCount(c.id))}<div class="clienttag">cancels</div></td>
+      <td>${(()=>{const owed=coachOwedTotal(c.id),paid=coachPaidTotal(c.id);
+        if(owed<=0&&paid<=0)return '<span class="muted">—</span>';
+        return owed>0
+          ? `<b style="color:var(--red)">${money(owed)}</b><div class="clienttag">${money(paid)} paid</div>`
+          : `<span class="pill green">settled</span><div class="clienttag">${money(paid)} paid</div>`;})()}</td>
       <td>${c.created?fmtDate(c.created):'<span class="muted">—</span>'}</td>
       <td class="right"><div class="actions">
         ${c.pending?`<button class="btn sm" onclick="openCoach('${c.id}')">Review</button>`:''}
+        <button class="btn sm ghost" title="Every payout, and mark what you have handed over" onclick="openCoachPayouts('${c.id}')">💵 Payouts</button>
         <button class="iconbtn" title="Manage this coach" onclick="setMgCoach('${c.id}');flash('Now managing ${c.name.replace(/'/g,'')}')">Manage</button>
         <button class="iconbtn" onclick="openCoach('${c.id}')">Edit</button>
       </div></td></tr>`;
-  }).join('')||'<tr><td colspan="10"><div class="empty">No coaches yet — add your first coach.</div></td></tr>';
+  }).join('')||'<tr><td colspan="11"><div class="empty">No coaches yet — add your first coach.</div></td></tr>';
   $('#view-coaches').innerHTML=`
     <h1 class="page">Coaches</h1>
     <div class="sub">Every coach's profile, rates, sign-in and status. Use <b>Manage</b> (or the selector top-right) to work inside one coach's Booking, Availability and Finance. ${pendCount?`<span class="pill yellow" style="margin-left:6px">⏳ ${pendCount} awaiting approval</span>`:''}</div>
@@ -9176,7 +9191,13 @@ function coachPayoutTableHtml(coachId,opts){
   <p class="muted small" style="margin-top:8px">Pay is earned the moment a session or event is marked <b>completed</b>${mine?'':' — whether or not the client has paid'}.</p>`;
 }
 function openCoachPayouts(coachId){
-  openModal(coachName(coachId)+' — payout history',coachPayoutTableHtml(coachId),
+  const owed=coachOwedTotal(coachId);
+  openModal(coachName(coachId)+' — payouts',
+    `<div class="stats" style="margin-bottom:12px">
+      <div class="stat"><div class="k">You owe</div><div class="v" style="color:${owed>0?'var(--red)':'var(--green)'}">${money(owed)}</div><div class="d muted">${owed>0?'not handed over yet':'all settled'}</div></div>
+      <div class="stat"><div class="k">Already paid</div><div class="v">${money(coachPaidTotal(coachId))}</div><div class="d muted">ticked off below</div></div>
+      <div class="stat"><div class="k">Earned</div><div class="v">${money(coachPayoutTotal(coachId))}</div><div class="d muted">all completed work</div></div>
+    </div>`+coachPayoutTableHtml(coachId),
     `<button class="btn" onclick="closeModal()">Close</button>`,{full:AUTH==='owner'});
 }
 /* ---- Unpaid family time: people, rates, and the log ---------------------- */
