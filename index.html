@@ -4421,9 +4421,10 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 02:58 UTC';
+const BUILD='2026-08-29 03:28 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Fixed: tapping a name in the P&amp;L breakdown jumped to the top of the page instead of opening the detail.</b> The click handler is JavaScript written into an HTML attribute, and the name was quoted with double quotes \u2014 which closed the attribute early and left the rest of the call as stray markup. The handler never ran, so the click fell through to the link and scrolled the page. Names are now escaped for the attribute, so <b>By person</b> and <b>By category</b> open their entries as intended \u2014 including names with quotes or apostrophes.',
    '<b>Fixed: marking a payout as paid did not update the You owe column.</b> The dialog repainted but the page behind it did not, so the Coaches table kept the old figure until you changed tab \u2014 it looked as though the tick had done nothing. Both now refresh together.',
    '<b>Fixed: old payout amounts lingered after the pay model changed.</b> Derived expenses are recomputed inside <span class="mono">save()</span>, so a device that only ever loaded kept whatever the cloud held \u2014 which after the switch to a flat rate meant the old share-of-the-price figures, complete with odd cents. They are now recomputed when data arrives as well as when it is saved.',
    'Settling a payout writes to <span class="mono">settings.payouts_settled</span>. If that column has not been created yet the save fails and the tick would be lost on the next refresh, so the app now refuses up front and tells you to run the SQL \u2014 silently losing a record of money changing hands is the worst possible outcome.',
@@ -9092,8 +9093,12 @@ function plGroup(lines,dim){
 }
 function plBarRows(rows,total){
   if(!rows.length)return '<tr><td colspan="3"><div class="empty">Nothing in this period.</div></td></tr>';
-  return rows.map(r=>`<tr${r.onclick?` style="cursor:pointer" onclick="${r.onclick}"`:''}>
-    <td><b>${r.onclick?`<a href="#" onclick="event.preventDefault();${r.onclick}">${r.k}</a>`:r.k}</b></td>
+  /* The handler is JS being written into an HTML attribute, so it has to be escaped for HTML —
+     JSON.stringify gives it double quotes, which closed the attribute early and left the whole
+     call as stray markup. The click then fell through to href="#" and jumped the page to the top,
+     which read as "it went back to the P&L page". */
+  return rows.map(r=>`<tr${r.onclick?` style="cursor:pointer" onclick="${attrEsc(r.onclick)}"`:''}>
+    <td><b>${r.onclick?`<a href="#" onclick="${attrEsc('event.preventDefault();event.stopPropagation();'+r.onclick)}">${escapeHtml(r.k)}</a>`:escapeHtml(r.k)}</b></td>
     <td style="min-width:130px"><div class="bar"><i style="width:${total?Math.max(2,r.v/total*100):0}%"></i></div></td>
     <td class="right"><b>${money(r.v)}</b><div class="clienttag">${total?(r.v/total*100).toFixed(1):0}%</div></td></tr>`).join('');
 }
