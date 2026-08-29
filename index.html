@@ -4430,9 +4430,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 04:56 UTC';
+const BUILD='2026-08-29 15:22 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Fixed: a session that already ran this morning was still advertised as coming up.</b> Both the events ticker and the group join list compared <i>dates</i> only, so anything earlier today still counted as upcoming \u2014 a 9am class was still being offered at 11am. Starring an event made it worse: featured events were deliberately exempt from the start time, which was meant to protect a to-be-confirmed date and instead stopped the clock entirely.',
+   'Featured now means shown more prominently and tolerant of a TBC date \u2014 it no longer ignores the time. An event or group with no time set still runs all day, which is the leniency that was actually wanted.',
    '<b>Fixed: a recurring expense lost its description on every occurrence but the first.</b> Two $25 rows for the same Supabase subscription read differently \u2014 one said <i>Supabase database pro-plan</i>, the other just <i>Fixed / overhead</i>. The expense list dropped the note and then tried to find it again by matching on date, which cannot work for a monthly charge: only the first occurrence carries the date the row was actually saved with. The note travels with each occurrence now.',
    'Every row in the P&amp;L expense panels now opens the entries behind it \u2014 <b>Where the money went</b> and <b>By category</b>, not just <b>By person</b>. Each list shows the date, category, who it was for, the note explaining the figure, and a total. One function serves all three slices, so a list can never disagree with the bar above it.',
    'While there: the <i>Session coach pay</i> description still said \u201ceach coach\u2019s share of what their sessions collected\u201d, which stopped being true when pay became a flat agreed rate. It now reads <b>the agreed rate for each session a coach ran</b>.',
@@ -5339,10 +5341,21 @@ function groupSpots(s){return Math.max(0,typeMax(s.type)-(s.customerIds||[]).len
    players to be worth running — and using it as the join signal made a group of 2 look closed
    when it still had two seats. Every surface (client list, call to action, home ticker) now
    asks this one function. */
+/* Has this session not started yet? Same shape as eventUpcoming: a date-only comparison counts a
+   9am session as "today" all day, which kept a finished morning group on the join list. */
+function sessionUpcoming(s){
+  if(!s||!s.date)return false;
+  const today=todayISO();
+  if(s.date>today)return true;
+  if(s.date<today)return false;
+  if(!s.time)return true;                       // no time set — leave it up for the day
+  const n=nowBoston(), [h,m]=s.time.split(':').map(Number);
+  return (h*60+(m||0)) >= (n.getHours()*60+n.getMinutes());
+}
 function groupJoinable(s){
   return !!s && s.type==='group' &&
     (s.status==='pending'||s.status==='scheduled') &&
-    (s.date||'')>=todayISO() && groupSpots(s)>0;
+    sessionUpcoming(s) && groupSpots(s)>0;
 }
 /* The pill every screen shows, so the wording can never disagree between them. */
 function groupStateLabel(s){
@@ -8478,9 +8491,13 @@ function eventCoachNames(ev){
    the stricter time-aware test, so an ordinary 9am event doesn't advertise itself at 8pm. */
 function eventAdvertisable(ev){
   if(!ev||ev.active===false)return false;
-  if(!ev.featured)return eventUpcoming(ev);
   if(!ev.date)return true;                     // date TBC — keep advertising it
-  return ev.date>=todayISO();                  // date only: ignore the start time
+  /* Starring an event used to make it ignore the start time, so a 9am class was still being
+     advertised as "coming up" at 11am. Featured now only means it is shown more prominently and
+     that a to-be-confirmed date is tolerated — it does not stop the clock. eventUpcoming() already
+     treats a dateless TIME as lasting the whole day, which is the leniency that was actually
+     wanted. */
+  return eventUpcoming(ev);
 }
 /* Sort order for every event list: soonest first, still-to-be-confirmed last.
    Undated events used to sort to the TOP, because an empty date string compares below every real
