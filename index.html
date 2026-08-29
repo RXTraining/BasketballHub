@@ -4430,9 +4430,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 15:31 UTC';
+const BUILD='2026-08-29 16:23 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Fixed: photos picked on an iPhone were silently rejected.</b> iOS hands back an <b>empty file type</b> for anything chosen through the Files app or iCloud Photos, and the uploader decided photo-versus-video from that field alone \u2014 so those files failed the check and were dropped. It now falls back to the file extension, so a <span class="mono">.HEIC</span> or <span class="mono">.MOV</span> with no declared type uploads correctly.',
+   '<b>And it now tells you what happened.</b> Failures were reported only by a flash message, which is gone in three seconds and easy to miss on a phone \u2014 hence \u201cI selected my photos and nothing happened\u201d. Each file now leaves a line under the upload button (uploading \u2026 / \u2713 uploaded as a draft / \u2715 with the actual reason), and if nothing at all got through you get a dialog rather than a vanished toast.',
    '<b>Finance now shows what the business owes its coaches</b>, beside what clients owe the business \u2014 the two are mirror images and only one of them was on the dashboard. Tap the card for a per-coach breakdown of still-owed and already-paid, with a link straight to each coach&rsquo;s payout list.',
    '<b>Fixed: a session that already ran this morning was still advertised as coming up.</b> Both the events ticker and the group join list compared <i>dates</i> only, so anything earlier today still counted as upcoming \u2014 a 9am class was still being offered at 11am. Starring an event made it worse: featured events were deliberately exempt from the start time, which was meant to protect a to-be-confirmed date and instead stopped the clock entirely.',
    'Featured now means shown more prominently and tolerant of a TBC date \u2014 it no longer ignores the time. An event or group with no time set still runs all day, which is the leniency that was actually wanted.',
@@ -6487,6 +6489,42 @@ function videoHtml(url,width){
     : `<video src="${e.src}" controls playsinline preload="metadata" style="display:block;width:${w};max-width:100%;max-height:70vh;height:auto;border-radius:10px;margin:6px auto 0;background:#000"></video>`;
 }
 // Downscale + re-encode a photo before upload to cut storage & (repeated) view egress.
+/* ---- Working out what a file actually is -----------------------------------
+   iOS hands back an EMPTY f.type for anything picked through the Files app or iCloud Photos, and
+   sometimes for HEIC straight from the camera roll. Both upload paths decided image-vs-video from
+   f.type alone, so those files were rejected as "not a photo or video" — and the only complaint
+   was a flash message that is gone in three seconds on a phone. Fall back to the extension. */
+const IMG_EXT=/\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?)$/i;
+const VID_EXT=/\.(mp4|mov|m4v|webm|avi|mkv|hevc|3gp|qt)$/i;
+function fileKind(f){
+  const t=(f&&f.type||'').toLowerCase();
+  if(t.indexOf('image')===0)return 'image';
+  if(t.indexOf('video')===0)return 'video';
+  const n=(f&&f.name)||'';
+  if(IMG_EXT.test(n))return 'image';
+  if(VID_EXT.test(n))return 'video';
+  return '';
+}
+function fileMime(f,kind){
+  const t=(f&&f.type||'').trim();
+  if(t)return t;
+  const n=((f&&f.name)||'').toLowerCase();
+  if(kind==='image')return /\.png$/.test(n)?'image/png':/\.(heic|heif)$/.test(n)?'image/heic':'image/jpeg';
+  if(kind==='video')return /\.(mov|qt)$/.test(n)?'video/quicktime':'video/mp4';
+  return 'application/octet-stream';
+}
+/* A phone toast is not a receipt. Every upload leaves a line on screen saying what happened to it,
+   so "I selected six photos" can be checked against six results. */
+function upLog(html){
+  const box=$('#upLog'); if(!box)return;
+  box.style.display='';
+  box.insertAdjacentHTML('beforeend','<div style="padding:3px 0">'+html+'</div>');
+}
+function upLogReset(n){
+  const box=$('#upLog'); if(!box)return;
+  box.innerHTML='<b class="small">Upload — '+n+' file'+(n===1?'':'s')+' selected</b>';
+  box.style.display='';
+}
 async function compressImage(file,maxDim=1600,quality=0.8){
   try{
     const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(file);});
@@ -6516,7 +6554,11 @@ async function addMediaFiles(input){
   for(const f of files){
     mediaBusy++; renderMediaPrev();
     try{
-    const type=f.type.indexOf('video')===0?'video':'image';
+    const kind=fileKind(f);
+    if(!kind){ flash((f.name||'That file')+' was not recognised as a photo or video',true);
+      alert((f.name||'That file')+' could not be attached — the phone did not say what kind of file it is.\n\nTry picking it from Photos rather than Files, or export it as JPG or MP4 first.');
+      continue; }
+    const type=kind;
     if(type==='video' && f.size>MAX_VIDEO_MB*1024*1024){
       // A flash alone is too easy to miss — the coach walks away believing the video attached.
       // Block with a dialog so a rejected file is never mistaken for a saved one.
@@ -6526,7 +6568,7 @@ async function addMediaFiles(input){
     }
     if(type==='image' && f.size>MAX_IMAGE_MB*1024*1024){flash(f.name+' is too large (max '+MAX_IMAGE_MB+'MB)',true);continue;}
     // compress photos; leave videos as-is (can't transcode in-browser)
-    let upFile=f, upType=f.type, upName=f.name||'file';
+    let upFile=f, upType=fileMime(f,kind), upName=f.name||(kind==='image'?'photo.jpg':'clip.mp4');
     if(type==='image'){const c=await compressImage(f);if(c){upFile=c;upType='image/jpeg';upName=(f.name||'photo').replace(/\.[^.]+$/,'')+'.jpg';}}
     // folder = client NAME (clear structure in R2/Storage), resolved from the selected/session client
     const cbId=$$('.sCustCb').filter(cb=>cb.checked).map(cb=>cb.value)[0];
@@ -10303,6 +10345,7 @@ function renderAdmin(){
         <label class="btn ghost sm" style="cursor:pointer">⬆ Upload photo or video<input type="file" accept="image/*,video/*" multiple style="display:none" onchange="uploadHighlightVideo(this)"></label>
         <button class="btn sm" onclick="addHighlight()">+ Add highlight</button>
       </div>
+      <div id="upLog" class="clienttag" style="display:none;margin-top:8px;padding:8px 10px;background:var(--panel2);border-radius:8px;font-size:12.5px"></div>
       <div id="hiPrev" style="margin-top:10px"></div>
     </div>
     <div class="panel" style="margin-top:16px">
@@ -10421,10 +10464,17 @@ async function uploadHighlightVideo(input){
   const date=$('#nhDate')&&$('#nhDate').value||todayISO();
   const upSport=($('#nhSport')&&$('#nhSport').value)||hlSportOptions()[0]||'';
   const baseTitle=($('#nhTitle')&&$('#nhTitle').value||'').trim();
-  let added=0;
+  let added=0, failed=0;
+  upLogReset(files.length);
   for(const f of files){
-    const isImg=f.type.indexOf('image')===0;
-    if(!isImg&&f.type.indexOf('video')!==0){flash(f.name+' is not a photo or video',true);continue;}
+    const kind=fileKind(f);
+    const isImg=kind==='image';
+    if(!kind){
+      failed++;
+      upLog('<span style="color:var(--red)">\u2715 '+escapeHtml(f.name||'file')+'</span> — not recognised as a photo or video'
+        +(f.type?'':' (the phone gave no file type)'));
+      continue;
+    }
     if(!isImg&&f.size>MAX_VIDEO_MB*1024*1024){
       flash(f.name+' is '+Math.round(f.size/1048576)+'MB — over the '+MAX_VIDEO_MB+'MB limit. Trim it or paste a YouTube link.',true);continue;}
     // iPhone records HEVC/H.265 in .mov by default. Chrome and Firefox can play its AUDIO but
@@ -10436,29 +10486,44 @@ async function uploadHighlightVideo(input){
          'Recommended: on iPhone go to Settings → Camera → Formats → "Most Compatible" and '+
          're-record, or export/convert to MP4 (H.264) first.\n\nUpload it anyway?'))continue;
     }
-    let up=f, ctype=f.type, name=f.name||(isImg?'photo.jpg':'clip.mp4');
+    let up=f, ctype=fileMime(f,kind), name=f.name||(isImg?'photo.jpg':'clip.mp4');
     if(isImg){const c=await compressImage(f,1800,0.86); if(c){up=c;ctype='image/jpeg';name=name.replace(/\.[^.]+$/,'')+'.jpg';}}
     flash('Uploading '+name+'…');
+    upLog('\u2191 '+escapeHtml(name)+' — uploading '+Math.max(1,Math.round(up.size/1048576))+'MB\u2026');
     try{
       let url='';
       if(useR2()){
         const r=await fetch(R2_ENDPOINT,{method:'POST',headers:{'content-type':ctype,'x-upload-token':R2_TOKEN,'x-file-name':name,'x-customer-id':'highlights'},body:up});
-        const j=await r.json(); if(!r.ok||!j.url){flash('Upload failed: '+((j&&j.error)||r.status),true);continue;} url=j.url;
+        let j={}; try{ j=await r.json(); }catch(e){}
+        if(!r.ok||!j.url){ failed++;
+          upLog('<span style="color:var(--red)">\u2715 '+escapeHtml(name)+'</span> — server said: '+escapeHtml(String((j&&j.error)||('HTTP '+r.status))));
+          flash('Upload failed: '+((j&&j.error)||r.status),true); continue; }
+        url=j.url;
       }else if(supa&&SUPA_OK){
         const path='media/highlights/'+uid()+'-'+name.replace(/[^a-zA-Z0-9._-]/g,'_');
         const u=await supa.storage.from(MEDIA_BUCKET).upload(path,up,{upsert:true,contentType:ctype});
-        if(u.error){flash('Upload failed: '+u.error.message,true);continue;}
+        if(u.error){ failed++;
+          upLog('<span style="color:var(--red)">\u2715 '+escapeHtml(name)+'</span> — '+escapeHtml(u.error.message));
+          flash('Upload failed: '+u.error.message,true); continue; }
         url=supa.storage.from(MEDIA_BUCKET).getPublicUrl(path).data.publicUrl;
-      }else{return flash('Connect Supabase or R2 to upload media',true);}
+      }else{ upLog('<span style="color:var(--red)">\u2715 No storage connected</span> — set up R2 or Supabase first');
+        return flash('Connect Supabase or R2 to upload media',true);}
       if(!DB.highlights)DB.highlights=[];
       // uploads start as DRAFTS — nothing reaches the public page until it's published
       const ord=(DB.highlights||[]).reduce((m,x)=>Math.max(m,x.ord||0),0)+1;
       DB.highlights.push({id:uid(),url,date,sport:upSport,active:false,type:isImg?'image':'video',ord,
         title:baseTitle||name.replace(/\.[^.]+$/,'')});
       added++;
-    }catch(e){flash('Upload failed: '+e.message,true);}
+      upLog('<span style="color:var(--green)">\u2713 '+escapeHtml(name)+'</span> — uploaded as a draft');
+    }catch(e){ failed++;
+      upLog('<span style="color:var(--red)">\u2715 '+escapeHtml(name)+'</span> — '+escapeHtml(e.message||'upload failed'));
+      flash('Upload failed: '+e.message,true);}
   }
-  if(added){ save(); flash(added+' item'+(added>1?'s':'')+' uploaded as DRAFT — press Publish to show on the home page'); renderAdmin(); }
+  if(added){ save(); flash(added+' item'+(added>1?'s':'')+' uploaded as DRAFT — press Publish to show on the home page'); }
+  /* Nothing got through, so say so loudly. A toast that has already faded is why "I selected my
+     photos and nothing happened" was the whole of the feedback. */
+  if(!added&&failed)alert('None of the '+failed+' selected file'+(failed===1?'':'s')+' uploaded.\n\nThe reason for each is listed under the upload button.');
+  if(added)renderAdmin();
 }
 
 /* ============================================================================
