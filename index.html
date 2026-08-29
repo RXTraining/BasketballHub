@@ -4421,9 +4421,10 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 03:28 UTC';
+const BUILD='2026-08-29 03:50 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Revenue rows now open their detail, like the expense ones.</b> Tap any bar under <b>Where the revenue came from</b> \u2014 on any of Sport, Session type, Coach, Client or Source \u2014 and every entry behind it is listed: date, where the money came from, which family, which session type and the amount, with a total. The grouping and the detail share one key function, so a bar and its list can never disagree.',
    '<b>Fixed: tapping a name in the P&amp;L breakdown jumped to the top of the page instead of opening the detail.</b> The click handler is JavaScript written into an HTML attribute, and the name was quoted with double quotes \u2014 which closed the attribute early and left the rest of the call as stray markup. The handler never ran, so the click fell through to the link and scrolled the page. Names are now escaped for the attribute, so <b>By person</b> and <b>By category</b> open their entries as intended \u2014 including names with quotes or apostrophes.',
    '<b>Fixed: marking a payout as paid did not update the You owe column.</b> The dialog repainted but the page behind it did not, so the Coaches table kept the old figure until you changed tab \u2014 it looked as though the tick had done nothing. Both now refresh together.',
    '<b>Fixed: old payout amounts lingered after the pay model changed.</b> Derived expenses are recomputed inside <span class="mono">save()</span>, so a device that only ever loaded kept whatever the cloud held \u2014 which after the switch to a flat rate meant the old share-of-the-price figures, complete with odd cents. They are now recomputed when data arrives as well as when it is saved.',
@@ -9083,13 +9084,46 @@ let plRange=6, plDim='sport';
 function setPlRange(n){ plRange=n; renderPL(); }
 function setPlDim(d){ plDim=d; renderPL(); }
 const PL_DIMS=[['sport','Sport'],['type','Session type'],['coach','Coach'],['client','Client'],['src','Source']];
+function plKeyOf(r,dim){
+  return dim==='coach'?(r.coachId?coachName(r.coachId):'— unassigned')
+       :dim==='client'?(r.custId&&custById(r.custId)?custById(r.custId).name:'— walk-in')
+       :dim==='type'?r.type : dim==='src'?r.src : (r.sport||'—');
+}
 function plGroup(lines,dim){
-  const key=r=>dim==='coach'?(r.coachId?coachName(r.coachId):'— unassigned')
-            :dim==='client'?(r.custId&&custById(r.custId)?custById(r.custId).name:'— walk-in')
-            :dim==='type'?r.type : dim==='src'?r.src : (r.sport||'—');
   const m={};
-  lines.forEach(r=>{ const k=key(r); m[k]=(m[k]||0)+r.amount; });
-  return Object.keys(m).map(k=>({k,v:m[k]})).sort((a,b)=>b.v-a.v);
+  lines.forEach(r=>{ const k=plKeyOf(r,dim); m[k]=(m[k]||0)+r.amount; });
+  // Same key function feeds the drill-down, so a row and its detail can never disagree.
+  return Object.keys(m).map(k=>({k,v:m[k],
+    onclick:'showRevenueDetail('+JSON.stringify(dim)+','+JSON.stringify(k)+')'}))
+    .sort((a,b)=>b.v-a.v);
+}
+/* Every line behind one bar. "Why is Group $955 when a place costs $20?" should be answerable on
+   screen — the answer is usually a package sold for a round sum, or a session priced by the hour
+   rather than by the head, and only the individual entries show that. */
+function showRevenueDetail(dim,key){
+  const months=plMonths(plRange), from=months[0], to=months[months.length-1];
+  const rows=plRevenueLines()
+    .filter(r=>{const k=(r.date||'').slice(0,7); return k>=from&&k<=to;})
+    .filter(r=>inScope(r.coachId))
+    .filter(r=>plKeyOf(r,dim)===key)
+    .sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const total=rows.reduce((a,r)=>a+r.amount,0);
+  const label=(PL_DIMS.find(x=>x[0]===dim)||['','' ])[1];
+  openModal(label+': '+key+' — '+money(total),
+    `<div class="sub" style="margin-bottom:8px">${rows.length} entr${rows.length===1?'y':'ies'} between ${plMonthLabel(from)} and ${plMonthLabel(to)}.</div>
+     <table><thead><tr><th>Date</th><th>Source</th><th>Who</th><th>Session type</th><th class="right">Amount</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr><td>${fmtDate(r.date)}</td>
+        <td>${escapeHtml(r.src||'—')}</td>
+        <td>${escapeHtml(r.custId&&custById(r.custId)?custById(r.custId).name:'— walk-in')}
+          ${r.coachId?`<div class="clienttag">${escapeHtml(coachName(r.coachId))}</div>`:''}</td>
+        <td>${escapeHtml(r.type||'—')}</td>
+        <td class="right">${money(r.amount)}</td></tr>`).join('')
+        ||'<tr><td colspan="5"><div class="empty">Nothing in this period.</div></td></tr>'}
+      <tr style="border-top:2px solid var(--line)"><td><b>Total</b></td><td></td><td></td><td></td>
+        <td class="right"><b>${money(total)}</b></td></tr>
+     </tbody></table>
+     <p class="muted small" style="margin-top:8px">Revenue is counted when the money arrives: a package on the day it is sold, a session when it is paid, an event ticket when the registration is marked paid.</p>`,
+    `<button class="btn" onclick="closeModal()">Close</button>`,{full:AUTH==='owner'});
 }
 function plBarRows(rows,total){
   if(!rows.length)return '<tr><td colspan="3"><div class="empty">Nothing in this period.</div></td></tr>';
