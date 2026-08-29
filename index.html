@@ -4411,9 +4411,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 01:14 UTC';
+const BUILD='2026-08-29 01:27 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Revenue by session type now accounts for every dollar collected.</b> Revenue has four sources \u2014 session payments, packages, manually entered cash, and event tickets \u2014 and this panel only ever counted the first two. The other two landed in <i>Revenue (collected)</i> with no row to appear in, so the breakdown came up short with no way to see where the difference had gone. Manual cash is now attributed to its session type, or listed as <b>Other cash</b> if it has none, and event takings get their own <b>Events</b> row.',
+   'The panel also carries a <b>Total</b> and, if that total ever fails to match the Revenue card, says so in red rather than quietly disagreeing. A breakdown that does not add up to the headline figure is worse than no breakdown \u2014 it makes you doubt both numbers.',
    '<b>Fixed: money was rounded to whole dollars, so columns stopped adding up.</b> A 15% cut of $35 is <b>$29.75</b>, which displayed as \u201c$30\u201d \u2014 four of those looked like $120 against a real $119, and an expense list showing five \u201c$30\u201d rows totalled $149. Cents are now shown when there are cents; whole amounts still read as <i>$35</i>, so nothing gains noise it did not have.',
    '<b>Fixed: Revenue by session type only listed 1:1 and Group.</b> It was written before the weekend classes existed, so money taken for a Weekend Open Run or Running/Conditioning counted towards <i>Revenue (collected)</i> but was missing from the breakdown \u2014 the two figures disagreed by exactly the weekend takings. Every type that earned anything is now listed, with a <b>Total</b> row so the two can be checked against each other at a glance.',
    '<b>Fixed: hand-set coach payouts were not removed when a session stopped being delivered.</b> Un-completing or cancelling a session with per-session payouts left the payout expense standing, so the business kept being charged for work that never happened. The computed payouts were always cleared correctly; only the hand-set ones leaked. Worth re-checking any coach total that looks too high.',
@@ -9221,7 +9223,16 @@ function renderFinance(){
   const byType={}; TYPE_ORDER.forEach(ty=>byType[ty]=0);
   cashSess.forEach(s=>{byType[s.type]=(byType[s.type]||0)+sessionCashAmt(s);});
   allPkgs.forEach(p=>{byType[p.type]=(byType[p.type]||0)+p.amount;});
-  const maxType=Math.max.apply(null,TYPE_ORDER.map(ty=>byType[ty]).concat([1]));
+  /* Revenue has four sources; this panel counted two. Manually entered cash and event tickets
+     both landed in "Revenue (collected)" with no row to appear in, so the breakdown came up short
+     by exactly those amounts and there was no way to see where the difference had gone. */
+  let otherRev=0;
+  CE.forEach(e=>{ const ty=e.type; if(ty&&byType[ty]!=null)byType[ty]+=e.amount; else otherRev+=e.amount; });
+  const revLines=TYPE_ORDER.filter(ty=>byType[ty]>0).map(ty=>({k:typeIcon(ty)+' '+typeLabel(ty),v:byType[ty]}));
+  if(eventInc>0)revLines.push({k:'🎉 '+t('Events'),v:eventInc});
+  if(otherRev>0)revLines.push({k:'💵 '+t('Other cash'),v:otherRev});
+  const revLineTotal=revLines.reduce((a,r)=>a+r.v,0);
+  const maxType=Math.max.apply(null,revLines.map(r=>r.v).concat([1]));
 
   const expRows=EX.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e=>`<tr>
     <td>${fmtDate(e.date)}${(e.freq&&e.freq!=='once')?` <span class="pill blue">↻ ${FREQ_LABEL[e.freq]}</span>`:''}</td><td>${e.coachId==='owner'?'🏢':coachIcon(e.coachId)} ${coachName(e.coachId)}</td><td>${e.cat}${isAutoExpense(e)?' <span class="pill blue">auto</span>':''}</td><td class="muted">${e.note||''}</td>
@@ -9364,14 +9375,15 @@ function renderFinance(){
              the Revenue card but missing from this list — the two figures disagreed by exactly the
              weekend takings. Every type with revenue is listed, and the total is shown so the two
              can be checked against each other at a glance. */''}
-        ${(()=>{const shown=TYPE_ORDER.filter(ty=>byType[ty]>0);
-          const list=shown.length?shown:['1on1','group'];
-          return list.map(ty=>`<div class="barrow"><div class="lab">${typeIcon(ty)} ${typeLabel(ty)}</div>
-            <div class="bar"><i style="width:${maxType?byType[ty]/maxType*100:0}%"></i></div>
-            <div class="val">${money(byType[ty])}</div></div>`).join('');})()}
+        ${revLines.map(r=>`<div class="barrow"><div class="lab">${r.k}</div>
+            <div class="bar"><i style="width:${maxType?r.v/maxType*100:0}%"></i></div>
+            <div class="val">${money(r.v)}</div></div>`).join('')
+          ||'<div class="empty">No revenue in this period.</div>'}
         <div class="barrow" style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px">
           <div class="lab"><b>Total</b></div><div class="bar"></div>
-          <div class="val"><b>${money(TYPE_ORDER.reduce((a,ty)=>a+(byType[ty]||0),0))}</b></div></div>
+          <div class="val"><b>${money(revLineTotal)}</b></div></div>
+        ${Math.abs(revLineTotal-revenue)>0.005?`<div class="clienttag" style="color:var(--red);margin-top:6px">
+          ⚠ ${money(Math.abs(revenue-revLineTotal))} of the ${money(revenue)} collected is not accounted for above — tell Claude.</div>`:''}
         <div class="panel" style="background:var(--panel2);margin-top:16px;padding:14px">
           <div class="clienttag">Prepaid liability (sessions owed)</div>
           <div style="font-size:20px;font-weight:900;margin-top:4px">${remCredits} sessions · ${money(creditValue)}</div>
