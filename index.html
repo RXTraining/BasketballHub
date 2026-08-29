@@ -2334,7 +2334,9 @@ async function pollSync(){
     if(AUTH==='client' && TAB==='booking'){DB=fresh;lastSig=sig;refreshClientStatus();}
     return;                                                    // leave lastSig so we refresh once typing stops
   }
-  DB=fresh; lastSig=sig; refreshOwner();
+  DB=fresh; lastSig=sig;
+  try{resyncAutoExpenses();}catch(e){}      // same reason as bootLoad: keep derived rows current
+  refreshOwner();
 }
 let pollHooked=false, rtChannel=null, rtTimer=null, rtState='';
 /* Supabase Realtime: push updates instantly to every open device */
@@ -2501,7 +2503,12 @@ async function ptrRefresh(){
   try{
     if(supa&&SUPA_OK){
       const fresh=await fetchCloud();
-      if(fresh){ DB=fresh; lastSig=dataSig(fresh); }
+      if(fresh){ DB=fresh; lastSig=dataSig(fresh);
+        /* Derived expenses are recomputed in save(), so a device that only ever LOADS keeps
+           whatever amounts the cloud happens to hold — after the payout model changed, that meant
+           old share-of-the-price figures (with odd cents) lingering until somebody saved. Recompute
+           on arrival; the next save persists it. */
+        try{resyncAutoExpenses();}catch(e){console.warn('resync after load failed',e);} }
     }
   }catch(e){}
   try{
@@ -4414,9 +4421,12 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 02:50 UTC';
+const BUILD='2026-08-29 02:58 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Fixed: marking a payout as paid did not update the You owe column.</b> The dialog repainted but the page behind it did not, so the Coaches table kept the old figure until you changed tab \u2014 it looked as though the tick had done nothing. Both now refresh together.',
+   '<b>Fixed: old payout amounts lingered after the pay model changed.</b> Derived expenses are recomputed inside <span class="mono">save()</span>, so a device that only ever loaded kept whatever the cloud held \u2014 which after the switch to a flat rate meant the old share-of-the-price figures, complete with odd cents. They are now recomputed when data arrives as well as when it is saved.',
+   'Settling a payout writes to <span class="mono">settings.payouts_settled</span>. If that column has not been created yet the save fails and the tick would be lost on the next refresh, so the app now refuses up front and tells you to run the SQL \u2014 silently losing a record of money changing hands is the worst possible outcome.',
    'Marking a coach as paid was buried in Finance behind the Coach comparison, which only appears in the All-coaches view. The <b>Coaches</b> tab now carries a <b>You owe</b> column and a <b>\ud83d\udcb5 Payouts</b> button on every row, and the dialog opens with <b>You owe / Already paid / Earned</b> before the line-by-line list. Paying people is a job you start from the list of people.',
    'The coach&rsquo;s schedule no longer shows client money. The <b>Payment</b> and <b>Price</b> columns are gone, along with the <i>$35 to 1</i> payout tag and the event&rsquo;s takings and owed figures. A coach is paid a flat rate for the job \u2014 showing what the client was charged beside it invites exactly the wrong comparison. Their own pay is on the <b>My Earnings</b> page, where it belongs.',
    '<b>Coach pay is now a rate for the job, set per coach.</b> It used to be a share of whatever the client was charged, so a coach\u2019s pay moved with the price and with how much had been collected. Each coach now has a grid on their page: a figure per session type per number of players \u2014 <b>1:1 $30, 1:2 $30, 1:3 $35, 1:4 $40</b> by default, and any cell can be overridden for that coach. Blank falls back to the default, then to the nearest smaller group size that is set, so it never invents a rate above what was agreed.',
@@ -9150,11 +9160,20 @@ function coachPayoutTotal(coachId){ return coachPayoutRows(coachId).reduce((a,r)
 function settledSet(){ return new Set(DB.settings.payoutsSettled||[]); }
 function isSettled(id){ return settledSet().has(id); }
 function togglePayoutSettled(id,coachId){
+  /* This is stored in settings.payouts_settled. If that column has not been created yet the cloud
+     save fails and the tick is lost on the next refresh — silently, which is the worst way to lose
+     a record of money changing hands. Say so up front. */
+  if(syncFails&&syncFails.settings){
+    return flash('Cannot record this yet — the settings table failed to save. Run supabase-setup.sql, then try again.',true);
+  }
   const set=settledSet();
   if(set.has(id))set.delete(id); else set.add(id);
   DB.settings.payoutsSettled=[...set];
   save();
-  if(AUTH==='owner'&&coachId)openCoachPayouts(coachId); else renderMoney();
+  /* The dialog was repainted but the page behind it was not, so the Coaches table kept showing the
+     old "You owe" until you changed tab — it looked as though marking paid had done nothing. */
+  if(AUTH==='owner'){ refreshOwner(); if(coachId)openCoachPayouts(coachId); }
+  else renderMoney();
 }
 function coachOwedTotal(coachId){
   return coachPayoutRows(coachId).filter(r=>!isSettled(r.id)).reduce((a,r)=>a+r.amount,0);
