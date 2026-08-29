@@ -456,6 +456,10 @@
   .modal.full .body{flex:1;overflow:auto}
   .modal.full .head{position:sticky;top:0;background:var(--panel);z-index:2}
   .modal.full .foot{position:sticky;bottom:0;background:var(--panel)}
+  /* display:none on a file input stops iOS delivering the picked file in some versions. Keep it
+     in the layout but invisible instead. */
+  input[type=file].hidefile{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;
+    clip:rect(0 0 0 0);white-space:nowrap;border:0;padding:0;margin:0}
   .x{background:transparent;border:0;color:var(--muted);font-size:22px;cursor:pointer;line-height:1}
 
   /* Was an orange wash with #d9d9de body text — near-white copy on a near-white panel,
@@ -2322,12 +2326,34 @@ function isTextEntry(ae){
   if(ae.tagName==='INPUT'){const t=(ae.type||'text').toLowerCase();return ['text','password','number','email','search','tel','url'].includes(t);}
   return false;
 }
+/* ---- A file picker is a modal too ------------------------------------------
+   While the iOS photo sheet is open the page underneath is still live, and a background refresh
+   re-renders it — which destroys the <input> the picker was opened from. iOS then has nowhere to
+   deliver the selection, so tapping the tick does nothing at all and the sheet just sits there.
+   The camera path is quick enough to usually beat the next refresh; browsing a library is not,
+   which is exactly why one worked and the other did not.
+
+   Set on any file input's click, cleared when the selection arrives or the window regains focus. */
+let pickerOpen=0;
+function markPickerOpen(){
+  pickerOpen=Date.now();
+  const clear=()=>{ pickerOpen=0; window.removeEventListener('focus',clear); };
+  window.addEventListener('focus',clear);
+  setTimeout(()=>{ if(pickerOpen&&Date.now()-pickerOpen>300000)pickerOpen=0; },300000);  // never stuck
+}
+function pickerBusy(){ return !!pickerOpen; }
+document.addEventListener('click',e=>{
+  const t=e.target;
+  if(t&&t.tagName==='INPUT'&&(t.type||'').toLowerCase()==='file')markPickerOpen();
+},true);
 async function pollSync(){
   if(!supa||!SUPA_OK||cloudTimer||pushing)return;              // skip if a local save/push is in flight
+  if(pickerBusy())return;                                      // a photo picker is open — see above
   if($('#modal').classList.contains('show'))return;            // don't disrupt an open dialog
   let fresh; try{ fresh=await fetchCloud(); }catch(e){ return; }
   const sig=dataSig(fresh);
   if(sig===lastSig)return;                                     // nothing changed
+  if(pickerBusy())return;                                      // still holding a picker open
   if(isTextEntry(document.activeElement)){
     // someone is typing — don't blow away their text. A client on the booking page
     // still gets a non-destructive status-panel refresh; owner/coach retry next tick.
@@ -3260,7 +3286,11 @@ function readSess(){
   }
   return ss;
 }
-function refreshOwner(){if(AUTH==='owner')try{alertUnfilledGroups();}catch(e){}
+function refreshOwner(){
+  /* Re-rendering while a photo picker is open replaces the <input> the picker belongs to, and iOS
+     then silently drops the selection. Nothing on screen is worth that. */
+  if(typeof pickerBusy==='function'&&pickerBusy())return;
+  if(AUTH==='owner')try{alertUnfilledGroups();}catch(e){}
   const f={about:renderAbout,booking:renderBooking,past:renderPast,journey:renderJourney,skills:renderSkills,money:renderMoney,events:renderEvents,messages:renderMessages,customers:renderCustomers,coaches:renderCoaches,locations:renderLocations,availability:renderAvailability,finance:renderFinance,pl:renderPL,activity:renderActivity,admin:renderAdmin}[TAB];if(f)f();if(TAB!=='messages'&&(AUTH==='owner'||AUTH==='client'))renderTabs();if(AUTH==='owner')renderWhoami();}
 
 /* ---------- Auth ---------- */
@@ -4430,9 +4460,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 18:44 UTC';
+const BUILD='2026-08-29 18:52 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Fixed: the iOS photo sheet did nothing when you tapped the tick.</b> While the picker is open the page underneath is still live, and a background refresh re-renders it \u2014 which destroys the file input the picker was opened from. iOS then has nowhere to deliver the selection, so the tick does nothing and the sheet just sits there. Taking a photo with the camera is quick enough to usually beat the next refresh; browsing a library is not, which is why one worked and the other did not. The page no longer repaints while a picker is open.',
+   'Also stopped hiding file inputs with <span class="mono">display:none</span>, which some iOS versions treat as a reason not to deliver the file at all. They are now hidden but still laid out.',
    '<b>Fixed: on an iPhone, photos chosen from the library did nothing while the camera worked.</b> The uploader reset the file input as soon as the handler started. A photo taken with the camera is a real temporary file and survives that; a photo from the library is a lazy handle onto a Photos asset, and clearing the input can invalidate it before it has been read \u2014 so the upload got nothing, silently. The input is now cleared only after every file has been read.',
    'Also split <span class="mono">accept=\"image/*,video/*\"</span> into separate <b>\ud83d\udcf7 Photos</b> and <b>\ud83c\udfac Video</b> buttons. iOS Safari mishandles that comma-separated list in the Photos picker, and the two-button version is clearer on a phone anyway. Everywhere media can be attached now offers the pair.',
    '<b>Fixed: iPhone HEIC photos could be uploaded in a format most browsers cannot display.</b> Photos are converted to JPEG, but the conversion was only kept <i>if it saved space</i> \u2014 and HEIC is efficient enough that the JPEG is often larger, so the conversion was thrown away and the raw <span class="mono">.HEIC</span> went up. Safari showed it; Chrome, Edge, Firefox and Android showed nothing. HEIC is now always converted, whatever the size. If a HEIC cannot be converted at all it is refused with an explanation rather than uploaded broken.',
@@ -7570,7 +7602,7 @@ function openCoach(id){
     <div class="field"><label class="f">Photo</label>
       <div class="row" style="gap:10px;align-items:center">
         <img id="coPhotoPrev" src="${g('photo')||''}" alt="" style="width:56px;height:56px;border-radius:10px;object-fit:cover;background:var(--panel2);${g('photo')?'':'display:none'}" onerror="this.style.display='none'">
-        <label class="btn ghost sm" style="cursor:pointer">⬆ Upload photo<input type="file" accept="image/*" style="display:none" onchange="uploadCoachPhoto(this)"></label>
+        <label class="btn ghost sm" style="cursor:pointer">⬆ Upload photo<input type="file" accept="image/*" class="hidefile" onchange="uploadCoachPhoto(this)"></label>
       </div>
       <input id="coPhoto" value="${g('photo')}" placeholder="…or paste a direct image link (ends in .jpg/.png)" style="margin-top:8px">
       <div class="clienttag" style="margin-top:4px">Upload a photo, or paste a <b>direct image link</b>. iCloud/Google Photos <i>share</i> links won't work — they're web pages, not image files.</div></div>
@@ -8650,7 +8682,7 @@ function openEvent(id){
     <div class="field"><label class="f">🎬 Video (optional) — shown to clients on this event</label>
       <input id="evVideo" value="${safeUrl(ev.video||'')}" placeholder="Paste a YouTube / Vimeo / Drive link…">
       <div class="row" style="gap:8px;align-items:center;margin-top:6px">
-        <label class="btn ghost sm" style="cursor:pointer">⬆ …or upload a video<input type="file" accept="video/*" style="display:none" onchange="uploadEventVideo(this)"></label>
+        <label class="btn ghost sm" style="cursor:pointer">⬆ …or upload a video<input type="file" accept="video/*" class="hidefile" onchange="uploadEventVideo(this)"></label>
         <span class="clienttag">Uploads up to ${MAX_VIDEO_MB}MB. For long footage an (unlisted) YouTube link streams better on phones.</span>
       </div>
       <div id="evVideoPrev" style="margin-top:8px">${videoHtml(ev.video||'','280px')}</div>
@@ -9092,8 +9124,8 @@ function chatThreadHtml(type,id){
     ${AUTH==='owner'?`<div class="field" style="margin-bottom:6px"><input id="chatVideoLink" placeholder="🎬 Paste a video link (YouTube / Vimeo / Drive) — optional"></div>`:''}
     <div class="row" style="gap:8px;align-items:flex-end">
       <textarea id="chatInput" placeholder="${t('Type a message…')}" style="flex:1;min-height:46px;resize:vertical"></textarea>
-      <label class="btn ghost" title="Attach a photo" style="cursor:pointer">📷<input type="file" accept="image/*" multiple style="display:none" onchange="addMediaFiles(this)"></label>
-      <label class="btn ghost" title="Attach a video" style="cursor:pointer">🎬<input type="file" accept="video/*" style="display:none" onchange="addMediaFiles(this)"></label>
+      <label class="btn ghost" title="Attach a photo" style="cursor:pointer">📷<input type="file" accept="image/*" multiple class="hidefile" onchange="addMediaFiles(this)"></label>
+      <label class="btn ghost" title="Attach a video" style="cursor:pointer">🎬<input type="file" accept="video/*" class="hidefile" onchange="addMediaFiles(this)"></label>
       <button class="btn" onclick="sendMessage()">${t('Send')}</button>
     </div>`;
 }
@@ -10364,8 +10396,8 @@ function renderAdmin(){
       <div class="field" style="margin-top:10px"><label class="f">Video link</label>
         <input id="nhUrl" placeholder="Paste a YouTube / Vimeo / Drive link…"></div>
       <div class="row" style="gap:8px;align-items:center;margin-top:-4px">
-        <label class="btn ghost sm" style="cursor:pointer">📷 Photos<input type="file" accept="image/*" multiple style="display:none" onchange="uploadHighlightVideo(this)"></label>
-        <label class="btn ghost sm" style="cursor:pointer">🎬 Video<input type="file" accept="video/*" style="display:none" onchange="uploadHighlightVideo(this)"></label>
+        <label class="btn ghost sm" style="cursor:pointer">📷 Photos<input type="file" accept="image/*" multiple class="hidefile" onchange="uploadHighlightVideo(this)"></label>
+        <label class="btn ghost sm" style="cursor:pointer">🎬 Video<input type="file" accept="video/*" class="hidefile" onchange="uploadHighlightVideo(this)"></label>
         <button class="btn sm" onclick="addHighlight()">+ Add highlight</button>
       </div>
       <div id="upLog" class="clienttag" style="display:none;margin-top:8px;padding:8px 10px;background:var(--panel2);border-radius:8px;font-size:12.5px"></div>
