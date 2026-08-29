@@ -4407,9 +4407,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-28 03:40 UTC';
+const BUILD='2026-08-29 01:04 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Fixed: hand-set coach payouts were not removed when a session stopped being delivered.</b> Un-completing or cancelling a session with per-session payouts left the payout expense standing, so the business kept being charged for work that never happened. The computed payouts were always cleared correctly; only the hand-set ones leaked. Worth re-checking any coach total that looks too high.',
+   'The P&amp;L expense panel gained a <b>By person</b> breakdown, and every row opens the individual entries behind it \u2014 date, category and the note explaining each figure. \u201cWhy is the expense to X this much?\u201d now has an answer on screen instead of needing the Expenses list added up by hand.',
    'Tidied the <b>Launch a group</b> card: <b>TRAIN TOGETHER</b> is now the heading beside the accent bar, and the duplicate heading underneath is gone. The button reads <b>Launch a group</b> and, once pressed, turns dark with a ring and becomes <b>\u2713 Pick a coach and time \u00b7 tap to cancel</b> \u2014 it names the next step only once that step is actually next, and the same button undoes it.',
    '<b>Stay signed in.</b> The session was kept in <span class="mono">sessionStorage</span>, which is discarded when the tab or app closes \u2014 which is why everyone retyped their password every visit. A <b>Keep me signed in on this device</b> tick on the player and coach sign-in now carries it over, for as long as they want. Signing out forgets the device, which is the way to clear a shared phone.',
    'To be clear about what is stored: the <b>password is never saved</b>, only who you are \u2014 no weaker than the personal sign-in link already sent by email, and revocable by signing out. A remembered session is also re-checked against the live record on every load, so an account suspended or un-approved in the meantime cannot walk back in on it.',
@@ -8896,10 +8898,33 @@ function plGroup(lines,dim){
 }
 function plBarRows(rows,total){
   if(!rows.length)return '<tr><td colspan="3"><div class="empty">Nothing in this period.</div></td></tr>';
-  return rows.map(r=>`<tr>
-    <td><b>${r.k}</b></td>
+  return rows.map(r=>`<tr${r.onclick?` style="cursor:pointer" onclick="${r.onclick}"`:''}>
+    <td><b>${r.onclick?`<a href="#" onclick="event.preventDefault();${r.onclick}">${r.k}</a>`:r.k}</b></td>
     <td style="min-width:130px"><div class="bar"><i style="width:${total?Math.max(2,r.v/total*100):0}%"></i></div></td>
     <td class="right"><b>${money(r.v)}</b><div class="clienttag">${total?(r.v/total*100).toFixed(1):0}%</div></td></tr>`).join('');
+}
+/* Every expense line behind one person's total, so "why is it this much?" has an answer on
+   screen rather than needing the books added up by hand. */
+function showCoachSpend(who,from,to){
+  const rows=plExpenseLines()
+    .filter(r=>{const k=(r.date||'').slice(0,7); return k>=from&&k<=to;})
+    .filter(r=>(r.coachId&&r.coachId!=='owner'?coachName(r.coachId):'Business')===who)
+    .sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const total=rows.reduce((a,r)=>a+r.amount,0);
+  /* plExpenseLines() flattens recurring entries into occurrences and drops the note, so pull the
+     wording back off the original expense — that note is what actually explains each figure. */
+  const noteFor=r=>{const e=(DB.expenses||[]).find(x=>x.date===r.date&&(x.cat||'Other')===r.cat
+      &&Math.abs((Number(x.amount)||0)-r.amount)<0.005); return e&&e.note?e.note:'';};
+  openModal(who+' — '+money(total)+' in this period',
+    `<table><thead><tr><th>Date</th><th>What</th><th class="right">Amount</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr><td>${fmtDate(r.date)}</td>
+        <td>${escapeHtml(r.cat)}${noteFor(r)?`<div class="clienttag">${escapeHtml(noteFor(r))}</div>`:''}</td>
+        <td class="right">${money(r.amount)}</td></tr>`).join('')
+        ||'<tr><td colspan="3"><div class="empty">Nothing in this period.</div></td></tr>'}
+      <tr style="border-top:2px solid var(--line)"><td><b>Total</b></td><td></td>
+        <td class="right"><b>${money(total)}</b></td></tr>
+    </tbody></table>`,
+    `<button class="btn" onclick="closeModal()">Close</button>`);
 }
 /* ---- Unpaid family time: people, rates, and the log ---------------------- */
 function contribSorted(){
@@ -9067,6 +9092,12 @@ function renderPL(){
   const expByKind=kinds.map(([k,lab,note])=>({k,lab,note,v:exp.filter(x=>x.kind===k).reduce((a,x)=>a+x.amount,0)}));
   const expByCat={}; exp.forEach(x=>{expByCat[x.cat]=(expByCat[x.cat]||0)+x.amount;});
   const catRows=Object.keys(expByCat).map(k=>({k,v:expByCat[k]})).sort((a,b)=>b.v-a.v);
+  /* "Why is the expense to X this much?" is the question this page gets asked most, so answer it
+     directly instead of making the owner add up rows in the Expenses list. */
+  const expByWho={}; exp.forEach(x=>{const k=x.coachId&&x.coachId!=='owner'?coachName(x.coachId):'Business';
+    expByWho[k]=(expByWho[k]||0)+x.amount;});
+  const whoRows=Object.keys(expByWho).map(k=>({k,v:expByWho[k],onclick:`showCoachSpend(${JSON.stringify(k)},'${from}','${to}')`}))
+    .sort((a,b)=>b.v-a.v);
 
   const dimRows=plGroup(rev,plDim);
 
@@ -9124,6 +9155,9 @@ function renderPL(){
         <h3 style="margin-top:18px">By category</h3>
         <table><thead><tr><th>Category</th><th></th><th class="right">Spent</th></tr></thead>
           <tbody>${plBarRows(catRows,E)}</tbody></table>
+        <h3 style="margin-top:18px">By person <span class="muted" style="font-weight:400;font-size:12px">— tap a name for the individual entries</span></h3>
+        <table><thead><tr><th>Person</th><th></th><th class="right">Paid out</th></tr></thead>
+          <tbody>${plBarRows(whoRows,E)}</tbody></table>
       </div>
     </div>
 
@@ -10133,7 +10167,13 @@ function syncPayoutExpense(s){
      payout but may still be owed a flat fee or an assistant fee on a weekend class. */
   if(hasCustomPayouts(s)){
     upsertAutoExpense(null,eid);                       // drop the computed one
-    if(s.status!=='completed')return null;             // not delivered — nothing owed yet
+    if(s.status!=='completed'){
+      /* Not delivered — nothing is owed. Returning here without clearing left the per-coach rows
+         standing, so un-completing or cancelling a session with hand-set payouts kept charging
+         the business for work that never happened. */
+      sessionPayouts(s).forEach(x=>upsertAutoExpense(null,payoutExpenseId(s.id,x.coachId)));
+      return null;
+    }
     return sessionPayouts(s).map(x=>{
       const amt=Math.round((Number(x.amount)||0)*100)/100;
       const id=payoutExpenseId(s.id,x.coachId);
@@ -10165,7 +10205,8 @@ function resyncAutoExpenses(){
     syncSessionExpenses(s);
     live.add(gasExpenseId(s.id));
     live.add(payoutExpenseId(s.id));
-    sessionPayouts(s).forEach(x=>live.add(payoutExpenseId(s.id,x.coachId)));   // one row per person
+    // only a delivered session keeps its payout rows alive
+    if(s.status==='completed')sessionPayouts(s).forEach(x=>live.add(payoutExpenseId(s.id,x.coachId)));
   });
   syncLabourExpenses();
   (DB.contributions||[]).forEach(x=>live.add(labourExpenseId(x.id)));
