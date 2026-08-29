@@ -4430,9 +4430,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 16:40 UTC';
+const BUILD='2026-08-29 18:44 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Fixed: on an iPhone, photos chosen from the library did nothing while the camera worked.</b> The uploader reset the file input as soon as the handler started. A photo taken with the camera is a real temporary file and survives that; a photo from the library is a lazy handle onto a Photos asset, and clearing the input can invalidate it before it has been read \u2014 so the upload got nothing, silently. The input is now cleared only after every file has been read.',
+   'Also split <span class="mono">accept=\"image/*,video/*\"</span> into separate <b>\ud83d\udcf7 Photos</b> and <b>\ud83c\udfac Video</b> buttons. iOS Safari mishandles that comma-separated list in the Photos picker, and the two-button version is clearer on a phone anyway. Everywhere media can be attached now offers the pair.',
    '<b>Fixed: iPhone HEIC photos could be uploaded in a format most browsers cannot display.</b> Photos are converted to JPEG, but the conversion was only kept <i>if it saved space</i> \u2014 and HEIC is efficient enough that the JPEG is often larger, so the conversion was thrown away and the raw <span class="mono">.HEIC</span> went up. Safari showed it; Chrome, Edge, Firefox and Android showed nothing. HEIC is now always converted, whatever the size. If a HEIC cannot be converted at all it is refused with an explanation rather than uploaded broken.',
    '<b>Fixed: photos picked on an iPhone were silently rejected.</b> iOS hands back an <b>empty file type</b> for anything chosen through the Files app or iCloud Photos, and the uploader decided photo-versus-video from that field alone \u2014 so those files failed the check and were dropped. It now falls back to the file extension, so a <span class="mono">.HEIC</span> or <span class="mono">.MOV</span> with no declared type uploads correctly.',
    '<b>And it now tells you what happened.</b> Failures were reported only by a flash message, which is gone in three seconds and easy to miss on a phone \u2014 hence \u201cI selected my photos and nothing happened\u201d. Each file now leaves a line under the upload button (uploading \u2026 / \u2713 uploaded as a draft / \u2715 with the actual reason), and if nothing at all got through you get a dialog rather than a vanished toast.',
@@ -5046,7 +5048,8 @@ function openCoachStatus(id){
     ${paySection}
     <div class="field"><label class="f">📣 Feedback to client — shown on their My Sessions</label><textarea id="csFeedback" placeholder="How did it go? Progress, tips, next focus...">${s.feedback||''}</textarea></div>
     <div class="field"><label class="f">📎 Photos / videos for client</label>
-      <input type="file" accept="image/*,video/*" multiple onchange="addMediaFiles(this)">
+      <input type="file" accept="image/*" multiple onchange="addMediaFiles(this)">
+      <input type="file" accept="video/*" onchange="addMediaFiles(this)" style="margin-top:6px">
       <div id="sMediaPrev" style="margin-top:8px"></div>
       <div class="clienttag" style="margin-top:4px">Shown to the client with this session. Photos are compressed automatically. Videos up to ${MAX_VIDEO_MB}MB — but a trimmed 1080p clip (~30MB) uploads faster and plays without buffering on a phone.</div></div>
     <p class="muted small">Status, cash payment, feedback and media can be updated here — other session details are managed by the owner. Changes sync to the owner and the client.</p>
@@ -6009,7 +6012,8 @@ function editSkillEntry(id){
     <div class="field"><label class="f">Progress note — the client sees this</label>
       <textarea id="seNote">${escapeHtml(e.note||'')}</textarea></div>
     <div class="field"><label class="f">📎 Attachments</label>
-      <input type="file" accept="image/*,video/*" multiple onchange="addMediaFiles(this)">
+      <input type="file" accept="image/*" multiple onchange="addMediaFiles(this)">
+      <input type="file" accept="video/*" onchange="addMediaFiles(this)" style="margin-top:6px">
       <div id="sMediaPrev" style="margin-top:8px"></div>
       <div class="clienttag" style="margin-top:4px">Remove an attachment with the ✕ on its thumbnail.</div></div>
   `,`<button class="btn danger" onclick="delSkillLog('${id}',true)">Delete</button>
@@ -6047,7 +6051,8 @@ function openSkillLog(cid,preselect,backToBoard){
     <div class="field"><label class="f">What did they achieve? — the client sees this</label>
       <textarea id="slNote" placeholder="e.g. Can now chain crossover into a pull-up off the left hand, 7/10 reps."></textarea></div>
     <div class="field"><label class="f">📎 Photo / video evidence (optional)</label>
-      <input type="file" accept="image/*,video/*" multiple onchange="addMediaFiles(this)">
+      <input type="file" accept="image/*" multiple onchange="addMediaFiles(this)">
+      <input type="file" accept="video/*" onchange="addMediaFiles(this)" style="margin-top:6px">
       <div id="sMediaPrev" style="margin-top:8px"></div></div>
     <p class="muted small">Each entry is one step on the timeline for that skill — add a new one each time they move forward, rather than editing the old one.</p>
   `,`<button class="btn ghost" onclick="${backToBoard?`openClientSkills('${cid}')`:'closeModal()'}">Cancel</button>
@@ -6561,7 +6566,9 @@ function blockIfUploading(){
   return true;
 }
 async function addMediaFiles(input){
-  const files=[...input.files];input.value='';
+  // See uploadHighlightVideo: clearing the input before reading invalidates iOS library files.
+  const files=[...input.files];
+  if(!files.length){ flash('No file came back from the picker — try again',true); return; }
   for(const f of files){
     mediaBusy++; renderMediaPrev();
     try{
@@ -6612,6 +6619,7 @@ async function addMediaFiles(input){
     }
     } finally { mediaBusy=Math.max(0,mediaBusy-1); renderMediaPrev(); }
   }
+  try{ input.value=''; }catch(e){}          // safe now: every file has been read
 }
 function renderMediaPrev(){
   const el=$('#sMediaPrev');if(!el)return;
@@ -6706,7 +6714,8 @@ function openSession(id,returnCust,preset){
     <div class="field"><label class="f">Notes (internal — not shown to client)</label><textarea id="sNotes">${s.notes||''}</textarea></div>
     <div class="field"><label class="f">📣 Feedback to client — shown on their My Sessions</label><textarea id="sFeedback" placeholder="How did it go? Progress, tips, next focus...">${s.feedback||''}</textarea></div>
     <div class="field"><label class="f">📎 Photos / videos for client</label>
-      <input type="file" accept="image/*,video/*" multiple onchange="addMediaFiles(this)">
+      <input type="file" accept="image/*" multiple onchange="addMediaFiles(this)">
+      <input type="file" accept="video/*" onchange="addMediaFiles(this)" style="margin-top:6px">
       <div id="sMediaPrev" style="margin-top:8px"></div>
       <div class="clienttag" style="margin-top:4px">Saved on this device with the session and shown to the client. Keep files small — large videos may exceed browser storage.</div></div>
     <p class="muted small">Marking payment as "package credit" counts one used session against the client's prepaid total. Manage venues in the Locations tab.</p>
@@ -9083,7 +9092,8 @@ function chatThreadHtml(type,id){
     ${AUTH==='owner'?`<div class="field" style="margin-bottom:6px"><input id="chatVideoLink" placeholder="🎬 Paste a video link (YouTube / Vimeo / Drive) — optional"></div>`:''}
     <div class="row" style="gap:8px;align-items:flex-end">
       <textarea id="chatInput" placeholder="${t('Type a message…')}" style="flex:1;min-height:46px;resize:vertical"></textarea>
-      <label class="btn ghost" title="Attach photo or video" style="cursor:pointer">📎<input type="file" accept="image/*,video/*" style="display:none" onchange="addMediaFiles(this)"></label>
+      <label class="btn ghost" title="Attach a photo" style="cursor:pointer">📷<input type="file" accept="image/*" multiple style="display:none" onchange="addMediaFiles(this)"></label>
+      <label class="btn ghost" title="Attach a video" style="cursor:pointer">🎬<input type="file" accept="video/*" style="display:none" onchange="addMediaFiles(this)"></label>
       <button class="btn" onclick="sendMessage()">${t('Send')}</button>
     </div>`;
 }
@@ -9180,7 +9190,8 @@ function openBroadcast(){
     <div class="field"><label class="f">🎬 Video link (YouTube / Vimeo / Drive)</label>
       <input id="bcLink" placeholder="https://youtu.be/…"></div>
     <div class="field"><label class="f">…or upload a video / photo</label>
-      <input type="file" accept="image/*,video/*" multiple onchange="addMediaFiles(this)">
+      <input type="file" accept="image/*" multiple onchange="addMediaFiles(this)">
+      <input type="file" accept="video/*" onchange="addMediaFiles(this)" style="margin-top:6px">
       <div id="sMediaPrev" style="margin-top:8px"></div>
       <div class="clienttag" style="margin-top:4px">Uploads up to ${MAX_VIDEO_MB}MB. Longer or higher-quality footage is better on YouTube (unlisted works) — paste the link above; it streams adaptively so clients on slow connections aren't left buffering.</div></div>
     <div class="field"><label class="f">Send to (${active.length} active client${active.length>1?'s':''})</label>
@@ -10353,7 +10364,8 @@ function renderAdmin(){
       <div class="field" style="margin-top:10px"><label class="f">Video link</label>
         <input id="nhUrl" placeholder="Paste a YouTube / Vimeo / Drive link…"></div>
       <div class="row" style="gap:8px;align-items:center;margin-top:-4px">
-        <label class="btn ghost sm" style="cursor:pointer">⬆ Upload photo or video<input type="file" accept="image/*,video/*" multiple style="display:none" onchange="uploadHighlightVideo(this)"></label>
+        <label class="btn ghost sm" style="cursor:pointer">📷 Photos<input type="file" accept="image/*" multiple style="display:none" onchange="uploadHighlightVideo(this)"></label>
+        <label class="btn ghost sm" style="cursor:pointer">🎬 Video<input type="file" accept="video/*" style="display:none" onchange="uploadHighlightVideo(this)"></label>
         <button class="btn sm" onclick="addHighlight()">+ Add highlight</button>
       </div>
       <div id="upLog" class="clienttag" style="display:none;margin-top:8px;padding:8px 10px;background:var(--panel2);border-radius:8px;font-size:12.5px"></div>
@@ -10470,8 +10482,12 @@ function previewHighlight(id){
    (title defaults to the filename) — with multiple files there's no single form to fill in, and
    titles/dates are editable in the table right above. */
 async function uploadHighlightVideo(input){
-  const files=[...input.files]; input.value='';
-  if(!files.length)return;
+  /* Do NOT clear input.value here. On iOS a File taken from the photo library is a lazy handle
+     onto a Photos asset; resetting the input can invalidate it before it has been read, so the
+     upload silently gets nothing. A photo from the CAMERA is a real temp file and survives, which
+     is exactly why the camera worked and the library did not. Cleared at the end instead. */
+  const files=[...input.files];
+  if(!files.length){ flash('No file came back from the picker — try again',true); return; }
   const date=$('#nhDate')&&$('#nhDate').value||todayISO();
   const upSport=($('#nhSport')&&$('#nhSport').value)||hlSportOptions()[0]||'';
   const baseTitle=($('#nhTitle')&&$('#nhTitle').value||'').trim();
@@ -10538,6 +10554,7 @@ async function uploadHighlightVideo(input){
       upLog('<span style="color:var(--red)">\u2715 '+escapeHtml(name)+'</span> — '+escapeHtml(e.message||'upload failed'));
       flash('Upload failed: '+e.message,true);}
   }
+  try{ input.value=''; }catch(e){}          // safe now: every file has been read
   if(added){ save(); flash(added+' item'+(added>1?'s':'')+' uploaded as DRAFT — press Publish to show on the home page'); }
   /* Nothing got through, so say so loudly. A toast that has already faded is why "I selected my
      photos and nothing happened" was the whole of the feedback. */
