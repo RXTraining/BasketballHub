@@ -4488,9 +4488,10 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 21:13 UTC';
+const BUILD='2026-08-29 21:18 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   'The draft banner in Admin now offers <b>Discard all</b> beside <b>Publish all</b>. A draft is a decision with two answers, and only one of them had a button \u2014 a test upload, a duplicate or a blurry shot had to be deleted a row at a time, which is how drafts accumulate. The confirmation lists what is going, published highlights are untouched, and the stored file itself is left alone so an accidental discard cannot destroy the original.',
    '<b>Found it: <span class="mono">accept=\"image/*\"</span> was making Safari convert every camera photo before handing it over.</b> A screenshot uploaded fine and a camera photo hung on a spinning circle \u2014 the difference is that a screenshot is already a PNG, while a camera photo is HEIC, and <span class="mono">accept</span> makes Safari transcode it to JPEG first. That conversion is what stalled. On iPhone the photo button now carries <b>no accept attribute</b>: iOS shows its plain sheet and passes the original file straight through, and the app converts it itself in <span class="mono">compressImage()</span> where a failure is visible instead of silent.',
    'It costs one extra tap on iPhone \u2014 the sheet asks Photo Library or Take Photo \u2014 and removes the hang. For anyone who would rather avoid HEIC altogether, <i>Settings \u2192 Camera \u2192 Formats \u2192 Most Compatible</i> records JPEG and sidesteps it. Desktop and Android keep the filtered multi-select picker, which has never had this problem.',
    '<b>The iPhone upload problem was iCloud, not the app.</b> The spinning circle on the selected photo is iOS downloading the original from iCloud \u2014 with <i>Optimise iPhone Storage</i> on, only small previews live on the phone, and the picker cannot hand anything over until the full file comes down. On cellular that can stall indefinitely, which is why the sheet sat there and X was the only way out, why the camera always worked (nothing to download), and why it succeeded once (that photo was already cached). Admin now says so on iPhone, with the fix: open the photo in Photos first so it downloads, then pick it.',
@@ -10410,7 +10411,10 @@ function renderAdmin(){
           <div class="row" style="justify-content:space-between;align-items:center;gap:10px">
             <div><b>⏳ ${drafts.length} item${drafts.length>1?'s':''} not on the home page yet</b>
               <div class="clienttag" style="margin-top:3px">Uploads start as drafts so nothing goes public by accident. Publish to show ${drafts.length>1?'them':'it'}.</div></div>
-            <button class="btn sm" onclick="publishAllHighlights()">Publish all ${drafts.length}</button>
+            <div class="actions">
+              <button class="btn sm" onclick="publishAllHighlights()">Publish all ${drafts.length}</button>
+              <button class="btn sm ghost danger" onclick="discardAllDrafts()">Discard all ${drafts.length}</button>
+            </div>
           </div></div>`;
       })()}
       <div style="overflow-x:auto"><table><thead><tr><th></th><th>Title</th><th>Sport</th><th>Date</th><th>Media</th><th>Status</th><th></th></tr></thead><tbody>
@@ -10555,6 +10559,21 @@ function publishAllHighlights(){
   if(!confirm('Publish '+drafts.length+' item'+(drafts.length>1?'s':'')+' to the home page?'))return;
   drafts.forEach(h=>h.active=true);
   save(); flash(drafts.length+' published to the home page 🎬'); renderAdmin();
+}
+/* The other half of the draft decision. A test upload, a duplicate, a photo that turned out blurry
+   \u2014 the only way to get rid of it was to delete each row one at a time, which is why drafts piled
+   up. Deleting the record does NOT delete the file from storage; that is deliberate, because an
+   accidental discard here should not destroy the original. */
+function discardAllDrafts(){
+  const drafts=(DB.highlights||[]).filter(h=>h.active===false);
+  if(!drafts.length)return;
+  if(!confirm('Discard '+drafts.length+' unpublished item'+(drafts.length>1?'s':'')+'?\n\n'+
+    drafts.slice(0,8).map(h=>'  \u2022 '+(h.title||'untitled')).join('\n')+
+    (drafts.length>8?'\n  \u2026and '+(drafts.length-8)+' more':'')+
+    '\n\nThey are removed from this list. Published highlights are untouched.'))return;
+  const ids=new Set(drafts.map(h=>h.id));
+  DB.highlights=(DB.highlights||[]).filter(h=>!ids.has(h.id));
+  save(); flash(drafts.length+' draft'+(drafts.length>1?'s':'')+' discarded'); renderAdmin();
 }
 function pubHighlight(id){
   const h=(DB.highlights||[]).find(x=>x.id===id); if(!h)return;
