@@ -4430,9 +4430,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 04:46 UTC';
+const BUILD='2026-08-29 04:52 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   'Every row in the P&amp;L expense panels now opens the entries behind it \u2014 <b>Where the money went</b> and <b>By category</b>, not just <b>By person</b>. Each list shows the date, category, who it was for, the note explaining the figure, and a total. One function serves all three slices, so a list can never disagree with the bar above it.',
+   'While there: the <i>Session coach pay</i> description still said \u201ceach coach\u2019s share of what their sessions collected\u201d, which stopped being true when pay became a flat agreed rate. It now reads <b>the agreed rate for each session a coach ran</b>.',
    'Every Finance table now reads <b>newest first</b>. Cash, Packages and Expenses already did; <b>Outstanding payments</b> was sorted oldest-first, so the four tables disagreed about which way time ran.',
    '<b>Cash &amp; other income now includes event places paid in cash</b>, which were missing \u2014 so the panel did not add up to the Revenue card. Credit-paid places stay out, because that money is already listed as the package it came from. The table is also merged into one date order: it used to be three lists glued end to end (manual cash, then sessions, then events), so an event on the 22nd appeared below a session from the 1st, at the bottom of a scroll box, and looked like it was missing.',
    'Every Finance table carries its <b>total in the heading</b>: Cash &amp; other income, Package revenue, Outstanding payments and Expenses. Reading a column to find out what it sums to was work the page should have done.',
@@ -9297,124 +9299,41 @@ function plBarRows(rows,total){
 }
 /* Every expense line behind one person's total, so "why is it this much?" has an answer on
    screen rather than needing the books added up by hand. */
-function showCoachSpend(who,from,to){
+/* Every expense line behind one bar, whichever way the money is being sliced — by kind, by
+   category or by person. One function so the three lists cannot disagree with the bars above them,
+   and so a new slice is a one-line addition rather than a third copy of this. */
+const EXP_KIND_LABEL={fixed:'Fixed / overhead',coach:'Coach-attributed',auto:'Session coach pay',
+  event:'Event coach pay',gas:'Mileage',labour:'Unpaid family time'};
+function expDimKey(r,dim){
+  return dim==='kind' ? (EXP_KIND_LABEL[r.kind]||r.kind)
+       : dim==='cat'  ? (r.cat||'Other')
+       : (r.coachId&&r.coachId!=='owner'?coachName(r.coachId):'Business');
+}
+function showExpenseDetail(dim,key){
+  const months=plMonths(plRange), from=months[0], to=months[months.length-1];
   const rows=plExpenseLines()
     .filter(r=>{const k=(r.date||'').slice(0,7); return k>=from&&k<=to;})
-    .filter(r=>(r.coachId&&r.coachId!=='owner'?coachName(r.coachId):'Business')===who)
-    .sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    .filter(r=>inScope(r.coachId))
+    .filter(r=>expDimKey(r,dim)===key)
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const total=rows.reduce((a,r)=>a+r.amount,0);
   /* plExpenseLines() flattens recurring entries into occurrences and drops the note, so pull the
      wording back off the original expense — that note is what actually explains each figure. */
   const noteFor=r=>{const e=(DB.expenses||[]).find(x=>x.date===r.date&&(x.cat||'Other')===r.cat
       &&Math.abs((Number(x.amount)||0)-r.amount)<0.005); return e&&e.note?e.note:'';};
-  openModal(who+' — '+money(total)+' in this period',
-    `<table><thead><tr><th>Date</th><th>What</th><th class="right">Amount</th></tr></thead><tbody>
+  const head={kind:'Kind',cat:'Category',who:'Person'}[dim]||'';
+  openModal(head+': '+key+' — '+money(total),
+    `<div class="sub" style="margin-bottom:8px">${rows.length} entr${rows.length===1?'y':'ies'} between ${plMonthLabel(from)} and ${plMonthLabel(to)}.</div>
+     <table><thead><tr><th>Date</th><th>Category</th><th>Who</th><th>What</th><th class="right">Amount</th></tr></thead><tbody>
       ${rows.map(r=>`<tr><td>${fmtDate(r.date)}</td>
-        <td>${escapeHtml(r.cat)}${noteFor(r)?`<div class="clienttag">${escapeHtml(noteFor(r))}</div>`:''}</td>
+        <td>${escapeHtml(r.cat||'—')}${r.recurring?' <span class="pill blue">↻</span>':''}</td>
+        <td>${escapeHtml(r.coachId&&r.coachId!=='owner'?coachName(r.coachId):'Business')}</td>
+        <td class="muted">${escapeHtml(noteFor(r)||EXP_KIND_LABEL[r.kind]||'')}</td>
         <td class="right">${money(r.amount)}</td></tr>`).join('')
-        ||'<tr><td colspan="3"><div class="empty">Nothing in this period.</div></td></tr>'}
-      <tr style="border-top:2px solid var(--line)"><td><b>Total</b></td><td></td>
+        ||'<tr><td colspan="5"><div class="empty">Nothing in this period.</div></td></tr>'}
+      <tr style="border-top:2px solid var(--line)"><td><b>Total</b></td><td></td><td></td><td></td>
         <td class="right"><b>${money(total)}</b></td></tr>
     </tbody></table>`,
-    `<button class="btn" onclick="closeModal()">Close</button>`);
-}
-/* ---- What a coach is actually paid ----------------------------------------
-   Read from the expense rows rather than recomputed, so the coach's view and the owner's books
-   are the same numbers by construction — they cannot drift. Each row is traced back to the
-   session or event that produced it, because "you were paid $29.75" is not much use without
-   "for David's 1:1 on Aug 26, out of $35 collected".
-
-   Ids are uid()-based (base36, no dashes), so splitting on '-' is safe. */
-function coachPayoutRows(coachId){
-  if(!coachId)return [];
-  return (DB.expenses||[]).filter(e=>e.coachId===coachId&&isAutoExpense(e)&&!/^labour-/.test(e.id||''))
-    .map(e=>{
-      const p=(e.id||'').split('-'), kind=p[0];
-      const row={id:e.id,date:e.date,amount:Number(e.amount)||0,cat:e.cat||'',note:e.note||'',
-                 kind:kind,what:'',who:'',collected:null,ref:''};
-      if(kind==='evpay'){
-        const ev=eventById(p[1]);
-        row.what=ev?('🎉 '+mlText(ev.title)):'Event';
-        row.who=ev?(eventRegsFor(ev.id).length+' registered'):'';
-        row.collected=ev?eventRevenue(ev):null; row.ref=p[1];
-      }else{
-        const sess=DB.sessions.find(x=>x.id===p[1]);
-        row.ref=p[1];
-        if(sess){
-          row.what=(kind==='gas'?'⛽ Mileage · ':'')+typeShort(sess.type);
-          row.who=custNames(sess.customerIds)||'—';
-          row.collected=(kind==='gas')?null:sessionPaidAmt(sess);
-        }else{ row.what=(kind==='gas'?'⛽ Mileage':'Coach payout'); }
-      }
-      return row;
-    })
-    .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-}
-function coachPayoutTotal(coachId){ return coachPayoutRows(coachId).reduce((a,r)=>a+r.amount,0); }
-/* ---- Handing the money over ------------------------------------------------
-   A payout row says the business owes the coach. Settling is a separate fact: it records that the
-   money actually moved. Kept as a list of expense ids rather than a flag on the expense, because
-   the expenses themselves are derived and rebuilt on every save — a flag there would be wiped. */
-function settledSet(){ return new Set(DB.settings.payoutsSettled||[]); }
-function isSettled(id){ return settledSet().has(id); }
-function togglePayoutSettled(id,coachId){
-  /* This is stored in settings.payouts_settled. If that column has not been created yet the cloud
-     save fails and the tick is lost on the next refresh — silently, which is the worst way to lose
-     a record of money changing hands. Say so up front. */
-  if(syncFails&&syncFails.settings){
-    return flash('Cannot record this yet — the settings table failed to save. Run supabase-setup.sql, then try again.',true);
-  }
-  const set=settledSet();
-  if(set.has(id))set.delete(id); else set.add(id);
-  DB.settings.payoutsSettled=[...set];
-  save();
-  /* The dialog was repainted but the page behind it was not, so the Coaches table kept showing the
-     old "You owe" until you changed tab — it looked as though marking paid had done nothing. */
-  if(AUTH==='owner'){ refreshOwner(); if(coachId)openCoachPayouts(coachId); }
-  else renderMoney();
-}
-function coachOwedTotal(coachId){
-  return coachPayoutRows(coachId).filter(r=>!isSettled(r.id)).reduce((a,r)=>a+r.amount,0);
-}
-function coachPaidTotal(coachId){
-  return coachPayoutRows(coachId).filter(r=>isSettled(r.id)).reduce((a,r)=>a+r.amount,0);
-}
-/* The same table for both audiences: the owner checking what they owe, and the coach checking
-   what they earned. */
-function coachPayoutTableHtml(coachId,opts){
-  const rows=coachPayoutRows(coachId), mine=opts&&opts.mine;
-  const owed=rows.filter(r=>!isSettled(r.id)).reduce((a,r)=>a+r.amount,0);
-  const paid=rows.filter(r=>isSettled(r.id)).reduce((a,r)=>a+r.amount,0);
-  /* The coach's view deliberately omits what the client was charged and what they still owe.
-     That is the business's business — the coach agreed a rate for the job, and mixing the two
-     invites an argument about a number that has nothing to do with their pay. */
-  return `<table><thead><tr><th>Date</th><th>Session</th><th>${mine?'Player(s)':'Client(s)'}</th>
-      <th class="right">${mine?'You earned':'Owed to coach'}</th><th>${mine?'Paid to you':'Paid'}</th></tr></thead><tbody>
-    ${rows.map(r=>`<tr>
-      <td>${fmtDate(r.date)}</td>
-      <td>${escapeHtml(r.what)}${r.note?`<div class="clienttag">${escapeHtml(r.note)}</div>`:''}</td>
-      <td>${escapeHtml(r.who||'—')}</td>
-      <td class="right"><b>${money(r.amount)}</b></td>
-      <td>${isSettled(r.id)
-        ? `<span class="pill green">${mine?'✓ Received':'✓ Paid'}</span>${mine?'':`<button class="iconbtn" title="Undo" onclick="togglePayoutSettled('${r.id}','${coachId}')">↩</button>`}`
-        : (mine?'<span class="pill yellow">Awaiting payment</span>'
-               :`<button class="btn sm" onclick="togglePayoutSettled('${r.id}','${coachId}')">Mark paid</button>`)}</td></tr>`).join('')
-      ||`<tr><td colspan="5"><div class="empty">${mine?'Nothing yet. Pay appears as soon as a session or event you ran is marked completed.':'No payouts yet for this coach.'}</div></td></tr>`}
-    <tr style="border-top:2px solid var(--line)">
-      <td><b>Still owed</b></td><td></td><td></td>
-      <td class="right"><b style="color:${owed>0?'var(--red)':'var(--muted)'}">${money(owed)}</b></td>
-      <td class="clienttag">${money(paid)} already ${mine?'received':'paid'}</td></tr>
-  </tbody></table>
-  <p class="muted small" style="margin-top:8px">Pay is earned the moment a session or event is marked <b>completed</b>${mine?'':' — whether or not the client has paid'}.</p>`;
-}
-function openCoachPayouts(coachId){
-  const owed=coachOwedTotal(coachId);
-  openModal(coachName(coachId)+' — payouts',
-    `<div class="stats" style="margin-bottom:12px">
-      <div class="stat"><div class="k">You owe</div><div class="v" style="color:${owed>0?'var(--red)':'var(--green)'}">${money(owed)}</div><div class="d muted">${owed>0?'not handed over yet':'all settled'}</div></div>
-      <div class="stat"><div class="k">Already paid</div><div class="v">${money(coachPaidTotal(coachId))}</div><div class="d muted">ticked off below</div></div>
-      <div class="stat"><div class="k">Earned</div><div class="v">${money(coachPayoutTotal(coachId))}</div><div class="d muted">all completed work</div></div>
-    </div>`+coachPayoutTableHtml(coachId),
     `<button class="btn" onclick="closeModal()">Close</button>`,{full:AUTH==='owner'});
 }
 /* ---- Unpaid family time: people, rates, and the log ---------------------- */
@@ -9576,20 +9495,24 @@ function renderPL(){
   });
   const best=byMonth.reduce((m,x)=>x.n>m.n?x:m,byMonth[0]||{n:0,k:''});
 
-  const kinds=[['fixed','Fixed / overhead','Rent, gear, anything that exists whether or not anyone trains'],
-               ['coach','Coach-attributed','Entered by hand against a coach'],
-               ['auto','Session coach pay','Each coach\u2019s share of what their sessions collected'],
-               ['event','Event coach pay','Host and assistant fees for events \u2014 set per event'],
-               ['gas','Mileage','Round trips for in-house coaches, derived from each session'],
-               ['labour','Unpaid family time','Hours worked without an invoice, valued at each person\u2019s rate']];
-  const expByKind=kinds.map(([k,lab,note])=>({k,lab,note,v:exp.filter(x=>x.kind===k).reduce((a,x)=>a+x.amount,0)}));
+  /* Labels come from EXP_KIND_LABEL so the bars and the drill-down cannot drift apart \u2014 the
+     drill-down matches on the label, so two copies of it would be a silent trap. */
+  const kindNotes={fixed:'Rent, gear, anything that exists whether or not anyone trains',
+    coach:'Entered by hand against a coach',
+    auto:'The agreed rate for each session a coach ran',
+    event:'Host and assistant fees for events \u2014 set per event',
+    gas:'Round trips for in-house coaches, derived from each session',
+    labour:'Hours worked without an invoice, valued at each person\u2019s rate'};
+  const expByKind=Object.keys(kindNotes).map(k=>({k,lab:EXP_KIND_LABEL[k],note:kindNotes[k],
+    v:exp.filter(x=>x.kind===k).reduce((a,x)=>a+x.amount,0)}));
   const expByCat={}; exp.forEach(x=>{expByCat[x.cat]=(expByCat[x.cat]||0)+x.amount;});
-  const catRows=Object.keys(expByCat).map(k=>({k,v:expByCat[k]})).sort((a,b)=>b.v-a.v);
+  const catRows=Object.keys(expByCat).map(k=>({k,v:expByCat[k],
+    onclick:'showExpenseDetail("cat",'+JSON.stringify(k)+')'})).sort((a,b)=>b.v-a.v);
   /* "Why is the expense to X this much?" is the question this page gets asked most, so answer it
      directly instead of making the owner add up rows in the Expenses list. */
   const expByWho={}; exp.forEach(x=>{const k=x.coachId&&x.coachId!=='owner'?coachName(x.coachId):'Business';
     expByWho[k]=(expByWho[k]||0)+x.amount;});
-  const whoRows=Object.keys(expByWho).map(k=>({k,v:expByWho[k],onclick:`showCoachSpend(${JSON.stringify(k)},'${from}','${to}')`}))
+  const whoRows=Object.keys(expByWho).map(k=>({k,v:expByWho[k],onclick:'showExpenseDetail("who",'+JSON.stringify(k)+')'}))
     .sort((a,b)=>b.v-a.v);
 
   const dimRows=plGroup(rev,plDim);
@@ -9638,18 +9561,20 @@ function renderPL(){
         ${plDim==='src'?`<div class="clienttag" style="margin-top:10px">Nothing here is counted twice. A package is revenue on the day you sell it, so a session or event place later paid <b style="color:var(--txt)">from</b> that package adds nothing — only places paid in cash appear as cash.</div>`:''}
       </div>
       <div class="panel">
-        <h3>Where the money went</h3>
+        <h3>Where the money went <span class="muted" style="font-weight:400;font-size:12px">— tap any row for the entries behind it</span></h3>
         <table><thead><tr><th>Kind</th><th></th><th class="right">Spent</th></tr></thead><tbody>
-          ${expByKind.filter(x=>x.v>0).map(x=>`<tr>
-            <td><b>${x.lab}</b><div class="clienttag">${x.note}</div></td>
+          ${expByKind.filter(x=>x.v>0).map(x=>{
+            const go=attrEsc('showExpenseDetail("kind",'+JSON.stringify(x.lab)+')');
+            return `<tr style="cursor:pointer" onclick="${go}">
+            <td><b><a href="#" onclick="${attrEsc('event.preventDefault();event.stopPropagation();showExpenseDetail("kind",'+JSON.stringify(x.lab)+')')}">${escapeHtml(x.lab)}</a></b><div class="clienttag">${x.note}</div></td>
             <td style="min-width:110px"><div class="bar"><i style="width:${E?Math.max(2,x.v/E*100):0}%"></i></div></td>
-            <td class="right"><b>${money(x.v)}</b><div class="clienttag">${E?(x.v/E*100).toFixed(1):0}%</div></td></tr>`).join('')
+            <td class="right"><b>${money(x.v)}</b><div class="clienttag">${E?(x.v/E*100).toFixed(1):0}%</div></td></tr>`;}).join('')
             ||'<tr><td colspan="3"><div class="empty">No expenses in this period.</div></td></tr>'}
         </tbody></table>
         <h3 style="margin-top:18px">By category</h3>
         <table><thead><tr><th>Category</th><th></th><th class="right">Spent</th></tr></thead>
           <tbody>${plBarRows(catRows,E)}</tbody></table>
-        <h3 style="margin-top:18px">By person <span class="muted" style="font-weight:400;font-size:12px">— tap a name for the individual entries</span></h3>
+        <h3 style="margin-top:18px">By person</h3>
         <table><thead><tr><th>Person</th><th></th><th class="right">Paid out</th></tr></thead>
           <tbody>${plBarRows(whoRows,E)}</tbody></table>
       </div>
