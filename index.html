@@ -4474,9 +4474,10 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 19:22 UTC';
+const BUILD='2026-08-29 19:32 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Paste a photo instead of picking one.</b> When the iOS photo sheet refuses to confirm a selection there is nothing a web page can do about it from the outside \u2014 so Admin \u2192 Home page highlights now has a <b>paste box</b>. In Photos: Share \u2192 <b>Copy Photo</b>, come back, touch and hold the box, Paste. It skips the file picker completely and works on iPhone, iPad, Android and every desktop. Pasted images get a dated filename rather than fifty copies of \u201cimage.png\u201d.',
    '<b>Found the real cause of the stuck iPhone photo sheet.</b> The app snaps the page back to 100% when it detects a pinch, by rewriting the viewport meta tag. Opening the iOS photo sheet fires the same viewport events \u2014 so the app was rewriting the viewport <i>underneath a presented native sheet</i>, which leaves it sitting on top unresponsive until you pinch and switch windows. The snap-back is now suppressed while any file picker is open, and the flag is held for a moment after focus returns because iOS fires focus before it delivers the file.',
    '<b>iPhone uploads: the picker itself is the problem, so on iOS the app now avoids it.</b> Three things compound \u2014 <span class="mono">multiple</span> makes Safari transcode every selected HEIC before handing anything over (which can stall so long the sheet never closes), <span class="mono">accept=\"image/*\"</span> forces the Photos-library picker that \u201cPrivate Access\u201d restricts, and a re-render underneath detaches the input. On an iPhone the app now asks for <b>one file at a time</b> and offers <b>\ud83d\udcc1 Choose file</b>, which opens the plain iOS file sheet instead of the Photos picker. Other platforms keep multi-select.',
    '<b>Fixed: the iOS photo sheet did nothing when you tapped the tick.</b> While the picker is open the page underneath is still live, and a background refresh re-renders it \u2014 which destroys the file input the picker was opened from. iOS then has nowhere to deliver the selection, so the tick does nothing and the sheet just sits there. Taking a photo with the camera is quick enough to usually beat the next refresh; browsing a library is not, which is why one worked and the other did not. The page no longer repaints while a picker is open.',
@@ -10437,6 +10438,11 @@ function renderAdmin(){
         <button class="btn sm" onclick="addHighlight()">+ Add highlight</button>
       </div>
       ${IS_IOS?`<div class="clienttag" style="margin-top:6px">On iPhone, pick <b style="color:var(--txt)">one photo at a time</b>. If the photo sheet will not close when you tap the tick, use <b style="color:var(--txt)">📁 Choose file</b> \u2014 it opens the plain iOS file sheet, which does not have that fault.</div>`:''}
+      <div id="pasteBox" contenteditable="true" onpaste="handlePasteUpload(event)"
+        style="margin-top:8px;border:2px dashed var(--line);border-radius:10px;padding:14px;
+               text-align:center;color:var(--muted);font-size:13px;min-height:20px"
+        data-ph="Paste a photo here">Paste a photo here</div>
+      <div class="clienttag" style="margin-top:4px">${pasteHint()}</div>
       <div id="upLog" class="clienttag" style="display:none;margin-top:8px;padding:8px 10px;background:var(--panel2);border-radius:8px;font-size:12.5px"></div>
       <div id="hiPrev" style="margin-top:10px"></div>
     </div>
@@ -10550,6 +10556,35 @@ function previewHighlight(id){
 /* Accepts photos and videos, one or many. Each uploaded file is added to the list immediately
    (title defaults to the filename) — with multiple files there's no single form to fill in, and
    titles/dates are editable in the table right above. */
+/* ---- Paste a photo instead of picking one ----------------------------------
+   The iOS photo sheet can refuse to confirm a selection, and there is nothing a web page can do
+   about that from the outside. Copying is a different path entirely: in the Photos app, share →
+   Copy Photo, then paste here. Works on iPhone, iPad, Android and every desktop, and needs no
+   file picker at all. */
+function pasteHint(){
+  return IS_IOS
+    ? 'Or <b style="color:var(--txt)">paste a photo</b>: in Photos, tap Share → <b style="color:var(--txt)">Copy Photo</b>, come back, then touch and hold the box below and choose Paste.'
+    : 'Or <b style="color:var(--txt)">paste a photo</b> — copy an image anywhere, click the box below and press Ctrl/⌘ + V.';
+}
+async function handlePasteUpload(e){
+  const items=(e.clipboardData&&e.clipboardData.items)||[];
+  const files=[];
+  for(const it of items){
+    if(it.kind==='file'){
+      const f=it.getAsFile(); if(!f)continue;
+      /* A pasted image usually has no filename. Give it a dated one so the highlight has a
+         sensible title and the stored object is not called "image.png" fifty times. */
+      const ext=(f.type||'').indexOf('png')>=0?'png':'jpg';
+      files.push(f.name?f:new File([f],'pasted-'+todayISO()+'-'+Math.random().toString(36).slice(2,6)+'.'+ext,{type:f.type||'image/'+ext}));
+    }
+  }
+  if(!files.length)return;                    // a plain text paste — leave it alone
+  e.preventDefault();
+  const box=$('#pasteBox'); if(box)box.textContent='Uploading…';
+  /* Reuse the normal uploader by handing it something that looks like a file input. */
+  try{ await uploadHighlightVideo({files,value:''}); }
+  finally{ if(box)box.textContent='Paste a photo here'; }
+}
 async function uploadHighlightVideo(input){
   /* Do NOT clear input.value here. On iOS a File taken from the photo library is a lazy handle
      onto a Photos asset; resetting the input can invalidate it before it has been read, so the
