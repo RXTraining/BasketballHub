@@ -4488,9 +4488,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-29 21:18 UTC';
+const BUILD='2026-08-30 01:13 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>The endless spinner was our own code, not the iOS picker.</b> Photos are shrunk before upload, and that step awaited <span class="mono">new Image()</span> with only <i>onload</i> and <i>onerror</i> to finish it. For a HEIC that Safari can neither decode nor reject, <b>neither event ever fires</b> \u2014 so the promise never settled and the upload waited forever with no error anywhere. A screenshot is a PNG, decodes instantly, and always worked: exactly the pattern reported.',
+   'Decoding now tries <span class="mono">createImageBitmap</span> first (wider format support, always settles) and falls back to an image element, both on a 15-second limit, so nothing can block indefinitely. If conversion genuinely fails the original is uploaded anyway with a warning rather than being refused \u2014 the photo is fine, only our JPEG step failed. The network upload gained a two-minute abort for the same reason.',
    'The draft banner in Admin now offers <b>Discard all</b> beside <b>Publish all</b>. A draft is a decision with two answers, and only one of them had a button \u2014 a test upload, a duplicate or a blurry shot had to be deleted a row at a time, which is how drafts accumulate. The confirmation lists what is going, published highlights are untouched, and the stored file itself is left alone so an accidental discard cannot destroy the original.',
    '<b>Found it: <span class="mono">accept=\"image/*\"</span> was making Safari convert every camera photo before handing it over.</b> A screenshot uploaded fine and a camera photo hung on a spinning circle \u2014 the difference is that a screenshot is already a PNG, while a camera photo is HEIC, and <span class="mono">accept</span> makes Safari transcode it to JPEG first. That conversion is what stalled. On iPhone the photo button now carries <b>no accept attribute</b>: iOS shows its plain sheet and passes the original file straight through, and the app converts it itself in <span class="mono">compressImage()</span> where a failure is visible instead of silent.',
    'It costs one extra tap on iPhone \u2014 the sheet asks Photo Library or Take Photo \u2014 and removes the hang. For anyone who would rather avoid HEIC altogether, <i>Settings \u2192 Camera \u2192 Formats \u2192 Most Compatible</i> records JPEG and sidesteps it. Desktop and Android keep the filtered multi-select picker, which has never had this problem.',
@@ -6631,6 +6633,36 @@ function upLogReset(n){
 function isHeic(f){
   return /image\/hei[cf]/i.test((f&&f.type)||'') || /\.(heic|heif)$/i.test((f&&f.name)||'');
 }
+/* Decode a picked file into something drawable, without ever hanging.
+   The old code awaited `new Image()` with only onload/onerror to settle it. If the browser can
+   neither decode nor reject the file — which is what a HEIC can do on iOS Safari — NEITHER event
+   fires, the promise never settles, and the await blocks forever: a spinner that never stops and
+   no error anywhere. Two decoders are tried, both on a timer. */
+function decodeImage(file,ms){
+  const limit=ms||15000;
+  const withTimeout=(promise,label)=>Promise.race([
+    promise,
+    new Promise((_,rej)=>setTimeout(()=>rej(new Error(label+' timed out')),limit))
+  ]);
+  // createImageBitmap handles more formats than <img>, decodes off the main thread, and always
+  // settles. Preferred where it exists; <img> is the fallback for older Safari.
+  if(typeof createImageBitmap==='function'){
+    return withTimeout(createImageBitmap(file),'decode').catch(()=>decodeViaImg(file,limit));
+  }
+  return decodeViaImg(file,limit);
+}
+function decodeViaImg(file,limit){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file), i=new Image();
+    let t=null, settled=false;
+    const finish=(fn,v)=>{ if(settled)return; settled=true;
+      if(t){clearTimeout(t);t=null;} try{URL.revokeObjectURL(url);}catch(e){} fn(v); };
+    t=setTimeout(()=>finish(rej,new Error('image decode timed out')),limit);
+    i.onload=()=>finish(res,i);
+    i.onerror=()=>finish(rej,new Error('image could not be decoded'));
+    i.src=url;
+  });
+}
 async function compressImage(file,maxDim=1600,quality=0.8){
   try{
     /* HEIC must be converted even when the JPEG comes out LARGER. HEIC is far more efficient than
@@ -6638,17 +6670,20 @@ async function compressImage(file,maxDim=1600,quality=0.8){
        raw .HEIC — which Safari renders and Chrome, Edge, Firefox and Android do not. Compatibility
        beats file size for a photo the whole club is meant to see. */
     const mustConvert=isHeic(file);
-    const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(file);});
+    const img=await decodeImage(file);
     let w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+    if(!w||!h)return null;
     if(Math.max(w,h)>maxDim){const s=maxDim/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);}
     const cv=document.createElement('canvas');cv.width=w;cv.height=h;
     cv.getContext('2d').drawImage(img,0,0,w,h);
-    URL.revokeObjectURL(img.src);
-    const blob=await new Promise(res=>cv.toBlob(res,'image/jpeg',quality));
+    try{ if(img.close)img.close(); }catch(e){}          // release an ImageBitmap
+    const blob=await new Promise(res=>{ const t=setTimeout(()=>res(null),limitMs());
+      cv.toBlob(b=>{clearTimeout(t);res(b);},'image/jpeg',quality); });
     if(!blob)return null;
     return (mustConvert || blob.size<file.size) ? blob : null;
-  }catch(e){return null;}
+  }catch(e){ console.warn('compressImage failed:',e&&e.message); return null; }
 }
+function limitMs(){ return 15000; }
 /* Number of uploads still in flight. addMediaFiles is async — it awaits the upload and only THEN
    pushes into editMedia. Without this counter, hitting Save mid-upload captured editMedia before
    the file landed and the attachment was silently dropped: no error, no file, just gone. That is
@@ -10671,9 +10706,10 @@ async function uploadHighlightVideo(input){
       const c=await compressImage(f,1800,0.86);
       if(c){ up=c; ctype='image/jpeg'; name=name.replace(/\.[^.]+$/,'')+'.jpg'; }
       else if(isHeic(f)){
-        failed++;
-        upLog('<span style="color:var(--red)">\u2715 '+escapeHtml(name)+'</span> — this iPhone HEIC photo could not be converted, and most browsers cannot display HEIC. Set Camera \u2192 Formats \u2192 Most Compatible, or export it as JPG.');
-        continue;
+        /* Conversion failed or timed out. Upload the original rather than refusing: the photo is
+           fine, only our JPEG step failed, and a highlight that Safari can show beats no highlight
+           at all. Flagged so it can be replaced. */
+        upLog('<span style="color:var(--a6)">\u26a0 '+escapeHtml(name)+'</span> — could not convert to JPEG, uploading the original. It may not display on Android or Windows; Camera \u2192 Formats \u2192 Most Compatible avoids this.');
       }
     }
     flash('Uploading '+name+'…');
@@ -10681,7 +10717,11 @@ async function uploadHighlightVideo(input){
     try{
       let url='';
       if(useR2()){
-        const r=await fetch(R2_ENDPOINT,{method:'POST',headers:{'content-type':ctype,'x-upload-token':R2_TOKEN,'x-file-name':name,'x-customer-id':'highlights'},body:up});
+        /* A stalled network request would otherwise wait forever too. */
+        const ac=(typeof AbortController!=='undefined')?new AbortController():null;
+        const killer=ac?setTimeout(()=>{try{ac.abort();}catch(e){}},120000):null;
+        const r=await fetch(R2_ENDPOINT,{method:'POST',signal:ac?ac.signal:undefined,headers:{'content-type':ctype,'x-upload-token':R2_TOKEN,'x-file-name':name,'x-customer-id':'highlights'},body:up})
+          .finally(()=>{ if(killer)clearTimeout(killer); });
         let j={}; try{ j=await r.json(); }catch(e){}
         if(!r.ok||!j.url){ failed++;
           upLog('<span style="color:var(--red)">\u2715 '+escapeHtml(name)+'</span> — server said: '+escapeHtml(String((j&&j.error)||('HTTP '+r.status))));
