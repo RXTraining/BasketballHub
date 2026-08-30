@@ -4488,9 +4488,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-30 01:13 UTC';
+const BUILD='2026-08-30 01:29 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Multiple photos at once again on iPhone.</b> The one-at-a-time restriction was a workaround for a fault that turned out to be on the phone itself, not in the app. The picker keeps no <span class="mono">accept</span> attribute \u2014 that part matters, because it is what stops Safari trying to convert HEIC before handing the file over.',
+   '<b>Fixed: the registration count on the Events page did not update.</b> Adding, approving, removing or paying for a registration repainted the dialog but not the page behind it, so the table kept the old headcount until something else forced a redraw \u2014 the same class of bug as the coach payout column. All six actions now refresh both.',
    '<b>The endless spinner was our own code, not the iOS picker.</b> Photos are shrunk before upload, and that step awaited <span class="mono">new Image()</span> with only <i>onload</i> and <i>onerror</i> to finish it. For a HEIC that Safari can neither decode nor reject, <b>neither event ever fires</b> \u2014 so the promise never settled and the upload waited forever with no error anywhere. A screenshot is a PNG, decodes instantly, and always worked: exactly the pattern reported.',
    'Decoding now tries <span class="mono">createImageBitmap</span> first (wider format support, always settles) and falls back to an image element, both on a 15-second limit, so nothing can block indefinitely. If conversion genuinely fails the original is uploaded anyway with a warning rather than being refused \u2014 the photo is fine, only our JPEG step failed. The network upload gained a two-minute abort for the same reason.',
    'The draft banner in Admin now offers <b>Discard all</b> beside <b>Publish all</b>. A draft is a decision with two answers, and only one of them had a button \u2014 a test upload, a duplicate or a blurry shot had to be deleted a row at a time, which is how drafts accumulate. The confirmation lists what is going, published highlights are untouched, and the stored file itself is left alone so an accidental discard cannot destroy the original.',
@@ -6587,7 +6589,7 @@ function filePickHtml(fn,opts){
        so it needs no conversion and always worked — which is exactly the symptom.
        Without accept, iOS shows its plain sheet and passes the original file straight through; we
        convert it ourselves in compressImage(), where a failure is visible and recoverable. */
-    return `<label class="${cls}" style="cursor:pointer" title="Opens the iOS sheet — choose Photo Library or Take Photo">📷 ${o.photoLabel||'Photo'}<input type="file" class="hidefile" onchange="${fn}(this)"></label>
+    return `<label class="${cls}" style="cursor:pointer" title="Opens the iOS sheet — choose Photo Library or Take Photo">📷 ${o.photoLabel||'Photos'}<input type="file" multiple class="hidefile" onchange="${fn}(this)"></label>
       <label class="${cls}" style="cursor:pointer">🎬 ${o.videoLabel||'Video'}<input type="file" accept="video/*" class="hidefile" onchange="${fn}(this)"></label>`;
   }
   return `<label class="${cls}" style="cursor:pointer">📷 ${o.photoLabel||'Photos'}<input type="file" accept="image/*" multiple class="hidefile" onchange="${fn}(this)"></label>
@@ -8701,7 +8703,7 @@ function eventAdvertisable(ev){
    still leads the day's TBC-time one. */
 function eventSortKey(ev){ return (ev.date||'9999-99-99')+(ev.time||'99:99'); }
 function eventPendingRegs(){return (DB.eventRegs||[]).filter(r=>r.status==='pending'&&(eventById(r.eventId)));}
-function eventRegApprove(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;r.status='registered';save();flash('Registration approved ✅');viewEventRegs(r.eventId);}
+function eventRegApprove(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;r.status='registered';save();flash('Registration approved ✅');refreshOwner();viewEventRegs(r.eventId);}
 
 function renderEvents(){ if(AUTH==='client') return renderEventsClient(); renderEventsOwner(); }
 
@@ -8938,7 +8940,9 @@ function ownerAddReg(eid){
   const ev=eventById(eid);if(eventSpotsLeft(ev)<=0)return flash('Event is full',true);
   if(myEventReg(eid,cid))return flash('Already registered',true);
   DB.eventRegs.push({id:uid(),eventId:eid,customerId:cid,status:'registered',paid:false,paidVia:'',checkedIn:false,created:todayISO()});
-  save();flash('Registered');viewEventRegs(eid);
+  /* Repaint the page underneath too, or the Events table keeps the old headcount until something
+     else forces a redraw — the dialog and the page disagreeing about the same number. */
+  save();flash('Registered');refreshOwner();viewEventRegs(eid);
 }
 function eventMarkAllPaid(eid){
   const ev=eventById(eid); if(!ev)return;
@@ -8948,7 +8952,7 @@ function eventMarkAllPaid(eid){
   due.forEach(r=>{r.paid=true;r.paidVia='cash';});
   save(); flash(due.length+' marked paid \u{1F4B5}'); viewEventRegs(eid);
 }
-function eventRegPay(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;r.paid=true;r.paidVia='cash';save();flash('Marked paid 💵');viewEventRegs(r.eventId);}
+function eventRegPay(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;r.paid=true;r.paidVia='cash';save();flash('Marked paid 💵');refreshOwner();viewEventRegs(r.eventId);}
 /* An event place bought with a group credit. It really consumes one — creditConsumers() counts it
    alongside the sessions — so the balance falls and the place cannot be paid for twice. */
 function eventRegCredit(id){
@@ -8957,7 +8961,7 @@ function eventRegCredit(id){
   if(creditsFor(c,'group')<=0)
     return flash(c.name+' has no group credits left — sell a package or take the cash.',true);
   r.paid=true; r.paidVia='package';
-  save(); flash('Paid with a group credit 🎟️');
+  save(); flash('Paid with a group credit 🎟️'); refreshOwner();
   logAct('credit_used',c.name+' · event place',r.eventId);
   viewEventRegs(r.eventId);
 }
@@ -8974,11 +8978,11 @@ function eventRegUnpay(id){
   const r=(DB.eventRegs||[]).find(x=>x.id===id); if(!r)return;
   const was=r.paidVia;
   r.paid=false; r.paidVia='';
-  save(); flash(was==='package'?'Credit returned 🎟️':'Marked unpaid');
+  save(); flash(was==='package'?'Credit returned 🎟️':'Marked unpaid'); refreshOwner();
   viewEventRegs(r.eventId);
 }
-function eventRegCheckin(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;r.checkedIn=!r.checkedIn;save();viewEventRegs(r.eventId);}
-function eventRegRemove(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;if(!confirm('Remove this registration?'))return;const eid=r.eventId;r.status='cancelled';save();flash('Removed');viewEventRegs(eid);}
+function eventRegCheckin(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;r.checkedIn=!r.checkedIn;save();refreshOwner();viewEventRegs(r.eventId);}
+function eventRegRemove(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;if(!confirm('Remove this registration?'))return;const eid=r.eventId;r.status='cancelled';save();flash('Removed');refreshOwner();viewEventRegs(eid);}
 
 /* ---- client view ---- */
 function renderEventsClient(){
