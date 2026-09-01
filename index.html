@@ -869,7 +869,7 @@
     padding:6px 11px;font-size:12.5px;color:var(--lp-mut);font-weight:700}
   .lp-coach-rates b{color:var(--lp-ink)}
   /* ---- sports rail ---- */
-  /* which sports a plan is available in — matters now that Open Run is basketball-only and
+  /* which sports a plan is available in — matters now that the Weekend Clinic is basketball-only and
      Conditioning is track-only */
   .lp-plan-sports{display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 12px}
   .lp-plan-sports span{font-size:11.5px;font-weight:800;color:#2f6b12;background:var(--a1b);
@@ -1265,8 +1265,8 @@ const ZH={
   'Training now':'现已开课',
   'SLOGAN':'我们在你心中种下运动的种子',
   'NO_WEEKEND_SLOTS':'{name} 目前还没有安排时段，教练排好后会在这里显示。',
-  'Weekend Open Run':'周末自由球局',
-  'Open Run':'自由球局',
+  'Weekend Clinic':'周末训练营','Clinic':'训练营',
+
   'Weekend Running/Conditioning':'周末跑步 / 体能课',
   'Conditioning':'体能课',
   'up to':'最多',
@@ -1477,8 +1477,8 @@ const KO={
   'Training now':'현재 운영 중',
   'SLOGAN':'우리는 스포츠의 씨앗을 심습니다',
   'NO_WEEKEND_SLOTS':'{name} 시간이 아직 공지되지 않았습니다. 코치가 일정을 올리면 여기에 표시됩니다.',
-  'Weekend Open Run':'주말 오픈 런',
-  'Open Run':'오픈 런',
+  'Weekend Clinic':'주말 클리닉','Clinic':'클리닉',
+
   'Weekend Running/Conditioning':'주말 러닝/컨디셔닝',
   'Conditioning':'컨디셔닝',
   'up to':'최대',
@@ -1684,8 +1684,8 @@ const JA={
   'Training now':'開講中',
   'SLOGAN':'スポーツの種を蒔く',
   'NO_WEEKEND_SLOTS':'{name} の時間はまだ公開されていません。コーチが予定を追加するとここに表示されます。',
-  'Weekend Open Run':'週末オープンラン',
-  'Open Run':'オープンラン',
+  'Weekend Clinic':'週末クリニック','Clinic':'クリニック',
+
   'Weekend Running/Conditioning':'週末ランニング/コンディショニング',
   'Conditioning':'コンディショニング',
   'up to':'最大',
@@ -1783,7 +1783,7 @@ const EN={
   'C_INT':'Intervals &amp; tempo work',
   'C_STR':'Strength &amp; injury prevention',
   'C_ALL':'Every level welcome',
-  'Weekend Open Run':'Weekend Open Run',
+  'Weekend Clinic':'Weekend Clinic',
   'Weekend Running/Conditioning':'Weekend Running/Conditioning',
   'Book this':'Book this',
   'per player':'per player',
@@ -1986,7 +1986,7 @@ const MAX_WEEKEND = 10;   // the standing weekend classes run much bigger than a
 const SESSION_TYPES={
   '1on1':    {label:'1:1',                          short:'1:1',          max:1,           sports:null,           dedicated:false, rateKey:'rate1on1'},
   'group':   {label:'Group',                        short:'Group',        max:MAX_GROUP,   sports:null,           dedicated:false, rateKey:'rateGroup'},
-  'openrun': {label:'Weekend Open Run',             short:'Open Run',     max:MAX_WEEKEND, sports:['basketball'], dedicated:true,  rateKey:'rateCond'},
+  'openrun': {label:'Weekend Clinic',               short:'Clinic',       max:MAX_WEEKEND, sports:['basketball'], dedicated:true,  rateKey:'rateCond'},
   'cond':    {label:'Weekend Running/Conditioning', short:'Conditioning', max:MAX_WEEKEND, sports:['track'],      dedicated:true,  rateKey:'rateCond'}
 };
 const TYPE_ORDER=['1on1','group','openrun','cond'];
@@ -2881,7 +2881,7 @@ function cancelledByLabel(s){
   return '<span class="pill red">Cancelled'+who+'</span>'+refundPill(s);
 }
 /* ---- Credit pools --------------------------------------------------------
-   Group, Weekend Open Run and Weekend Running/Conditioning are all priced per player at a
+   Group, Weekend Clinic and Weekend Running/Conditioning are all priced per player at a
    similar rate, so a credit bought for one can settle any of them — a family with two group
    credits left can spend them on Saturday running. 1:1 sits in its own pool because it costs
    substantially more; letting a $20 credit pay for a $35 session would quietly lose money.
@@ -2890,7 +2890,7 @@ function cancelledByLabel(s){
    across the whole pool, so the balance is always derived and can never drift out of step with
    the sessions themselves. */
 /* Group and the two weekend classes share one pool of credits: they are all the same
-   pay-per-head format, so a Group 10-pack covers a Weekend Open Run or a Running/Conditioning
+   pay-per-head format, so a Group 10-pack covers a Weekend Clinic or a Running/Conditioning
    class just as well. 1:1 stays on its own — it is a different price and a different thing. */
 const CREDIT_POOLS=[['1on1'],['group','openrun','cond']];
 function creditPool(type){ return CREDIT_POOLS.find(p=>p.indexOf(type)>=0)||[type]; }
@@ -4327,7 +4327,7 @@ function exportExcel(){
   add('Customers',DB.customers.map(c=>({Name:c.name,Phone:c.phone,Email:c.email,Town:c.town||'',WeChat:c.wechat||'','In group':c.inGroup?'Yes':'No',Parent:c.parent,Level:c.level,
     '1:1 used':poolUsed(c,'1on1'),'1:1 total':poolTotal(c,'1on1'),'1:1 left':creditsFor(c,'1on1'),
     'Group+weekend used':poolUsed(c,'group'),'Group+weekend total':poolTotal(c,'group'),'Group+weekend left':creditsFor(c,'group'),
-    'Group pkg':totalFor(c,'group'),'Open Run pkg':totalFor(c,'openrun'),'Conditioning pkg':totalFor(c,'cond'),
+    'Group pkg':totalFor(c,'group'),'Weekend Clinic pkg':totalFor(c,'openrun'),'Conditioning pkg':totalFor(c,'cond'),
     Password:c.pwd,Created:c.created,Notes:c.notes})));
   add('Coaches',(DB.coaches||[]).map(co=>({Name:co.name,Tagline:co.tagline,Affiliation:co.affiliation,Detail:co.affiliationSub,
     Active:co.active!==false?'Yes':'No',Sessions:DB.sessions.filter(s=>s.coachId===co.id&&s.status!=='cancelled').length})));
@@ -4488,9 +4488,10 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-08-30 01:29 UTC';
+const BUILD='2026-09-01 02:37 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Weekend Open Run is now the Weekend Clinic.</b> Basketball only, as before, and only the wording changed \u2014 the underlying type is untouched, so existing sessions, credits, packages, availability windows and coach rates all carry over with nothing to re-enter. Chinese, Korean and Japanese updated to match.',
    '<b>Multiple photos at once again on iPhone.</b> The one-at-a-time restriction was a workaround for a fault that turned out to be on the phone itself, not in the app. The picker keeps no <span class="mono">accept</span> attribute \u2014 that part matters, because it is what stops Safari trying to convert HEIC before handing the file over.',
    '<b>Fixed: the registration count on the Events page did not update.</b> Adding, approving, removing or paying for a registration repainted the dialog but not the page behind it, so the table kept the old headcount until something else forced a redraw \u2014 the same class of bug as the coach payout column. All six actions now refresh both.',
    '<b>The endless spinner was our own code, not the iOS picker.</b> Photos are shrunk before upload, and that step awaited <span class="mono">new Image()</span> with only <i>onload</i> and <i>onerror</i> to finish it. For a HEIC that Safari can neither decode nor reject, <b>neither event ever fires</b> \u2014 so the promise never settled and the upload waited forever with no error anywhere. A screenshot is a PNG, decodes instantly, and always worked: exactly the pattern reported.',
