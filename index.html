@@ -4488,9 +4488,10 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-02 00:08 UTC';
+const BUILD='2026-09-02 00:17 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   'Dropped the <i>Next up</i> badge and the <i>Going ahead \u2014 room for more</i> pill from the group list, and gave every row the same type sizes and the same buttons. Ranking one option with a badge and a bigger button makes the eye stop comparing and start accepting a recommendation \u2014 but these are alternatives, and a parent picks on time, coach and who is already in. Each row now carries only what differs: when, how full, where, how long, the price, the coach, the players.',
    'When more than one group has room, they are now laid out identically. The soonest one had a richer layout of its own and the rest were compact rows underneath, so two options on the same card were arranged two different ways and could not be compared at a glance \u2014 which is the whole job of a list of choices. Every group now shows the same things in the same order: time, how full it is, place, length, price per player, the coach with their photo, and who is already in. The first is marked <b>Next up</b> and keeps the solid join button; nothing else differs.',
    '<b>Weekend Open Run is now the Weekend Clinic.</b> Basketball only, as before, and only the wording changed \u2014 the underlying type is untouched, so existing sessions, credits, packages, availability windows and coach rates all carry over with nothing to re-enter. Chinese, Korean and Japanese updated to match.',
    '<b>Multiple photos at once again on iPhone.</b> The one-at-a-time restriction was a workaround for a fault that turned out to be on the phone itself, not in the app. The picker keeps no <span class="mono">accept</span> attribute \u2014 that part matters, because it is what stops Safari trying to convert HEIC before handing the file over.',
@@ -5622,35 +5623,26 @@ function coachBlockHtml(coachId){
 function groupCoachHtml(s){ return coachBlockHtml(s&&s.coachId); }
 /* Ask to join / withdraw, in one place — the headline group and the ones listed under it were
    drifting apart, and the headline never showed a request already waiting. */
-function groupJoinBtns(s,big){
-  const z=big?'':' sm';
+function groupJoinBtns(s){
   return myJoinPending(s,clientAs)
-    ? `<span class="pill yellow">${t('⏳ Pending approval')}</span><button class="btn ghost${z}" onclick="cancelJoinRequest('${s.id}')">${t('Withdraw')}</button>`
-    : `<button class="btn${z}" onclick="requestJoinGroup('${s.id}')">${t('Ask to join')}${big?' — '+fmtDT(s.date,s.time):''}</button>`;
-}
-function groupRunPill(s){
-  const n=(s.customerIds||[]).length;
-  return isForming(s)
-    /* "Running" was a bad word to choose in an app that also has a Running sport and a Weekend
-       Running/Conditioning class — on a basketball group it read as the sport. This pill is about
-       whether the session goes ahead, so say that. */
-    ? `<span class="pill yellow" title="${t('Needs at least')} ${groupMin()} ${t('players')} ${t('to go ahead')}">${t('Needs')} ${groupMin()-n} ${t('more to go ahead')}</span>`
-    : `<span class="pill blue">${t('Going ahead — room for more')}</span>`;
+    ? `<span class="pill yellow">${t('⏳ Pending approval')}</span><button class="btn ghost sm" onclick="cancelJoinRequest('${s.id}')">${t('Withdraw')}</button>`
+    : `<button class="btn sm" onclick="requestJoinGroup('${s.id}')">${t('Ask to join')}</button>`;
 }
 /* A compact row for the other groups, listed inside the same card as the headline one. */
 /* EVERY group is drawn with this, including the first. Giving the soonest one a different, richer
    layout meant two groups on the same card were laid out two different ways, so the eye could not
    compare them — which is the whole job of a list of options. The first is marked "Next up" and
    its join button is the solid one; nothing else differs. */
-function groupRowHtml(s,opts){
-  const first=opts&&opts.first;
+/* EVERY group is drawn with this, identically — same order, same type sizes, same buttons.
+   Ranking one of them with a badge or a bigger button makes the eye stop comparing and start
+   accepting a recommendation, which is not the job here: these are alternatives, and the reader
+   picks on time, coach and who is already in. */
+function groupRowHtml(s){
   const co=coachById(s.coachId);
   return `<div style="padding:12px 0;border-top:1px solid rgba(255,255,255,.25)">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
-      <div style="min-width:0;flex:1">
-        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b>
-        ${first?`<span class="pill">${t('Next up')}</span>`:''}
-        ${groupStatePill(s)} ${groupRunPill(s)}
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+      <div style="min-width:0;flex:1 1 260px">
+        <b style="font-size:15px">${fmtDT(s.date,s.time)}</b> ${groupStatePill(s)}
         <div class="clienttag" style="margin-top:4px">📍 ${escapeHtml(s.location||'TBD')} · ${s.dur||defaultDur('group')} ${t('min')} · <b style="color:#fff">${shareLabel(s)}</b> ${t('per player')}</div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
           ${co&&co.photo?`<img src="${attrEsc(co.photo)}" alt="" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex:0 0 auto">`
@@ -5661,8 +5653,8 @@ function groupRowHtml(s,opts){
         <div style="margin-top:7px">${rosterHtml(s,clientAs)}</div>
       </div>
       <div class="actions" style="flex:0 0 auto">
-        ${groupJoinBtns(s,!!first)}
-        <button class="btn ghost${first?'':' sm'}" onclick="inviteToGroup('${s.id}')">${first?t('Invite a friend'):t('Invite')}</button>
+        ${groupJoinBtns(s)}
+        <button class="btn ghost sm" onclick="inviteToGroup('${s.id}')">${t('Invite')}</button>
       </div>
     </div>
   </div>`;
@@ -5684,7 +5676,7 @@ function groupCtaHtml(){
         ${open.length===1?t('A group has room for you — it stays open until it is full.')
                          :open.length+' '+t('groups have room right now — pick one.')}
       </div>
-      ${open.map((g,i)=>groupRowHtml(g,{first:i===0})).join('')}
+      ${open.map(g=>groupRowHtml(g)).join('')}
       <p class="clienttag" style="margin-top:10px">${t('You can see who is already in each group so you know who your child would be training with. Only signed-in families see this — never the public page.')}</p>`);
   }
   if(mine.length){
