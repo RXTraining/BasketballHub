@@ -3995,9 +3995,6 @@ function renderLanding(){
       </div>
     </header>
 
-    ${lpFeaturedHtml()}
-    ${lpOpenGroupsHtml()}
-
     <section class="lp-sec lp-about" id="lpAbout">
       <div class="lp-kicker">${t('Who we are')}</div>
       <h2 class="lp-h2 lp-h2-mark">${t('THE RX APPROACH')}</h2>
@@ -4011,6 +4008,9 @@ function renderLanding(){
       <h2 class="lp-h2">${t('HIGHLIGHTS')}</h2>
       ${lpHighlightsHtml()}
     </section>
+
+    ${lpFeaturedHtml()}
+    ${lpOpenGroupsHtml()}
 
     <section class="lp-sec" id="lpSessions">
       <div class="lp-kicker">${t('What we offer')}</div>
@@ -4515,13 +4515,13 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-02 02:35 UTC';
+const BUILD='2026-09-04 21:03 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
    '<b>Fixed: Add to calendar used the wrong time zone.</b> The times were written with no zone at all \u2014 <span class="mono">20260902T180000</span> \u2014 which iCalendar calls a <i>floating</i> time and every calendar reads in the <b>viewer\u2019s</b> zone. A family in California adding a 6pm Boston session got 6pm Pacific: three hours late, with nothing to show anything was wrong. Times are now converted from the Boston clock to UTC using that date\u2019s real offset, so the event lands at the right moment wherever it is opened.',
    'Because the offset is looked up per date rather than assumed, <b>EST and EDT are both correct</b> \u2014 including sessions on the changeover weekends. Session downloads, the coach\u2019s bulk export, event downloads and the Google Calendar link all go through the same conversion, and an event with no date yet now says so instead of producing a broken file.',
    '<b>Launching a group is always available now, not only when nothing is forming.</b> A list of what already exists was the only option on the page \u2014 but none of those times may suit a family, and they may want a particular coach. <b>None of these suit?</b> sits under the list of open groups, under a client&rsquo;s own group, and on the home page as <i>Or start your own group</i>.',
-   '<b>FEATURED moved above <i>Who we are</i></b> on the home page. What is happening next is more use to a visitor than who we are, and it was sitting below the highlights reel where nobody scrolled to it.',
+   'Home page order: <b>Who we are \u2192 Highlights \u2192 Featured \u2192 Groups with room \u2192 Sessions \u2192 Coaches</b>. A visitor meets the approach, sees the training, and is then shown what they can actually join \u2014 the two things they can act on sit together, straight after the reel that makes them want to.',
    '<b>Groups with room now appear on the home page</b>, under FEATURED \u2014 date, place, length, price per player, the coach and how many spots are left, with a join button. <b>No names or ages:</b> the roster stays behind sign-in, because that page is public and those are children. It uses the same card as FEATURED so the two read as one page.',
    'An event can now nominate a <b>lead coach</b> from its ticked hosts. That name shows with the event on the home page, in the scrolling bar, on the client&rsquo;s events list and in their banner, with the other hosts as \u201c+1\u201d. It is stored separately from the host list, so adding or reordering hosts never silently changes who is billed as lead \u2014 and if that coach is removed from the event it falls back to the first host.',
    'Ages on a group roster now all read <b>11 years old</b>. They were coming from two places \u2014 the numeric <i>Age</i> field, which said \u201c11 yrs\u201d, and the free-text <i>Level</i> box, where families had typed \u201c13 years old\u201d, \u201c11\u201d or \u201cU14\u201d \u2014 so one row of children was labelled three different ways. A bare number or an \u201c11 yrs\u201d in the Level box is now recognised as an age and phrased identically; a real level like <i>AAU U14</i> is left exactly as typed, and the same value is never printed twice.',
