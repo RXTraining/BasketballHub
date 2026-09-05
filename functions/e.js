@@ -105,12 +105,20 @@ export async function onRequestGet(context){
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="en_US">
 <link rel="canonical" href="${esc(SITE + '/e?i=' + id)}">
+<link rel="image_src" href="${esc(img)}">
+<link rel="apple-touch-icon" href="${esc(img)}">
 <style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
   background:#f6f8f4;color:#1b2418;padding:24px;text-align:center}
  a{color:#4d8000;font-weight:800}</style>
 </head><body>
 <div>
+  <!-- A REAL <img>, not only the og:image tag. WeChat and QQ do not read Open Graph: when a link is
+       shared (rather than pasted as text) they build the card themselves from the page title and
+       the first usable image in the document. A text-only page therefore produced a card with no
+       picture. link rel="image_src" is the other legacy signal those crawlers still honour. -->
+  <img src="${esc(img)}" alt="RX.TRAINING" width="600" height="315"
+       style="width:100%;max-width:420px;height:auto;border-radius:12px;margin:0 auto 18px;display:block">
   <h1 style="font-size:20px;margin:0 0 8px">${esc(title)}</h1>
   <p style="margin:0 0 16px;color:#5b6b55">${esc(bits.join(' · '))}</p>
   <p><a href="${esc(appUrl)}">Opening registration… tap here if nothing happens</a></p>
