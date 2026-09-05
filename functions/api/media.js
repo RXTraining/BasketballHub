@@ -23,7 +23,7 @@ const ALLOWED = [/^image\//, /^video\//];
 function cors(resp) {
   resp.headers.set("Access-Control-Allow-Origin", "*");
   resp.headers.set("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
-  resp.headers.set("Access-Control-Allow-Headers", "content-type,x-upload-token,x-file-name,x-customer-id");
+  resp.headers.set("Access-Control-Allow-Headers", "content-type,x-upload-token,x-file-name,x-customer-id,x-fixed-key");
   return resp;
 }
 const json = (obj, status = 200) =>
@@ -76,7 +76,14 @@ export async function onRequest(context) {
 
     const customer = safe(request.headers.get("x-customer-id"), "unassigned");
     const name = safe(request.headers.get("x-file-name"), isVideo ? "clip.mp4" : "photo.jpg");
-    const key = `media/${customer}/${rid()}-${name}`;
+    /* Brand assets are written repeatedly to the SAME key on purpose — the link-preview card has
+       to live at one address because the og:image tag baked into every page can never change.
+       Restricted to the brand/ prefix so this cannot be used to overwrite a client's media, which
+       is namespaced per customer and write-once by design. */
+    const fixed = request.headers.get("x-fixed-key");
+    const key = (fixed && /^brand\/[a-zA-Z0-9._-]{1,60}$/.test(fixed))
+      ? fixed
+      : `media/${customer}/${rid()}-${name}`;
 
     await env.RX_MEDIA.put(key, body, { httpMetadata: { contentType: ctype } });
     return json({ key, url: `${url.origin}/api/media?key=${encodeURIComponent(key)}` });
