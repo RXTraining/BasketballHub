@@ -1348,7 +1348,7 @@ const ZH={
   // events
   'Workshops, guest sessions and more. Register for anything that interests you. Times are Boston (ET).':'工作坊、嘉宾课程等。感兴趣即可报名。时间为波士顿时间（ET）。',
   'No upcoming events right now — check back soon.':'暂无即将开始的活动 — 请稍后再来。',
-  'Register':'报名','Full':'已满','✓ Registered':'✓ 已报名','⏳ Pending approval':'⏳ 待审核','Paid':'已付款','Free':'免费','When':'时间','Where':'地点','Price':'费用','Places':'名额','per player':'每人','Scan to register':'扫码报名','No app, no account needed':'无需下载 App，无需注册','Poster':'海报',
+  'Register':'报名','Full':'已满','✓ Registered':'✓ 已报名','⏳ Pending approval':'⏳ 待审核','Paid':'已付款','Free':'免费','When':'时间','Where':'地点','Price':'费用','Places':'名额','per player':'每人','Scan to register':'扫码报名','No app, no account needed':'无需下载 App，无需注册','Poster':'海报','Sorry — we could not save your registration. Please send your coach a message.':'抱歉，报名未能保存，请联系您的教练。',
   'See all →':'查看全部 →',
   // payments
   'My Payments':'我的付款','Credit used':'已用课时','over':'超出','All money you\'ve paid, grouped by period.':'您的所有付款，按周期汇总。',
@@ -1558,7 +1558,7 @@ const KO={
   'No past sessions yet.':'아직 지난 수업이 없습니다.',
   'Workshops, guest sessions and more. Register for anything that interests you. Times are Boston (ET).':'워크숍, 게스트 세션 등. 관심 있는 항목에 등록하세요. 시간은 보스턴 시간(ET)입니다.',
   'No upcoming events right now — check back soon.':'예정된 이벤트가 없습니다 — 나중에 다시 확인하세요.',
-  'Register':'등록','Full':'마감','✓ Registered':'✓ 등록됨','⏳ Pending approval':'⏳ 승인 대기','Paid':'결제됨','Free':'무료','When':'일시','Where':'장소','Price':'참가비','Places':'잔여','per player':'1인당','Scan to register':'스캔하여 등록','No app, no account needed':'앱 설치도 계정도 필요 없습니다','Poster':'포스터',
+  'Register':'등록','Full':'마감','✓ Registered':'✓ 등록됨','⏳ Pending approval':'⏳ 승인 대기','Paid':'결제됨','Free':'무료','When':'일시','Where':'장소','Price':'참가비','Places':'잔여','per player':'1인당','Scan to register':'스캔하여 등록','No app, no account needed':'앱 설치도 계정도 필요 없습니다','Poster':'포스터','Sorry — we could not save your registration. Please send your coach a message.':'죄송합니다. 등록을 저장하지 못했습니다. 코치에게 알려주세요.',
   'See all →':'전체 보기 →',
   'My Payments':'내 결제','Credit used':'사용한 크레딧','over':'초과',"All money you've paid, grouped by period.":'기간별 결제 내역입니다.',
   'Total paid':'총 결제액','By period':'기간별','All payments':'전체 결제','Detail':'상세','Amount':'금액',
@@ -1765,7 +1765,7 @@ const JA={
   'No past sessions yet.':'過去のセッションはまだありません。',
   'Workshops, guest sessions and more. Register for anything that interests you. Times are Boston (ET).':'ワークショップやゲストセッションなど。気になるものに登録してください。時間はボストン時間（ET）です。',
   'No upcoming events right now — check back soon.':'現在予定されているイベントはありません — またご確認ください。',
-  'Register':'登録','Full':'満員','✓ Registered':'✓ 登録済み','⏳ Pending approval':'⏳ 承認待ち','Paid':'支払い済み','Free':'無料','When':'日時','Where':'場所','Price':'参加費','Places':'残り','per player':'1人あたり','Scan to register':'スキャンして登録','No app, no account needed':'アプリも登録も不要です','Poster':'ポスター',
+  'Register':'登録','Full':'満員','✓ Registered':'✓ 登録済み','⏳ Pending approval':'⏳ 承認待ち','Paid':'支払い済み','Free':'無料','When':'日時','Where':'場所','Price':'参加費','Places':'残り','per player':'1人あたり','Scan to register':'スキャンして登録','No app, no account needed':'アプリも登録も不要です','Poster':'ポスター','Sorry — we could not save your registration. Please send your coach a message.':'申し訳ありません。登録を保存できませんでした。コーチにご連絡ください。',
   'See all →':'すべて見る →',
   'My Payments':'マイ支払い','Credit used':'使用したクレジット','over':'超過',"All money you've paid, grouped by period.":'期間別の支払い履歴です。',
   'Total paid':'支払い合計','By period':'期間別','All payments':'すべての支払い','Detail':'詳細','Amount':'金額',
@@ -2920,7 +2920,33 @@ function stampLogin(role,id){
 /* targeted single-record upsert for client actions (never bulk) */
 function pushRows(table,rows){
   if(!(supa&&SUPA_OK)||!rows||!rows.length)return;
-  supa.from(table).upsert(rows).then(r=>{if(r&&r.error)flash('Cloud save failed — saved on this device',true);},()=>flash('Cloud save failed — saved on this device',true));
+  supa.from(table).upsert(rows).then(r=>{if(r&&r.error)noteSyncFail(table,r.error);},e=>noteSyncFail(table,e));
+}
+/* A targeted pushRows failure used to raise one flash and disappear. That is invisible where it
+   matters most: a public registrant is NOT signed in, so cloudPush() deliberately refuses to run
+   for them and these two upserts are the ONLY writes that happen. If the customers row fails and
+   the event_regs row succeeds, the owner is left with a registration pointing at nobody — which is
+   the "?" in the registrations list, with no name and no phone number to chase. Record it the same
+   way the bulk sync does so Admin keeps showing it until it is fixed. */
+function noteSyncFail(table,err){
+  const msg=(err&&err.message)||'unknown error';
+  syncFails[table]=msg;
+  try{localStorage.setItem('rx_syncfails',JSON.stringify(syncFails));}catch(e){}
+  console.warn('sync failed:',table,msg);
+  flash('Cloud save failed ('+table+') — saved on this device only',true);
+}
+/* Same upsert, but await it and say whether it landed. Used where creating the second row only
+   makes sense if the first one saved. */
+async function pushRowsNow(table,rows){
+  if(!(supa&&SUPA_OK))return true;                 // offline/local-only mode: nothing to verify
+  if(!rows||!rows.length)return true;
+  try{
+    const r=await supa.from(table).upsert(rows);
+    if(r&&r.error){ noteSyncFail(table,r.error); return false; }
+    delete syncFails[table];
+    try{localStorage.setItem('rx_syncfails',JSON.stringify(syncFails));}catch(e){}
+    return true;
+  }catch(e){ noteSyncFail(table,e); return false; }
 }
 async function syncTable(name,rows){
   if(rows.length) {const {error}=await supa.from(name).upsert(rows); if(error) throw error;}
@@ -3599,11 +3625,24 @@ function renderWhoami(){
    Matching matters more than the form does: without it a public link is a duplicate factory, and
    within a month there are two records for the same family with the credits on the wrong one. */
 function normPhone(v){ return String(v||'').replace(/[^0-9]/g,'').slice(-10); }
-function findCustomerBy(phone,email){
-  const ph=normPhone(phone), em=String(email||'').trim().toLowerCase();
-  return (DB.customers||[]).find(c=>
+/* Who is registering, given a mobile, an email and the PLAYER's name.
+   The mobile identifies a FAMILY, not a player — two children share a parent's phone. Matching on
+   the phone alone meant a second child was taken for their sibling: the name typed was thrown
+   away, and the parent was told "you are already registered" for a child who had not been. So the
+   phone narrows it to a household and the name picks the player within it; a name we have not seen
+   on that phone is a new player, returned as a sibling so their parent and contact details carry
+   over rather than being asked for twice. */
+const nameKey=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+function findCustomerBy(phone,email,name){
+  const ph=normPhone(phone), em=String(email||'').trim().toLowerCase(), nk=nameKey(name);
+  const household=(DB.customers||[]).filter(c=>
       (ph && normPhone(c.phone)===ph) ||
-      (em && String(c.email||'').trim().toLowerCase()===em)) || null;
+      (em && String(c.email||'').trim().toLowerCase()===em));
+  if(!household.length)return null;
+  if(!nk)return household[0];                       // no name to go on — old behaviour
+  const exact=household.find(c=>nameKey(c.name)===nk);
+  if(exact)return exact;
+  return {sibling:household[0]};                    // same family, a player we have not met
 }
 /* Two shapes for the same destination:
      /e?i=<id> — what you SHARE. A Cloudflare Pages Function answers it with that event's Open
@@ -3657,7 +3696,7 @@ function closePublicReg(){
   closeModal();
   try{ if(/[#&]e=/.test(location.hash))history.replaceState(null,'',location.pathname+location.search); }catch(e){}
 }
-function submitPublicReg(eid){
+async function submitPublicReg(eid){
   const ev=eventById(eid); if(!ev)return;
   const name=($('#peName').value||'').trim();
   const parent=($('#peParent').value||'').trim();
@@ -3671,29 +3710,41 @@ function submitPublicReg(eid){
   if(eventSpotsLeft(ev)<=0)return flash(t('Sorry, this event just filled up'),true);
 
   const wv=waiverRecord(parent,'Parent/guardian',$('#pePhoto')&&$('#pePhoto').checked);
-  let c=findCustomerBy(phone,email), isNew=false;
+  const found=findCustomerBy(phone,email,name);
+  const kin=(found&&found.sibling)||null;
+  let c=(found&&!found.sibling)?found:null, isNew=false;
   if(c){
-    // known family — fill any blanks, never overwrite what they already told us
+    // this exact player — fill any blanks, never overwrite what they already told us
     if(!c.parent)c.parent=parent;
     if(!c.phone)c.phone=phone;
     if(!c.email&&email)c.email=email;
     if((c.age==null||c.age==='')&&ageRaw)c.age=Math.max(0,Math.round(+ageRaw||0))||null;
     c.waiver=wv;
+    if(myEventReg(eid,c.id)){ closePublicReg(); return flash(t('You are already registered for this event')); }
   }else{
     isNew=true;
-    c={id:uid(),name,phone,email,parent,town:'',level:'',
+    c={id:uid(),name,phone,email:email||(kin?kin.email:''),parent:parent||(kin?kin.parent:''),
+       town:(kin?kin.town:'')||'',level:'',
        age:(ageRaw===''?null:(Math.max(0,Math.round(+ageRaw||0))||null)),
-       notes:'Registered via public link — '+mlText(ev.title),created:todayISO(),wechat:'',carrier:'',
+       notes:(kin?'Registered via public link (same household as '+kin.name+') — ':'Registered via public link — ')+mlText(ev.title),
+       created:todayISO(),wechat:'',carrier:(kin?kin.carrier:'')||'',
        inGroup:false,approved:false,waiver:wv,creditsTotal:{_v:2},packages:[],
        token:uid()+uid(),pwd:DB.settings.defaultClientPwd};
-    DB.customers.push(c);
   }
-  if(myEventReg(eid,c.id)){ closePublicReg(); return flash(t('You are already registered for this event')); }
   const reg={id:uid(),eventId:eid,customerId:c.id,status:'registered',paid:false,paidVia:'',
              checkedIn:false,created:todayISO(),waiver:wv};
+  /* Save the PERSON first and check it actually landed, then the registration. These go up as two
+     separate writes — a public visitor is not signed in, so the bulk sync deliberately refuses to
+     run for them — and the customers row carries far more columns, so it is the one that fails
+     when the setup SQL has not been run. Writing the registration anyway produced an entry
+     pointing at nobody: "?" in the owner's list, with no name and no number to chase. */
+  if(!await pushRowsNow('customers',[custRow(c)])){
+    return flash(t('Sorry — we could not save your registration. Please send your coach a message.'),true);
+  }
+  if(isNew)DB.customers.push(c);
   DB.eventRegs.push(reg);
   save();
-  try{ pushRows('customers',[custRow(c)]); pushRows('event_regs',[eventRegRow(reg)]); }catch(e){}
+  await pushRowsNow('event_regs',[eventRegRow(reg)]);
   logAct('event_register',(isNew?'NEW via link · ':'via link · ')+name+' · '+mlText(ev.title),eid);
   try{ notifyOwnerEventReg(ev,c); }catch(e){}
   closeModal();
@@ -4929,8 +4980,14 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-05 04:57 UTC';
+const BUILD='2026-09-05 05:34 UTC';
 const CHANGELOG=[
+ {v:'2.5', d:'2026-09-05', t:'Two fixes in public event sign-up', items:[
+   '<b>A second child on the same phone can register.</b> The mobile number identifies a <i>family</i>, not a player \u2014 but sign-up matched on the phone alone, so a sibling was mistaken for the child already registered: the name typed was thrown away and the parent was told \u201cyou are already registered\u201d for a child who was not. The phone now narrows it to a household and the <b>player\u2019s name</b> picks the person within it. A name we have not seen on that number is a new player, and their parent, email and town carry over so nobody is asked twice. Registering the same child twice is still refused.',
+   '<b>A registration can no longer be saved without the person it belongs to.</b> Somebody registering from a public link is not signed in, so the ordinary cloud sync deliberately refuses to run for them and the client record and the registration go up as two separate writes. If the first failed and the second succeeded \u2014 which is what happens when the setup SQL has not been run and a column is missing \u2014 the result was a registration pointing at nobody: <b>\u201c?\u201d</b> in the list, with no name and no number to chase. The person is now written first and checked; if it does not land, nothing is created and the visitor is told plainly rather than being shown a confirmation for a place they do not have.',
+   'Those failures are also <b>recorded now</b> instead of raising one flash on the visitor\u2019s phone and vanishing. Admin \u2192 Cloud sync keeps showing them until they are fixed \u2014 a silent write failure on somebody else\u2019s device is invisible to you, which is exactly why the missing record was a mystery.',
+   'An orphaned registration is shown as <b>Record missing</b> with its id, and what to do about it, rather than a bare question mark.',
+ ]},
  {v:'2.4', d:'2026-09-05', t:'Posters in any language, and a waiver to match', items:[
    '<b>The poster can be made in any of our four languages</b> \u2014 pick EN, \u4e2d\u6587, \ud55c\uad6d\uc5b4 or \u65e5\u672c\u8a9e in the poster box and it redraws. An owner working in English still needs a Chinese poster for a WeChat group, so the language of the poster is now a separate choice from the language of the admin screen.',
    '<b>The QR carries that language with it.</b> Scan a Chinese poster and the registration form opens in Chinese. Somebody sold on an event in one language who lands on a page in another has to go hunting for the language selector, and that is the moment they give up.',
@@ -9819,7 +9876,8 @@ function viewEventRegs(id){
   const ev=eventById(id);if(!ev)return;
   const regs=(DB.eventRegs||[]).filter(r=>r.eventId===id&&r.status!=='cancelled');
   const rows=regs.map(r=>{const c=custById(r.customerId);return `<tr>
-    <td><div class="nameceil"><span class="av">${c?initials(c.name):'?'}</span><div><b>${c?c.name:'?'}</b>
+    <td><div class="nameceil"><span class="av">${c?initials(c.name):'⚠'}</span><div><b>${c?c.name:'Record missing'}</b>
+      ${c?'':`<div class="clienttag" style="color:var(--red)">This registration points at a client record that is not in the database — usually a failed cloud save. Check <b>Admin → Cloud sync</b>, then remove this row and re-add them by hand.<br><span class="mono">${escapeHtml(r.customerId||'(no id)')}</span></div>`}
       <div class="clienttag">${(c&&c.level)||'—'}${c&&c.parent?' · '+c.parent:''}</div></div></div></td>
     <td>${c&&c.phone?`<a href="tel:${c.phone.replace(/[^0-9+]/g,'')}">${c.phone}</a>`:'<span class="muted">—</span>'}</td>
     <td>${r.status==='pending'?'<span class="pill yellow">⏳ Pending</span>':'<span class="pill green">Registered</span>'}</td>
