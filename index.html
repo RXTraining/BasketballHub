@@ -14,7 +14,11 @@
 <meta property="og:title" content="RX.TRAINING — youth athletic training">
 <meta property="og:description" content="Coaching in Lexington, MA. See what is coming up, join a group, or book a session.">
 <meta property="og:url" content="https://rxtraining.org/">
-<meta property="og:image" content="https://rxtraining.org/og-card.png">
+<!-- One fixed address, changing contents. A crawler does not run JavaScript, so this tag can
+     never be chosen at view time — and it is baked into every page, so the URL itself can never
+     change. /api/og-card serves whatever Admin last published (which lists the sports actually
+     enabled) and falls back to the committed og-card.png if nothing has been. -->
+<meta property="og:image" content="https://rxtraining.org/api/og-card">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
@@ -5021,8 +5025,14 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-05 11:24 UTC';
+const BUILD='2026-09-05 11:47 UTC';
 const CHANGELOG=[
+ {v:'2.8', d:'2026-09-05', t:'The link preview card follows your sports', items:[
+   '<b>The picture chat apps show for a shared link now lists the sports you have enabled</b>, drawn the same way as the poster and from the same list the home page cycles through, so the two cannot drift apart. <b>Admin \u2192 Link preview card</b> has Preview and Publish.',
+   'It could not simply read your settings: preview crawlers do not run JavaScript, so the page cannot choose the image when it is viewed \u2014 and the tag is baked into every page, so its URL can never change either. The address is therefore fixed (<span class="mono">/api/og-card</span>) and the <i>image behind it</i> is what changes. Publishing uploads the freshly drawn card to that one address.',
+   'If nothing has been published \u2014 a new deploy, or storage briefly unavailable \u2014 it falls back to the card committed with the site, so a shared link always has a picture. A preview that fails to load is worse than one that is slightly out of date.',
+   'It is still a fixed image, so <b>publish it again whenever you change your sports</b>. And it cannot animate the way the website does: every chat app renders a single frame, so all your sports are shown side by side.',
+ ]},
  {v:'2.7', d:'2026-09-05', t:'Every new account gets its own password', items:[
    '<b>A new client no longer starts on the shared default password.</b> Each account created by sign-up or by a public event link is given its own \u2014 a word and three digits, like <span class="mono">dunk417</span>, short enough to read off a screen and repeat down the phone.',
    'This fixes a real hole. Because everyone started on the same password, two players with the same name held identical credentials and nothing could tell them apart. Refusing to guess is the only safe thing to do at sign-in \u2014 but it meant <b>a stranger registering under an existing player\u2019s name locked that player out of their own account</b>. Unique passwords remove the collision at its source rather than coping with it afterwards, and two namesakes can now both sign in normally.',
@@ -9968,6 +9978,105 @@ function eventPosterCanvas(ev){
   ctr('rxtraining.org',H-64,'700 34px '+FONT,'#3a6e14');
   return cv;
 }
+/* ---- The link-preview card ---------------------------------------------------------------------
+   The picture chat apps show when somebody pastes a link to the site. Same wordmark, slogan and
+   sport icons as the poster, and drawn from the same posterSports() list, so the two cannot drift
+   apart or from the home page. 1200x630 is the size every platform crops from.
+   It is a still image by necessity: previews never animate — WeChat, iMessage and WhatsApp all
+   render a single frame — so every sport is shown at once rather than cycled. */
+function ogCardCanvas(){
+  const W=1200,H=630,cv=document.createElement('canvas');
+  cv.width=W;cv.height=H;
+  const x=cv.getContext('2d'),FONT='-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"PingFang SC","Microsoft YaHei",sans-serif';
+  x.fillStyle='#fff';x.fillRect(0,0,W,H);
+  const band=x.createLinearGradient(0,0,W,0);band.addColorStop(0,'#ff8a1a');band.addColorStop(1,'#f05a14');
+  x.fillStyle=band;x.fillRect(0,0,W,14);
+
+  const sports=posterSports();
+  const mf='800 96px '+FONT;x.font=mf;
+  const wRX=x.measureText('RX').width,wTR=x.measureText('TRAINING').width,br=54,gap=30;
+  let px=(W-(wRX+gap+br*2+gap+wTR))/2,my=250;
+  x.textAlign='left';x.fillStyle='#0f1410';x.fillText('RX',px,my);
+  px+=wRX+gap;posterIcon(x,sports[0],px+br,my-32,br*2);px+=br*2+gap;
+  x.font=mf;x.textAlign='left';x.fillStyle='#0f1410';x.fillText('TRAINING',px,my);
+
+  const slogan=mlText((DB.settings&&DB.settings.slogan)||'')||t('SLOGAN');
+  x.textAlign='center';
+  let sf=46; x.font='600 '+sf+'px '+FONT;
+  while(x.measureText(slogan).width>W-140&&sf>26){ sf-=2; x.font='600 '+sf+'px '+FONT; }
+  x.fillStyle='#3a6e14';x.fillText(slogan,W/2,my+76);
+  const rule=x.createLinearGradient(W/2-124,0,W/2+124,0);
+  rule.addColorStop(0,'#ff8a1a');rule.addColorStop(1,'#f05a14');
+  x.fillStyle=rule;x.fillRect(W/2-124,my+108,248,9);
+
+  // every sport we coach, with its name — this is the part that has to follow Admin
+  const ir=32,pitch=Math.min(168,(W-160)/Math.max(1,sports.length)),sx=W/2-(sports.length-1)*pitch/2;
+  sports.forEach((g,i)=>posterIcon(x,g,sx+i*pitch,my+186,ir*2));
+  const names=sportsForCard();
+  if(names.length===sports.length){
+    x.font='500 22px '+FONT;x.fillStyle='#606c5c';x.textAlign='center';
+    names.forEach((n,i)=>{
+      let lbl=n,f=22;
+      while(x.measureText(lbl).width>pitch-14&&lbl.length>3){ lbl=lbl.slice(0,-1); }
+      if(lbl!==n)lbl=lbl.slice(0,-1)+'…';
+      x.fillText(lbl,sx+i*pitch,my+186+ir+30);
+    });
+  }
+  x.font='500 24px '+FONT;x.fillStyle='#7a8676';x.textAlign='center';
+  x.fillText('rxtraining.org',W/2,H-46);
+  return cv;
+}
+/* The sport NAMES matching posterSports(), in the reader's language. Returns [] if the two lists
+   cannot be lined up, and the card then shows icons alone rather than mislabelled ones. */
+function sportsForCard(){
+  try{
+    const advertised=(DB.settings.sports||'').split(',').map(s=>s.trim()).filter(Boolean);
+    const live=(typeof bookableSports==='function')?bookableSports():[];
+    let use=advertised.filter(sp=>live.some(l=>sportKey(l)===sportKey(sp)));
+    live.forEach(l=>{ if(!use.some(u=>sportKey(u)===sportKey(l)))use.push(l); });
+    if(!use.length)use=advertised;
+    const out=[],seen={};
+    use.forEach(sp=>{ const ic=sportIcon(sp); if(ic&&!seen[ic]){seen[ic]=1;out.push(sportName(sp)||sp);} });
+    return out;
+  }catch(e){ return []; }
+}
+async function publishOgCard(){
+  if(!R2_ENDPOINT||!R2_TOKEN)return flash('Media storage is not configured — see R2-SETUP.md',true);
+  let blob;
+  try{
+    blob=await new Promise((res,rej)=>{
+      try{ ogCardCanvas().toBlob(b=>b?res(b):rej(new Error('canvas produced nothing')),'image/png'); }
+      catch(e){ rej(e); }
+    });
+  }catch(e){ return flash('Could not draw the card: '+e.message,true); }
+  flash('Publishing the link preview card…');
+  try{
+    const r=await fetch(R2_ENDPOINT,{method:'POST',headers:{'content-type':'image/png',
+      'x-upload-token':R2_TOKEN,'x-file-name':'og-card.png','x-fixed-key':'brand/og-card.png'},body:blob});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+    /* Deliberately localStorage, not a settings column: this is a reminder to the person who
+       publishes, not shared data, and adding a column would mean another SQL migration to run
+       before anything worked. */
+    try{localStorage.setItem('rx_ogcard_at',new Date().toISOString());}catch(e){}
+    renderAdmin();
+    flash('Link preview card updated 🖼️ — it may take a few minutes to refresh in chat apps');
+  }catch(e){ flash('Upload failed: '+e.message,true); }
+}
+function ogCardPublishedAt(){
+  try{ return (localStorage.getItem('rx_ogcard_at')||'').slice(0,10); }catch(e){ return ''; }
+}
+function previewOgCard(){
+  let url;
+  try{ url=ogCardCanvas().toDataURL('image/png'); }
+  catch(e){ return flash('Could not draw the card: '+e.message,true); }
+  openModal('Link preview card',
+    `<p class="muted small" style="margin-bottom:10px">This is the picture chat apps show when a link to the site or an event is pasted. It lists the sports you have enabled. It is a fixed image — <b style="color:var(--txt)">publish it again whenever you change your sports</b>, or it will keep showing the old ones.</p>
+     <img src="${url}" alt="Link preview card" style="width:100%;border:1px solid var(--line);border-radius:12px;display:block">
+     <p class="muted small" style="margin-top:10px">Previews cannot animate — every chat app shows a single frame — so all your sports appear at once instead of cycling.</p>`,
+    `<button class="btn" onclick="publishOgCard()">Publish this card</button>
+     <button class="btn ghost" onclick="closeModal()">Close</button>`);
+}
 /* Saving differs by platform, so offer both routes rather than guessing: iOS Safari ignores the
    download attribute on a blob for images, but long-pressing a rendered <img> always works.
 
@@ -11697,6 +11806,15 @@ function renderAdmin(){
       </details>
       <div id="upLog" class="clienttag" style="display:none;margin-top:8px;padding:8px 10px;background:var(--panel2);border-radius:8px;font-size:12.5px"></div>
       <div id="hiPrev" style="margin-top:10px"></div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h3>Link preview card</h3>
+      <div class="clienttag" style="margin-bottom:8px">The picture chat apps show when a link to the site or an event is pasted. It carries the wordmark, the slogan and <b style="color:var(--txt)">the sports you have enabled</b>. It is a fixed image, so it does not follow your sports on its own — <b style="color:var(--txt)">publish it again whenever you change them</b>, or it will keep showing the old ones.${ogCardPublishedAt()?` <span class="pill green">published ${fmtDate(ogCardPublishedAt())}</span>`:' <span class="pill yellow">never published — the built-in card is being used</span>'}</div>
+      <div class="actions">
+        <button class="btn sm ghost" onclick="previewOgCard()">Preview</button>
+        <button class="btn sm" onclick="publishOgCard()">Publish card</button>
+      </div>
+      <div class="clienttag" style="margin-top:6px">WeChat is the exception: it does not build preview boxes for outside links at all, so send an event <b style="color:var(--txt)">poster</b> there instead.</div>
     </div>
     <div class="panel" style="margin-top:16px">
       <h3>Liability waiver <span class="pill">v${waiverVersion()}</span></h3>
