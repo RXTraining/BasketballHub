@@ -1993,7 +1993,8 @@ coaching, group sessions, clinics, camps and events organised by RX.TRAINING and
 
 2. ASSUMPTION OF RISK. I understand that athletic activity carries inherent risks that cannot be
 eliminated, including sprains, fractures, concussion and other head injury, heat illness,
-collision with other participants or equipment, permanent disability and, in rare cases, death.
+collision with other participants or equipment, permanent disability and, in rare cases, the most
+serious outcomes, including a fatal one.
 Risks may arise from the Participant's own actions, the actions of others, the condition of the
 facility or equipment, or the negligence of the Released Parties. Knowing these risks, I
 voluntarily choose for the Participant to take part and accept them.
@@ -2004,7 +2005,8 @@ know about. I authorise the Released Parties to obtain emergency medical treatme
 Participant if I cannot be reached, and I am responsible for the cost of that treatment.
 
 4. RELEASE. To the fullest extent permitted by law, I release the Released Parties from all claims,
-demands and causes of action for injury, illness, death or property loss arising out of the
+demands and causes of action for injury, illness, the most serious outcomes including a fatal one,
+or property loss arising out of the
 Activity, including claims based on their ordinary negligence. This release does not apply to
 gross negligence, recklessness or intentional misconduct.
 
@@ -2097,9 +2099,9 @@ function openWaiver(opts){
      <label style="display:flex;gap:9px;align-items:flex-start;margin-top:12px;cursor:pointer;font-size:13.5px">
        <input type="checkbox" id="wvOK" style="width:auto;margin-top:3px">
        <span>${t('I have read and agree to this agreement, and I am authorised to sign it. My typed name is my signature.')}</span></label>
-     <label style="display:flex;gap:9px;align-items:flex-start;margin-top:10px;cursor:pointer;font-size:13.5px;padding:10px 12px;background:var(--panel2);border-radius:10px">
+     <label style="display:flex;gap:9px;align-items:flex-start;margin-top:12px;cursor:pointer;font-size:13.5px">
        <input type="checkbox" id="wvPhoto" style="width:auto;margin-top:3px" ${(cw&&cw.photo)?'checked':''}>
-       <span><b>${t('Photos and video')} <span class="muted">(${t('optional')})</span></b><br>${t('RX.TRAINING may use photos or video of this player to promote its coaching — website, social media, printed material. Never with a full name or any personal detail. You can say no and it changes nothing about taking part, and you can withdraw it later.')}</span></label>`,
+       <span><b>${t('Photos and video')} <span class="muted">(${t('optional')})</span></b> — ${t('RX.TRAINING may use photos or video of this player to promote its coaching — website, social media, printed material. Never with a full name or any personal detail. You can say no and it changes nothing about taking part, and you can withdraw it later.')}</span></label>`,
     `<button class="btn ghost" onclick="closeModal()">${t('Cancel')}</button>
      <button class="btn" onclick="acceptWaiver()">${t('Agree and continue')}</button>`,{full:false});
 }
@@ -3554,7 +3556,7 @@ function openPublicEventReg(eid){
        <label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;font-size:13px">
          <input type="checkbox" id="peWv" style="width:auto;margin-top:3px">
          <span>${t('I have read and agree to the')} <a href="#" onclick="event.preventDefault();openWaiverReadOnly()"><b>${t('liability waiver')}</b></a>, ${t('and I am the parent or guardian signing for this player (or I am over 18).')}</span></label>
-       <label style="display:flex;gap:9px;align-items:flex-start;margin-top:10px;cursor:pointer;font-size:12.5px">
+       <label style="display:flex;gap:9px;align-items:flex-start;margin-top:10px;cursor:pointer;font-size:13px">
          <input type="checkbox" id="pePhoto" style="width:auto;margin-top:3px">
          <span>${t('Optional:')} ${t('RX.TRAINING may use photos or video of this player to promote its coaching. Saying no changes nothing about taking part.')}</span></label>
      </div>
@@ -4463,7 +4465,7 @@ function renderSignup(){
         <input type="checkbox" id="suWv" style="width:auto;margin-top:3px">
         <span>${t('I have read and agree to the')} <a href="#" onclick="event.preventDefault();openWaiverReadOnly()"><b>${t('liability waiver')}</b></a>, ${t('and I am the parent or guardian signing for this player (or I am over 18).')}</span></label>
       <input id="suWvName" placeholder="${t('Parent / guardian full name (your signature)')}" style="margin-top:8px">
-      <label style="display:flex;gap:9px;align-items:flex-start;margin-top:10px;cursor:pointer;font-size:12.5px">
+      <label style="display:flex;gap:9px;align-items:flex-start;margin-top:10px;cursor:pointer;font-size:13px">
         <input type="checkbox" id="suWvPhoto" style="width:auto;margin-top:3px">
         <span>${t('Optional:')} ${t('RX.TRAINING may use photos or video of this player to promote its coaching. Saying no changes nothing about taking part.')}</span></label>
     </div>
@@ -4832,9 +4834,10 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-05 02:58 UTC';
+const BUILD='2026-09-05 03:20 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   'Waiver wording: \u201cdeath\u201d is now phrased as <i>the most serious outcomes, including a fatal one</i> \u2014 gentler for a parent to read while still naming the risk, which is what makes disclosing it worth anything. The media tick now sits on the same left edge and at the same size as the tick above it; it was inset in a tinted box, which made two questions in the same list look like different kinds of thing.',
    '<b>Fixed: a shared event link just loaded the website.</b> The registration form was opening \u2014 underneath the landing page. Dialogs sit at z-index 100 and the landing page at 300, so it appeared behind it, invisible. Any dialog opened while the landing page is showing now goes above it.',
    'A link to an event that has finished or been withdrawn now says so, instead of quietly loading the home page and looking broken.',
    '<b>Photo and media consent added to the waiver \u2014 as a separate, optional tick.</b> It is not bundled into the release, and declining changes nothing about taking part. A family should not have to choose between their child training and their child\u2019s picture being on the internet, and permission given as a condition of entry is weak permission anyway. The clause commits to never publishing a name, age, school or contact detail alongside an image, and to removing material on request.',
