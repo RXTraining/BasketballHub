@@ -1348,7 +1348,7 @@ const ZH={
   // events
   'Workshops, guest sessions and more. Register for anything that interests you. Times are Boston (ET).':'工作坊、嘉宾课程等。感兴趣即可报名。时间为波士顿时间（ET）。',
   'No upcoming events right now — check back soon.':'暂无即将开始的活动 — 请稍后再来。',
-  'Register':'报名','Full':'已满','✓ Registered':'✓ 已报名','⏳ Pending approval':'⏳ 待审核','Paid':'已付款','Free':'免费',
+  'Register':'报名','Full':'已满','✓ Registered':'✓ 已报名','⏳ Pending approval':'⏳ 待审核','Paid':'已付款','Free':'免费','When':'时间','Where':'地点','Price':'费用','Places':'名额','per player':'每人','Scan to register':'扫码报名','No app, no account needed':'无需下载 App，无需注册','Poster':'海报',
   'See all →':'查看全部 →',
   // payments
   'My Payments':'我的付款','Credit used':'已用课时','over':'超出','All money you\'ve paid, grouped by period.':'您的所有付款，按周期汇总。',
@@ -1558,7 +1558,7 @@ const KO={
   'No past sessions yet.':'아직 지난 수업이 없습니다.',
   'Workshops, guest sessions and more. Register for anything that interests you. Times are Boston (ET).':'워크숍, 게스트 세션 등. 관심 있는 항목에 등록하세요. 시간은 보스턴 시간(ET)입니다.',
   'No upcoming events right now — check back soon.':'예정된 이벤트가 없습니다 — 나중에 다시 확인하세요.',
-  'Register':'등록','Full':'마감','✓ Registered':'✓ 등록됨','⏳ Pending approval':'⏳ 승인 대기','Paid':'결제됨','Free':'무료',
+  'Register':'등록','Full':'마감','✓ Registered':'✓ 등록됨','⏳ Pending approval':'⏳ 승인 대기','Paid':'결제됨','Free':'무료','When':'일시','Where':'장소','Price':'참가비','Places':'잔여','per player':'1인당','Scan to register':'스캔하여 등록','No app, no account needed':'앱 설치도 계정도 필요 없습니다','Poster':'포스터',
   'See all →':'전체 보기 →',
   'My Payments':'내 결제','Credit used':'사용한 크레딧','over':'초과',"All money you've paid, grouped by period.":'기간별 결제 내역입니다.',
   'Total paid':'총 결제액','By period':'기간별','All payments':'전체 결제','Detail':'상세','Amount':'금액',
@@ -1765,7 +1765,7 @@ const JA={
   'No past sessions yet.':'過去のセッションはまだありません。',
   'Workshops, guest sessions and more. Register for anything that interests you. Times are Boston (ET).':'ワークショップやゲストセッションなど。気になるものに登録してください。時間はボストン時間（ET）です。',
   'No upcoming events right now — check back soon.':'現在予定されているイベントはありません — またご確認ください。',
-  'Register':'登録','Full':'満員','✓ Registered':'✓ 登録済み','⏳ Pending approval':'⏳ 承認待ち','Paid':'支払い済み','Free':'無料',
+  'Register':'登録','Full':'満員','✓ Registered':'✓ 登録済み','⏳ Pending approval':'⏳ 承認待ち','Paid':'支払い済み','Free':'無料','When':'日時','Where':'場所','Price':'参加費','Places':'残り','per player':'1人あたり','Scan to register':'スキャンして登録','No app, no account needed':'アプリも登録も不要です','Poster':'ポスター',
   'See all →':'すべて見る →',
   'My Payments':'マイ支払い','Credit used':'使用したクレジット','over':'超過',"All money you've paid, grouped by period.":'期間別の支払い履歴です。',
   'Total paid':'支払い合計','By period':'期間別','All payments':'すべての支払い','Detail':'詳細','Amount':'金額',
@@ -4853,8 +4853,15 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-05 03:53 UTC';
+const BUILD='2026-09-05 05:20 UTC';
 const CHANGELOG=[
+ {v:'2.3', d:'2026-09-05', t:'A poster to share on WeChat', items:[
+   '<b>Every event can now be shared as a poster image</b> \u2014 the \u{1F5BC} button beside an event, or <i>Poster for WeChat</i> in the share box. It draws the wordmark, slogan, title, when, where, coach, price and places left, with a <b>QR code</b> to the same public sign-up link. Save it and send it as a photo.',
+   'This exists because <b>WeChat ignores link previews entirely.</b> It only builds a card for a page that has called its own JS-SDK, which needs an Official Account and an ICP-filed domain \u2014 neither of which a Lexington business can get. So on WeChat our link will always arrive as bare text no matter what the page says. A picture always shows, and it still reads to somebody who never taps anything.',
+   'The QR is drawn by the app itself rather than fetched from a QR service, so the poster renders with no network and nothing about our events is handed to a third party. Error-correction level M means it still scans after a chat app has re-compressed the image and somebody has photographed it off another screen.',
+   'The poster lays the code out first and fits the text to what is left, shrinking the type and finally trimming with an ellipsis. Laying the text out first and dropping the code in afterwards let a long title or address run underneath it and lose a line \u2014 on the one part of the picture that has to be readable.',
+   'The link preview card now shows <b>every sport we coach</b>, not just a basketball. It cannot animate the way the website does \u2014 chat apps render a single still frame \u2014 so all the sports sit side by side instead. The card is a fixed image: change the sports in Admin and it must be regenerated.',
+ ]},
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
    'The link preview now carries a proper <b>1200\u00d7630 card</b> with the RX.TRAINING wordmark, the ball and <i>We plant the seed of sport</i> \u2014 not the bare app icon. It is the first thing a stranger sees when a parent forwards the link to a group chat, and an anonymous rounded square says nothing about who is inviting their child. The square icon was also the wrong shape: chat apps crop it or show it small beside the text.',
    'The redirect on that page is now JavaScript only. A <span class="mono">meta refresh</span> is followed by some preview crawlers <i>before</i> they read anything, so they described the app&rsquo;s home page instead of the event \u2014 which is how a per-event card silently becomes the generic one.',
@@ -9233,6 +9240,7 @@ function renderEventsOwner(){
       <td class="right"><div class="actions">
         <button class="btn sm" onclick="viewEventRegs('${ev.id}')">Registrations</button>
         <button class="iconbtn" title="Public sign-up link — share anywhere" onclick="shareEventLink('${ev.id}')">🔗</button>
+        <button class="iconbtn" title="Poster image with QR code — for WeChat" onclick="sharePoster('${ev.id}')">🖼️</button>
         ${ev.email_note?'':''}<button class="iconbtn" title="Email all clients about this" onclick="announceEvent('${ev.id}')">📣</button>
         <button class="iconbtn" onclick="openEvent('${ev.id}')">Edit</button>
       </div></td></tr>`;
@@ -9375,9 +9383,310 @@ function shareEventLink(eid){
      <input id="evShareUrl" value="${attrEsc(url)}" readonly onclick="this.select()">
      <p class="muted small" style="margin:12px 0 6px"><b style="color:var(--txt)">Ready-made post</b></p>
      <textarea id="evShareMsg" rows="8" readonly onclick="this.select()">${escapeHtml(msg)}</textarea>
-     <p class="muted small" style="margin-top:10px">Their place is held straight away. A new family arrives in <b style="color:var(--txt)">Approvals</b> as a pending account — approve it and they can sign in to see their sessions.</p>`,
+     <p class="muted small" style="margin-top:10px">Their place is held straight away. A new family arrives in <b style="color:var(--txt)">Approvals</b> as a pending account — approve it and they can sign in to see their sessions.</p>
+     <p class="muted small" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)"><b style="color:var(--txt)">Sending this on WeChat?</b> WeChat does not build preview boxes for outside links — it will show the bare address. Send the <b style="color:var(--txt)">poster</b> as a photo instead.</p>`,
     `<button class="btn" onclick="rxCopy('evShareMsg','Post copied 📋')">Copy post</button>
      <button class="btn ghost" onclick="rxCopy('evShareUrl','Link copied 🔗')">Copy link only</button>
+     <button class="btn ghost" onclick="sharePoster('${eid}')">Poster for WeChat</button>
+     <button class="btn ghost" onclick="closeModal()">Close</button>`);
+}
+/* ---- QR code, byte mode, error-correction level M, versions 1-10 -----------------------------
+   Written out longhand because this app has no build step and loads no third-party scripts, and
+   because the poster must render with no network — the QR is the only part of the picture the
+   recipient acts on, so it cannot wait on a CDN being reachable (least of all from China, which
+   is the whole reason the poster exists).
+   Level M tolerates ~15% damage: enough for a poster that has been screenshotted, re-compressed
+   by a chat app and then photographed off someone else's screen. Versions stop at 10 (213 bytes);
+   our links are ~45 characters, which is version 3. */
+const QR_RS={1:[[26,16,1]],2:[[44,28,1]],3:[[70,44,1]],4:[[50,32,2]],5:[[67,43,2]],
+  6:[[43,27,4]],7:[[49,31,4]],8:[[60,38,2],[61,39,2]],9:[[58,36,3],[59,37,2]],10:[[69,43,4],[70,44,1]]};
+const QR_ALIGN={1:[],2:[6,18],3:[6,22],4:[6,26],5:[6,30],6:[6,34],7:[6,22,38],8:[6,24,42],9:[6,26,46],10:[6,28,50]};
+const QR_EXP=new Uint8Array(512),QR_LOG=new Uint8Array(256);
+(function(){let x=1;for(let i=0;i<255;i++){QR_EXP[i]=x;QR_LOG[x]=i;x<<=1;if(x&256)x^=0x11d;}
+  for(let i=255;i<512;i++)QR_EXP[i]=QR_EXP[i-255];})();
+const qrMul=(a,b)=>(a&&b)?QR_EXP[QR_LOG[a]+QR_LOG[b]]:0;
+function qrGenPoly(n){
+  let p=[1];
+  for(let i=0;i<n;i++){
+    const q=new Array(p.length+1).fill(0);
+    // index 0 is the highest-degree coefficient, so multiplying by x keeps the index while
+    // multiplying by a^i pushes it down one. Getting these the wrong way round produces a
+    // symbol whose data is right and whose checkwords are all wrong — it simply will not scan.
+    for(let j=0;j<p.length;j++){ q[j]^=p[j]; q[j+1]^=qrMul(p[j],QR_EXP[i]); }
+    p=q;
+  }
+  return p;
+}
+function qrEC(data,n){
+  const g=qrGenPoly(n),r=data.concat(new Array(n).fill(0));
+  for(let i=0;i<data.length;i++){
+    const f=r[i]; if(!f)continue;
+    for(let j=0;j<g.length;j++) r[i+j]^=qrMul(g[j],f);
+  }
+  return r.slice(data.length);
+}
+function qrUtf8(s){
+  const o=[];
+  for(const ch of s){
+    const c=ch.codePointAt(0);
+    if(c<0x80)o.push(c);
+    else if(c<0x800)o.push(0xC0|c>>6,0x80|c&63);
+    else if(c<0x10000)o.push(0xE0|c>>12,0x80|(c>>6&63),0x80|c&63);
+    else o.push(0xF0|c>>18,0x80|(c>>12&63),0x80|(c>>6&63),0x80|c&63);
+  }
+  return o;
+}
+const QR_MASKS=[(r,c)=>(r+c)%2===0,(r,c)=>r%2===0,(r,c)=>c%3===0,(r,c)=>(r+c)%3===0,
+  (r,c)=>((r/2|0)+(c/3|0))%2===0,(r,c)=>(r*c)%2+(r*c)%3===0,
+  (r,c)=>((r*c)%2+(r*c)%3)%2===0,(r,c)=>((r+c)%2+(r*c)%3)%2===0];
+function qrBCH(data,g,digits){
+  const dig=n=>{let d=0;while(n){d++;n>>>=1;}return d;};
+  let d=data<<digits;
+  while(dig(d)-dig(g)>=0) d^=g<<(dig(d)-dig(g));
+  return (data<<digits)|d;
+}
+/* size x size array of 0/1, 1 = dark. Throws if the text will not fit version 10. */
+function qrMatrix(text){
+  const bytes=qrUtf8(text);
+  let ver=0,cap=0;
+  for(let v=1;v<=10;v++){
+    let c=0; QR_RS[v].forEach(([,d,n])=>c+=d*n);
+    if(bytes.length*8+4+(v<10?8:16)<=c*8){ ver=v; cap=c; break; }
+  }
+  if(!ver) throw new Error('QR: '+bytes.length+' bytes exceeds version 10');
+  const bits=[],put=(v,len)=>{for(let i=len-1;i>=0;i--)bits.push((v>>i)&1);};
+  put(4,4); put(bytes.length,ver<10?8:16); bytes.forEach(b=>put(b,8));
+  for(let i=0;i<4&&bits.length<cap*8;i++)bits.push(0);
+  while(bits.length%8)bits.push(0);
+  const dc=[];
+  for(let i=0;i<bits.length;i+=8){let v=0;for(let j=0;j<8;j++)v=(v<<1)|bits[i+j];dc.push(v);}
+  for(let i=0;dc.length<cap;i++)dc.push(i%2?0x11:0xEC);
+  const dBlk=[],eBlk=[];let pos=0;
+  QR_RS[ver].forEach(([total,dcount,n])=>{
+    for(let i=0;i<n;i++){const d=dc.slice(pos,pos+dcount);pos+=dcount;dBlk.push(d);eBlk.push(qrEC(d,total-dcount));}
+  });
+  const flow=[];
+  for(let i=0;i<Math.max.apply(null,dBlk.map(b=>b.length));i++) dBlk.forEach(b=>{if(i<b.length)flow.push(b[i]);});
+  for(let i=0;i<Math.max.apply(null,eBlk.map(b=>b.length));i++) eBlk.forEach(b=>{if(i<b.length)flow.push(b[i]);});
+  const size=17+4*ver,m=[],fx=[];
+  for(let r=0;r<size;r++){m.push(new Array(size).fill(0));fx.push(new Array(size).fill(false));}
+  const set=(r,c,v)=>{if(r<0||c<0||r>=size||c>=size)return;m[r][c]=v?1:0;fx[r][c]=true;};
+  [[0,0],[0,size-7],[size-7,0]].forEach(([r0,c0])=>{
+    for(let r=-1;r<=7;r++)for(let c=-1;c<=7;c++)
+      set(r0+r,c0+c,(r>=0&&r<=6&&(c===0||c===6))||(c>=0&&c<=6&&(r===0||r===6))||(r>=2&&r<=4&&c>=2&&c<=4));
+  });
+  for(let i=8;i<size-8;i++){set(6,i,i%2===0);set(i,6,i%2===0);}
+  const ap=QR_ALIGN[ver];
+  ap.forEach(r=>ap.forEach(c=>{
+    if((r<=8&&c<=8)||(r<=8&&c>=size-9)||(r>=size-9&&c<=8))return;
+    for(let dr=-2;dr<=2;dr++)for(let dc=-2;dc<=2;dc++)
+      set(r+dr,c+dc,Math.max(Math.abs(dr),Math.abs(dc))!==1);
+  }));
+  set(size-8,8,1);
+  for(let i=0;i<9;i++){if(!fx[8][i])set(8,i,0);if(!fx[i][8])set(i,8,0);}
+  for(let i=0;i<8;i++){set(8,size-1-i,0);set(size-1-i,8,0);}
+  if(ver>=7){
+    const vb=qrBCH(ver,0x1F25,12);
+    for(let i=0;i<18;i++){const on=(vb>>i)&1;set((i/3|0),i%3+size-11,on);set(i%3+size-11,(i/3|0),on);}
+  }
+  const place=mask=>{
+    const g=m.map(r=>r.slice());
+    let row=size-1,inc=-1,bit=7,byte=0;
+    for(let col=size-1;col>0;col-=2){
+      if(col===6)col--;
+      for(;;){
+        for(let c=0;c<2;c++){
+          if(!fx[row][col-c]){
+            let dark=byte<flow.length?((flow[byte]>>>bit)&1)===1:false;
+            if(QR_MASKS[mask](row,col-c))dark=!dark;
+            g[row][col-c]=dark?1:0;
+            if(--bit<0){byte++;bit=7;}
+          }
+        }
+        row+=inc;
+        if(row<0||row>=size){row-=inc;inc=-inc;break;}
+      }
+    }
+    const fmt=qrBCH((0<<3)|mask,0x537,10)^0x5412;   // 0 = level M
+    for(let i=0;i<15;i++){
+      const on=((fmt>>i)&1)===1?1:0;
+      g[i<6?i:i<8?i+1:size-15+i][8]=on;
+      g[8][i<8?size-1-i:i<9?15-i:14-i]=on;
+    }
+    g[size-8][8]=1;
+    return g;
+  };
+  const penalty=g=>{
+    let p=0,dark=0;
+    const run=get=>{
+      for(let a=0;a<size;a++){
+        let last=-1,len=0;
+        for(let b=0;b<size;b++){
+          const v=get(a,b);
+          if(v===last)len++; else {if(len>=5)p+=3+len-5;last=v;len=1;}
+        }
+        if(len>=5)p+=3+len-5;
+      }
+    };
+    run((a,b)=>g[a][b]); run((a,b)=>g[b][a]);
+    for(let r=0;r<size-1;r++)for(let c=0;c<size-1;c++){
+      const s=g[r][c]+g[r][c+1]+g[r+1][c]+g[r+1][c+1];
+      if(s===0||s===4)p+=3;
+    }
+    const seq=[1,0,1,1,1,0,1,0,0,0,0];
+    const hit=(get,a,b)=>{for(let i=0;i<11;i++)if(get(a,b+i)!==seq[i])return false;return true;};
+    for(let a=0;a<size;a++)for(let b=0;b+11<=size;b++){
+      if(hit((x,y)=>g[x][y],a,b))p+=40;
+      if(hit((x,y)=>g[y][x],a,b))p+=40;
+    }
+    for(let r=0;r<size;r++)for(let c=0;c<size;c++)dark+=g[r][c];
+    p+=Math.floor(Math.abs(dark*100/(size*size)-50)/5)*10;
+    return p;
+  };
+  let best=null,bestP=Infinity;
+  for(let k=0;k<8;k++){const g=place(k),s=penalty(g);if(s<bestP){bestP=s;best=g;}}
+  return best;
+}
+
+/* ---- The shareable poster --------------------------------------------------------------------
+   WeChat ignores Open Graph entirely: it only builds a preview card for a page that has called its
+   own JS-SDK, which needs an Official Account and an ICP-filed domain. Neither is available to a
+   Lexington business, so on WeChat our link will always arrive as bare text. A picture, though,
+   always shows — and it still reads to someone who never taps anything. */
+function posterWrap(x,text,maxW){
+  const words=String(text||'').split(/\s+/).filter(Boolean),lines=[];
+  let line='';
+  words.forEach(w=>{
+    const test=line?line+' '+w:w;
+    if(x.measureText(test).width>maxW&&line){lines.push(line);line=w;} else line=test;
+  });
+  if(line)lines.push(line);
+  // CJK has no spaces, so the word split above yields one enormous "word" — break it per character
+  if(lines.length===1&&x.measureText(lines[0]).width>maxW){
+    const chars=[...lines[0]];lines.length=0;line='';
+    chars.forEach(c=>{
+      if(x.measureText(line+c).width>maxW&&line){lines.push(line);line=c;} else line+=c;
+    });
+    if(line)lines.push(line);
+  }
+  return lines;
+}
+/* Wrap, then cut the last line with an ellipsis if it still will not fit in maxLines. */
+function posterFit(x,text,w,maxLines){
+  const all=posterWrap(x,text,w);
+  if(all.length<=maxLines) return all;
+  const keep=all.slice(0,maxLines);
+  let last=keep[maxLines-1];
+  while(last.length>1 && x.measureText(last+'…').width>w) last=last.slice(0,-1);
+  keep[maxLines-1]=last.replace(/\s+$/,'')+'…';
+  return keep;
+}
+function posterBall(x,cx,cy,r){
+  x.save();
+  x.fillStyle='#ff8a1a';x.beginPath();x.arc(cx,cy,r,0,7);x.fill();
+  x.strokeStyle='#12180f';x.lineWidth=Math.max(2,r*.09);x.lineJoin='round';
+  x.beginPath();x.arc(cx,cy,r,0,7);x.stroke();
+  x.beginPath();x.moveTo(cx-r,cy);x.lineTo(cx+r,cy);x.moveTo(cx,cy-r);x.lineTo(cx,cy+r);x.stroke();
+  x.beginPath();x.ellipse(cx-r*.83,cy,r*.68,r,0,-Math.PI/3,Math.PI/3);x.stroke();
+  x.beginPath();x.ellipse(cx+r*.83,cy,r*.68,r,0,Math.PI*2/3,Math.PI*4/3);x.stroke();
+  x.restore();
+}
+function eventPosterCanvas(ev){
+  const W=1080,H=1440,cv=document.createElement('canvas');
+  cv.width=W;cv.height=H;
+  const x=cv.getContext('2d'),FONT='-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"PingFang SC","Microsoft YaHei",sans-serif';
+  const ctr=(txt,y,font,fill)=>{x.font=font;x.fillStyle=fill;x.textAlign='center';x.fillText(txt,W/2,y);};
+  x.fillStyle='#fff';x.fillRect(0,0,W,H);
+  const band=x.createLinearGradient(0,0,W,0);band.addColorStop(0,'#ff8a1a');band.addColorStop(1,'#f05a14');
+  x.fillStyle=band;x.fillRect(0,0,W,16);
+
+  // Wordmark: RX (ball) TRAINING, laid out by measurement so it stays centred at any font metric
+  const mf='800 78px '+FONT;x.font=mf;
+  const wRX=x.measureText('RX').width,wTR=x.measureText('TRAINING').width,br=44,gap=26;
+  let px=(W-(wRX+gap+br*2+gap+wTR))/2,my=170;
+  x.textAlign='left';x.fillStyle='#0f1410';x.fillText('RX',px,my);
+  px+=wRX+gap;posterBall(x,px+br,my-26,br);px+=br*2+gap;
+  x.fillText('TRAINING',px,my);
+  const slogan=(DB.settings&&DB.settings.slogan)||t('SLOGAN');
+  ctr(slogan,my+66,'600 38px '+FONT,'#3a6e14');
+  const rule=x.createLinearGradient(W/2-120,0,W/2+120,0);
+  rule.addColorStop(0,'#ff8a1a');rule.addColorStop(1,'#f05a14');
+  x.fillStyle=rule;x.fillRect(W/2-120,my+96,240,8);
+
+  /* The QR is sized and placed FIRST so the text above can be fitted to the space that is
+     genuinely left. Laying the text out first and dropping the code in afterwards meant a long
+     title or a long address ran under the code's white quiet zone and lost its bottom row. */
+  const url=publicEventUrl(ev.id),mat=qrMatrix(url),n=mat.length,quiet=4,box=440;
+  const cell=Math.floor(box/(n+quiet*2)),side=cell*(n+quiet*2),qx=(W-side)/2,qy=H-side-190;
+  /* Everything above the code must finish by here. The caption sits on its own baseline 34px
+     above the code at 40px type, so the reserved strip is the caption's full height plus air —
+     not just the gap to the code, which is what let a long event run into "Scan to register". */
+  const floor=qy-96;
+
+  // The event itself
+  const top=my+210;
+  let y=top;
+  const title=mlText(ev.title)||t('Event');
+  const rows=[[t('When'),eventWhen(ev)]];
+  if(ev.location)rows.push([t('Where'),ev.location]);
+  if(eventLeadId(ev))rows.push([t('Coach'),eventLeadName(ev)]);
+  rows.push([t('Price'),ev.price?money(ev.price)+' '+t('per player'):t('Free')]);
+  const left=eventLeftText(ev); if(left)rows.push([t('Places'),left]);
+  const colX=W/2-300,valX=colX+30,valW=W-valX-70;
+
+  /* Try the roomiest setting first and step down until the block clears the code. The last step
+     is deliberately reachable — earlier this gave up while still too tall and the final row ran
+     straight through "Scan to register", so the tightest step drops each value to one ellipsised
+     line, which always fits. Shrinking beats overlapping. */
+  const steps=[];
+  for(let s=0;s<13;s++) steps.push({tf:Math.max(34,76-s*4), rf:Math.max(24,38-Math.round(s*1.4)),
+                                    rowH:Math.max(40,58-s*2), ml:s<9?2:1});
+  let plan=steps[0];
+  for(const st of steps){
+    x.font='800 '+st.tf+'px '+FONT;
+    st.lines=posterFit(x,title,W-160,3);
+    x.font='700 '+st.rf+'px '+FONT;
+    st.wrapped=rows.map(([k,v])=>[k,posterFit(x,v,valW,st.ml)]);
+    let h=st.lines.length*st.tf*1.22+26;
+    st.wrapped.forEach(([,ls])=>h+=st.rowH+(ls.length>1?st.rf*1.16:0));
+    plan=st; plan.h=h;
+    if(top+h<=floor) break;
+  }
+  // Centre the block in the space above the code; bottom-anchoring the QR otherwise leaves a
+  // short event floating with a large hole under it
+  y=top+Math.max(0,(floor-top-plan.h)/2);
+  x.textAlign='center';x.font='800 '+plan.tf+'px '+FONT;x.fillStyle='#0f1410';
+  plan.lines.forEach(l=>{x.fillText(l,W/2,y);y+=plan.tf*1.22;});
+  y+=26;
+  plan.wrapped.forEach(([k,ls])=>{
+    x.textAlign='right';x.font='600 '+Math.round(plan.rf*.9)+'px '+FONT;x.fillStyle='#7a8676';x.fillText(k,colX,y);
+    x.textAlign='left';x.font='700 '+plan.rf+'px '+FONT;x.fillStyle='#0f1410';
+    ls.forEach((l,i)=>x.fillText(l,valX,y+i*plan.rf*1.16));
+    y+=plan.rowH+(ls.length>1?plan.rf*1.16:0);
+  });
+
+  // Quiet zone included, because a code butted up against artwork often will not lock on
+  x.fillStyle='#fff';x.fillRect(qx,qy,side,side);
+  x.fillStyle='#0f1410';
+  for(let r=0;r<n;r++)for(let c=0;c<n;c++)
+    if(mat[r][c]) x.fillRect(qx+(c+quiet)*cell,qy+(r+quiet)*cell,cell,cell);
+  ctr(t('Scan to register'),qy-34,'700 40px '+FONT,'#0f1410');
+  ctr(t('No app, no account needed'),qy+side+46,'500 30px '+FONT,'#7a8676');
+  ctr('rxtraining.org',H-64,'700 34px '+FONT,'#3a6e14');
+  return cv;
+}
+/* Saving differs by platform, so offer both routes rather than guessing: iOS Safari ignores the
+   download attribute on a blob for images, but long-pressing a rendered <img> always works. */
+function sharePoster(eid){
+  const ev=eventById(eid); if(!ev)return;
+  let url;
+  try{ url=eventPosterCanvas(ev).toDataURL('image/png'); }
+  catch(e){ return flash('Could not draw the poster: '+e.message,true); }
+  openModal(t('Poster')+' — '+mlText(ev.title),
+    `<p class="muted small" style="margin-bottom:12px">Send this as a <b style="color:var(--txt)">photo</b> in WeChat. WeChat does not build preview boxes for outside links, so a picture is the only thing that shows up properly there — and it still reads to anyone who never taps it.</p>
+     <img id="evPoster" src="${url}" alt="${attrEsc(mlText(ev.title))}" style="width:100%;border:1px solid var(--line);border-radius:12px;display:block">
+     <p class="muted small" style="margin-top:10px">On a phone: <b style="color:var(--txt)">press and hold</b> the image, then Save. On a computer, use Download.</p>`,
+    `<a class="btn" href="${url}" download="${attrEsc((mlText(ev.title)||'event').replace(/[^a-z0-9]+/gi,'-').toLowerCase())}-rx.png">Download</a>
      <button class="btn ghost" onclick="closeModal()">Close</button>`);
 }
 function rxCopy(id,msg){
