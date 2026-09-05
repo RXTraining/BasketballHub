@@ -53,7 +53,12 @@ export async function onRequestGet(context){
   const url = new URL(context.request.url);
   const id = (url.searchParams.get('i') || url.searchParams.get('id') || '')
     .replace(/[^a-z0-9]/gi,'').slice(0,40);
-  const appUrl = SITE + '/#e=' + id;
+  /* Carried through to the app so a poster shared in Chinese opens a Chinese registration form.
+     Whitelisted rather than passed along, because this value is reflected into a URL inside the
+     page we serve — anything not on this list is simply dropped. */
+  const langIn = (url.searchParams.get('l') || '').toLowerCase();
+  const lang = ['zh','ko','ja','en'].includes(langIn) ? langIn : '';
+  const appUrl = SITE + '/#e=' + id + (lang && lang !== 'en' ? '&l=' + lang : '');
 
   let ev = null;
   if (id){
