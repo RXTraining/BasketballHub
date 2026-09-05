@@ -74,7 +74,11 @@ export async function onRequestGet(context){
   const desc  = live
     ? (bits.join(' · ') + (detail ? ' — ' + detail.slice(0,120) : '') + ' · Tap to register').slice(0,300)
     : 'Youth athletic training in Lexington, MA. Tap to see what is coming up.';
-  const img   = SITE + '/icon-512.png';
+  /* A 1200x630 card carrying the wordmark and the slogan, not the bare app icon. It is the first
+     thing a stranger sees in a chat, and an anonymous rounded square says nothing about who is
+     inviting their child. Every chat app expects this ratio; a square icon gets cropped or shown
+     tiny beside the text. */
+  const img   = SITE + '/og-card.png';
 
   const html = `<!DOCTYPE html><html lang="en"><head>
 <meta charset="utf-8">
@@ -91,8 +95,10 @@ export async function onRequestGet(context){
 <meta name="twitter:title" content="${esc(title)}">
 <meta name="twitter:description" content="${esc(desc)}">
 <meta name="twitter:image" content="${esc(img)}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
 <link rel="canonical" href="${esc(SITE + '/e?i=' + id)}">
-<meta http-equiv="refresh" content="0;url=${esc(appUrl)}">
 <style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
   background:#f6f8f4;color:#1b2418;padding:24px;text-align:center}
@@ -103,6 +109,10 @@ export async function onRequestGet(context){
   <p style="margin:0 0 16px;color:#5b6b55">${esc(bits.join(' · '))}</p>
   <p><a href="${esc(appUrl)}">Opening registration… tap here if nothing happens</a></p>
 </div>
+<!-- The redirect is JavaScript ONLY, deliberately. A <meta http-equiv="refresh"> is followed by
+     some preview crawlers before they read anything, so they end up describing the destination
+     page instead of this one — which is how a per-event card silently becomes the generic site
+     card. Crawlers do not run scripts; real browsers do. -->
 <script>location.replace(${JSON.stringify(appUrl)});</script>
 </body></html>`;
 
