@@ -518,11 +518,29 @@
   .legend span{display:inline-flex;align-items:center;gap:6px}
   .swatch{width:11px;height:11px;border-radius:3px;display:inline-block}
 
-  .flash{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(120%);
+  .flash{position:fixed;bottom:calc(22px + env(safe-area-inset-bottom,0px));left:50%;
+    transform:translateX(-50%) translateY(120%);
     background:var(--green);color:#ffffff;font-weight:800;padding:12px 22px;border-radius:12px;
-    box-shadow:var(--shadow);z-index:400;transition:.35s;font-size:13.5px;max-width:90vw;text-align:center}
+    box-shadow:var(--shadow);z-index:500;transition:.35s;font-size:13.5px;max-width:90vw;text-align:center}
   .flash.show{transform:translateX(-50%) translateY(0)}
-  .flash.warn{background:var(--yellow);color:#ffffff}
+  /* Failures move to the TOP and stay put.
+     At the bottom of the window they were landing under the browser's own chrome and the Windows
+     taskbar — a window sized taller than the work area puts a position:fixed bottom edge off the
+     visible screen entirely — and they cleared themselves after under three seconds. An error you
+     do not see is worse than no error at all: the action failed and you carry on believing it
+     worked. Confirmations still appear at the bottom briefly; only failures interrupt. */
+  .flash.warn{background:var(--yellow);color:#ffffff;
+    top:calc(16px + env(safe-area-inset-top,0px));bottom:auto;
+    transform:translateX(-50%) translateY(-160%);
+    max-width:min(620px,92vw);text-align:left;line-height:1.5;font-weight:700;
+    padding:14px 38px 14px 46px;border-left:5px solid #ffffff;cursor:pointer;position:fixed;
+    box-shadow:0 10px 34px rgba(0,0,0,.32)}
+  .flash.warn::before{content:"⚠";position:absolute;left:16px;top:13px;font-size:18px}
+  .flash.warn.show{transform:translateX(-50%) translateY(0)}
+  /* A symbol rather than the word "close": this toast carries messages in four languages and a
+     stray English label in the corner of a Chinese error reads like a bug of its own. */
+  .flash.warn::after{content:"✕";position:absolute;top:10px;right:12px;
+    font-size:13px;font-weight:700;opacity:.8}
   .seg{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
   .mlseg{margin-bottom:8px}
   .mlseg button b{font-size:11px}
@@ -4971,8 +4989,24 @@ function exportExcel(){
 
 /* ---------- flash + modal ---------- */
 let flashT;
-function flash(msg,warn){const f=$('#flash');f.textContent=msg;f.className='flash show'+(warn?' warn':'');
-  clearTimeout(flashT);flashT=setTimeout(()=>f.className='flash'+(warn?' warn':''),2800);}
+/* A confirmation can disappear on its own; a failure must NOT.
+   Failures stay on screen until they are dismissed or replaced. Any timeout is the wrong length
+   for somebody who looked away at the wrong moment, and the cost of missing one is not a missed
+   message — it is carrying on believing an action succeeded when it did not. role=alert so it is
+   announced rather than leaving the only report of a failure to a colour at the edge of the
+   screen. */
+function flash(msg,warn){
+  const f=$('#flash'); if(!f)return;
+  f.textContent=msg;
+  f.className='flash show'+(warn?' warn':'');
+  f.setAttribute('role',warn?'alert':'status');
+  clearTimeout(flashT);
+  if(!warn)flashT=setTimeout(()=>{f.className='flash';},2800);
+  if(!f._dismiss){
+    f._dismiss=true;
+    f.addEventListener('click',()=>{ clearTimeout(flashT); f.className=f.className.replace(' show',''); });
+  }
+}
 /* Wrap every table in a horizontal scroller, once. Runs after any render — including modal
    bodies, which are replaced wholesale — so no call site has to remember to do it. */
 function wrapTables(root){
@@ -5110,8 +5144,12 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-05 17:25 UTC';
+const BUILD='2026-09-05 17:48 UTC';
 const CHANGELOG=[
+ {v:'3.1', d:'2026-09-05', t:'Errors you cannot miss', items:[
+   '<b>Error messages now appear at the top of the screen and stay there until you dismiss them.</b> They used to slide up from the bottom edge and clear themselves after under three seconds \u2014 and the bottom edge is exactly where the browser\u2019s own chrome and the Windows taskbar sit, so a window sized taller than the screen put them out of sight entirely. An error you do not see is worse than no error at all: the action failed and you carry on believing it worked.',
+   'They are also wider and wrap properly, carry a \u26a0 marker and a \u2715 to close, sit above every dialog, and are announced to screen readers. <b>Confirmations are unchanged</b> \u2014 brief, at the bottom, gone on their own. Only failures interrupt, and only failures wait for you.',
+ ]},
  {v:'3.0', d:'2026-09-05', t:'Passwords that cannot collide, and getting them back', items:[
    '<b>Two players with the same name can no longer be given the same password.</b> Saving now fails outright and says which record already holds it. This was not a tidiness rule: name and password together are the whole of a client\u2019s identity, so a collision makes <i>both</i> accounts unusable \u2014 setting up a new client would silently break a working one. <b>Reset to default</b> no longer walks into it either; where the default is already taken by a namesake it offers a password of that client\u2019s own instead.',
    '<b>Lost the sign-in details?</b> A family registering through a public link is shown their password once. The client row\u2019s <b>\ud83d\udd17 Link</b> button now shows the name and password as well as the personal link, with a ready-made message to send, and says whether the account is still awaiting approval. They are also emailed automatically when you approve them \u2014 that already happened, but there was nowhere to look it up in the meantime.',
