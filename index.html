@@ -7,6 +7,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>RX.TRAINING</title>
 <meta name="theme-color" content="#ffffff">
+<!-- Preview card when the site itself is pasted into a chat. A shared EVENT link is answered by
+     functions/e/[id].js instead, which replaces these with that event's own title and details. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RX.TRAINING">
+<meta property="og:title" content="RX.TRAINING — youth athletic training">
+<meta property="og:description" content="Coaching in Lexington, MA. See what is coming up, join a group, or book a session.">
+<meta property="og:url" content="https://rxtraining.org/">
+<meta property="og:image" content="https://rxtraining.org/icon-512.png">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <!-- "default" (not black-translucent): keeps the web view BELOW the iOS status bar. With
      black-translucent the page renders under the clock/wifi strip, where iOS swallows taps —
@@ -3532,7 +3541,15 @@ function findCustomerBy(phone,email){
       (ph && normPhone(c.phone)===ph) ||
       (em && String(c.email||'').trim().toLowerCase()===em)) || null;
 }
-function publicEventUrl(eid){ return location.origin+location.pathname+'#e='+eid; }
+/* Two shapes for the same destination:
+     /e/<id>   — what you SHARE. A Cloudflare Pages Function answers it with that event's Open
+                 Graph tags, so WeChat, iMessage, WhatsApp and the rest draw a preview box with the
+                 title, date, place and price, then send a real browser on to the app.
+     /#e=<id>  — what the app uses once loaded. Still accepted, so links already shared keep
+                 working; they just show a generic card.
+   A hash is never sent to the server and preview crawlers do not run JavaScript, which is why the
+   hash form can never produce a per-event card however clever the page is. */
+function publicEventUrl(eid){ return location.origin+'/e/'+eid; }
 function openPublicEventReg(eid){
   const ev=eventById(eid);
   if(!ev||ev.active===false)return flash('That event is no longer listed',true);
@@ -4834,9 +4851,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-05 03:20 UTC';
+const BUILD='2026-09-05 03:31 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>A shared event link now shows a preview box.</b> Paste it into WeChat, iMessage, WhatsApp or Instagram and it draws a card with the event title, when and where it is, and the price \u2014 tapping the card opens the registration form. Before, it was a bare URL, which nobody taps.',
+   'This needed a small server-side page (<span class="mono">functions/e/[id].js</span>): preview crawlers do not run JavaScript, and the <span class="mono">#e=</span> part of a URL is never sent to the server at all, so the old link could only ever produce one generic card for every event. Shared links are now <span class="mono">rxtraining.org/e/&lt;id&gt;</span>. Links already shared still work \u2014 they just show the generic card.',
    'Waiver wording: \u201cdeath\u201d is now phrased as <i>the most serious outcomes, including a fatal one</i> \u2014 gentler for a parent to read while still naming the risk, which is what makes disclosing it worth anything. The media tick now sits on the same left edge and at the same size as the tick above it; it was inset in a tinted box, which made two questions in the same list look like different kinds of thing.',
    '<b>Fixed: a shared event link just loaded the website.</b> The registration form was opening \u2014 underneath the landing page. Dialogs sit at z-index 100 and the landing page at 300, so it appeared behind it, invisible. Any dialog opened while the landing page is showing now goes above it.',
    'A link to an event that has finished or been withdrawn now says so, instead of quietly loading the home page and looking broken.',
@@ -9348,7 +9367,7 @@ function shareEventLink(eid){
     eventLeftText(ev)||'',
     '','Register here (no app needed):',url].filter(x=>x!=='').join('\n');
   openModal('Share “'+mlText(ev.title)+'”',
-    `<p class="muted small" style="margin-bottom:10px">Post this anywhere — WeChat, Instagram, a team group chat. Anyone who taps it can register in one screen: no account, no password. A family you already have is recognised by their mobile number, so it will not create a second record for them.</p>
+    `<p class="muted small" style="margin-bottom:10px">Post this anywhere — WeChat, Instagram, a team group chat. It appears as a <b style="color:var(--txt)">preview box</b> showing the title, date, place and price; tapping it opens the registration form. No account, no password. A family you already have is recognised by their mobile number, so it will not create a second record for them.</p>
      <input id="evShareUrl" value="${attrEsc(url)}" readonly onclick="this.select()">
      <p class="muted small" style="margin:12px 0 6px"><b style="color:var(--txt)">Ready-made post</b></p>
      <textarea id="evShareMsg" rows="8" readonly onclick="this.select()">${escapeHtml(msg)}</textarea>
