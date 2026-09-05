@@ -1994,7 +1994,15 @@ function nowBoston(){return new Date(new Date().toLocaleString('en-US',{timeZone
    counting, because nobody agreed to the new words — that is the whole point of versioning it.
    The signer is the parent or guardian: almost every client here is a minor, and a child cannot
    waive anything. */
-const DEFAULT_WAIVER=`RX.TRAINING — ASSUMPTION OF RISK, RELEASE OF LIABILITY AND INDEMNITY AGREEMENT
+/* The waiver is written in the same [en]/[zh]/[ko]/[ja] block format the rest of the app uses for
+   multilingual text, so a parent reads it in their own language. Two things are deliberate:
+   the Chinese version states plainly that the ENGLISH text governs — a translation supplied for
+   comprehension is normal practice and is what keeps the document enforceable, whereas two equally
+   authoritative versions that drift apart is how a waiver stops being worth anything. And a
+   language with no section falls back to English rather than showing nothing, because an unread
+   waiver is worse than one read in a second language. */
+const DEFAULT_WAIVER=`[en]
+RX.TRAINING — ASSUMPTION OF RISK, RELEASE OF LIABILITY AND INDEMNITY AGREEMENT
 
 Read this carefully. It affects your legal rights.
 
@@ -2045,8 +2053,62 @@ part is held unenforceable, the rest remains in force. This is the entire agreem
 subject it covers.
 
 By typing my name and accepting below, I confirm I have read and understood this agreement and
-that I intend my typed name to be my signature.`;
-function waiverText(){ return (DB.settings&&DB.settings.waiverText)||DEFAULT_WAIVER; }
+that I intend my typed name to be my signature.
+
+[zh]
+RX.TRAINING — 风险自担、责任免除及赔偿协议
+
+请仔细阅读。本协议影响您的法律权利。
+
+本中文文本仅为方便理解而提供。具有法律效力的版本为英文版；如两者有任何不一致之处，以英文版为准。
+
+1. 活动内容。本人为本人或本人的子女（下称"参加者"）报名参加由 RX.TRAINING 及其教练（合称"免责方"）
+在室内及室外场地组织的体育训练、指导、小组课、训练营、集训与活动（下称"活动"）。
+
+2. 风险自担。本人理解体育活动存在无法完全消除的固有风险，包括扭伤、骨折、脑震荡及其他头部损伤、
+中暑、与其他参加者或器材碰撞、永久性伤残，以及在极少数情况下最严重的后果，包括死亡。
+风险可能源于参加者自身的行为、他人的行为、场地或器材的状况，或免责方的疏忽。在知悉上述风险的前提下，
+本人自愿让参加者参与并接受这些风险。
+
+3. 健康与医疗。本人确认参加者身体健康、适合参加，并已告知教练应当知悉的任何疾病、伤病、过敏或用药情况。
+如无法联系到本人，本人授权免责方为参加者安排紧急医疗救治，相关费用由本人承担。
+
+4. 责任免除。在法律允许的最大范围内，本人免除免责方就因活动引起的伤害、疾病、最严重的后果（包括死亡）
+或财产损失而产生的一切索赔、请求及诉因，包括基于其一般过失的索赔。本免除条款不适用于重大过失、
+鲁莽行为或故意不当行为。
+
+5. 赔偿。在法律允许的范围内，本人同意就参加者或代表参加者提出的、因活动引起的任何索赔，
+向免责方作出赔偿。
+
+6. 规则与行为。参加者将遵守教练的指示及场地规则。对于行为危及安全的参加者，免责方有权将其请离，
+且不予退费。
+
+7. 签署权限。如参加者未满 18 周岁，本人确认本人为其父母或法定监护人，并代表其本人及本人自身签署本协议。
+
+8. 摄影与媒体（可选 — 需单独勾选）。RX.TRAINING 可能对课程、训练营、集训及活动进行拍照或录像。
+若本人勾选媒体选项，即授权 RX.TRAINING 无偿使用参加者的图像及影像用于宣传其教练服务 —
+包括其网站、社交媒体账号、印刷材料及类似用途。本人理解这些内容可能为公众所见，一经发布可能难以撤回。
+RX.TRAINING 不会在图像旁公布参加者的全名、年龄、就读学校、联系方式或任何医疗信息。本人可随时
+通知 RX.TRAINING 撤回此项授权，此后其将停止使用相关素材，并在合理可行的范围内从其自有网站及账号中移除。
+不同意此项授权不会影响参加者在任何课程或活动中的名额。
+
+9. 一般条款。本协议受美国马萨诸塞州联邦法律管辖。如本协议任何部分被认定为不可执行，其余部分继续有效。
+本协议构成就其所涵盖事项的完整协议。
+
+在下方输入本人姓名并点击接受，即表示本人已阅读并理解本协议，并且本人所输入的姓名即为本人的签名。`;
+/* Two accessors on purpose. waiverRaw() is the stored source, complete with its [en]/[zh] blocks —
+   that is what Admin edits and what gets saved. waiverText() is what a parent reads, resolved to
+   their language. Editing the resolved text would silently throw away every other translation the
+   moment the owner pressed Save. */
+function waiverRaw(){ return (DB.settings&&DB.settings.waiverText)||DEFAULT_WAIVER; }
+function waiverText(){ return mlText(waiverRaw()); }
+/* Which languages the live waiver actually covers — shown in Admin so the owner can see at a
+   glance that, say, Korean readers are being served the English text. */
+function waiverLangs(){
+  const raw=waiverRaw(), out=[];
+  ['en','zh','ko','ja'].forEach(l=>{ if(new RegExp('^\\s*\\['+l+'\\]','mi').test(raw)) out.push(l); });
+  return out;
+}
 function waiverVersion(){ return Math.max(1,Number(DB.settings&&DB.settings.waiverVersion)||1); }
 /* Has this person accepted the version that is live right now? */
 function waiverOK(rec){ return !!(rec&&Number(rec.version)===waiverVersion()); }
@@ -3551,7 +3613,13 @@ function findCustomerBy(phone,email){
                  working; they just show a generic card.
    A hash is never sent to the server and preview crawlers do not run JavaScript, which is why the
    hash form can never produce a per-event card however clever the page is. */
-function publicEventUrl(eid){ return location.origin+'/e?i='+eid; }
+/* The link carries the language it was shared in, so a poster made in Chinese opens a Chinese
+   registration form. Without it, someone who was sold the event in Chinese lands on an English
+   page and has to hunt for the language selector — which is exactly the moment they give up. */
+function publicEventUrl(eid,lang){
+  const l=(lang||LANG||'en');
+  return location.origin+'/e?i='+eid+(l&&l!=='en'?'&l='+l:'');
+}
 function openPublicEventReg(eid){
   const ev=eventById(eid);
   if(!ev||ev.active===false)return flash('That event is no longer listed',true);
@@ -3638,6 +3706,14 @@ function submitPublicReg(eid){
 }
 function initAuth(){
   ensureTokens();
+  /* A shared link can carry the language it was advertised in (?l= or #...&l=). Read it here,
+     BEFORE anything paints — set inside the timeout below and the page behind the registration
+     form would already have drawn in the wrong language. It is a deliberate override of the
+     saved preference: the visitor is arriving from a poster written in that language. */
+  try{
+    const lm=(location.search+location.hash).match(/[?#&]l=(en|zh|ko|ja)\b/i);
+    if(lm){ LANG=lm[1].toLowerCase(); try{localStorage.setItem('rx_lang',LANG);}catch(e){} }
+  }catch(e){}
   /* A public registration link takes priority over everything else on the page: the visitor tapped
      it to do one thing. */
   const em=location.hash.match(/[#&]e=([a-z0-9]+)/i);
@@ -4853,8 +4929,14 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-05 05:20 UTC';
+const BUILD='2026-09-05 04:57 UTC';
 const CHANGELOG=[
+ {v:'2.4', d:'2026-09-05', t:'Posters in any language, and a waiver to match', items:[
+   '<b>The poster can be made in any of our four languages</b> \u2014 pick EN, \u4e2d\u6587, \ud55c\uad6d\uc5b4 or \u65e5\u672c\u8a9e in the poster box and it redraws. An owner working in English still needs a Chinese poster for a WeChat group, so the language of the poster is now a separate choice from the language of the admin screen.',
+   '<b>The QR carries that language with it.</b> Scan a Chinese poster and the registration form opens in Chinese. Somebody sold on an event in one language who lands on a page in another has to go hunting for the language selector, and that is the moment they give up.',
+   '<b>The waiver is bilingual.</b> A parent reads it in their own language; a language we have not translated falls back to English rather than showing nothing. The Chinese text states plainly that the <b>English version governs</b> \u2014 a translation for comprehension is normal practice, whereas two equally authoritative versions that drift apart is how a waiver stops being worth anything. Admin now lists which languages the live waiver covers, and edits the multilingual source rather than the resolved text, which would have thrown away every other translation on the first Save.',
+   '<b>The poster shows the sports we actually coach</b>, not just a basketball \u2014 taken from the same list the home page cycles through, so the two cannot drift apart. A poster that says \u201cbasketball\u201d to a family we would happily coach at track is a sale we never get to make.',
+ ]},
  {v:'2.3', d:'2026-09-05', t:'A poster to share on WeChat', items:[
    '<b>Every event can now be shared as a poster image</b> \u2014 the \u{1F5BC} button beside an event, or <i>Poster for WeChat</i> in the share box. It draws the wordmark, slogan, title, when, where, coach, price and places left, with a <b>QR code</b> to the same public sign-up link. Save it and send it as a photo.',
    'This exists because <b>WeChat ignores link previews entirely.</b> It only builds a card for a page that has called its own JS-SDK, which needs an Official Account and an ICP-filed domain \u2014 neither of which a Lexington business can get. So on WeChat our link will always arrive as bare text no matter what the page says. A picture always shows, and it still reads to somebody who never taps anything.',
@@ -9581,15 +9663,19 @@ function posterFit(x,text,w,maxLines){
   keep[maxLines-1]=last.replace(/\s+$/,'')+'…';
   return keep;
 }
-function posterBall(x,cx,cy,r){
+/* The sports we actually run, as the same emoji the website cycles through — lpBallSet() is the
+   single source for "what we are enabled for", so the poster cannot drift from the home page.
+   Drawn as text rather than by hand: there are ten possible sports and hand-drawing each one is a
+   maintenance trap, whereas the emoji already matches what a visitor sees on the site. */
+function posterSports(){ try{ return lpBallSet(); }catch(e){ return ['🏀']; } }
+function posterIcon(x,glyph,cx,cy,size){
   x.save();
-  x.fillStyle='#ff8a1a';x.beginPath();x.arc(cx,cy,r,0,7);x.fill();
-  x.strokeStyle='#12180f';x.lineWidth=Math.max(2,r*.09);x.lineJoin='round';
-  x.beginPath();x.arc(cx,cy,r,0,7);x.stroke();
-  x.beginPath();x.moveTo(cx-r,cy);x.lineTo(cx+r,cy);x.moveTo(cx,cy-r);x.lineTo(cx,cy+r);x.stroke();
-  x.beginPath();x.ellipse(cx-r*.83,cy,r*.68,r,0,-Math.PI/3,Math.PI/3);x.stroke();
-  x.beginPath();x.ellipse(cx+r*.83,cy,r*.68,r,0,Math.PI*2/3,Math.PI*4/3);x.stroke();
+  x.textAlign='center'; x.textBaseline='middle';
+  x.font=size+'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+  x.fillStyle='#0f1410';
+  x.fillText(glyph,cx,cy);
   x.restore();
+  x.textBaseline='alphabetic';
 }
 function eventPosterCanvas(ev){
   const W=1080,H=1440,cv=document.createElement('canvas');
@@ -9600,18 +9686,25 @@ function eventPosterCanvas(ev){
   const band=x.createLinearGradient(0,0,W,0);band.addColorStop(0,'#ff8a1a');band.addColorStop(1,'#f05a14');
   x.fillStyle=band;x.fillRect(0,0,W,16);
 
-  // Wordmark: RX (ball) TRAINING, laid out by measurement so it stays centred at any font metric
+  // Wordmark: RX (sport) TRAINING, laid out by measurement so it stays centred at any font metric
+  const sports=posterSports();
   const mf='800 78px '+FONT;x.font=mf;
   const wRX=x.measureText('RX').width,wTR=x.measureText('TRAINING').width,br=44,gap=26;
   let px=(W-(wRX+gap+br*2+gap+wTR))/2,my=170;
   x.textAlign='left';x.fillStyle='#0f1410';x.fillText('RX',px,my);
-  px+=wRX+gap;posterBall(x,px+br,my-26,br);px+=br*2+gap;
-  x.fillText('TRAINING',px,my);
-  const slogan=(DB.settings&&DB.settings.slogan)||t('SLOGAN');
+  px+=wRX+gap;posterIcon(x,sports[0],px+br,my-26,br*2);px+=br*2+gap;
+  x.font=mf;x.textAlign='left';x.fillStyle='#0f1410';x.fillText('TRAINING',px,my);
+  const slogan=mlText((DB.settings&&DB.settings.slogan)||'')||t('SLOGAN');
   ctr(slogan,my+66,'600 38px '+FONT,'#3a6e14');
   const rule=x.createLinearGradient(W/2-120,0,W/2+120,0);
   rule.addColorStop(0,'#ff8a1a');rule.addColorStop(1,'#f05a14');
   x.fillStyle=rule;x.fillRect(W/2-120,my+96,240,8);
+  /* Every sport we coach, in a row. The wordmark can only hold one glyph, and a poster that says
+     "basketball" to a family we would happily coach at track is a sale we never get to make. */
+  if(sports.length>1){
+    const ir=34,pitch=Math.min(110,(W-200)/sports.length),sx=W/2-(sports.length-1)*pitch/2;
+    sports.forEach((g,i)=>posterIcon(x,g,sx+i*pitch,my+150,ir*2));
+  }
 
   /* The QR is sized and placed FIRST so the text above can be fitted to the space that is
      genuinely left. Laying the text out first and dropping the code in afterwards meant a long
@@ -9624,7 +9717,7 @@ function eventPosterCanvas(ev){
   const floor=qy-96;
 
   // The event itself
-  const top=my+210;
+  const top=my+(sports.length>1?250:210);   // clear the sports row when there is one
   let y=top;
   const title=mlText(ev.title)||t('Event');
   const rows=[[t('When'),eventWhen(ev)]];
@@ -9676,17 +9769,35 @@ function eventPosterCanvas(ev){
   return cv;
 }
 /* Saving differs by platform, so offer both routes rather than guessing: iOS Safari ignores the
-   download attribute on a blob for images, but long-pressing a rendered <img> always works. */
-function sharePoster(eid){
+   download attribute on a blob for images, but long-pressing a rendered <img> always works.
+
+   The poster is built in a chosen language rather than whatever the admin happens to be set to —
+   an owner working in English still needs a Chinese poster for a WeChat group. LANG is swapped
+   for the duration of the draw and put back in a finally block: everything downstream (t(),
+   mlText(), the date format, the QR's link) reads that global, so this is the one place to set
+   it, and leaving it swapped would silently repaint the whole admin in Chinese. */
+let posterLang=null;
+function posterLangFor(){ return posterLang||LANG||'en'; }
+function sharePoster(eid,lang){
   const ev=eventById(eid); if(!ev)return;
-  let url;
-  try{ url=eventPosterCanvas(ev).toDataURL('image/png'); }
-  catch(e){ return flash('Could not draw the poster: '+e.message,true); }
-  openModal(t('Poster')+' — '+mlText(ev.title),
-    `<p class="muted small" style="margin-bottom:12px">Send this as a <b style="color:var(--txt)">photo</b> in WeChat. WeChat does not build preview boxes for outside links, so a picture is the only thing that shows up properly there — and it still reads to anyone who never taps it.</p>
-     <img id="evPoster" src="${url}" alt="${attrEsc(mlText(ev.title))}" style="width:100%;border:1px solid var(--line);border-radius:12px;display:block">
+  posterLang=lang||posterLang||LANG||'en';
+  const keep=LANG;
+  let url,title;
+  try{
+    LANG=posterLang;
+    url=eventPosterCanvas(ev).toDataURL('image/png');
+    title=mlText(ev.title);
+  }catch(e){ return flash('Could not draw the poster: '+e.message,true); }
+  finally{ LANG=keep; }
+  const pick=Object.keys(LANG_NAMES).map(k=>
+    `<button class="btn sm ${k===posterLang?'':'ghost'}" onclick="sharePoster('${eid}','${k}')">${LANG_NAMES[k]}</button>`).join(' ');
+  openModal(t('Poster')+' — '+title,
+    `<div class="row" style="align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+       <span class="clienttag">Language</span><div class="actions">${pick}</div></div>
+     <p class="muted small" style="margin-bottom:12px">Send this as a <b style="color:var(--txt)">photo</b> in WeChat. WeChat does not build preview boxes for outside links, so a picture is the only thing that shows up properly there — and it still reads to anyone who never taps it. The QR carries the language too, so scanning a Chinese poster opens a Chinese registration form.</p>
+     <img id="evPoster" src="${url}" alt="${attrEsc(title)}" style="width:100%;border:1px solid var(--line);border-radius:12px;display:block">
      <p class="muted small" style="margin-top:10px">On a phone: <b style="color:var(--txt)">press and hold</b> the image, then Save. On a computer, use Download.</p>`,
-    `<a class="btn" href="${url}" download="${attrEsc((mlText(ev.title)||'event').replace(/[^a-z0-9]+/gi,'-').toLowerCase())}-rx.png">Download</a>
+    `<a class="btn" href="${url}" download="${attrEsc((title||'event').replace(/[^a-z0-9一-鿿]+/gi,'-').toLowerCase())}-rx-${posterLang}.png">Download</a>
      <button class="btn ghost" onclick="closeModal()">Close</button>`);
 }
 function rxCopy(id,msg){
@@ -11393,7 +11504,8 @@ function renderAdmin(){
         <b class="small">⚠ Have a lawyer review this before you rely on it.</b>
         <div class="clienttag" style="margin-top:3px">The text below is a general template, not legal advice. Enforceability varies by state, and a parent's release of a <b style="color:var(--txt)">child's own</b> future claims is treated differently almost everywhere. A Massachusetts attorney who handles youth sports should draft the wording; this app's job is to prove who agreed to what, and when.</div>
       </div>
-      <textarea id="wvText" rows="14" style="font-size:12.5px;line-height:1.5">${escapeHtml(waiverText())}</textarea>
+      <div class="clienttag" style="margin-bottom:6px">Languages in this waiver: ${waiverLangs().map(l=>'<span class="pill">'+(LANG_NAMES[l]||l)+'</span>').join(' ')||'<span class="pill">English only</span>'} — a parent reads whichever matches their language, and falls back to English. To add one, start a line with <span class="mono">[ko]</span> or <span class="mono">[ja]</span> and write that version below it.</div>
+      <textarea id="wvText" rows="14" style="font-size:12.5px;line-height:1.5">${escapeHtml(waiverRaw())}</textarea>
       <div class="row" style="justify-content:space-between;align-items:center;margin-top:8px;gap:10px;flex-wrap:wrap">
         <div class="clienttag">Saving changed wording creates <b style="color:var(--txt)">version ${waiverVersion()+1}</b>. Everyone is asked to accept again before their next booking — nobody agreed to the new words.</div>
         <div class="actions">
@@ -11423,7 +11535,7 @@ function renderAdmin(){
 function saveWaiverText(){
   const txt=($('#wvText')&&$('#wvText').value||'').trim();
   if(txt.length<40)return flash('That looks too short to be a waiver',true);
-  if(txt===waiverText())return flash('No change');
+  if(txt===waiverRaw())return flash('No change');
   /* A new version invalidates every acceptance of the old one — say so plainly before doing it,
      because everyone will be asked again and that is a real cost to them. */
   const stale=(DB.customers||[]).filter(c=>custWaiverOK(c)).length;
