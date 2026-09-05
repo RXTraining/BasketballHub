@@ -83,7 +83,8 @@ export async function onRequestGet(context){
      thing a stranger sees in a chat, and an anonymous rounded square says nothing about who is
      inviting their child. Every chat app expects this ratio; a square icon gets cropped or shown
      tiny beside the text. */
-  const img   = SITE + '/og-card.png';
+  // the card Admin last published (falls back to the committed file) — see functions/api/og-card.js
+  const img   = SITE + '/api/og-card';
 
   const html = `<!DOCTYPE html><html lang="en"><head>
 <meta charset="utf-8">
