@@ -3644,6 +3644,28 @@ function findCustomerBy(phone,email,name){
   if(exact)return exact;
   return {sibling:household[0]};                    // same family, a player we have not met
 }
+
+/* A starting password that actually tells two people apart.
+   Everyone who signed up for themselves used to start on the one shared default, so two players
+   with the same name held identical credentials and nothing could distinguish them. Refusing to
+   guess (which is the only safe thing to do at sign-in) then meant a stranger registering under an
+   existing player's name locked that player out of their own account — a real person shut out by
+   somebody they have never met. Handing each new account its own password removes the collision at
+   its source instead of coping with it afterwards.
+   Words plus digits rather than random characters: a parent has to read this off a screen, type it
+   on a phone, and sometimes repeat it down the phone to a coach. */
+const PWD_WORDS=['jump','pass','dunk','sprint','rally','swift','drive','pivot','stride','focus','court','relay'];
+function newClientPwd(name){
+  const taken=new Set((DB.customers||[])
+    .filter(c=>nameKey(c.name)===nameKey(name))
+    .map(c=>String(c.pwd||'')));
+  taken.add(String((DB.settings&&DB.settings.defaultClientPwd)||''));
+  for(let i=0;i<200;i++){
+    const p=PWD_WORDS[Math.floor(Math.random()*PWD_WORDS.length)]+String(100+Math.floor(Math.random()*900));
+    if(!taken.has(p))return p;
+  }
+  return 'rx'+Date.now().toString(36).slice(-6);
+}
 /* Two shapes for the same destination:
      /e?i=<id> — what you SHARE. A Cloudflare Pages Function answers it with that event's Open
                  Graph tags, so WeChat, iMessage, WhatsApp and the rest draw a preview box with the
@@ -3729,7 +3751,7 @@ async function submitPublicReg(eid){
        notes:(kin?'Registered via public link (same household as '+kin.name+') — ':'Registered via public link — ')+mlText(ev.title),
        created:todayISO(),wechat:'',carrier:(kin?kin.carrier:'')||'',
        inGroup:false,approved:false,waiver:wv,creditsTotal:{_v:2},packages:[],
-       token:uid()+uid(),pwd:DB.settings.defaultClientPwd};
+       token:uid()+uid(),pwd:newClientPwd(name)};
   }
   const reg={id:uid(),eventId:eid,customerId:c.id,status:'registered',paid:false,paidVia:'',
              checkedIn:false,created:todayISO(),waiver:wv};
@@ -3757,7 +3779,7 @@ async function submitPublicReg(eid){
          <div class="clienttag" style="margin-top:6px">${t('Go to')} <b style="color:var(--txt)">rxtraining.org</b> ${t('and use:')}</div>
          <div style="margin-top:8px;line-height:1.9">
            <div>${t('Name')}: <b style="color:var(--txt)" class="mono">${escapeHtml(name)}</b></div>
-           <div>${t('Password')}: <b style="color:var(--txt)" class="mono">${escapeHtml(DB.settings.defaultClientPwd||'')}</b></div>
+           <div>${t('Password')}: <b style="color:var(--txt)" class="mono">${escapeHtml(c.pwd||'')}</b></div>
          </div>
          <div class="clienttag" style="margin-top:8px">${t('Please change this password once you are in — anyone given the same starting password could otherwise be confused with you.')}</div>
        </div>`
@@ -4634,7 +4656,7 @@ function saveSignup(){
   const wvName=($('#suWvName')?$('#suWvName').value:'').trim();
   if(wvName.length<3)return flash(t('Please type the parent or guardian full name'),true);
   const c={id:uid(),name,phone:($('#suPhone').value||'').trim(),waiver:waiverRecord(wvName,'Parent/guardian',$('#suWvPhoto')&&$('#suWvPhoto').checked),email:($('#suEmail').value||'').trim(),town:($('#suTown').value||'').trim(),parent:($('#suParent').value||'').trim(),
-    age:(()=>{const v=($('#suAge')?$('#suAge').value:'').trim();return v===''?null:(Math.max(0,Math.round(+v||0))||null);})(),level:'',notes:'Self sign-up',created:todayISO(),wechat:'',carrier:'',inGroup:false,approved:false,creditsTotal:{'1on1':0,'group':0},packages:[],token:uid()+uid(),pwd:DB.settings.defaultClientPwd};
+    age:(()=>{const v=($('#suAge')?$('#suAge').value:'').trim();return v===''?null:(Math.max(0,Math.round(+v||0))||null);})(),level:'',notes:'Self sign-up',created:todayISO(),wechat:'',carrier:'',inGroup:false,approved:false,creditsTotal:{'1on1':0,'group':0},packages:[],token:uid()+uid(),pwd:newClientPwd(name)};
   DB.customers.push(c);save();pushRows('customers',[custRow(c)]);
   notifySignup(c);
   try{localStorage.setItem('rx_signup',JSON.stringify({id:c.id,name:c.name}));}catch(e){}
@@ -4999,8 +5021,14 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-05 05:47 UTC';
+const BUILD='2026-09-05 11:24 UTC';
 const CHANGELOG=[
+ {v:'2.7', d:'2026-09-05', t:'Every new account gets its own password', items:[
+   '<b>A new client no longer starts on the shared default password.</b> Each account created by sign-up or by a public event link is given its own \u2014 a word and three digits, like <span class="mono">dunk417</span>, short enough to read off a screen and repeat down the phone.',
+   'This fixes a real hole. Because everyone started on the same password, two players with the same name held identical credentials and nothing could tell them apart. Refusing to guess is the only safe thing to do at sign-in \u2014 but it meant <b>a stranger registering under an existing player\u2019s name locked that player out of their own account</b>. Unique passwords remove the collision at its source rather than coping with it afterwards, and two namesakes can now both sign in normally.',
+   'The password is shown to the new family on the confirmation screen, and the owner\u2019s <b>Add client</b> form suggests a fresh one too, so the same collision cannot be created by hand.',
+   'Accounts that <i>already</i> share the default are not changed retroactively \u2014 give one of them a new password in <b>Edit</b>, or use <b>Merge</b> if they are really the same person.',
+ ]},
  {v:'2.6', d:'2026-09-05', t:'Duplicate clients, and sign-in details for new families', items:[
    '<b>Duplicate players can be merged.</b> A client table row whose name is shared now carries a <b>\u29c9 duplicate name</b> flag and a <b>Merge</b> button. Merging moves sessions, event places, messages, cash entries, skill progress, packages and credits onto the record you keep, fills its blank fields from the other, and deletes the other. Deleting the newcomer instead would lose their event place and their signed waiver; keeping both splits one child\u2019s history in two, so credits and payments never add up.',
    'Public sign-up will keep producing these \u2014 a family already training with us registers from a poster on a different phone, or types \u201cTom\u201d where the record says \u201cTom Smith\u201d. The flag means you find out on the client list rather than when the numbers stop making sense.',
@@ -8133,10 +8161,10 @@ function openCustomer(id){
     </div>
     <div class="field"><label class="f">Client login password</label>
       <div class="row" style="gap:8px">
-        <input id="cPwd" value="${id?(c.pwd||''):DB.settings.defaultClientPwd}" style="flex:1">
+        <input id="cPwd" value="${id?(c.pwd||''):newClientPwd($('#cName')?$('#cName').value:'')}" style="flex:1">
         <button class="btn ghost sm" type="button" onclick="document.getElementById('cPwd').value='${DB.settings.defaultClientPwd}'">Reset to default</button>
       </div>
-      <div class="clienttag" style="margin-top:6px">Default: ${DB.settings.defaultClientPwd}. The client can change this themselves after signing in.</div></div>
+      <div class="clienttag" style="margin-top:6px">A fresh password is suggested for each new client so two players with the same name can still be told apart at sign-in. Default: ${DB.settings.defaultClientPwd}. The client can change this themselves after signing in.</div></div>
     ${id?'<p class="muted small">Use 🔗 Client link (in the list or View) to send this player their personal sign-in link.</p>':'<p class="muted small">A personal client login link is generated automatically when you save.</p>'}
   `,`
     ${id?`<button class="btn danger" onclick="delCustomer('${id}')">Delete</button>`:''}
