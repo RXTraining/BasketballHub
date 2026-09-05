@@ -1345,7 +1345,7 @@ const ZH={
   // signup
   'New here? Create an account':'新用户？创建账号','Create your account':'创建账号','Apply':'提交申请','Back':'返回',
   'Tell us about the player so the coach can prepare.':'请填写学员信息，方便教练准备。',
-  'Full name':'姓名','Phone':'电话','Email':'邮箱','Town / City':'城镇/城市','Parent / Guardian':'家长/监护人','Level / Age group':'级别/年龄组','Choose a password':'设置密码',
+  'Full name':'姓名','Phone':'电话','Email':'邮箱','Town / City':'城镇/城市','Parent / Guardian':'家长/监护人','Age':'年龄','Choose a password':'设置密码',
   'Application submitted — you can sign in once the owner approves.':'申请已提交 — 管理员审核通过后即可登录。',
   'Your account is awaiting owner approval.':'您的账号正在等待管理员审核。','Your account is suspended. Please contact your coach.':'您的账号已被暂停，请联系您的教练。',
   'A default password will be assigned — you can change it after your first sign-in.':'系统将分配默认密码，登录后可自行修改。',
@@ -3269,6 +3269,7 @@ async function initPush(){
   }catch(e){console.warn('push init failed',e&&e.message);}
 }
 function switchTab(){
+  rxJumpToTop=true;                      // this ONE render is allowed to reset the scroll
   try{window.scrollTo(0,0);}catch(e){}   // a new tab starts at the top; a refresh does not
   renderTabs();
   $$('.view').forEach(v=>v.classList.remove('active'));
@@ -4172,14 +4173,15 @@ function renderSignup(){
     <input id="suEmail" placeholder="${t('Email')}" style="margin-top:10px">
     <input id="suTown" placeholder="${t('Town / City')}" style="margin-top:10px">
     <input id="suParent" placeholder="${t('Parent / Guardian')}" style="margin-top:10px">
-    <input id="suLevel" placeholder="${t('Level / Age group')}" style="margin-top:10px">
+    <input id="suAge" type="number" min="3" max="99" placeholder="${t('Age')}" style="margin-top:10px">
     <p class="muted small" style="margin-top:10px">${t('A default password will be assigned — you can change it after your first sign-in.')}</p>
     <button class="btn" style="width:100%;margin-top:8px" onclick="saveSignup()">${t('Apply')}</button>
     <button class="btn ghost" style="width:100%;margin-top:10px" onclick="showLogin()">← ${t('Back')}</button>`;
 }
 function saveSignup(){
   const name=($('#suName').value||'').trim();if(!name)return flash(t('Full name'),true);
-  const c={id:uid(),name,phone:($('#suPhone').value||'').trim(),email:($('#suEmail').value||'').trim(),town:($('#suTown').value||'').trim(),parent:($('#suParent').value||'').trim(),level:($('#suLevel').value||'').trim(),notes:'Self sign-up',created:todayISO(),wechat:'',carrier:'',inGroup:false,approved:false,creditsTotal:{'1on1':0,'group':0},packages:[],token:uid()+uid(),pwd:DB.settings.defaultClientPwd};
+  const c={id:uid(),name,phone:($('#suPhone').value||'').trim(),email:($('#suEmail').value||'').trim(),town:($('#suTown').value||'').trim(),parent:($('#suParent').value||'').trim(),
+    age:(()=>{const v=($('#suAge')?$('#suAge').value:'').trim();return v===''?null:(Math.max(0,Math.round(+v||0))||null);})(),level:'',notes:'Self sign-up',created:todayISO(),wechat:'',carrier:'',inGroup:false,approved:false,creditsTotal:{'1on1':0,'group':0},packages:[],token:uid()+uid(),pwd:DB.settings.defaultClientPwd};
   DB.customers.push(c);save();pushRows('customers',[custRow(c)]);
   notifySignup(c);
   try{localStorage.setItem('rx_signup',JSON.stringify({id:c.id,name:c.name}));}catch(e){}
@@ -4515,9 +4517,13 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-04 21:03 UTC';
+const BUILD='2026-09-05 00:37 UTC';
 const CHANGELOG=[
  {v:'2.2', d:'2026-08-21', t:'Slogan, weekend classes & colour', items:[
+   '<b>Editing a row no longer throws you back to the top.</b> Every save re-renders the whole view, which reset the page scroll and the sideways scroll of every table in it \u2014 so correcting one customer near the bottom of a long list bounced you to the top and lost your place in a wide table, every single time. Both are now restored after the redraw, on <b>every</b> table in the app: customers, coaches, booking, availability, finance, P&amp;L, events, admin, messages, activity, skills and locations.',
+   'Switching tab still starts at the top, which is what you want there \u2014 a new page should begin at its beginning. Only a refresh in place holds its position.',
+   '<b>Create account now asks for <i>Age</i> instead of <i>Level / Age group</i>.</b> The free-text box was where \u201c13 years old\u201d, \u201c11\u201d and \u201cU14\u201d all ended up, which is why one group roster showed a child\u2019s age three different ways. A number is what the app actually needs \u2014 for the roster, and for you to judge whether a group suits a player. <b>Level</b> survives on the owner\u2019s customer form as an optional extra, for when there really is a team or standard worth recording.',
+   'The owner&rsquo;s <b>Customers</b> table gained <b>Age</b> and <b>Parent / guardian</b> as sortable columns of their own, rather than a cramped line under the name.',
    '<b>Fixed: Add to calendar used the wrong time zone.</b> The times were written with no zone at all \u2014 <span class="mono">20260902T180000</span> \u2014 which iCalendar calls a <i>floating</i> time and every calendar reads in the <b>viewer\u2019s</b> zone. A family in California adding a 6pm Boston session got 6pm Pacific: three hours late, with nothing to show anything was wrong. Times are now converted from the Boston clock to UTC using that date\u2019s real offset, so the event lands at the right moment wherever it is opened.',
    'Because the offset is looked up per date rather than assumed, <b>EST and EDT are both correct</b> \u2014 including sessions on the changeover weekends. Session downloads, the coach\u2019s bulk export, event downloads and the Google Calendar link all go through the same conversion, and an event with no date yet now says so instead of producing a broken file.',
    '<b>Launching a group is always available now, not only when nothing is forming.</b> A list of what already exists was the only option on the page \u2014 but none of those times may suit a family, and they may want a particular coach. <b>None of these suit?</b> sits under the list of open groups, under a client&rsquo;s own group, and on the home page as <i>Or start your own group</i>.',
@@ -7261,6 +7267,8 @@ let custSearch='';
 let custSort={col:'joined',dir:'desc'}, coachSort={col:'joined',dir:'desc'};
 const CUST_COLS=[
   {id:'name',label:'Player',get:c=>c.name||''},
+  {id:'age',label:'Age',num:true,get:c=>(c.age!=null&&c.age!==''&&!isNaN(c.age))?Number(c.age):-1},
+  {id:'parent',label:'Parent / guardian',get:c=>c.parent||''},
   {id:'contact',label:'Contact',get:c=>c.email||c.phone||''},
   {id:'town',label:'Town',get:c=>c.town||''},
   {id:'wechat',label:'WeChat',get:c=>c.wechat||''},
@@ -7297,7 +7305,9 @@ function renderCustomers(){
   const rows=list.map(c=>{
     const next=sortSessions(DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.date>=todayISO()&&s.status==='scheduled'))[0];
     return `<tr>
-      <td><div class="nameceil"><span class="av">${initials(c.name)}</span><div><b>${c.name}</b> ${c.approved===false?'<span class="pill yellow">⏳ pending</span>':''}${c.suspended?'<span class="pill red">⏸ suspended</span>':''}<div class="clienttag">${c.level||'—'}${c.parent?' · '+c.parent:''}</div></div></div></td>
+      <td><div class="nameceil"><span class="av">${initials(c.name)}</span><div><b>${c.name}</b> ${c.approved===false?'<span class="pill yellow">⏳ pending</span>':''}${c.suspended?'<span class="pill red">⏸ suspended</span>':''}<div class="clienttag">${ageLevelLabel(c)||'—'}</div></div></div></td>
+      <td>${(c.age!=null&&c.age!=='')?`<b>${Number(c.age)}</b>`:'<span class="muted">—</span>'}</td>
+      <td>${c.parent?escapeHtml(c.parent):'<span class="muted">—</span>'}</td>
       <td>${c.phone||''}<div class="clienttag">${c.email||''}</div></td>
       <td>${c.town||'<span class="muted">—</span>'}</td>
       <td>${c.wechat||'<span class="muted">—</span>'}<div class="clienttag">${c.inGroup?'<span style="color:var(--green)">✓ in group</span>':'not in group'}</div></td>
@@ -7331,7 +7341,7 @@ function renderCustomers(){
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
       <table>
         <thead><tr>${sortHead(CUST_COLS,custSort,'setCustSort')}</tr></thead>
-        <tbody>${rows||'<tr><td colspan="12"><div class="empty">No customers found.</div></td></tr>'}</tbody>
+        <tbody>${rows||'<tr><td colspan="15"><div class="empty">No customers found.</div></td></tr>'}</tbody>
       </table>
     </div>`;
   mountCustGrowth();
@@ -7553,7 +7563,7 @@ function openCustomer(id){
     <div class="field" style="max-width:260px"><label class="f">Mobile carrier (for text on confirm)</label><select id="cCarrier">${carrierOptions(c.carrier)}</select><div class="clienttag" style="margin-top:4px">Pick a carrier to text this client when a session is confirmed (free).</div></div>
     <div class="row">
       <div class="field" style="max-width:120px"><label class="f">Age</label><input type="number" id="cAge" min="3" max="99" value="${(c.age!=null&&c.age!=='')?c.age:''}" placeholder="—"><div class="clienttag" style="margin-top:4px">Shown to other families on group rosters.</div></div>
-      <div class="field"><label class="f">Level / Age group</label><input id="cLevel" value="${c.level||''}" placeholder="e.g. AAU U14"></div>
+      <div class="field"><label class="f">Level <span class="muted">(optional)</span></label><input id="cLevel" value="${c.level||''}" placeholder="e.g. AAU U14"><div class="clienttag" style="margin-top:4px">Only if it says something age does not — a team or standard.</div></div>
       <div class="field"><label class="f">Parent / Guardian</label><input id="cParent" value="${c.parent||''}"></div>
     </div>
     <div class="field" style="max-width:260px"><label class="f">Town / City</label><input id="cTown" value="${(c.town||'').replace(/"/g,'&quot;')}" placeholder="e.g. Lexington"></div>
@@ -11586,6 +11596,50 @@ window.addEventListener('resize',()=>{if(AUTH==='owner'&&['finance','pl','bookin
   DB = await bootLoad();
   if(!SUPA_OK) flash('Cloud offline — check connection and refresh',true);
   initAuth();
+})();
+
+/* ---- Editing something should not throw the page away ----------------------
+   Every render replaces a whole view's innerHTML. That resets the document scroll and the
+   horizontal scroll of every table inside it — so correcting one customer near the bottom of a
+   long list bounced you back to the top and lost your place in a wide table, on every save. Each
+   renderer now restores both, unless the render came from switching tab, which genuinely should
+   start at the top.
+
+   Tables are keyed by their position in the view rather than by id, because they are rebuilt from
+   scratch and have no stable identity. Same page, same order — good enough, and wrong only if the
+   number of tables changes, in which case starting at 0 is the right answer anyway. */
+let rxJumpToTop=false;
+(function(){
+  const NAMES=['renderCustomers','renderCoaches','renderBooking','renderBookingOwner','renderBookingTable',
+    'renderAvailability','renderFinance','renderPL','renderEvents','renderEventsOwner','renderAdmin',
+    'renderMessages','renderActivity','renderSkills','renderMoney','renderLocations','renderApprovals'];
+  NAMES.forEach(n=>{
+    const fn=window[n];
+    if(typeof fn!=='function')return;
+    window[n]=function(){
+      if(rxJumpToTop) return fn.apply(this,arguments);          // tab change: let it start at the top
+      let y=0, cols=[];
+      try{
+        y=window.scrollY||window.pageYOffset||0;
+        cols=[...document.querySelectorAll('.tblscroll')].map(e=>[e.scrollLeft,e.scrollTop]);
+      }catch(e){}
+      const out=fn.apply(this,arguments);
+      const put=()=>{ try{
+        if(y)window.scrollTo(0,y);
+        document.querySelectorAll('.tblscroll').forEach((e,i)=>{
+          if(cols[i]){ e.scrollLeft=cols[i][0]; e.scrollTop=cols[i][1]; }
+        });
+      }catch(e){} };
+      // twice: once now, once after layout settles (wrapTables builds the scrollers on a timer)
+      requestAnimationFrame(put); setTimeout(put,60);
+      return out;
+    };
+  });
+  // switchTab sets the flag; clear it once the render it triggered has run
+  const st=window.switchTab;
+  if(typeof st==='function'){
+    window.switchTab=function(){ const r=st.apply(this,arguments); setTimeout(()=>{rxJumpToTop=false;},80); return r; };
+  }
 })();
 </script>
 </body>
