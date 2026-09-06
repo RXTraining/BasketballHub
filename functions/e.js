@@ -49,15 +49,53 @@ function whenText(date, time){
   }catch(e){ return date; }
 }
 
+/* MUST match evShortCode() in index.html — the poster prints what that produces and this resolves
+   it. FNV-1a, base-31, no O/0 or I/1/L because the whole point is that it gets typed by hand. */
+const EVCODE_A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+function evShortCode(id){
+  let h = 2166136261 >>> 0; const s = String(id || '');
+  for (let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  let out = '';
+  for (let i = 0; i < 4; i++){ out = EVCODE_A[h % EVCODE_A.length] + out; h = Math.floor(h / EVCODE_A.length); }
+  return out;
+}
+
 export async function onRequestGet(context){
   const url = new URL(context.request.url);
-  const id = (url.searchParams.get('i') || url.searchParams.get('id') || '')
+  let id = (url.searchParams.get('i') || url.searchParams.get('id') || '')
     .replace(/[^a-z0-9]/gi,'').slice(0,40);
+  /* ?c=CODE — the short form printed on a poster for someone typing rather than scanning. Resolved
+     by deriving the code for each live event, because the code is computed from the id rather than
+     stored. The list is small; if two ever collided the soonest event wins, which is the one a
+     poster in someone's hand is overwhelmingly likely to be about. */
+  const code = (url.searchParams.get('c') || '').toUpperCase().replace(/[^A-Z2-9]/g,'').slice(0,4);
+  if (!id && code.length === 4){
+    try{
+      const r = await fetch(
+        SUPABASE_URL + '/rest/v1/events?active=is.true&select=id,date&order=date.asc',
+        { headers:{ apikey:SUPABASE_ANON_KEY, Authorization:'Bearer ' + SUPABASE_ANON_KEY } });
+      if (r.ok){
+        const rows = await r.json();
+        const hit = (Array.isArray(rows) ? rows : []).find(e => evShortCode(e.id) === code);
+        if (hit) id = String(hit.id).replace(/[^a-z0-9]/gi,'').slice(0,40);
+      }
+    }catch(e){ /* fall through to the generic card rather than failing the page */ }
+  }
   /* Carried through to the app so a poster shared in Chinese opens a Chinese registration form.
      Whitelisted rather than passed along, because this value is reflected into a URL inside the
      page we serve — anything not on this list is simply dropped. */
   const langIn = (url.searchParams.get('l') || '').toLowerCase();
-  const lang = ['zh','ko','ja','en'].includes(langIn) ? langIn : '';
+  let lang = ['zh','ko','ja','en'].includes(langIn) ? langIn : '';
+  /* The typed short link carries no language — every character on a poster is one more chance the
+     reader gives up — so fall back to the browser's own. Somebody typing a Chinese poster's
+     address should not land in English when their phone has already said which language they read.
+     An explicit ?l= always wins; this only fills the gap. */
+  if (!lang){
+    const al = (context.request.headers.get('accept-language') || '').toLowerCase();
+    if (/^zh|[,;]\s*zh/.test(al)) lang = 'zh';
+    else if (/^ko|[,;]\s*ko/.test(al)) lang = 'ko';
+    else if (/^ja|[,;]\s*ja/.test(al)) lang = 'ja';
+  }
   const appUrl = SITE + '/#e=' + id + (lang && lang !== 'en' ? '&l=' + lang : '');
 
   let ev = null;
