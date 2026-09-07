@@ -4093,14 +4093,83 @@ function lpFormingGroups(){
    the roster: a visitor needs to know a group exists, when, with whom and what it costs — never who
    the children are. That stays behind sign-in. Uses the same .lp-event card as FEATURED so the two
    sections read as one page rather than two designs. */
+/* ---- Sport tabs, in one place ------------------------------------------------------------------
+   Three places show a list that is really several lists — the public group section, the gallery
+   and the client's join screen — and each of them needs the same tab strip. One implementation so
+   they cannot drift into three slightly different behaviours.
+
+   The tabs rotate on their own, because a visitor who never taps only ever sees the first sport,
+   and the first sport is whichever coach happened to be added first. But rotation stops the
+   instant the person does anything in that section: a page that keeps moving while you are reading
+   it is worse than one that never moved. Stopped means stopped for the rest of the visit — not
+   "paused for a moment", which is the same annoyance with extra steps. */
+const SPORT_ROTATE_MS=6500;
+let sportRot={};                     // key -> {timer, stopped}
+function sportRotStop(key){
+  const r=sportRot[key]; if(!r)return;
+  clearInterval(r.timer); r.timer=null; r.stopped=true;
+}
+function sportRotStart(key,sports,getCur,pick){
+  const r=(sportRot[key]=sportRot[key]||{});
+  if(r.stopped)return;               // they took over earlier in this visit
+  clearInterval(r.timer);
+  if(!sports||sports.length<2)return;
+  r.timer=setInterval(()=>{
+    // Nothing to look at: a hidden tab, or a section scrolled off screen, should not burn through
+    // the sports so the visitor arrives back at a random one.
+    if(document.hidden)return;
+    const el=document.getElementById(key);
+    if(el){ const b=el.getBoundingClientRect();
+      if(b.bottom<0||b.top>(window.innerHeight||0))return; }
+    const cur=getCur();
+    const i=sports.findIndex(x=>sportKey(x)===sportKey(cur));
+    pick(sports[(i+1)%sports.length],true);
+  },SPORT_ROTATE_MS);
+}
+/* Any real interaction inside the strip's section ends the rotation. Bound once per element. */
+function sportRotBind(key){
+  const el=document.getElementById(key); if(!el||el._rotBound)return;
+  el._rotBound=true;
+  ['pointerdown','keydown','wheel','touchstart'].forEach(ev=>
+    el.addEventListener(ev,()=>sportRotStop(key),{passive:true}));
+}
+function sportTabsHtml(sports,cur,pickFn,countOf){
+  if(!sports||sports.length<2)return '';   // one sport should not grow a tab that does nothing
+  return `<div class="lp-sporttabs">${sports.map(sp=>`
+    <button class="lp-sporttab${sportKey(sp)===sportKey(cur)?' on':''}" onclick="${pickFn}('${String(sp).replace(/'/g,"\\'")}')">
+      ${sportIcon(sp)} ${sportName(sp)||sp}${countOf?`<span>${countOf(sp)}</span>`:''}</button>`).join('')}</div>`;
+}
+/* The sports that actually have a forming group right now — an empty tab is a dead end. */
+function lpGroupSports(){
+  const order=bookableSports().concat((DB.settings.sports||'').split(',').map(x=>x.trim()).filter(Boolean));
+  const have=lpFormingGroups().map(g=>{const co=coachById(g.coachId);return sportLabel((co&&co.sport)||'')||'';});
+  const seen=[];
+  order.forEach(sp=>{ if(have.some(h=>sportKey(h)===sportKey(sp))&&!seen.some(x=>sportKey(x)===sportKey(sp)))seen.push(sp); });
+  have.forEach(h=>{ if(h&&!seen.some(x=>sportKey(x)===sportKey(h)))seen.push(h); });
+  return seen;
+}
+let lpGrpSport=null;
+function lpGroupsFor(sp){
+  return lpFormingGroups().filter(g=>{const co=coachById(g.coachId);
+    return !sp||sportKey((co&&co.sport)||'')===sportKey(sp);});
+}
+function lpGrpPickSport(sp,auto){
+  if(!auto)sportRotStop('lpGroups');
+  lpGrpSport=sp; renderLanding();
+  if(!auto){ try{ const el=document.getElementById('lpGroups'); if(el)el.scrollIntoView({block:'nearest'}); }catch(e){} }
+}
 function lpOpenGroupsHtml(){
   const list=lpFormingGroups();
   if(!list.length)return '';
+  const sports=lpGroupSports();
+  if(sports.length>1&&(!lpGrpSport||!sports.some(x=>sportKey(x)===sportKey(lpGrpSport))))lpGrpSport=sports[0];
+  const shown=sports.length>1?lpGroupsFor(lpGrpSport):list;
   return `<section class="lp-sec" id="lpGroups">
     <div class="lp-kicker">${t('Train together')}</div>
     <h2 class="lp-h2">${t('GROUPS WITH ROOM')}</h2>
     <p class="lp-p">${t('Join one of these, or pick your own coach and time and start your own — other families can then ask to join yours.')}</p>
-    ${list.map(g=>{
+    ${sportTabsHtml(sports,lpGrpSport,'lpGrpPickSport',sp=>lpGroupsFor(sp).length)}
+    ${shown.map(g=>{
       const co=coachById(g.coachId), spots=groupSpots(g), n=(g.customerIds||[]).length;
       return `<div class="lp-event reveal">
         <div class="lp-ico">${co&&co.sport?sportIcon(co.sport):'👥'}</div>
@@ -4207,15 +4276,15 @@ function lpHighlightsHtml(){
   const items=lpGalMonth?lpGalItems(lpGalMonth,lpGalSport):[];
   /* The sport row only appears when there is more than one — a single-sport gallery should not
      grow a tab that does nothing. */
-  const sportTabs=sports.length>1?`<div class="lp-sporttabs">${sports.map(sp=>`
-    <button class="lp-sporttab${sportKey(sp)===sportKey(lpGalSport)?' on':''}" onclick="lpGalPickSport('${sp.replace(/'/g,"\\'")}')">
-      ${sportIcon(sp)} ${sportName(sp)||sp}<span>${lpHighlights().filter(h=>sportKey(hlSport(h))===sportKey(sp)).length}</span></button>`).join('')}</div>`:'';
+  const sportTabs=sportTabsHtml(sports,lpGalSport,'lpGalPickSport',
+    sp=>lpHighlights().filter(h=>sportKey(hlSport(h))===sportKey(sp)).length);
   const tabs=`<div class="lp-months">${months.map(k=>`
     <button class="lp-month${k===lpGalMonth?' on':''}" onclick="lpGalPick('${k}')">
       ${lpMonthLabel(k)}<span>${lpGalItems(k,lpGalSport).length}</span></button>`).join('')}</div>`;
   return `${sportTabs}${tabs}<div class="lp-gal" id="lpGal">${lpGalSlideHtml(items,lpGalIdx)}</div>`;
 }
-function lpGalPickSport(sp){ lpGalSport=sp; lpGalMonth=null; lpGalIdx=0; renderLanding(); }
+function lpGalPickSport(sp,auto){ if(!auto)sportRotStop('lpFilm');
+  lpGalSport=sp; lpGalMonth=null; lpGalIdx=0; renderLanding(); }
 function lpGalSlideHtml(items,i){
   if(!items.length)return `<div class="empty">${t('Nothing here yet.')}</div>`;
   i=Math.max(0,Math.min(i,items.length-1));
@@ -4699,6 +4768,14 @@ function renderLanding(){
   setTimeout(lpClampCards,350);
   try{ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(lpClampCards); }catch(e){}
   lpAnimate();
+  /* Rotation is (re)armed after each paint. sportRotStart is a no-op once the visitor has taken
+     over, so re-rendering for any other reason cannot resurrect it. */
+  try{
+    sportRotBind('lpGroups');
+    sportRotStart('lpGroups',lpGroupSports(),()=>lpGrpSport,(sp,auto)=>lpGrpPickSport(sp,auto));
+    sportRotBind('lpFilm');
+    sportRotStart('lpFilm',lpGalSports(),()=>lpGalSport,(sp,auto)=>lpGalPickSport(sp,auto));
+  }catch(e){ console.warn('sport rotation:',e&&e.message); }
 }
 /* Reveal-on-scroll. Uses IntersectionObserver where available and simply shows everything where
    it isn't, so the page can never end up with invisible content. The CSS honours
@@ -5229,8 +5306,15 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-07 21:53 UTC';
+const BUILD='2026-09-07 22:08 UTC';
 const CHANGELOG=[
+ {v:'3.5', d:'2026-09-07', t:'A tab per sport', items:[
+   '<b>Groups on the home page are now split by sport</b>, and the tabs move on their own so a visitor who never taps still sees every sport rather than only whichever coach happened to be added first. The <b>Highlights</b> gallery already had sport tabs \u2014 those now rotate too.',
+   '<b>Rotation stops the moment you touch the section</b> and stays stopped for the rest of the visit. A page that keeps moving while you read it is worse than one that never moved, and \u201cpauses for a moment\u201d is the same annoyance with extra steps. It also holds off while the browser tab is in the background or the section is scrolled out of view, so you never come back to a random sport.',
+   '<b>Join a group</b> on the client side is tabbed the same way, so a family who trains at track is not reading past four basketball groups to find theirs.',
+   '<b>Booking &amp; Schedule</b> gets a sport row too \u2014 but as a filter that stays put, not a rotating strip. The owner is working there, and a list that reshuffles under the cursor is how you click the wrong row. It defaults to <b>All sports</b>, and the calendar view honours it as well, so switching view does not quietly widen what you are looking at.',
+   'A single sport shows no tabs anywhere, and a sport with nothing in it gets no tab \u2014 an empty tab is a dead end.',
+ ]},
  {v:'3.4', d:'2026-09-07', t:'What you tapped is what you get', items:[
    '<b>The coach or group you picked on the public page is still picked after you sign in.</b> Every button out there opened the same sign-in card and then forgot why \u2014 somebody who tapped <i>Ask to join</i> on a particular Saturday group landed on a generic booking screen with the default coach selected, and had to find it all over again. Tapping a group now opens that group; <i>Book with</i> a coach selects that coach; a plan card preselects its type; <i>start your own group</i> starts one.',
    'It survives waiting for approval, so a brand-new family who signs up still arrives at the thing they clicked. It expires after six hours, so a click from last week cannot hijack a later sign-in.',
@@ -5688,6 +5772,20 @@ function renderAbout(){
    BOOKING & SCHEDULE
    ============================================================ */
 let bookFilter='upcoming', bookView='table';
+/* Sport filter for the owner's schedule. A filter, not a rotating strip: the owner is working
+   here, and a list that reshuffles itself under a cursor is a way to click the wrong row.
+   'all' is the default because most days the owner wants the whole day, not one sport. */
+let bookSport='all';
+function bookSportSet(sp){ bookSport=sp; renderBooking(); }
+function sessionSportOf(s){ const co=coachById(s&&s.coachId); return sportLabel((co&&co.sport)||'')||''; }
+function ownerSessionSports(){
+  const order=bookableSports().concat((DB.settings.sports||'').split(',').map(x=>x.trim()).filter(Boolean));
+  const have=DB.sessions.filter(s=>inScope(s.coachId)).map(sessionSportOf).filter(Boolean);
+  const seen=[];
+  order.forEach(sp=>{ if(have.some(h=>sportKey(h)===sportKey(sp))&&!seen.some(x=>sportKey(x)===sportKey(sp)))seen.push(sp); });
+  have.forEach(h=>{ if(!seen.some(x=>sportKey(x)===sportKey(h)))seen.push(h); });
+  return seen;
+}
 function renderBooking(){
   if(ROLE==='client') return renderBookingClient();
   renderBookingOwner();
@@ -5749,6 +5847,12 @@ function renderBookingOwner(){
       <button class="${bookView==='table'?'active':''}" onclick="bookView='table';renderBooking()">▤ Table</button>
       <button class="${bookView==='calendar'?'active':''}" onclick="bookView='calendar';renderBooking()">▦ Calendar</button>
     </div>
+    ${(()=>{const sp=ownerSessionSports(); if(sp.length<2)return '';
+      const n=x=>DB.sessions.filter(s=>inScope(s.coachId)&&sportKey(sessionSportOf(s))===sportKey(x)).length;
+      return `<div class="seg mlseg">
+        <button class="${bookSport==='all'?'active':''}" onclick="bookSportSet('all')">All sports <span class="pill">${DB.sessions.filter(s=>inScope(s.coachId)).length}</span></button>
+        ${sp.map(x=>`<button class="${sportKey(bookSport)===sportKey(x)?'active':''}" onclick="bookSportSet('${String(x).replace(/'/g,"\\'")}')">${sportIcon(x)} ${sportName(x)||x} <span class="pill">${n(x)}</span></button>`).join('')}
+      </div>`;})()}
     <div id="bookBody"></div>`;
   if(AUTH==='owner') mountSessionsChart('bkChart');
   if(bookView==='table') renderBookingTable(); else renderBookingCalendar();
@@ -5761,6 +5865,7 @@ function renderBookingTable(){
   // sees that on their Earnings page. Showing both invited the wrong comparison.
   const showMoney=AUTH!=='coach';
   let list = sortSessions(DB.sessions.filter(s=>inScope(s.coachId)));
+  if(bookSport!=='all') list=list.filter(s=>sportKey(sessionSportOf(s))===sportKey(bookSport));
   if(bkChartFilter) list=list.filter(s=>periodKey(s.date,bkChartFilter.period).key===bkChartFilter.key);
   if(bookFilter==='upcoming') list=list.filter(s=>s.date>=now && s.status!=='cancelled' && s.status!=='completed');
   else if(bookFilter==='past') list=list.filter(s=>s.date<now||s.status==='completed').reverse();
@@ -5865,7 +5970,11 @@ function renderBookingCalendar(){
   const firstDow=ref.getDay();
   const daysIn=new Date(calY,calM+1,0).getDate();
   const byDate={};
-  DB.sessions.filter(s=>inScope(s.coachId)&&s.status!=='cancelled').forEach(s=>{(byDate[s.date]=byDate[s.date]||[]).push(s);});
+  // the calendar has to honour the same sport filter as the table, or switching view silently
+  // widens what you are looking at
+  DB.sessions.filter(s=>inScope(s.coachId)&&s.status!=='cancelled'
+      &&(bookSport==='all'||sportKey(sessionSportOf(s))===sportKey(bookSport)))
+    .forEach(s=>{(byDate[s.date]=byDate[s.date]||[]).push(s);});
   const evByDate={};
   (DB.events||[]).filter(e=>e.active!==false&&(scopeCoach()==='all'||!eventCoachIds(e).length||eventHasCoach(e,scopeCoach()))).forEach(e=>{(evByDate[e.date]=evByDate[e.date]||[]).push(e);});
   const dows=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -6104,6 +6213,11 @@ function renderBookingClient(){
       </div>
     </div>`;
   renderOpenSlots();
+  /* Arm the group tabs after the panel exists. No-op once the client has taken over. */
+  try{ sportRotBind('cliGroups');
+       sportRotStart('cliGroups',clientGroupSports(allOpenGroups(clientAs)),
+         ()=>cliGrpSport,(sp,auto)=>cliGrpPickSport(sp,auto));
+  }catch(e){ console.warn('group tabs:',e&&e.message); }
 }
 /* client self-service: update their own phone/carrier/email — applies immediately (no owner
    approval needed, unlike coach bio/rate proposals) and syncs via a targeted pushRows, same
@@ -6542,16 +6656,35 @@ function launchStripHtml(){
     </div>
   </div>`;
 }
+/* The sport a group belongs to is its coach's sport — a session has no sport of its own. */
+function groupSportOf(g){ const co=coachById(g&&g.coachId); return sportLabel((co&&co.sport)||'')||''; }
+let cliGrpSport=null;
+function clientGroupSports(open){
+  const order=bookableSports().concat((DB.settings.sports||'').split(',').map(x=>x.trim()).filter(Boolean));
+  const have=(open||[]).map(groupSportOf).filter(Boolean);
+  const seen=[];
+  order.forEach(sp=>{ if(have.some(h=>sportKey(h)===sportKey(sp))&&!seen.some(x=>sportKey(x)===sportKey(sp)))seen.push(sp); });
+  have.forEach(h=>{ if(!seen.some(x=>sportKey(x)===sportKey(h)))seen.push(h); });
+  return seen;
+}
+function cliGrpPickSport(sp,auto){
+  if(!auto)sportRotStop('cliGroups');
+  cliGrpSport=sp; renderBooking();
+}
 function groupCtaHtml(){
   if(!clientAs)return '';
   const open=allOpenGroups(clientAs);
   const mine=DB.sessions.filter(s=>s.type==='group'&&(s.customerIds||[]).includes(clientAs)
       &&(s.status==='pending'||s.status==='scheduled')&&s.date>=todayISO());
   const waiting=DB.sessions.filter(s=>myJoinPending(s,clientAs)).length;
-  const box=(bg,body)=>`<div class="panel gcta" style="background:${bg};margin-bottom:16px">${body}</div>`;
+  const box=(bg,body)=>`<div class="panel gcta" id="cliGroups" style="background:${bg};margin-bottom:16px">${body}</div>`;
 
   if(open.length){
-    const soonest=open[0];
+    /* Same tabs as the public page, for the same reason: with several sports running, a family
+       that trains at track should not have to read past four basketball groups to find theirs. */
+    const gsports=clientGroupSports(open);
+    if(gsports.length>1&&(!cliGrpSport||!gsports.some(x=>sportKey(x)===sportKey(cliGrpSport))))cliGrpSport=gsports[0];
+    const shown=gsports.length>1?open.filter(g=>groupSportOf(g)&&sportKey(groupSportOf(g))===sportKey(cliGrpSport)):open;
     return box('linear-gradient(135deg,var(--a1),var(--a3))',`
       <div class="eyebrow">${t('TRAIN TOGETHER')}</div>
       <h3 style="margin:4px 0 2px;font-size:20px">${t('Join a group')}</h3>
@@ -6559,7 +6692,9 @@ function groupCtaHtml(){
         ${open.length===1?t('A group has room for you — it stays open until it is full.')
                          :open.length+' '+t('groups have room right now — pick one.')}
       </div>
-      ${open.map(g=>groupRowHtml(g)).join('')}
+      ${sportTabsHtml(gsports,cliGrpSport,'cliGrpPickSport',
+          sp=>open.filter(g=>groupSportOf(g)&&sportKey(groupSportOf(g))===sportKey(sp)).length)}
+      ${shown.map(g=>groupRowHtml(g)).join('')}
       ${launchStripHtml()}
       <p class="clienttag" style="margin-top:10px">${t('You can see who is already in each group so you know who your child would be training with. Only signed-in families see this — never the public page.')}</p>`);
   }
