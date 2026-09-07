@@ -5323,8 +5323,14 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-07 22:34 UTC';
+const BUILD='2026-09-07 22:37 UTC';
 const CHANGELOG=[
+ {v:'3.9', d:'2026-09-07', t:'Sport, visible on the schedule', items:[
+   '<b>Booking &amp; Schedule has a Sport column.</b> The sport was being used to group and filter but never actually shown, so there was no way to tell what a session was filed as \u2014 or to spot one filed wrongly.',
+   'A sport <b>inherited from the coach</b> is greyed; one <b>set on the session itself</b> is in full colour. So a glance tells you which rows would move if a coach picked up a second sport, and which are pinned. Events show every sport they count under.',
+   '<b>Where to set it:</b> open a session with <b>Edit</b> and use the new <i>Sport</i> field, or open an event and use the one under the title. Leaving it blank keeps the old behaviour \u2014 the coach\u2019s sport.',
+   'The sport tab row no longer disappears when a sport happens to have nothing in it. It shows whenever the business runs more than one, with a count of 0 where that is the truth \u2014 a strip that comes and goes depending on what is booked looks like a fault.',
+ ]},
  {v:'3.8', d:'2026-09-07', t:'A session has its own sport', items:[
    '<b>Sessions and events now carry their own sport</b>, set in the session and event editors. It used to be read off the coach \u2014 but a coach can teach more than one, so their soccer session was filed under basketball and the sport tabs quietly disagreed with reality.',
    'Leave the field blank and it still takes the coach\u2019s sport, so <b>nothing already booked has to be touched</b> and everything behaves as it did. Set it on the ones that need it and they move to the right tab immediately.',
@@ -5843,6 +5849,14 @@ function ownerSessionSports(){
   const seen=[];
   order.forEach(sp=>{ if(have.some(h=>sportKey(h)===sportKey(sp))&&!seen.some(x=>sportKey(x)===sportKey(sp)))seen.push(sp); });
   have.forEach(h=>{ if(!seen.some(x=>sportKey(x)===sportKey(h)))seen.push(h); });
+  /* If the business runs more than one sport, the owner should always be able to switch — even
+     when a sport has nothing in it right now. A strip that appears and disappears depending on
+     what happens to be booked reads as a bug, and on a working screen a tab showing 0 is
+     information rather than a dead end (unlike the public page, where an empty tab is a let-down). */
+  if(seen.length<2){
+    order.forEach(sp=>{ const lab=sportLabel(sp)||sp;
+      if(lab&&!seen.some(x=>sportKey(x)===sportKey(lab)))seen.push(lab); });
+  }
   return seen;
 }
 function renderBooking(){
@@ -5984,6 +5998,12 @@ function renderBookingTable(){
     rows.push({k:(s.date||'')+(s.time||''),html:`<tr>
       <td><b>${fmtDT(s.date,s.time)}</b><div class="clienttag">${s.dur} min · ${s.location||''}</div></td>
       <td>${custNames(s.customerIds)}<div class="clienttag">${typePill(s)}</div></td>
+      <td>${(()=>{const sp=sessionSportOf(s);
+        if(!sp)return '<span class="muted">—</span>';
+        /* Italic when it is inherited: the owner should be able to see at a glance which sessions
+           are filed by their coach's sport and would move if that coach picked up a second one. */
+        return s.sport ? `${sportIcon(sp)} ${escapeHtml(sportName(sp)||sp)}`
+          : `<span class="muted" title="Taken from the coach — open Edit to set it on this session">${sportIcon(sp)} ${escapeHtml(sportName(sp)||sp)}</span>`;})()}</td>
       ${showCoach?`<td>${coachIcon(s.coachId)} ${coachName(s.coachId)}</td>`:''}
       <td>${statusPill}</td>
       <td>${checkCell}</td>
@@ -6013,6 +6033,10 @@ function renderBookingTable(){
     rows.push({k:(ev.date||'9999')+(ev.time||''),html:`<tr style="background:var(--panel2)">
       <td><b>${fmtDT(ev.date,ev.time)}</b><div class="clienttag">📍 ${escapeHtml(ev.location||'TBD')}</div></td>
       <td>🎉 ${escapeHtml(mlText(ev.title))}<div class="clienttag">${regs.length} registered${ev.capacity?(' of '+ev.capacity):''}</div></td>
+      <td>${(()=>{const sps=eventSportsOf(ev);
+        if(!sps.length)return '<span class="muted" title="No coach and no sport set — this event is only reachable under All sports">—</span>';
+        const txt=sps.map(sp=>`${sportIcon(sp)} ${escapeHtml(sportName(sp)||sp)}`).join('<br>');
+        return ev.sport?txt:`<span class="muted" title="Taken from the coaches on this event — open it to set one">${txt}</span>`;})()}</td>
       ${showCoach?`<td>${eventCoachHtml(ev)||'<span class="muted">—</span>'}</td>`:''}
       <td><span class="pill ${eventUpcoming(ev)?'blue':'green'}">${eventUpcoming(ev)?'Event · upcoming':'Event · done'}</span></td>
       <td><span class="pill">—</span></td>
@@ -6034,7 +6058,7 @@ function renderBookingTable(){
     </div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto">
       <table>
-        <thead><tr><th>When</th><th>Client(s)</th>${showCoach?'<th>Coach</th>':''}<th>Status</th><th>Check-in</th>${showMoney?'<th>Payment</th><th class="right">Price</th>':''}<th></th></tr></thead>
+        <thead><tr><th>When</th><th>Client(s)</th><th>Sport</th>${showCoach?'<th>Coach</th>':''}<th>Status</th><th>Check-in</th>${showMoney?'<th>Payment</th><th class="right">Price</th>':''}<th></th></tr></thead>
         <tbody>${rowsHtml||`<tr><td colspan="${(showCoach?4:3)+(showMoney?4:2)}"><div class="empty">Nothing in this view.</div></td></tr>`}</tbody>
       </table>
     </div>`;
