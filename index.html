@@ -3168,8 +3168,19 @@ function custPay(s,custId){
   if(s.type!=='1on1' && s.pay && s.pay[custId]) return s.pay[custId];
   return {paid:!!s.paid, paidVia:s.paidVia||'', requested:!!s.paymentRequested};
 }
-function completedCount(c){return DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status==='completed').length;}
-function bookedCount(c){return DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status==='scheduled'&&s.date>=todayISO()).length;}
+/* Events count for a client too. A child who did two clinics and one 1:1 has trained three times;
+   showing "1 completed" made the app look like it had lost their history — and it is the number
+   the family and the coach both look at first. Cancelled registrations are excluded, and a place
+   on an event with no date yet is upcoming, not completed. */
+function custEventRegs(cid){ return (DB.eventRegs||[]).filter(r=>r.customerId===cid&&r.status!=='cancelled'); }
+function completedCount(c){
+  const ev=custEventRegs(c.id).filter(r=>{const e=eventById(r.eventId);return e&&e.active!==false&&!eventUpcoming(e);}).length;
+  return DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status==='completed').length+ev;
+}
+function bookedCount(c){
+  const ev=custEventRegs(c.id).filter(r=>{const e=eventById(r.eventId);return e&&e.active!==false&&eventUpcoming(e);}).length;
+  return DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status==='scheduled'&&s.date>=todayISO()).length+ev;
+}
 /* integrity tally: how many sessions each side cancelled */
 function clientCancelCount(c){return DB.sessions.filter(s=>s.customerIds.includes(c.id)&&s.status==='cancelled'&&s.cancelledBy==='client').length;}
 function coachCancelCount(id){return DB.sessions.filter(s=>s.coachId===id&&s.status==='cancelled'&&s.cancelledBy==='coach').length;}
@@ -4631,13 +4642,19 @@ function renderLanding(){
   const co=(activeCoaches()[0])||{};
   const r1=coachRate(co.id,'1on1'), rg=coachRate(co.id,'group');
   const nCoach=activeCoaches().length;
-  const done=DB.sessions.filter(s=>s.status==='completed').length;
+  /* Events belong in the headline too: a camp that ran is coaching delivered, and leaving it out
+     understated the business to exactly the visitor being asked to trust it. */
+  const doneEvents=(DB.events||[]).filter(e=>e.active!==false&&e.date&&!eventUpcoming(e)).length;
+  const done=DB.sessions.filter(s=>s.status==='completed').length+doneEvents;
   /* Header stats. "AAU" and "100% PLAYER-LED" were fixed claims that never moved and read as
      basketball-only; these four all grow on their own as the business does, and a tile with a
      zero simply drops out rather than advertising an empty number. */
   const nSport=bookableSports().length;
   const nAthlete=new Set(DB.sessions.filter(s=>s.status==='completed')
-                    .reduce((a,s)=>a.concat(s.customerIds||[]),[])).size;
+                    .reduce((a,s)=>a.concat(s.customerIds||[]),[])
+                    .concat((DB.eventRegs||[]).filter(r=>{const e=eventById(r.eventId);
+                        return r.status!=='cancelled'&&e&&e.active!==false&&!eventUpcoming(e);})
+                      .map(r=>r.customerId))).size;
   const nSkill=(DB.skills||[]).filter(k=>k.active!==false).length;
   const statTiles=[
     [nSport,   nSport===1?t('SPORT'):t('SPORTS')],
@@ -5306,8 +5323,14 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-07 22:08 UTC';
+const BUILD='2026-09-07 22:17 UTC';
 const CHANGELOG=[
+ {v:'3.6', d:'2026-09-07', t:'Events count as sessions', items:[
+   '<b>Events are now counted in the session totals and the chart</b>, not only listed on the schedule. A clinic is coaching delivered \u2014 leaving it out made a month with two camps look quiet, and meant the numbers above the table disagreed with the table underneath them.',
+   'An event has no status of its own, so one is worked out: still to come counts as <b>booked</b>, already run counts as <b>completed</b>. A withdrawn event is not counted at all \u2014 it is not a cancelled session, it never happened.',
+   'The same applies to a client\u2019s <b>completed</b> and <b>upcoming</b> counts, and to <b>Sessions coached</b> and <b>Athletes trained</b> on the home page. A child who did two clinics and one 1:1 has trained three times; showing \u201c1 completed\u201d looked like the app had lost their history.',
+   '<b>Choosing a sport now filters the chart as well as the table</b>, and the counts on each tab match what that tab will actually show. The chips, the chart and the table all read one shared list, so they cannot drift apart again. Clicking a bar still filters the table, and the two filters combine.',
+ ]},
  {v:'3.5', d:'2026-09-07', t:'A tab per sport', items:[
    '<b>Groups on the home page are now split by sport</b>, and the tabs move on their own so a visitor who never taps still sees every sport rather than only whichever coach happened to be added first. The <b>Highlights</b> gallery already had sport tabs \u2014 those now rotate too.',
    '<b>Rotation stops the moment you touch the section</b> and stays stopped for the rest of the visit. A page that keeps moving while you read it is worse than one that never moved, and \u201cpauses for a moment\u201d is the same annoyance with extra steps. It also holds off while the browser tab is in the background or the section is scrolled out of view, so you never come back to a random sport.',
@@ -5780,7 +5803,9 @@ function bookSportSet(sp){ bookSport=sp; renderBooking(); }
 function sessionSportOf(s){ const co=coachById(s&&s.coachId); return sportLabel((co&&co.sport)||'')||''; }
 function ownerSessionSports(){
   const order=bookableSports().concat((DB.settings.sports||'').split(',').map(x=>x.trim()).filter(Boolean));
-  const have=DB.sessions.filter(s=>inScope(s.coachId)).map(sessionSportOf).filter(Boolean);
+  const have=DB.sessions.filter(s=>inScope(s.coachId)).map(sessionSportOf)
+    .concat((DB.events||[]).filter(ev=>ev.active!==false&&ev.date).map(eventSportOf))
+    .filter(Boolean);
   const seen=[];
   order.forEach(sp=>{ if(have.some(h=>sportKey(h)===sportKey(sp))&&!seen.some(x=>sportKey(x)===sportKey(sp)))seen.push(sp); });
   have.forEach(h=>{ if(!seen.some(x=>sportKey(x)===sportKey(h)))seen.push(h); });
@@ -5848,9 +5873,11 @@ function renderBookingOwner(){
       <button class="${bookView==='calendar'?'active':''}" onclick="bookView='calendar';renderBooking()">▦ Calendar</button>
     </div>
     ${(()=>{const sp=ownerSessionSports(); if(sp.length<2)return '';
-      const n=x=>DB.sessions.filter(s=>inScope(s.coachId)&&sportKey(sessionSportOf(s))===sportKey(x)).length;
+      const was=bookSport;
+      const countFor=x=>{ bookSport=x; const n=scheduleItems().length; bookSport=was; return n; };
+      const n=countFor;
       return `<div class="seg mlseg">
-        <button class="${bookSport==='all'?'active':''}" onclick="bookSportSet('all')">All sports <span class="pill">${DB.sessions.filter(s=>inScope(s.coachId)).length}</span></button>
+        <button class="${bookSport==='all'?'active':''}" onclick="bookSportSet('all')">All sports <span class="pill">${countFor('all')}</span></button>
         ${sp.map(x=>`<button class="${sportKey(bookSport)===sportKey(x)?'active':''}" onclick="bookSportSet('${String(x).replace(/'/g,"\\'")}')">${sportIcon(x)} ${sportName(x)||x} <span class="pill">${n(x)}</span></button>`).join('')}
       </div>`;})()}
     <div id="bookBody"></div>`;
@@ -5926,6 +5953,7 @@ function renderBookingTable(){
     .filter(ev=>eventCoachIds(ev).some(inScope)
              || eventPayouts(ev).some(x=>inScope(x.coachId))
              || (!eventCoachIds(ev).length&&inScope('')))
+    .filter(ev=>bookSport==='all'||sportKey(eventSportOf(ev))===sportKey(bookSport))
     .filter(ev=>{
       if(bookFilter==='upcoming')return eventUpcoming(ev);
       if(bookFilter==='past')return !eventUpcoming(ev);
@@ -13077,6 +13105,38 @@ let sessChartRange='month';   // day | week | month | quarter | year
 let bkChartFilter=null, custDateFilter=null, coachDateFilter=null, coachTableFilter=null;   // chart→table filters
 function setSessRange(r){sessChartRange=r;bkChartFilter=null;refreshOwner();}
 function filterChip(label,clearFn){return `<span class="pill blue" style="cursor:default">🔎 ${label} <b style="cursor:pointer;margin-left:4px" onclick="${clearFn}">✕</b></span>`;}
+/* ---- Events count as sessions -----------------------------------------------------------------
+   An event IS coaching delivered: a clinic on Saturday is not a lesser thing than four 1:1s, and
+   leaving it out of the totals made a busy month with two camps look quiet. The schedule listed
+   events already; the counts and the chart did not, so the table and the numbers above it
+   disagreed with each other.
+   An event has no status field, so one is derived: still to come = booked, already run = completed.
+   Withdrawn events (active === false) are filtered out before this and are not counted at all —
+   they are not "cancelled sessions", they never happened. */
+function eventAsSession(ev){
+  return {id:ev.id, date:ev.date, time:ev.time, isEvent:true,
+          status: eventUpcoming(ev) ? 'scheduled' : 'completed',
+          coachId: (eventLeadId(ev)||eventCoachIds(ev)[0]||'')};
+}
+/* An event's sport is its lead coach's, falling back to any host coach. */
+function eventSportOf(ev){
+  const id=eventLeadId(ev)||eventCoachIds(ev)[0]||'';
+  const co=coachById(id);
+  return sportLabel((co&&co.sport)||'')||'';
+}
+/* Everything on the schedule — sessions AND events — in scope and matching the sport filter.
+   One source, so the chips, the chart and the table can never disagree again. */
+function scheduleItems(){
+  const out=DB.sessions.filter(s=>inScope(s.coachId)
+      &&(bookSport==='all'||sportKey(sessionSportOf(s))===sportKey(bookSport)));
+  (DB.events||[]).filter(ev=>ev.active!==false&&ev.date)
+    .filter(ev=>eventCoachIds(ev).some(inScope)
+             || eventPayouts(ev).some(x=>inScope(x.coachId))
+             || (!eventCoachIds(ev).length&&inScope('')))
+    .filter(ev=>bookSport==='all'||sportKey(eventSportOf(ev))===sportKey(bookSport))
+    .forEach(ev=>out.push(eventAsSession(ev)));
+  return out;
+}
 function sessionSummary(list){const s={completed:0,scheduled:0,pending:0,cancelled:0,total:list.length};list.forEach(x=>{if(s[x.status]!==undefined)s[x.status]++;});return s;}
 function sessionsBuckets(list,period,maxN){
   const map={};
@@ -13086,8 +13146,9 @@ function sessionsBuckets(list,period,maxN){
   return arr;
 }
 function sessionsDashHtml(canvasId){
-  const list=DB.sessions.filter(s=>inScope(s.coachId));
+  const list=scheduleItems();
   const sm=sessionSummary(list);
+  const nEv=list.filter(x=>x.isEvent).length;
   const chip=(lab,n,col)=>`<div class="stat"><div class="k">${lab}</div><div class="v" style="color:${col}">${n}</div></div>`;
   return `<div class="stats" style="margin-bottom:14px">
       ${chip('Total sessions',sm.total,'var(--txt)')}
@@ -13096,6 +13157,7 @@ function sessionsDashHtml(canvasId){
       ${chip('Pending',sm.pending,'var(--yellow)')}
       ${chip('Cancelled',sm.cancelled,'var(--red)')}
     </div>
+    ${nEv?`<div class="clienttag" style="margin:-8px 0 12px">Includes <b style="color:var(--txt)">${nEv}</b> event${nEv>1?'s':''} — a clinic is coaching delivered, so it counts here too.${bookSport!=='all'?' Showing '+escapeHtml(sportName(bookSport)||bookSport)+' only.':''}</div>`:''}
     <div class="panel" style="margin-bottom:16px">
       <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
         <h3 style="margin:0">Sessions over time</h3>
@@ -13106,7 +13168,7 @@ function sessionsDashHtml(canvasId){
     </div>`;
 }
 function mountSessionsChart(canvasId){
-  const list=DB.sessions.filter(s=>inScope(s.coachId));
+  const list=scheduleItems();
   const buckets=sessionsBuckets(list,sessChartRange,sessChartRange==='day'?14:12);
   drawStackedBars(canvasId,buckets,(b)=>{bkChartFilter=(bkChartFilter&&bkChartFilter.key===b.key)?null:{period:sessChartRange,key:b.key,label:b.label};renderBooking();},bkChartFilter&&bkChartFilter.key);
 }
