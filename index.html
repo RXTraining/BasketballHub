@@ -2252,6 +2252,17 @@ const SESSION_TYPES={
 const TYPE_ORDER=['1on1','group','openrun','cond'];
 function typeDef(type){ return SESSION_TYPES[type]||SESSION_TYPES.group; }
 function typeMax(type){ return typeDef(type).max; }
+/* The cap for THIS session, which is not always the cap for its type.
+   One group is four players because that is what the drill needs; another is six because the
+   coach has space and a waiting list. `typeMax(type)` is still right when advertising what a
+   type generally holds — a rate card, a booking dropdown — but anywhere a real session is being
+   filled, joined or counted, ask the session. A missing or nonsense cap falls back to the type,
+   so every session created before this existed keeps its old behaviour exactly. */
+function sessionCap(s){
+  const c=Number(s&&s.cap);
+  if(Number.isFinite(c)&&c>=1&&c<=99)return Math.round(c);
+  return typeMax(s&&s.type);
+}
 function typeLabel(type){ return t(typeDef(type).label); }
 function typeShort(type){ return t(typeDef(type).short); }
 function typeIcon(type){ return type==='cond'?'🏃':(type==='openrun'?'🏀':''); }
@@ -2407,7 +2418,7 @@ function normalize(d){
     if(c.approved===undefined)c.approved=true;
     if(c.suspended===undefined)c.suspended=false;
   });
-  (d.sessions||[]).forEach(s=>{if(s.paidVia===undefined)s.paidVia=s.paid?'cash':'';if(s.paymentRequested===undefined)s.paymentRequested=false;if(!s.pay||typeof s.pay!=='object')s.pay={};if(!Array.isArray(s.joinReq))s.joinReq=[];if(s.formAlerted===undefined)s.formAlerted=false;});
+  (d.sessions||[]).forEach(s=>{if(s.paidVia===undefined)s.paidVia=s.paid?'cash':'';if(s.paymentRequested===undefined)s.paymentRequested=false;if(!s.pay||typeof s.pay!=='object')s.pay={};if(!Array.isArray(s.joinReq))s.joinReq=[];if(s.formAlerted===undefined)s.formAlerted=false;if(s.cap===undefined)s.cap=null;});
   // ----- multi-coach: seed a coach + stamp coach_id on every record -----
   if(!d.coaches||!d.coaches.length)d.coaches=[{id:'rx1',name:'Raymond Xu',tagline:'Lexington, MA · AAU Level Training',bio:"Training isn't just about drills. It's about teaching you the love of the game — the dedication, the grind, the mindset that you never give up. That's what every session is built on.",affiliation:'AAU',affiliationSub:'Middlesex Magic',photo:'',pwd:'coach',active:true}];
   const gR1=(d.settings&&d.settings.rate1on1)||30, gRG=(d.settings&&d.settings.rateGroup)||20;
@@ -2475,7 +2486,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
   d.availability=(avail||[]).map(a=>({id:a.id,coachId:a.coach_id||'',date:a.date,start:a.start_t,end:a.end_t,slotMin:a.slot_min||60,location:a.location||'',sessionType:a.session_type||'',approved:a.approved!==false}));
   d.customers=(cus||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',age:(c.age!=null&&c.age!==''?Number(c.age):null),waiver:(c.waiver&&typeof c.waiver==='object'?c.waiver:null),town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',inGroup:!!c.in_group,approved:c.approved!==false,suspended:c.suspended===true,creditsTotal:c.credits_total||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',
     packages:(pkg||[]).filter(p=>p.customer_id===c.id).map(p=>({id:p.id,coachId:p.coach_id||'',type:p.type,qty:p.qty,amount:Number(p.amount),date:p.date}))}));
-  d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:(s.price==null?null:Number(s.price)),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||'',paidWas:(s.paid_was!=null?Number(s.paid_was):null),payouts:(Array.isArray(s.payouts)?s.payouts:[]),paymentRequested:!!s.payment_requested,pay:(s.pay&&typeof s.pay==='object')?s.pay:{},joinReq:Array.isArray(s.join_req)?s.join_req:[],formAlerted:!!s.form_alerted}));
+  d.sessions=(ses||[]).map(s=>({id:s.id,coachId:s.coach_id||'',customerIds:s.customer_ids||[],type:s.type,cap:(s.cap!=null?Number(s.cap):null),date:s.date,time:s.time,dur:s.dur,price:(s.price==null?null:Number(s.price)),status:s.status,paid:!!s.paid,paidVia:s.paid_via||'',checkedIn:!!s.checked_in,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelledBy:s.cancelled_by||'',cancelledAt:s.cancelled_at||'',paidWas:(s.paid_was!=null?Number(s.paid_was):null),payouts:(Array.isArray(s.payouts)?s.payouts:[]),paymentRequested:!!s.payment_requested,pay:(s.pay&&typeof s.pay==='object')?s.pay:{},joinReq:Array.isArray(s.join_req)?s.join_req:[],formAlerted:!!s.form_alerted}));
   d.expenses=(exp||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||'',freq:e.freq||'once'}));
   d.cashEntries=(cash||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,amount:Number(e.amount),note:e.note||'',customerId:e.customer_id||'',type:e.type||'1on1',qty:e.qty||1}));
   d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coachId:e.coach_id||'',coachIds:(Array.isArray(e.coach_ids)?e.coach_ids:(e.coach_id?[e.coach_id]:[])),leadCoachId:(e.lead_coach_id||''),price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||'',video:e.video||'',featured:e.featured===true,payouts:(Array.isArray(e.payouts)?e.payouts:[])}));
@@ -2519,7 +2530,7 @@ function loginCountOf(c){
   return Math.max(c.loginCount||0,logged);
 }
 const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',email:c.email||'',parent:c.parent||'',level:c.level||'',age:(c.age!=null&&c.age!==''?Number(c.age):null),waiver:(c.waiver||null),town:c.town||'',notes:c.notes||'',created:c.created||'',wechat:c.wechat||'',in_group:!!c.inGroup,approved:c.approved!==false,suspended:c.suspended===true,credits_total:c.creditsTotal||{'1on1':0,'group':0},pwd:c.pwd||'',token:c.token||'',last_login:lastLoginOf(c)||null,login_count:loginCountOf(c)});
-const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,paid_was:(s.paidWas!=null?s.paidWas:null),payouts:(s.payouts||[]),payment_requested:!!s.paymentRequested,pay:s.pay||{},join_req:s.joinReq||[],form_alerted:!!s.formAlerted});
+const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,cap:(s.cap!=null?s.cap:null),date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,paid_was:(s.paidWas!=null?s.paidWas:null),payouts:(s.payouts||[]),payment_requested:!!s.paymentRequested,pay:s.pay||{},join_req:s.joinReq||[],form_alerted:!!s.formAlerted});
 const expRow=e=>({id:e.id,coach_id:e.coachId||null,date:e.date,cat:e.cat,amount:e.amount,note:e.note||'',freq:e.freq||'once'});
 const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',coach_id:(eventCoachIds(e)[0]||null),coach_ids:eventCoachIds(e),lead_coach_id:(eventLeadId(e)||null),price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||'',video:e.video||'',featured:e.featured===true,payouts:(e.payouts||[])});
 const eventRegRow=r=>({id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||'',waiver:(r.waiver||null)});
@@ -2573,7 +2584,7 @@ async function bootLoad(){
 /* ---- live-ish sync: poll the cloud and refresh the view when data changes ---- */
 let pollTimer=null, lastSig='';
 function dataSig(d){return JSON.stringify({
-  s:(d.sessions||[]).map(x=>[x.id,x.coachId,x.status,x.checkedIn,x.paidVia,x.date,x.time,x.price,x.feedback||'',(x.media||[]).length,(x.customerIds||[]).length,(x.joinReq||[]).length]),
+  s:(d.sessions||[]).map(x=>[x.id,x.coachId,x.status,x.checkedIn,x.paidVia,x.date,x.time,x.price,x.feedback||'',(x.media||[]).length,(x.customerIds||[]).length,(x.joinReq||[]).length,(x.cap!=null?x.cap:'')]),
   c:(d.customers||[]).map(x=>[x.id,x.name,x.email,x.pwd,x.age,(x.waiver&&x.waiver.version)||0,x.creditsTotal,x.packages.length]),
   a:(d.availability||[]).map(x=>[x.id,x.coachId,x.date,x.start,x.end,x.location,x.sessionType,x.approved]),
   co:(d.coaches||[]).map(x=>[x.id,x.name,x.active,x.tagline,x.bio,x.affiliation,x.rate1on1,x.rateGroup,x.rateCond,x.rateTbc,x.sport,x.pending,JSON.stringify(x.payRates||{})]),
@@ -4052,7 +4063,7 @@ function lpOpenGroupsHtml(){
         <div class="lp-ico">${co&&co.sport?sportIcon(co.sport):'👥'}</div>
         <h3>${t('Group session')}${co?' · '+t('Coach')+' '+escapeHtml(co.name):''}</h3>
         <p style="font-weight:800">📅 ${fmtDT(g.date,g.time)} · 📍 ${escapeHtml(g.location||'TBD')} · ${g.dur||defaultDur('group')} ${t('min')}${sessionPriced(g)?' · '+shareLabel(g)+' '+t('per player'):''}</p>
-        <p>${n} ${t('of')} ${typeMax('group')} ${t('players')} — <b>${spots} ${t('spot(s) left')}</b></p>
+        <p>${n} ${t('of')} ${sessionCap(g)} ${t('players')} — <b>${spots} ${t('spot(s) left')}</b></p>
         <button class="lp-btn solid" onclick="openAuth('book')">${t('Ask to join')}</button>
       </div>`;}).join('')}
     <div style="text-align:center;margin-top:6px">
@@ -4071,7 +4082,7 @@ function lpTickerHtml(){
     const co=coachById(g.coachId), sp=co&&co.sport?co.sport:'';
     const spots=groupSpots(g), n=(g.customerIds||[]).length;
     return `<span class="it"><b>${sp?sportIcon(sp)+' ':''}${isForming(g)?t('Group forming'):t('Group open')}</b>`
-      +`<span>${fmtDT(g.date,g.time)}${co?' · '+t('Coach')+' '+escapeHtml(co.name):''}${g.location?' · '+escapeHtml(g.location):''} · ${n}/${typeMax('group')} ${t('players')}`
+      +`<span>${fmtDT(g.date,g.time)}${co?' · '+t('Coach')+' '+escapeHtml(co.name):''}${g.location?' · '+escapeHtml(g.location):''} · ${n}/${sessionCap(g)} ${t('players')}`
       +` · <b>${spots} ${t('spot(s) left')}</b>${sessionPriced(g)?' · '+shareLabel(g)+' '+t('per player'):''}</span>`
       +`<button class="go" onclick="openAuth('book')">${t('Join')}</button></span>`;
   };
@@ -5170,8 +5181,13 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-06 00:20 UTC';
+const BUILD='2026-09-07 17:56 UTC';
 const CHANGELOG=[
+ {v:'3.3', d:'2026-09-07', t:'Set the size of one group', items:[
+   '<b>Each group session can now have its own maximum.</b> A <b>Max players</b> box in the session editor sets it; leave it blank and the session keeps the usual number for its type \u2014 <b>4</b> for a group, 10 for a weekend class \u2014 exactly as before.',
+   'The number is the one clients actually see. Spots left, whether a group shows as full, whether a join request can be accepted and the counts on the home page all read the session\u2019s own cap rather than the type\u2019s. Rate cards and booking dropdowns still describe what a type generally holds, because there they are describing the type and not any one session.',
+   'Nothing had to change for existing sessions: a blank cap means \u201cwhatever this type usually holds\u201d, so everything already booked behaves as it did. Setting a cap <i>below</i> the players already in a session shows it as full rather than throwing anybody out \u2014 that is a decision for the owner, not a side effect of typing a number.',
+ ]},
  {v:'3.2', d:'2026-09-06', t:'A smaller code and a readable address on the poster', items:[
    '<b>The QR is smaller</b> and the address now appears on the poster in full, so the picture leads with the event rather than the code.',
    'It is smaller, not tiny, and that is deliberate: in WeChat the way somebody actually reaches the form is to <b>press and hold the photo</b> and choose <i>Extract QR code</i>. The code is the tap-to-register route, so shrinking it further would break the only thing that works. The share box now explains that step, because it is not obvious to anyone who has not done it.',
@@ -6199,7 +6215,7 @@ function formHoursLeft(s){
 }
 /* Past the cutoff and still short of the minimum — needs a decision from the owner and the client. */
 function groupUnfilled(s){ return isForming(s) && formHoursLeft(s)<=0; }
-function groupSpots(s){return Math.max(0,typeMax(s.type)-(s.customerIds||[]).length);}
+function groupSpots(s){return Math.max(0,sessionCap(s)-(s.customerIds||[]).length);}
 /* ---- One answer to "can somebody still join this?" -------------------------
    Room is the only thing that decides it: a group stays open until it is FULL, not until it
    reaches the minimum. `isForming` answers a different question — whether the group has enough
@@ -6224,7 +6240,7 @@ function groupJoinable(s){
 }
 /* The pill every screen shows, so the wording can never disagree between them. */
 function groupStateLabel(s){
-  const n=(s.customerIds||[]).length, max=typeMax(s.type), left=groupSpots(s);
+  const n=(s.customerIds||[]).length, max=sessionCap(s), left=groupSpots(s);
   if(left<=0) return {cls:'', txt:n+' '+t('of')+' '+max+' · '+t('full')};
   return {cls:(left===1?'orange':'green'),
           txt:n+' '+t('of')+' '+max+' · '+left+' '+t('spot(s) left')};
@@ -6322,7 +6338,7 @@ function notifyOwnerJoin(s,c){
     subject:'RX Training — group join request from '+((c&&c.name)||'a client'),
     text:((c&&c.name)||'A client')+' asked to join a group session:\n'+fmtDT(s.date,s.time)+
          '\nCoach: '+coachName(s.coachId)+'\nLocation: '+(s.location||'TBD')+
-         '\nCurrently '+(s.customerIds||[]).length+' of '+MAX_GROUP+' players.'+
+         '\nCurrently '+(s.customerIds||[]).length+' of '+sessionCap(s)+' players.'+
          '\n\nApprove in RX.TRAINING (⏳ approvals).'}}).then(()=>{},()=>{});
 }
 /* Owner approves: the joiner moves into customerIds and the session is re-priced for the new
@@ -6374,7 +6390,7 @@ function groupInviteText(s){
     (typeLabel(s.type)||'Group')+': '+fmtDT(s.date,s.time),
     s.location?('📍 '+s.location):null,
     co?('🏅 '+t('Coach')+' '+co.name+(co.affiliation?(' — '+co.affiliation):'')):null,
-    (s.customerIds||[]).length+' '+t('of')+' '+typeMax(s.type)+' '+t('players')+' · '+groupSpots(s)+' '+t('spot(s) left'),
+    (s.customerIds||[]).length+' '+t('of')+' '+sessionCap(s)+' '+t('players')+' · '+groupSpots(s)+' '+t('spot(s) left'),
     sessionPriced(s)?(shareLabel(s)+' '+t('per player')):null,
     '',
     t('Sign up and ask to join here:'),
@@ -6499,7 +6515,7 @@ function groupCtaHtml(){
       <div class="eyebrow">${t('YOUR GROUP')}</div>
       <h3 style="margin:4px 0 2px;font-size:20px">${t('Your group is open — invite a friend')}</h3>
       <div class="lede" style="margin-bottom:10px">
-        <b>${fmtDT(g.date,g.time)}</b> · ${g.dur||defaultDur('group')} ${t('min')}${g.location?' · 📍 '+escapeHtml(g.location):''} · ${(g.customerIds||[]).length}/${typeMax('group')} ${t('players')} · <b>${shareLabel(g)}</b> ${t('per player')}.
+        <b>${fmtDT(g.date,g.time)}</b> · ${g.dur||defaultDur('group')} ${t('min')}${g.location?' · 📍 '+escapeHtml(g.location):''} · ${(g.customerIds||[]).length}/${sessionCap(g)} ${t('players')} · <b>${shareLabel(g)}</b> ${t('per player')}.
         ${t('Other families can see it and ask to join.')}</div>
       ${groupCoachHtml(g)}
       <div style="margin:10px 0">${rosterHtml(g,clientAs)}</div>
@@ -7618,13 +7634,22 @@ function openSession(id,returnCust,preset){
         // e.g. a Saturday run booked as a "Group" back when that cap was 10 — name the type it
         // actually fits and offer a one-tap switch rather than leaving the owner to work it out.
         const n=(s.customerIds||[]).length;
-        if(!id||s.type==='1on1'||n<=typeMax(s.type))return '';
+        if(!id||s.type==='1on1'||n<=sessionCap(s))return '';
         const fit=TYPE_ORDER.filter(ty=>ty!=='1on1'&&ty!==s.type&&typeMax(ty)>=n
                     &&(coachOffersType(s.coachId||targetCoach(),ty)));
-        return `<div class="clienttag" style="margin-top:6px;color:var(--yellow)">⚠ ${n} players in a ${typeShort(s.type)} (max ${typeMax(s.type)}).${
+        return `<div class="clienttag" style="margin-top:6px;color:var(--yellow)">⚠ ${n} players in a ${typeShort(s.type)} (max ${sessionCap(s)}).${
           fit.length?` <a href="#" onclick="switchSessionType('${id}','${fit[0]}');return false" style="color:var(--accent);font-weight:800">Switch to ${typeDef(fit[0]).label} →</a>`:''}</div>`;
       })()}</div>
       <div class="field"><label class="f">Duration (min)</label><input type="number" id="sDur" value="${s.dur}" min="15" step="15" oninput="sDurTouched=true;recalcPrice()" onchange="sDurTouched=true;recalcPrice()"></div>
+      <!-- Per-session cap. One group is four because that is what the drill needs; another is six
+           because the coach has room and a waiting list. Blank means "whatever this type usually
+           holds", so nothing has to be filled in to keep the old behaviour. -->
+      <div class="field" id="sCapWrap" style="${s.type==='1on1'?'display:none':''}">
+        <label class="f">Max players</label>
+        <input type="number" id="sCap" min="1" max="99" step="1" value="${s.cap!=null&&s.cap!==''?Number(s.cap):''}"
+               placeholder="${typeMax(s.type||'group')}">
+        <div class="clienttag" style="margin-top:4px">Leave blank for the usual <b style="color:var(--txt)">${typeMax(s.type||'group')}</b> for this type. This is the number clients see as spots left, and the point at which the group shows as full.</div>
+      </div>
     </div>
     <div class="row">
       <div class="field"><label class="f">Date</label><input type="date" id="sDate" value="${s.date}"></div>
@@ -7755,6 +7780,15 @@ let sDurTouched=false;
 function sessionTypeChanged(){
   const durEl=$('#sDur'), typeEl=$('#sType');
   if(durEl&&typeEl&&!sDurTouched)durEl.value=defaultDur(typeEl.value);
+  /* The cap belongs to the session, but its DEFAULT comes from the type — so switching a group to
+     a weekend class must move the placeholder from 4 to 10, or the field silently claims the wrong
+     fallback. A 1:1 has no cap to set. */
+  const wrap=$('#sCapWrap'), cap=$('#sCap');
+  if(wrap&&typeEl){
+    const one=typeEl.value==='1on1';
+    wrap.style.display=one?'none':'';
+    if(cap){ cap.placeholder=typeMax(typeEl.value); if(one)cap.value=''; }
+  }
   recalcPrice();
 }
 function recalcPrice(){
@@ -7780,10 +7814,19 @@ function saveSession(id,emailAfter){
   const type=$('#sType').value;
   // Grandfathering: a session booked when the cap was higher must stay editable, otherwise the
   // owner cannot even open it to fix the type. Only block ADDING players beyond the cap.
-  if(type!=='1on1' && ids.length>typeMax(type)){
+  const capRaw=($('#sCap')?String($('#sCap').value).trim():'');
+  let cap=null;
+  if(type!=='1on1' && capRaw!==''){
+    const n=Math.round(Number(capRaw));
+    if(!Number.isFinite(n)||n<1||n>99)return flash('Max players must be a number between 1 and 99',true);
+    cap=n;
+  }
+  const effMax=(cap!=null)?cap:typeMax(type);
+  if(type!=='1on1' && ids.length>effMax){
     const was=id?((DB.sessions.find(x=>x.id===id)||{}).customerIds||[]).length:0;
-    if(ids.length>Math.max(typeMax(type),was))
-      return flash(typeLabel(type)+' is capped at '+typeMax(type)+' players',true);
+    if(ids.length>Math.max(effMax,was))
+      return flash(ids.length+' clients ticked but this session is capped at '+effMax+
+        (cap!=null?' — raise Max players, or untick someone.':' — set a higher Max players, or untick someone.'),true);
   }
   const pay=$('#sPay').value;
   const coachId=(AUTH==='coach')?coachAs:($('#sCoach')?$('#sCoach').value:targetCoach());
@@ -7791,7 +7834,7 @@ function saveSession(id,emailAfter){
   const obj={coachId,customerIds:ids,type,dur:+$('#sDur').value,date:baseDate,time:$('#sTime').value,
     price:(String($('#sPrice').value).trim()===''?null:+$('#sPrice').value),payouts:payoutReadRows(),status:$('#sStatus').value,location:$('#sLoc').value,
     paid:pay!=='',paidVia:pay,checkedIn:$('#sCheck').checked,notes:$('#sNotes').value,
-    feedback:$('#sFeedback').value,media:editMedia.slice()};
+    feedback:$('#sFeedback').value,media:editMedia.slice(),cap};
   const exSess=id?DB.sessions.find(x=>x.id===id):null;
   if(obj.status==='cancelled' && (!exSess||exSess.status!=='cancelled')){ if(!confirm('Cancel this session? It will show as cancelled and the client will see the change.'))return; }
   if(obj.status==='cancelled'){obj.cancelledBy=(exSess&&exSess.cancelledBy)||'owner';obj.cancelledAt=(exSess&&exSess.cancelledAt)||new Date().toISOString();}
@@ -8573,12 +8616,12 @@ function openApprovals(){
     }
     if(psess.length){
       body+=`<h3 style="margin:4px 0 8px">Session requests (${psess.length})</h3>`;
-      body+='<div style="overflow-x:auto"><table><thead><tr><th>Client</th><th>Coach</th><th>When</th><th>Type</th><th></th></tr></thead><tbody>'+psess.map(s=>`<tr><td>${custNames(s.customerIds)}${conflictFlagHtml(s)}</td><td>${coachName(s.coachId)}</td><td>${fmtDT(s.date,s.time)}</td><td>${typeShort(s.type)}${isForming(s)?'<div class="clienttag">forming · '+(s.customerIds||[]).length+' of '+MAX_GROUP+'</div>':''}</td><td class="right"><div class="actions"><button class="btn sm" onclick="doApproveSession('${s.id}')">Approve</button><button class="iconbtn" title="Decline" onclick="doRejectSession('${s.id}')">✕</button></div></td></tr>`).join('')+'</tbody></table></div>';
+      body+='<div style="overflow-x:auto"><table><thead><tr><th>Client</th><th>Coach</th><th>When</th><th>Type</th><th></th></tr></thead><tbody>'+psess.map(s=>`<tr><td>${custNames(s.customerIds)}${conflictFlagHtml(s)}</td><td>${coachName(s.coachId)}</td><td>${fmtDT(s.date,s.time)}</td><td>${typeShort(s.type)}${isForming(s)?'<div class="clienttag">forming · '+(s.customerIds||[]).length+' of '+sessionCap(s)+'</div>':''}</td><td class="right"><div class="actions"><button class="btn sm" onclick="doApproveSession('${s.id}')">Approve</button><button class="iconbtn" title="Decline" onclick="doRejectSession('${s.id}')">✕</button></div></td></tr>`).join('')+'</tbody></table></div>';
     }
     if(joins.length){
       const rows=joins.flatMap(s=>(s.joinReq||[]).map(cid=>{const c=custById(cid);return `<tr>
         <td><b>${c?c.name:'?'}</b></td><td>${coachName(s.coachId)}</td><td>${fmtDT(s.date,s.time)}</td>
-        <td>${(s.customerIds||[]).length} of ${MAX_GROUP} players<div class="clienttag">${sessionPriced(s)?money(priceOf(s)/Math.max(1,(s.customerIds||[]).length+1))+' each after joining':t('TBC')}</div></td>
+        <td>${(s.customerIds||[]).length} of ${sessionCap(s)} players<div class="clienttag">${sessionPriced(s)?money(priceOf(s)/Math.max(1,(s.customerIds||[]).length+1))+' each after joining':t('TBC')}</div></td>
         <td class="right"><div class="actions"><button class="btn sm" onclick="approveJoin('${s.id}','${cid}')">Add to group</button><button class="iconbtn" title="Decline" onclick="rejectJoin('${s.id}','${cid}')">✕</button></div></td></tr>`;})).join('');
       body+=`<h3 style="margin:4px 0 8px">Group join requests (${joins.reduce((n,s)=>n+(s.joinReq||[]).length,0)})</h3>`;
       body+='<div style="overflow-x:auto"><table><thead><tr><th>Client</th><th>Coach</th><th>When</th><th>Group</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
@@ -8589,7 +8632,7 @@ function openApprovals(){
       body+='<div style="overflow-x:auto"><table><thead><tr><th>Client</th><th>Coach</th><th>When</th><th>Players</th><th></th></tr></thead><tbody>'+unfilled.map(s=>{
         const solo=soloPriceFor(s);
         return `<tr><td>${custNames(s.customerIds)}</td><td>${coachName(s.coachId)}</td><td>${fmtDT(s.date,s.time)}</td>
-        <td>${(s.customerIds||[]).length} of ${MAX_GROUP}</td>
+        <td>${(s.customerIds||[]).length} of ${sessionCap(s)}</td>
         <td class="right"><div class="actions"><button class="btn sm" onclick="ownerMakeSolo('${s.id}')">Make 1:1 · ${SOLO_DUR}min · ${money(solo)}</button><button class="iconbtn" title="Decline the request" onclick="doRejectSession('${s.id}')">✕</button></div></td></tr>`;}).join('')+'</tbody></table></div>';
     }
     if(evregs.length){
@@ -9351,7 +9394,7 @@ function renderOpenSlots(){
         const g=groupAtSlot(cid,dt,s.time,type);
         if(g){
           const n=(g.customerIds||[]).length;
-          extra=` · ${n} ${t('of')} ${typeMax(type)}`+(myJoinPending(g,clientAs)?' · '+t('requested'):' · '+t('join'));
+          extra=` · ${n} ${t('of')} ${sessionCap(g)}`+(myJoinPending(g,clientAs)?' · '+t('requested'):' · '+t('join'));
         }
       }
       return `<button type="button" class="slotchip${on?' sel':''}" onclick="setReqSlot('${dt}','${s.time}','${(s.location||'').replace(/'/g,"\\'")}')">${on?'✓ ':''}${fmtT(s.time)} · ${s.location}${extra}</button>`;
