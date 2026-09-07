@@ -5323,8 +5323,13 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-07 22:37 UTC';
+const BUILD='2026-09-07 22:54 UTC';
 const CHANGELOG=[
+ {v:'4.0', d:'2026-09-07', t:'Undo a waiver signed in error', items:[
+   '<b>Admin \u2192 Liability waiver</b> now has a <b>\u21a9 Clear</b> button on each client. Use it when an acceptance was made while testing, or signed by you on somebody\u2019s behalf.',
+   'This matters more than a tidy-up: a waiver signed by the wrong person is <i>worse than none at all</i>. The record says a parent agreed when no parent ever read it \u2014 which is precisely the claim the document exists to support. Clearing it puts the client back to <b>not signed</b>, so the real parent is asked before their next booking or event.',
+   'The old acceptance is removed rather than edited into someone else\u2019s name: it is a statement about a particular moment, and a corrected one would be a different statement. The confirmation quotes who signed and when, and the clearance is written to the activity log.',
+ ]},
  {v:'3.9', d:'2026-09-07', t:'Sport, visible on the schedule', items:[
    '<b>Booking &amp; Schedule has a Sport column.</b> The sport was being used to group and filter but never actually shown, so there was no way to tell what a session was filed as \u2014 or to spot one filed wrongly.',
    'A sport <b>inherited from the coach</b> is greyed; one <b>set on the session itself</b> is in full colour. So a glance tells you which rows would move if a coach picked up a second sport, and which are pinned. Events show every sport they count under.',
@@ -12449,7 +12454,7 @@ function renderAdmin(){
           <button class="btn sm" onclick="saveWaiverText()">Save waiver</button>
         </div>
       </div>
-      <div style="margin-top:12px;overflow-x:auto"><table><thead><tr><th>Client</th><th>Accepted</th><th>Signed by</th><th>Photos</th><th>When</th></tr></thead><tbody>
+      <div style="margin-top:12px;overflow-x:auto"><table><thead><tr><th>Client</th><th>Accepted</th><th>Signed by</th><th>Photos</th><th>When</th><th></th></tr></thead><tbody>
         ${(DB.customers||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(c=>{const w=custWaiver(c);return `<tr>
           <td>${escapeHtml(c.name||'—')}</td>
           <td>${custWaiverOK(c)?'<span class="pill green">v'+w.version+'</span>'
@@ -12457,8 +12462,9 @@ function renderAdmin(){
                    :'<span class="pill red">not signed</span>'}</td>
           <td>${w&&w.by?escapeHtml(w.by)+(w.rel?'<div class="clienttag">'+escapeHtml(w.rel)+'</div>':''):'<span class="muted">—</span>'}</td>
           <td>${w?(w.photo?'<span class="pill green">📷 yes</span>':'<span class="pill red">📷 no</span>'):'<span class="muted">—</span>'}</td>
-          <td class="muted">${w?escapeHtml(waiverWhenText(w)):'—'}</td></tr>`;}).join('')
-          ||'<tr><td colspan="5"><div class="empty">No clients yet.</div></td></tr>'}
+          <td class="muted">${w?escapeHtml(waiverWhenText(w)):'—'}</td>
+          <td class="right">${w?`<button class="iconbtn" title="Clear this acceptance — the family will be asked to sign again before their next booking" onclick="clearCustWaiver('${c.id}')">↩ Clear</button>`:'<span class="muted">—</span>'}</td></tr>`;}).join('')
+          ||'<tr><td colspan="6"><div class="empty">No clients yet.</div></td></tr>'}
       </tbody></table></div>
     </div>
 
@@ -12479,6 +12485,26 @@ function saveWaiverText(){
   DB.settings.waiverText=txt;
   DB.settings.waiverVersion=waiverVersion()+1;
   save(); flash('Waiver saved as v'+waiverVersion()); renderAdmin();
+}
+/* Undo an acceptance.
+   A waiver signed while testing — or by the owner on somebody's behalf — is worse than no waiver
+   at all: the record says a parent agreed when no parent ever saw it, and that is exactly the
+   claim the document exists to support. Clearing it puts the client back to "not signed", so the
+   real parent is asked before their next booking or event, which is the only version worth having.
+   The old record is not edited into something else, it is removed: an acceptance is a statement
+   about a moment, and a corrected one would be a different statement. */
+function clearCustWaiver(id){
+  const c=custById(id); if(!c)return;
+  const w=custWaiver(c);
+  if(!w)return flash('Nothing on file for '+c.name);
+  if(!confirm('Clear the liability waiver for “'+c.name+'”?\n\nSigned by: '+(w.by||'—')+
+      (w.rel?' ('+w.rel+')':'')+'\nWhen: '+waiverWhenText(w)+'\n\n'+
+      c.name+' will show as NOT SIGNED and will be asked to accept before their next booking or event.\n\nThis cannot be undone.'))return;
+  c.waiver=null;
+  save(); pushRows('customers',[custRow(c)]);
+  logAct('waiver_cleared',c.name+' — was '+(w.by||'?')+' · v'+(w.version||'?'));
+  flash('Waiver cleared for '+c.name+' — they will be asked to sign again');
+  renderAdmin();
 }
 function resetWaiverText(){
   if(!confirm('Replace the text with the built-in template? Nothing is saved until you press Save waiver.'))return;
