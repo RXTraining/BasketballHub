@@ -1352,7 +1352,8 @@ const ZH={
   'LET\'S WORK':'开始训练吧',
   'Create your account':'创建账号',
   'I already have one':'我已有账号',
-  'Book Sessions':'预约课程','Register Events':'活动报名','Join Group':'加入小组','Register for an event':'活动报名','Groups you can join':'可加入的小组课','NO_EVENTS_OPEN':'目前没有开放报名的活动 —— 新活动会第一时间发布在这里。','NO_GROUPS_FORMING':'目前没有正在组建的小组课 —— 你可以发起一个，其他家庭就能申请加入。',
+  'Sign in & register':'登录并报名','SIGNIN_PREFILL':'以前在我们这里训练过？直接登录即可，姓名、年龄和免责协议都已存档，无需重新填写。',
+  'Book Sessions':'预约课程','Register Events':'活动报名','Join Groups':'加入小组','Register for an event':'活动报名','Groups you can join':'可加入的小组课','NO_EVENTS_OPEN':'目前没有开放报名的活动 —— 新活动会第一时间发布在这里。','NO_GROUPS_FORMING':'目前没有正在组建的小组课 —— 你可以发起一个，其他家庭就能申请加入。',
   'Reserve your spot →':'立即报名 →',
   'Get in touch →':'联系我们 →',
   'Coach sign in':'教练登录',
@@ -1565,7 +1566,8 @@ const KO={
   'LET\'S WORK':'시작해 봅시다',
   'Create your account':'계정 만들기',
   'I already have one':'이미 계정이 있어요',
-  'Book Sessions':'세션 예약','Register Events':'이벤트 등록','Join Group':'그룹 참여','Register for an event':'이벤트 등록','Groups you can join':'참여할 수 있는 그룹','NO_EVENTS_OPEN':'현재 열린 이벤트가 없습니다 — 새 이벤트는 이곳에 가장 먼저 올라옵니다.','NO_GROUPS_FORMING':'지금 모집 중인 그룹이 없습니다 — 직접 만들면 다른 가족이 참여를 신청할 수 있습니다.',
+  'Sign in & register':'로그인 후 등록','SIGNIN_PREFILL':'이전에 함께 훈련한 적이 있나요? 로그인하면 이름·나이·동의서가 이미 저장되어 있어 다시 입력할 필요가 없습니다.',
+  'Book Sessions':'세션 예약','Register Events':'이벤트 등록','Join Groups':'그룹 참여','Register for an event':'이벤트 등록','Groups you can join':'참여할 수 있는 그룹','NO_EVENTS_OPEN':'현재 열린 이벤트가 없습니다 — 새 이벤트는 이곳에 가장 먼저 올라옵니다.','NO_GROUPS_FORMING':'지금 모집 중인 그룹이 없습니다 — 직접 만들면 다른 가족이 참여를 신청할 수 있습니다.',
   'Reserve your spot →':'자리 예약 →',
   'Get in touch →':'문의하기 →',
   'Coach sign in':'코치 로그인',
@@ -1773,7 +1775,8 @@ const JA={
   'LET\'S WORK':'さあ始めよう',
   'Create your account':'アカウントを作成',
   'I already have one':'すでに持っています',
-  'Book Sessions':'セッション予約','Register Events':'イベント申込','Join Group':'グループに参加','Register for an event':'イベント申込','Groups you can join':'参加できるグループ','NO_EVENTS_OPEN':'現在受付中のイベントはありません — 新しいイベントはここに最初に掲載されます。','NO_GROUPS_FORMING':'現在募集中のグループはありません — 作成すると他のご家族が参加を申請できます。',
+  'Sign in & register':'ログインして申込','SIGNIN_PREFILL':'以前トレーニングされたことがありますか？ログインすれば氏名・年齢・同意書は登録済みで、再入力は不要です。',
+  'Book Sessions':'セッション予約','Register Events':'イベント申込','Join Groups':'グループに参加','Register for an event':'イベント申込','Groups you can join':'参加できるグループ','NO_EVENTS_OPEN':'現在受付中のイベントはありません — 新しいイベントはここに最初に掲載されます。','NO_GROUPS_FORMING':'現在募集中のグループはありません — 作成すると他のご家族が参加を申請できます。',
   'Reserve your spot →':'枠を確保 →',
   'Get in touch →':'お問い合わせ →',
   'Coach sign in':'コーチログイン',
@@ -1837,7 +1840,8 @@ const EN={
   'What\'s coming up':'What\'s coming up',
   'Maybe later':'Maybe later',
   'EVPROMPT_INTRO':'You haven\'t signed up for these yet. Register now, or find them later on the Events tab.',
-  'Book Sessions':'Book Sessions','Register Events':'Register Events','Join Group':'Join Group','Register for an event':'Register for an event','Groups you can join':'Groups you can join','NO_EVENTS_OPEN':'No events are open right now — new ones are posted here first.','NO_GROUPS_FORMING':'No group is forming right now — start one and other families can ask to join yours.',
+  'Sign in & register':'Sign in & register','SIGNIN_PREFILL':'Trained with us before? Sign in instead — your details and waiver are already on file.',
+  'Book Sessions':'Book Sessions','Register Events':'Register Events','Join Groups':'Join Groups','Register for an event':'Register for an event','Groups you can join':'Groups you can join','NO_EVENTS_OPEN':'No events are open right now — new ones are posted here first.','NO_GROUPS_FORMING':'No group is forming right now — start one and other families can ask to join yours.',
   'Coming up':'Coming up',
   'FEATURED':'FEATURED',
   'Read more':'Read more',
@@ -3814,6 +3818,9 @@ function openPublicEventReg(eid){
        ${eventLeftText(ev)?' · '+eventLeftText(ev):''}</div>
      ${(mlText(ev.detail)||'').trim()?`<div class="clienttag" style="margin-bottom:10px;white-space:pre-wrap">${escapeHtml(mlText(ev.detail))}</div>`:''}
      ${full?`<div class="empty">${t('This event is full. Contact us and we will let you know if a place opens.')}</div>`:`
+     ${AUTH?'':`<div class="clienttag" style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+       <span>${t('SIGNIN_PREFILL')}</span>
+       <button class="btn ghost sm" onclick="closeModal();openAuth('client',{k:'event',id:'${eid}'})">${t('Sign in')}</button></div>`}
      <div class="row" style="gap:10px;flex-wrap:wrap">
        <div class="field" style="flex:1;min-width:180px"><label class="f">${t('Player full name')} *</label><input id="peName"></div>
        <div class="field" style="max-width:110px"><label class="f">${t('Age')}</label><input id="peAge" type="number" min="3" max="99"></div>
@@ -4039,6 +4046,12 @@ function enterApp(){
    cannot hijack a later sign-in. */
 let pendingIntent=null;
 const INTENT_TTL=6*3600*1000;
+/* Something the intent wants done AFTER the waiver has been settled, not racing it. Sign-in fires
+   the intent and the waiver prompt within a few hundred ms of each other, and both open a dialog —
+   whichever lands second wins the screen and the first one's follow-up is lost. Anything parked
+   here runs from inside the waiver callback instead, so a family that has already signed sees the
+   action immediately and one that has not signs once and then gets it. */
+let intentAfterWaiver=null;
 function setIntent(o){
   pendingIntent=o||null;
   try{ o ? localStorage.setItem('rx_intent',JSON.stringify({o,at:Date.now()}))
@@ -4059,6 +4072,16 @@ function applySignInIntent(){
     if(it.k==='coach'&&coachById(it.id)){ pickCoach=it.id; syncSportCoach(); return false; }
     if(it.k==='type'){ rqTypePick=it.ty||''; if(it.ty==='group')groupIntent=true; return false; }
     if(it.k==='launch'){ startAGroup(); return false; }
+    /* They picked an event on the public page and signed in rather than filling the public form
+       again. Their details and waiver are already on file, so the registration itself is one call —
+       registerEvent() still runs requireWaiver(), which only stops anyone who has never signed or
+       whose acceptance predates a rewording. */
+    if(it.k==='event'){
+      if(!eventById(it.id))return false;
+      TAB='events';
+      intentAfterWaiver=()=>{ try{ registerEvent(it.id); }catch(e){} };
+      return true;
+    }
     if(it.k==='group'){
       const g=(DB.sessions||[]).find(x=>x.id===it.id);
       if(!g)return false;
@@ -4667,16 +4690,18 @@ function lpDoEvents(){
   const list=(DB.events||[]).filter(eventAdvertisable)
     .sort((a,b)=>eventSortKey(a).localeCompare(eventSortKey(b)));
   openModal(t('Register for an event'),
-    list.length?list.map(ev=>{
+    (list.length?`<p class="muted small" style="margin-bottom:12px">${t('SIGNIN_PREFILL')}</p>`:'')+
+    (list.length?list.map(ev=>{
       const full=eventSpotsLeft(ev)<=0;
       return `<div class="panel" style="margin-bottom:10px">
         <b style="font-size:15px">${escapeHtml(mlText(ev.title))}</b>
         <div class="clienttag" style="margin-top:7px">📅 ${eventWhen(ev)}${ev.location?' · 📍 '+escapeHtml(ev.location):''} · ${ev.price?money(ev.price):t('Free')}${eventLeftText(ev)?' · '+eventLeftText(ev):''}</div>
         ${eventLeadId(ev)?`<div class="muted small" style="margin-top:6px">${t('Led by')} ${eventLeadHtml(ev,{plain:true})}</div>`:''}
-        <div style="margin-top:10px">${full?`<span class="pill">${t('Full')}</span>`
-          :`<button class="btn sm" onclick="openPublicEventReg('${ev.id}')">${t('Register')} →</button>`}</div>
+        <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">${full?`<span class="pill">${t('Full')}</span>`
+          :`<button class="btn sm" onclick="openPublicEventReg('${ev.id}')">${t('Register')} →</button>
+            <button class="btn ghost sm" onclick="closeModal();openAuth('client',{k:'event',id:'${ev.id}'})">${t('Sign in & register')}</button>`}</div>
       </div>`;}).join('')
-    :`<div class="empty">${t('NO_EVENTS_OPEN')}</div>`,
+    :`<div class="empty">${t('NO_EVENTS_OPEN')}</div>`),
     `<button class="btn ghost" onclick="closeModal()">${t('Close')}</button>`);
 }
 function lpDoGroups(){
@@ -4775,9 +4800,9 @@ function renderLanding(){
            three always answer. Signed in, they are shortcuts into the app instead of the sign-in
            card; "Back to app" for that case lives in the nav bar above. -->
       <div class="lp-cta reveal">
-        <button class="lp-btn solid lp-big" onclick="lpDoBook()">🏀 ${t('Book Sessions')}</button>
+        <button class="lp-btn solid lp-big" onclick="lpDoBook()">📅 ${t('Book Sessions')}</button>
         <button class="lp-btn line lp-big" onclick="lpDoEvents()">🌟 ${t('Register Events')}</button>
-        <button class="lp-btn line lp-big" onclick="lpDoGroups()">👥 ${t('Join Group')}</button>
+        <button class="lp-btn line lp-big" onclick="lpDoGroups()">👥 ${t('Join Groups')}</button>
       </div>
       <div class="lp-stats">
         ${statTiles.map(([v,l])=>`<div class="lp-stat reveal"><b>${v}</b><span>${l}</span></div>`).join('')}
@@ -5112,7 +5137,11 @@ function loginAsClient(id){
   let tookOver=false;
   try{ tookOver=applySignInIntent(); }catch(e){}
   if(tookOver)switchTab();
-  setTimeout(()=>{ try{ promptWaiverThen(()=>{ if(!tookOver)openEventPrompt(id); }); }catch(e){} },700);
+  setTimeout(()=>{ try{ promptWaiverThen(()=>{
+    const after=intentAfterWaiver; intentAfterWaiver=null;
+    if(after)after();                          // the thing they clicked before signing in
+    else if(!tookOver)openEventPrompt(id);     // otherwise the routine "what's coming up"
+  }); }catch(e){} },700);
 }
 /* Ask a signed-in client for the current waiver, then carry on with whatever was next. */
 function promptWaiverThen(next){
@@ -5393,7 +5422,7 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-10 04:29 UTC';
+const BUILD='2026-09-10 04:43 UTC';
 const CHANGELOG=[
  {v:'4.0', d:'2026-09-07', t:'Undo a waiver signed in error', items:[
    '<b>Admin \u2192 Liability waiver</b> now has a <b>\u21a9 Clear</b> button on each client. Use it when an acceptance was made while testing, or signed by you on somebody\u2019s behalf.',
