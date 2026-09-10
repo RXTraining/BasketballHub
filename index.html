@@ -1352,6 +1352,7 @@ const ZH={
   'LET\'S WORK':'开始训练吧',
   'Create your account':'创建账号',
   'I already have one':'我已有账号',
+  'Book Sessions':'预约课程','Register Events':'活动报名','Join Group':'加入小组','Register for an event':'活动报名','Groups you can join':'可加入的小组课','NO_EVENTS_OPEN':'目前没有开放报名的活动 —— 新活动会第一时间发布在这里。','NO_GROUPS_FORMING':'目前没有正在组建的小组课 —— 你可以发起一个，其他家庭就能申请加入。',
   'Reserve your spot →':'立即报名 →',
   'Get in touch →':'联系我们 →',
   'Coach sign in':'教练登录',
@@ -1564,6 +1565,7 @@ const KO={
   'LET\'S WORK':'시작해 봅시다',
   'Create your account':'계정 만들기',
   'I already have one':'이미 계정이 있어요',
+  'Book Sessions':'세션 예약','Register Events':'이벤트 등록','Join Group':'그룹 참여','Register for an event':'이벤트 등록','Groups you can join':'참여할 수 있는 그룹','NO_EVENTS_OPEN':'현재 열린 이벤트가 없습니다 — 새 이벤트는 이곳에 가장 먼저 올라옵니다.','NO_GROUPS_FORMING':'지금 모집 중인 그룹이 없습니다 — 직접 만들면 다른 가족이 참여를 신청할 수 있습니다.',
   'Reserve your spot →':'자리 예약 →',
   'Get in touch →':'문의하기 →',
   'Coach sign in':'코치 로그인',
@@ -1771,6 +1773,7 @@ const JA={
   'LET\'S WORK':'さあ始めよう',
   'Create your account':'アカウントを作成',
   'I already have one':'すでに持っています',
+  'Book Sessions':'セッション予約','Register Events':'イベント申込','Join Group':'グループに参加','Register for an event':'イベント申込','Groups you can join':'参加できるグループ','NO_EVENTS_OPEN':'現在受付中のイベントはありません — 新しいイベントはここに最初に掲載されます。','NO_GROUPS_FORMING':'現在募集中のグループはありません — 作成すると他のご家族が参加を申請できます。',
   'Reserve your spot →':'枠を確保 →',
   'Get in touch →':'お問い合わせ →',
   'Coach sign in':'コーチログイン',
@@ -1834,6 +1837,7 @@ const EN={
   'What\'s coming up':'What\'s coming up',
   'Maybe later':'Maybe later',
   'EVPROMPT_INTRO':'You haven\'t signed up for these yet. Register now, or find them later on the Events tab.',
+  'Book Sessions':'Book Sessions','Register Events':'Register Events','Join Group':'Join Group','Register for an event':'Register for an event','Groups you can join':'Groups you can join','NO_EVENTS_OPEN':'No events are open right now — new ones are posted here first.','NO_GROUPS_FORMING':'No group is forming right now — start one and other families can ask to join yours.',
   'Coming up':'Coming up',
   'FEATURED':'FEATURED',
   'Read more':'Read more',
@@ -4642,6 +4646,61 @@ function lpGo(id){
   try{ box.scrollTo({top:Math.max(0,top),behavior:'smooth'}); }
   catch(e){ box.scrollTop=Math.max(0,top); }
 }
+/* ---- The three doors on the header -------------------------------------------------------------
+   Book a session, register for an event, join a group forming. Each of these already existed on
+   this page, but each was a scroll and a sign-in away, and the sections vanish entirely when
+   there is nothing to list. These three buttons are always there and always answer.
+
+   Not signed in, events open WITHOUT an account (openPublicEventReg takes the registration on the
+   spot) while booking and joining need one — so those two carry the intent through sign-in, which
+   is what puts the family back on the group they picked instead of a generic booking screen.
+
+   The group list here is deliberately anonymous, same rule as the section below: a visitor sees
+   that a group exists, when, with whom and what it costs — never which children are in it. */
+function lpDoBook(){
+  if(AUTH){ closeHome(); TAB='booking'; switchTab(); return; }
+  openAuth('book');                     // returning family → sign-in, first-timer → create account
+}
+function lpDoEvents(){
+  // A coach has no Events tab; sending them there just bounces them back to Booking.
+  if(AUTH){ closeHome(); TAB=(AUTH==='coach')?'booking':'events'; switchTab(); return; }
+  const list=(DB.events||[]).filter(eventAdvertisable)
+    .sort((a,b)=>eventSortKey(a).localeCompare(eventSortKey(b)));
+  openModal(t('Register for an event'),
+    list.length?list.map(ev=>{
+      const full=eventSpotsLeft(ev)<=0;
+      return `<div class="panel" style="margin-bottom:10px">
+        <b style="font-size:15px">${escapeHtml(mlText(ev.title))}</b>
+        <div class="clienttag" style="margin-top:7px">📅 ${eventWhen(ev)}${ev.location?' · 📍 '+escapeHtml(ev.location):''} · ${ev.price?money(ev.price):t('Free')}${eventLeftText(ev)?' · '+eventLeftText(ev):''}</div>
+        ${eventLeadId(ev)?`<div class="muted small" style="margin-top:6px">${t('Led by')} ${eventLeadHtml(ev,{plain:true})}</div>`:''}
+        <div style="margin-top:10px">${full?`<span class="pill">${t('Full')}</span>`
+          :`<button class="btn sm" onclick="openPublicEventReg('${ev.id}')">${t('Register')} →</button>`}</div>
+      </div>`;}).join('')
+    :`<div class="empty">${t('NO_EVENTS_OPEN')}</div>`,
+    `<button class="btn ghost" onclick="closeModal()">${t('Close')}</button>`);
+}
+function lpDoGroups(){
+  if(AUTH){
+    closeHome(); TAB='booking'; switchTab();
+    // the client's own join panel is mid-screen on the booking tab — land on it, not above it
+    if(AUTH==='client')setTimeout(()=>{ try{ const el=$('#cliGroups');
+      if(el)el.scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){} },300);
+    return;
+  }
+  const list=lpFormingGroups();
+  openModal(t('Groups you can join'),
+    list.length?list.map(g=>{
+      const co=coachById(g.coachId), spots=groupSpots(g), n=(g.customerIds||[]).length;
+      return `<div class="panel" style="margin-bottom:10px">
+        <b style="font-size:15px">${co&&co.sport?sportIcon(co.sport)+' ':'👥 '}${t('Group session')}${co?' · '+t('Coach')+' '+escapeHtml(co.name):''}</b>
+        <div class="clienttag" style="margin-top:7px">📅 ${fmtDT(g.date,g.time)} · 📍 ${escapeHtml(g.location||'TBD')}${sessionPriced(g)?' · '+shareLabel(g)+' '+t('per player'):''}</div>
+        <div class="muted small" style="margin-top:6px">${n} ${t('of')} ${sessionCap(g)} ${t('players')} — <b>${spots} ${t('spot(s) left')}</b></div>
+        <div style="margin-top:10px"><button class="btn sm" onclick="closeModal();openAuth('book',{k:'group',id:'${g.id}'})">${t('Ask to join')}</button></div>
+      </div>`;}).join('')
+    :`<div class="empty">${t('NO_GROUPS_FORMING')}</div>`,
+    `<button class="btn ghost" onclick="closeModal()">${t('Close')}</button>
+     <button class="btn" onclick="closeModal();openAuth('book',{k:'launch'})">${t('Or start your own group →')}</button>`);
+}
 function renderLanding(){
   const el=$('#lpPage'); if(!el)return;
   const co=(activeCoaches()[0])||{};
@@ -4710,9 +4769,15 @@ function renderLanding(){
       <h1 class="lp-h1 reveal">RX<i class="lp-dot" id="lpBall" data-ball="🏀"></i>TRAINING</h1>
       <div class="lp-slogan reveal">${sloganHtml()}</div>
       ${lpLiveSportsHtml()}
+      <!-- The three things a visitor actually came here to do, before any scrolling. The sections
+           further down still sell each one, but they disappear when there is nothing on — which
+           left a visitor unable to tell "no events this month" from "we don't run events". These
+           three always answer. Signed in, they are shortcuts into the app instead of the sign-in
+           card; "Back to app" for that case lives in the nav bar above. -->
       <div class="lp-cta reveal">
-        <button class="lp-btn solid lp-big" onclick="${AUTH?'closeHome()':`openAuth('book')`}">${AUTH?t('Back to app'):t('Book a session →')}</button>
-        <button class="lp-btn line lp-big" onclick="lpGo('lpCoaches')">${t('Meet the coaches')}</button>
+        <button class="lp-btn solid lp-big" onclick="lpDoBook()">🏀 ${t('Book Sessions')}</button>
+        <button class="lp-btn line lp-big" onclick="lpDoEvents()">🌟 ${t('Register Events')}</button>
+        <button class="lp-btn line lp-big" onclick="lpDoGroups()">👥 ${t('Join Group')}</button>
       </div>
       <div class="lp-stats">
         ${statTiles.map(([v,l])=>`<div class="lp-stat reveal"><b>${v}</b><span>${l}</span></div>`).join('')}
@@ -5328,7 +5393,7 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-10 04:19 UTC';
+const BUILD='2026-09-10 04:29 UTC';
 const CHANGELOG=[
  {v:'4.0', d:'2026-09-07', t:'Undo a waiver signed in error', items:[
    '<b>Admin \u2192 Liability waiver</b> now has a <b>\u21a9 Clear</b> button on each client. Use it when an acceptance was made while testing, or signed by you on somebody\u2019s behalf.',
