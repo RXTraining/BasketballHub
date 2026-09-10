@@ -4086,9 +4086,12 @@ function applySignInIntent(){
       const g=(DB.sessions||[]).find(x=>x.id===it.id);
       if(!g)return false;
       pickCoach=g.coachId||pickCoach; rqTypePick=g.type||''; syncSportCoach();
-      // Ask, rather than joining them silently: they chose a group from a public page and have not
-      // seen the price or the time since.
-      setTimeout(()=>{ try{ requestJoinGroup(g.id); }catch(e){} },500);
+      /* Ask, rather than joining them silently: they chose a group from a public page and have not
+         seen the price or the time since. Parked until after the waiver rather than run on a timer
+         of its own — on its own timer this opened the waiver (via requireWaiver) a moment before
+         the sign-in waiver prompt opened it again, and the second dialog replaced the first along
+         with its onDone. The family signed, and the join request they had asked for was gone. */
+      intentAfterWaiver=()=>{ try{ requestJoinGroup(g.id); }catch(e){} };
       return true;
     }
   }catch(e){ console.warn('intent failed:',e&&e.message); }
@@ -5422,8 +5425,16 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-10 04:43 UTC';
+const BUILD='2026-09-10 23:31 UTC';
 const CHANGELOG=[
+ {v:'4.1', d:'2026-09-10', t:'Three doors on the home page', items:[
+   '<b>Book Sessions, Register Events and Join Groups</b> now sit at the top of the home page, above everything else. All three things were already on the page, but each was a scroll and a sign-in away \u2014 and the sections for events and groups <i>disappear entirely</i> when there is nothing on, so a visitor could not tell \u201cnothing this month\u201d from \u201cwe don\u2019t run those\u201d. The buttons are always there and always answer, empty or not.',
+   'Signed in, the same three buttons are shortcuts into the app rather than into the sign-in card \u2014 straight to booking, to Events, or to your group list.',
+   '<b>Registering for an event no longer needs an account.</b> A stranger can register on the spot, as before. What is new is the way out for families we already know: <b>Sign in &amp; register</b> sits next to it, on the event list and inside the registration form itself. Signing in that way carries the event with it \u2014 they land on Events with the registration already filed, and are never asked for a name, an age or the waiver they have signed once already.',
+   '<b>Fix: the waiver is now asked once, and first.</b> Signing in fired the event registration and the waiver prompt within a moment of each other, and both open a dialog \u2014 so whichever landed second took the screen and the first one\u2019s follow-up was lost. The registration now runs from inside the waiver step: a family who has signed sees it happen immediately, one who has not signs once and then it goes through.',
+   '<b>Fix: asking to join a group from the home page could be lost.</b> Same cause as above, on the other button \u2014 a family who had never signed the waiver was shown it twice, one prompt replacing the other, and the join request behind it vanished. They signed, and nothing had been asked. Now they sign once and the request goes in.',
+   'The Book button no longer carries a basketball \u2014 we coach more than one sport, and the icon was quietly saying otherwise.',
+ ]},
  {v:'4.0', d:'2026-09-07', t:'Undo a waiver signed in error', items:[
    '<b>Admin \u2192 Liability waiver</b> now has a <b>\u21a9 Clear</b> button on each client. Use it when an acceptance was made while testing, or signed by you on somebody\u2019s behalf.',
    'This matters more than a tidy-up: a waiver signed by the wrong person is <i>worse than none at all</i>. The record says a parent agreed when no parent ever read it \u2014 which is precisely the claim the document exists to support. Clearing it puts the client back to <b>not signed</b>, so the real parent is asked before their next booking or event.',
