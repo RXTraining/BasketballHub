@@ -4425,7 +4425,7 @@ function lpTickerHtml(){
                         without loading their player API, and guessing a duration would cut
                         someone off mid-video. Manual arrows only.
    ============================================================================ */
-let lpGalMonth=null, lpGalIdx=0, lpGalTimer=null, lpGalPaused=false, lpGalSport=null;
+let lpGalIdx=0, lpGalTimer=null, lpGalPaused=false, lpGalSport=null;
 const LP_PHOTO_MS=4500, LP_VIDEO_CAP_MS=90000;
 function lpHighlights(){
   return (DB.highlights||[]).filter(h=>h.active!==false&&h.url)
@@ -4455,20 +4455,18 @@ function lpMonthLabel(k){
   try{ return new Date(+y,+m-1,1).toLocaleDateString('en-US',{month:'short',year:'numeric'}); }
   catch(e){ return k; }
 }
-function lpGalMonths(sport){
-  const seen=[];
-  lpHighlights().filter(h=>!sport||sportKey(hlSport(h))===sportKey(sport))
-    .forEach(h=>{const k=lpMonthKey(h.date); if(k&&!seen.includes(k))seen.push(k);});
-  return seen;                                   // already newest-first from lpHighlights()
-}
-function lpGalItems(month,sport){
-  /* Newest FIRST, with the owner's manual order as the tie-break within a single date.
-     It used to be the other way round: `ord` came first, and since uploads are numbered 1,2,3…
-     in the order they were added, a month of photos played back oldest-first. Dragging still
-     works, and matters most where it should — a batch of photos from one session all share a
-     date, so their relative order is entirely manual. */
+/* One reel per sport, newest first, with the owner's manual order as the tie-break within a
+   single date. Dragging in Admin still matters where it should — a batch of photos from one
+   session all share a date, so their relative order is entirely manual.
+
+   The month tabs this replaced buried the gallery: a visitor landed on one month of one sport,
+   saw a single photo, and had to work out that the rest were behind tabs labelled with months
+   that mean nothing to somebody who has never trained here. Months are a filing system for the
+   owner, not a way for a parent to look at pictures. The date still shows under each photo, so
+   the chronology is not lost — it is just no longer a gate. */
+function lpGalItems(sport){
   return lpHighlights()
-    .filter(h=>lpMonthKey(h.date)===month&&(!sport||sportKey(hlSport(h))===sportKey(sport)))
+    .filter(h=>!sport||sportKey(hlSport(h))===sportKey(sport))
     .sort((a,b)=>((b.date||'').localeCompare(a.date||''))||((a.ord||0)-(b.ord||0)));
 }
 function lpHighlightsHtml(){
@@ -4477,22 +4475,17 @@ function lpHighlightsHtml(){
     return `<p class="lp-p">${t('FILM_P')}</p>
       <div class="lp-vid">${videoHtml('https://www.youtube.com/embed/1odU-4Ml2sw','100%')}</div>`;
   }
-  if(!lpGalSport||!sports.some(x=>sportKey(x)===sportKey(lpGalSport))){ lpGalSport=sports[0]; lpGalMonth=null; lpGalIdx=0; }
-  const months=lpGalMonths(lpGalSport);
-  if(!months.length){ lpGalMonth=null; }
-  else if(!lpGalMonth||!months.includes(lpGalMonth)){ lpGalMonth=months[0]; lpGalIdx=0; }
-  const items=lpGalMonth?lpGalItems(lpGalMonth,lpGalSport):[];
+  if(!lpGalSport||!sports.some(x=>sportKey(x)===sportKey(lpGalSport))){ lpGalSport=sports[0]; lpGalIdx=0; }
+  const items=lpGalItems(lpGalSport);
+  if(lpGalIdx>=items.length)lpGalIdx=0;
   /* The sport row only appears when there is more than one — a single-sport gallery should not
      grow a tab that does nothing. */
   const sportTabs=sportTabsHtml(sports,lpGalSport,'lpGalPickSport',
     sp=>lpHighlights().filter(h=>sportKey(hlSport(h))===sportKey(sp)).length);
-  const tabs=`<div class="lp-months">${months.map(k=>`
-    <button class="lp-month${k===lpGalMonth?' on':''}" onclick="lpGalPick('${k}')">
-      ${lpMonthLabel(k)}<span>${lpGalItems(k,lpGalSport).length}</span></button>`).join('')}</div>`;
-  return `${sportTabs}${tabs}<div class="lp-gal" id="lpGal">${lpGalSlideHtml(items,lpGalIdx)}</div>`;
+  return `${sportTabs}<div class="lp-gal" id="lpGal">${lpGalSlideHtml(items,lpGalIdx)}</div>`;
 }
 function lpGalPickSport(sp,auto){ if(!auto)sportRotStop('lpFilm');
-  lpGalSport=sp; lpGalMonth=null; lpGalIdx=0; renderLanding(); }
+  lpGalSport=sp; lpGalIdx=0; renderLanding(); }
 function lpGalSlideHtml(items,i){
   if(!items.length)return `<div class="empty">${t('Nothing here yet.')}</div>`;
   i=Math.max(0,Math.min(i,items.length-1));
@@ -4501,7 +4494,9 @@ function lpGalSlideHtml(items,i){
   const media=isImg
     ? `<img class="lp-galmedia" src="${safeUrl(h.url)}" alt="${(h.title||'').replace(/"/g,'&quot;')}">`
     : videoHtml(h.url,'100%');
-  const dots=items.length>1?`<div class="lp-dots">${items.map((_,n)=>
+  /* One dot per photo was fine for a single month. A whole reel would be a hundred of them, so
+     past a couple of rows the counter in the bar (i+1/N) carries the position instead. */
+  const dots=(items.length>1&&items.length<=14)?`<div class="lp-dots">${items.map((_,n)=>
       `<button class="lp-gdot${n===i?' on':''}" onclick="lpGalGo(${n})" aria-label="${n+1}"></button>`).join('')}</div>`:'';
   const nav=items.length>1?`
       <button class="lp-arrow l" onclick="lpGalStep(-1)" aria-label="${t('Previous')}" title="${t('Previous')}">‹</button>
@@ -4544,15 +4539,14 @@ function attachCodecCheck(root){
 }
 function lpGalRender(){
   const box=document.getElementById('lpGal'); if(!box)return;
-  const items=lpGalItems(lpGalMonth,lpGalSport);
+  const items=lpGalItems(lpGalSport);
   box.innerHTML=lpGalSlideHtml(items,lpGalIdx);
   attachCodecCheck(box);
   lpGalSchedule();
 }
-function lpGalPick(k){ lpGalMonth=k; lpGalIdx=0; renderLanding(); }
 function lpGalGo(n){ lpGalIdx=n; lpGalRender(); }
 function lpGalStep(d){
-  const items=lpGalItems(lpGalMonth,lpGalSport); if(!items.length)return;
+  const items=lpGalItems(lpGalSport); if(!items.length)return;
   lpGalIdx=(lpGalIdx+d+items.length)%items.length;
   lpGalRender();
 }
@@ -4566,7 +4560,7 @@ function lpGalToggle(btn){
 function lpGalSchedule(){
   if(lpGalTimer){clearTimeout(lpGalTimer);lpGalTimer=null;}
   if(lpGalPaused)return;
-  const items=lpGalItems(lpGalMonth,lpGalSport);
+  const items=lpGalItems(lpGalSport);
   if(items.length<2)return;
   const h=items[lpGalIdx]; if(!h)return;
   const box=document.getElementById('lpGal'); if(!box)return;
@@ -5596,7 +5590,7 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-11 02:00 UTC';
+const BUILD='2026-09-11 02:34 UTC';
 const CHANGELOG=[
  {v:'4.5', d:'2026-09-11', t:'Buttons kids want to press, numbers where they belong', items:[
    '<b>The three buttons now look like an app, not a form.</b> Deep colour, a round icon badge and a card that presses in when you touch it. The people actually tapping these are twelve years old and their parents \u2014 three identical dark-green rectangles asked them to read before they could choose. Geometry, type and behaviour stay identical on all three, so none is a default; only the colour tells them apart, the same way the number tiles do.',
