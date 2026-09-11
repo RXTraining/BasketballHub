@@ -1432,6 +1432,7 @@ const ZH={
   'CHANGE_PWD_SHORT':'登录后请立即修改密码。',
   'BY_THE_NUMBERS':'用数字说话',
   'Please enter an email address we can send the details to':'请填写邮箱，我们需要把登录信息发送给您','That group is no longer open':'该小组课已不再开放',
+  'NAME_IS_LOGIN':'请填写学员全名 \u2014 下次登录时就用这个名字','Please enter the player\u2019s age':'请填写学员年龄',
   'All':'全部',
   'Already train with us?':'已经是我们的学员？','NEW_HERE_BELOW':'\u2014 或者，第一次参加请在下方填写 \u2014',
   'Book Sessions':'预约课程','Register Events':'活动报名','Join Groups':'加入小组','Register for an event':'活动报名','Groups you can join':'可加入的小组课','NO_EVENTS_OPEN':'目前没有开放报名的活动 —— 新活动会第一时间发布在这里。','NO_GROUPS_FORMING':'目前没有正在组建的小组课 —— 你可以发起一个，其他家庭就能申请加入。',
@@ -1651,6 +1652,7 @@ const KO={
   'CHANGE_PWD_SHORT':'로그인 후 비밀번호를 변경해 주세요.',
   'BY_THE_NUMBERS':'숫자로 보는 RX',
   'Please enter an email address we can send the details to':'로그인 정보를 보내드릴 이메일 주소를 입력해 주세요','That group is no longer open':'이 그룹은 더 이상 신청할 수 없습니다',
+  'NAME_IS_LOGIN':'선수의 전체 이름을 입력해 주세요 \u2014 다음 로그인에 사용됩니다','Please enter the player\u2019s age':'선수의 나이를 입력해 주세요',
   'All':'전체',
   'Already train with us?':'이미 저희와 훈련 중이신가요?','NEW_HERE_BELOW':'\u2014 처음이시라면 아래에 입력해 주세요 \u2014',
   'Book Sessions':'세션 예약','Register Events':'이벤트 등록','Join Groups':'그룹 참여','Register for an event':'이벤트 등록','Groups you can join':'참여할 수 있는 그룹','NO_EVENTS_OPEN':'현재 열린 이벤트가 없습니다 — 새 이벤트는 이곳에 가장 먼저 올라옵니다.','NO_GROUPS_FORMING':'지금 모집 중인 그룹이 없습니다 — 직접 만들면 다른 가족이 참여를 신청할 수 있습니다.',
@@ -1865,6 +1867,7 @@ const JA={
   'CHANGE_PWD_SHORT':'ログイン後にパスワードを変更してください。',
   'BY_THE_NUMBERS':'数字で見る RX',
   'Please enter an email address we can send the details to':'ログイン情報をお送りするメールアドレスをご記入ください','That group is no longer open':'このグループは現在受付していません',
+  'NAME_IS_LOGIN':'選手のフルネームをご記入ください \u2014 次回のログインに使用します','Please enter the player\u2019s age':'選手の年齢をご記入ください',
   'All':'すべて',
   'Already train with us?':'すでに参加されていますか？','NEW_HERE_BELOW':'\u2014 はじめての方は下記にご記入ください \u2014',
   'Book Sessions':'セッション予約','Register Events':'イベント申込','Join Groups':'グループに参加','Register for an event':'イベント申込','Groups you can join':'参加できるグループ','NO_EVENTS_OPEN':'現在受付中のイベントはありません — 新しいイベントはここに最初に掲載されます。','NO_GROUPS_FORMING':'現在募集中のグループはありません — 作成すると他のご家族が参加を申請できます。',
@@ -1935,6 +1938,7 @@ const EN={
   'CHANGE_PWD_SHORT':'Please change this password after your first sign-in.',
   'BY_THE_NUMBERS':'By the numbers',
   'Please enter an email address we can send the details to':'Please enter an email address we can send the details to','That group is no longer open':'That group is no longer open',
+  'NAME_IS_LOGIN':'Use the player\u2019s full name \u2014 this is the name you will sign in with next time.','Please enter the player\u2019s age':'Please enter the player\u2019s age',
   'All':'All',
   'Already train with us?':'Already train with us?','NEW_HERE_BELOW':'\u2014 or, new here? fill in the form below \u2014',
   'Book Sessions':'Book Sessions','Register Events':'Register Events','Join Groups':'Join Groups','Register for an event':'Register for an event','Groups you can join':'Groups you can join','NO_EVENTS_OPEN':'No events are open right now — new ones are posted here first.','NO_GROUPS_FORMING':'No group is forming right now — start one and other families can ask to join yours.',
@@ -3825,6 +3829,8 @@ function renderWhoami(){
    within a month there are two records for the same family with the credits on the wrong one. */
 /* Deliberately loose: the job is to catch a typo or an empty box, not to police what a valid
    address looks like. Anything stricter rejects real addresses. */
+/* A real age, not just "a number was typed": 0 and 200 are both somebody in a hurry. */
+function validAge(v){ const n=Math.round(+String(v||'').trim()); return !!n && n>=3 && n<=99; }
 function looksLikeEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v||'').trim()); }
 function normPhone(v){ return String(v||'').replace(/[^0-9]/g,'').slice(-10); }
 /* Who is registering, given a mobile, an email and the PLAYER's name.
@@ -3977,8 +3983,9 @@ function openPublicEventReg(eid){
        </div></div>
      <div class="clienttag" style="margin-bottom:10px;text-align:center">${t('NEW_HERE_BELOW')}</div>`}
      <div class="row" style="gap:10px;flex-wrap:wrap">
-       <div class="field" style="flex:1;min-width:180px"><label class="f">${t('Player full name')} *</label><input id="peName"></div>
-       <div class="field" style="max-width:110px"><label class="f">${t('Age')}</label><input id="peAge" type="number" min="3" max="99"></div>
+       <div class="field" style="flex:1;min-width:180px"><label class="f">${t('Player full name')} *</label><input id="peName">
+         <div class="clienttag" style="margin-top:5px">${t('NAME_IS_LOGIN')}</div></div>
+       <div class="field" style="max-width:110px"><label class="f">${t('Age')} *</label><input id="peAge" type="number" min="3" max="99"></div>
      </div>
      <div class="row" style="gap:10px;flex-wrap:wrap">
        <div class="field" style="flex:1;min-width:180px"><label class="f">${t('Parent / guardian')} *</label><input id="peParent"></div>
@@ -4027,6 +4034,9 @@ async function submitPublicReg(eid){
      the confirmation. Without it a family registers, closes the screen showing their password,
      and there is no way to reach them except by asking the coach. */
   if(!looksLikeEmail(email))return flash(t('Please enter an email address we can send the details to'),true);
+  /* Age decides which group a child can join and how a coach plans the session — a blank one
+     means somebody has to ask before anything can be booked. */
+  if(!validAge(ageRaw))return flash(t('Please enter the player\u2019s age'),true);
   if(!$('#peWv')||!$('#peWv').checked)return flash(t('Please read and agree to the liability waiver'),true);
   if(eventSpotsLeft(ev)<=0)return flash(t('Sorry, this event just filled up'),true);
 
@@ -5200,12 +5210,13 @@ function renderSignup(){
   p.innerHTML=`
     <div class="muted small" style="margin-bottom:6px">${t('Create your account')}</div>
     <p class="muted small" style="margin-bottom:12px">${t('Tell us about the player so the coach can prepare.')}</p>
-    <input id="suName" placeholder="${t('Full name')} *" autocomplete="off">
+    <input id="suName" placeholder="${t('Player full name')} *" autocomplete="off">
+    <div class="muted small" style="margin:5px 2px 0">${t('NAME_IS_LOGIN')}</div>
     <input id="suPhone" placeholder="${t('Phone')}" style="margin-top:10px">
     <input id="suEmail" type="email" placeholder="${t('Email')} *" style="margin-top:10px">
     <input id="suTown" placeholder="${t('Town / City')}" style="margin-top:10px">
     <input id="suParent" placeholder="${t('Parent / Guardian')}" style="margin-top:10px">
-    <input id="suAge" type="number" min="3" max="99" placeholder="${t('Age')}" style="margin-top:10px">
+    <input id="suAge" type="number" min="3" max="99" placeholder="${t('Age')} *" style="margin-top:10px">
     <div style="margin-top:12px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px">
       <label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;font-size:13px">
         <input type="checkbox" id="suWv" style="width:auto;margin-top:3px">
@@ -5224,6 +5235,7 @@ function saveSignup(){
   // same reason as the public event form: the account's password has to be able to reach them
   if(!looksLikeEmail($('#suEmail')?$('#suEmail').value:''))
     return flash(t('Please enter an email address we can send the details to'),true);
+  if(!validAge($('#suAge')?$('#suAge').value:''))return flash(t('Please enter the player\u2019s age'),true);
   if(!$('#suWv')||!$('#suWv').checked)return flash(t('Please read and agree to the liability waiver'),true);
   const wvName=($('#suWvName')?$('#suWvName').value:'').trim();
   if(wvName.length<3)return flash(t('Please type the parent or guardian full name'),true);
@@ -5636,7 +5648,7 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-11 02:50 UTC';
+const BUILD='2026-09-11 03:20 UTC';
 const CHANGELOG=[
  {v:'4.5', d:'2026-09-11', t:'Buttons kids want to press, numbers where they belong', items:[
    '<b>The three buttons now look like an app, not a form.</b> Deep colour, a round icon badge and a card that presses in when you touch it. The people actually tapping these are twelve years old and their parents \u2014 three identical dark-green rectangles asked them to read before they could choose. Geometry, type and behaviour stay identical on all three, so none is a default; only the colour tells them apart, the same way the number tiles do.',
