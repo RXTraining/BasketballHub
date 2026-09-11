@@ -1353,6 +1353,8 @@ const ZH={
   'Create your account':'创建账号',
   'I already have one':'我已有账号',
   'Sign in & register':'登录并报名','SIGNIN_PREFILL':'以前在我们这里训练过？直接登录即可，姓名、年龄和免责协议都已存档，无需重新填写。',
+  'CHANGE_PWD_SHORT':'登录后请立即修改密码。',
+  'Already train with us?':'已经是我们的学员？','NEW_HERE_BELOW':'\u2014 或者，第一次参加请在下方填写 \u2014',
   'Book Sessions':'预约课程','Register Events':'活动报名','Join Groups':'加入小组','Register for an event':'活动报名','Groups you can join':'可加入的小组课','NO_EVENTS_OPEN':'目前没有开放报名的活动 —— 新活动会第一时间发布在这里。','NO_GROUPS_FORMING':'目前没有正在组建的小组课 —— 你可以发起一个，其他家庭就能申请加入。',
   'Reserve your spot →':'立即报名 →',
   'Get in touch →':'联系我们 →',
@@ -1567,6 +1569,8 @@ const KO={
   'Create your account':'계정 만들기',
   'I already have one':'이미 계정이 있어요',
   'Sign in & register':'로그인 후 등록','SIGNIN_PREFILL':'이전에 함께 훈련한 적이 있나요? 로그인하면 이름·나이·동의서가 이미 저장되어 있어 다시 입력할 필요가 없습니다.',
+  'CHANGE_PWD_SHORT':'로그인 후 비밀번호를 변경해 주세요.',
+  'Already train with us?':'이미 저희와 훈련 중이신가요?','NEW_HERE_BELOW':'\u2014 처음이시라면 아래에 입력해 주세요 \u2014',
   'Book Sessions':'세션 예약','Register Events':'이벤트 등록','Join Groups':'그룹 참여','Register for an event':'이벤트 등록','Groups you can join':'참여할 수 있는 그룹','NO_EVENTS_OPEN':'현재 열린 이벤트가 없습니다 — 새 이벤트는 이곳에 가장 먼저 올라옵니다.','NO_GROUPS_FORMING':'지금 모집 중인 그룹이 없습니다 — 직접 만들면 다른 가족이 참여를 신청할 수 있습니다.',
   'Reserve your spot →':'자리 예약 →',
   'Get in touch →':'문의하기 →',
@@ -1776,6 +1780,8 @@ const JA={
   'Create your account':'アカウントを作成',
   'I already have one':'すでに持っています',
   'Sign in & register':'ログインして申込','SIGNIN_PREFILL':'以前トレーニングされたことがありますか？ログインすれば氏名・年齢・同意書は登録済みで、再入力は不要です。',
+  'CHANGE_PWD_SHORT':'ログイン後にパスワードを変更してください。',
+  'Already train with us?':'すでに参加されていますか？','NEW_HERE_BELOW':'\u2014 はじめての方は下記にご記入ください \u2014',
   'Book Sessions':'セッション予約','Register Events':'イベント申込','Join Groups':'グループに参加','Register for an event':'イベント申込','Groups you can join':'参加できるグループ','NO_EVENTS_OPEN':'現在受付中のイベントはありません — 新しいイベントはここに最初に掲載されます。','NO_GROUPS_FORMING':'現在募集中のグループはありません — 作成すると他のご家族が参加を申請できます。',
   'Reserve your spot →':'枠を確保 →',
   'Get in touch →':'お問い合わせ →',
@@ -1841,6 +1847,8 @@ const EN={
   'Maybe later':'Maybe later',
   'EVPROMPT_INTRO':'You haven\'t signed up for these yet. Register now, or find them later on the Events tab.',
   'Sign in & register':'Sign in & register','SIGNIN_PREFILL':'Trained with us before? Sign in instead — your details and waiver are already on file.',
+  'CHANGE_PWD_SHORT':'Please change this password after your first sign-in.',
+  'Already train with us?':'Already train with us?','NEW_HERE_BELOW':'\u2014 or, new here? fill in the form below \u2014',
   'Book Sessions':'Book Sessions','Register Events':'Register Events','Join Groups':'Join Groups','Register for an event':'Register for an event','Groups you can join':'Groups you can join','NO_EVENTS_OPEN':'No events are open right now — new ones are posted here first.','NO_GROUPS_FORMING':'No group is forming right now — start one and other families can ask to join yours.',
   'Coming up':'Coming up',
   'FEATURED':'FEATURED',
@@ -3868,9 +3876,15 @@ function openPublicEventReg(eid){
        ${eventLeftText(ev)?' · '+eventLeftText(ev):''}</div>
      ${(mlText(ev.detail)||'').trim()?`<div class="clienttag" style="margin-bottom:10px;white-space:pre-wrap">${escapeHtml(mlText(ev.detail))}</div>`:''}
      ${full?`<div class="empty">${t('This event is full. Contact us and we will let you know if a place opens.')}</div>`:`
-     ${AUTH?'':`<div class="clienttag" style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-       <span>${t('SIGNIN_PREFILL')}</span>
-       <button class="btn ghost sm" onclick="closeModal();openAuth('client',{k:'event',id:'${eid}'})">${t('Sign in')}</button></div>`}
+     ${AUTH?'':`<div class="panel" style="border-color:var(--green);background:var(--a1b);margin-bottom:14px;padding:14px">
+       <div class="row" style="justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+         <div style="min-width:190px;flex:1">
+           <b style="font-size:15px">${t('Already train with us?')}</b>
+           <div class="clienttag" style="margin-top:4px">${t('SIGNIN_PREFILL')}</div>
+         </div>
+         <button class="btn" onclick="closeModal();openAuth('client',{k:'event',id:'${eid}'})">${t('Sign in')} \u2192</button>
+       </div></div>
+     <div class="clienttag" style="margin-bottom:10px;text-align:center">${t('NEW_HERE_BELOW')}</div>`}
      <div class="row" style="gap:10px;flex-wrap:wrap">
        <div class="field" style="flex:1;min-width:180px"><label class="f">${t('Player full name')} *</label><input id="peName"></div>
        <div class="field" style="max-width:110px"><label class="f">${t('Age')}</label><input id="peAge" type="number" min="3" max="99"></div>
@@ -3936,6 +3950,12 @@ async function submitPublicReg(eid){
        they agreed — and the date is half of what makes the record worth anything. Only replace it
        when there is nothing on file, or when what they have predates a rewording. */
     if(!custWaiverOK(c))c.waiver=wv;
+    /* Photo consent is a separate decision from the release, and they have just made it on this
+       form — so an existing family ticking the box here grants it on their record, not only on
+       this one registration. Only ever upwards: leaving the box unticked is not the same as
+       withdrawing permission given earlier, and withdrawal has its own deliberate action in
+       Admin. */
+    else if(c.waiver&&wv.photo&&!c.waiver.photo)c.waiver=Object.assign({},c.waiver,{photo:true,photoAt:wv.at});
     if(myEventReg(eid,c.id)){ closePublicReg(); return flash(t('You are already registered for this event')); }
   }else{
     isNew=true;
@@ -3962,6 +3982,18 @@ async function submitPublicReg(eid){
   save();
   await pushRowsNow('event_regs',[eventRegRow(reg)]);
   logAct('event_register',(isNew?'NEW via link · ':'via link · ')+name+' · '+mlText(ev.title),eid);
+  /* A brand-new family reads their name and password on the next screen and then closes it. If we
+     have an email, send the same details now rather than only when the account is approved — the
+     approval can be hours later, and by then the screen they were shown is long gone. Quietly:
+     this is a stranger's phone, and a failed email must not look like a failed registration. */
+  if(isNew&&c.email&&supa&&SUPA_OK){
+    try{ supa.functions.invoke('send-request-email',{body:{to:[c.email],replyTo:'rx@rxtraining.org',
+      subject:'RX Training — '+mlText(ev.title)+': you are registered',
+      text:'Hi '+firstName(c.parent||c.name)+',\n\n'+name+' has a place at '+mlText(ev.title)+
+           ' ('+eventWhen(ev)+(ev.location?', '+ev.location:'')+').\n\n'+credsText(c)+
+           '\n\nYour account is waiting for approval — we will confirm shortly.\n\n— RX Training'}})
+      .then(()=>{},()=>{}); }catch(e){}
+  }
   try{ notifyOwnerEventReg(ev,c); }catch(e){}
   closeModal();
   openModal(t('You are registered'),
@@ -5475,8 +5507,15 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-10 23:58 UTC';
+const BUILD='2026-09-11 00:20 UTC';
 const CHANGELOG=[
+ {v:'4.3', d:'2026-09-11', t:'Giving a family their sign-in details', items:[
+   '<b>Fix: the customer search box only took one letter at a time.</b> Every keystroke re-drew the list, which threw away the box being typed into \u2014 so the second letter went nowhere. Typing now works normally, and the caret stays where you left it. The same fix covers every other search and filter field in the app.',
+   '<b>New: \u21aa Send to client</b>, on the client\u2019s profile beside their password. It gives you three ways to hand over the sign-in details: <b>copy the text</b> to paste into WeChat, <b>a picture</b> to send as a photo (the route that actually works in WeChat \u2014 no app, no link to open), or <b>email</b> where we have an address. The card is drawn in the family\u2019s language, with a QR straight to the site.',
+   '<b>A family registering from an event link is now emailed their sign-in details straight away</b>, if they gave an email. They were only sent when the account was approved \u2014 which can be hours later, long after the screen showing the password had been closed.',
+   '<b>The public registration form now leads with a way to sign in.</b> A family we already know was being asked for a name, an age and the waiver they had signed once already \u2014 which is also how the same child ends up in the database twice. Signing in carries the event with them and registers them in one tap; the form underneath is for people who really are new.',
+   '<b>Fix: photo permission given on that form now reaches the family\u2019s record</b>, not just the one registration. Ticking the box only ever grants permission \u2014 leaving it blank is not the same as withdrawing consent given earlier, and withdrawing stays a deliberate action in Admin. The original signature and its date are untouched.',
+ ]},
  {v:'4.2', d:'2026-09-10', t:'A save can no longer delete what it has not seen', items:[
    '<b>What went wrong today.</b> Saving as the owner did not merge your changes into the cloud \u2014 it made the cloud look <i>exactly</i> like the copy in your browser, deleting anything it did not hold. Your device stops refreshing while an editor is open, while you are typing, and while the tab is in the background. So a family who registered on their phone during an editing session existed only in the cloud, your browser had never seen them, and your next save deleted them. A customer, their registrations, and edits made elsewhere were lost that way.',
    '<b>The rule has changed.</b> A save may now only delete rows this device has <b>actually seen and then removed</b> \u2014 what it has never seen is none of its business, so it stays and arrives on the next refresh. Deleting something yourself still works exactly as before: the app removes that row and nothing else.',
@@ -8730,7 +8769,7 @@ function viewCustomer(id){
     </div>
     <div class="panel" style="background:var(--panel2);margin:6px 0 14px;display:flex;justify-content:space-between;align-items:center;gap:10px">
       <div><b class="small">Client login password</b><div style="margin-top:4px;font-family:monospace">${c.pwd||'—'}</div></div>
-      <div class="actions"><button class="btn ghost sm" onclick="resetClientPwd('${id}')">Reset to default</button><button class="btn ghost sm" onclick="openCustomer('${id}')">Change…</button></div>
+      <div class="actions"><button class="btn sm" onclick="shareCredentials('${id}')">\u21aa Send to client</button><button class="btn ghost sm" onclick="resetClientPwd('${id}')">Reset to default</button><button class="btn ghost sm" onclick="openCustomer('${id}')">Change…</button></div>
     </div>
     <div class="panel" style="background:var(--panel2);margin:6px 0 14px">
       <div class="row" style="justify-content:space-between;align-items:center">
@@ -10896,6 +10935,101 @@ function sharePoster(eid,lang){
      <p class="muted small" style="margin-top:10px">On a phone: <b style="color:var(--txt)">press and hold</b> the image, then Save. On a computer, use Download.</p>`,
     `<a class="btn" href="${url}" download="${attrEsc((title||'event').replace(/[^a-z0-9一-鿿]+/gi,'-').toLowerCase())}-rx-${posterLang}.png">Download</a>
      <button class="btn ghost" onclick="closeModal()">Close</button>`);
+}
+/* ---- Handing a family their sign-in details ----------------------------------------------------
+   A client is identified by name + password, and the password is generated per account
+   (newClientPwd) — so the owner has to be able to GIVE it to them. Three ways out, because
+   families differ: text to paste into WeChat, a picture to send in WeChat (the route that
+   actually works there — it survives forwarding and needs no app), and email where we have one.
+   The card is drawn rather than screenshotted so the password is legible at any size. */
+function credsText(c){
+  return 'RX.TRAINING — '+t('How to sign in')+'\n\n'
+    +t('Go to')+' rxtraining.org\n'
+    +t('Name')+': '+(c.name||'')+'\n'
+    +t('Password')+': '+(c.pwd||DB.settings.defaultClientPwd||'')+'\n\n'
+    +t('Please change this password once you are in — anyone given the same starting password could otherwise be confused with you.');
+}
+function credsCardCanvas(c){
+  const W=1080,H=1350,cv=document.createElement('canvas'); cv.width=W;cv.height=H;
+  const x=cv.getContext('2d');
+  const FONT='-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"PingFang SC","Microsoft YaHei",sans-serif';
+  const ctr=(txt,y,font,fill)=>{x.font=font;x.fillStyle=fill;x.textAlign='center';x.fillText(txt,W/2,y);};
+  x.fillStyle='#fff';x.fillRect(0,0,W,H);
+  const band=x.createLinearGradient(0,0,W,0);band.addColorStop(0,'#ff8a1a');band.addColorStop(1,'#f05a14');
+  x.fillStyle=band;x.fillRect(0,0,W,16);
+  // wordmark, measured so it stays centred whatever the font metrics are
+  const mf='800 76px '+FONT; x.font=mf;
+  const wRX=x.measureText('RX').width,wTR=x.measureText('TRAINING').width,br=42,gap=24;
+  let px=(W-(wRX+gap+br*2+gap+wTR))/2, my=150;
+  x.textAlign='left';x.fillStyle='#0f1410';x.fillText('RX',px,my);
+  px+=wRX+gap; try{ posterIcon(x,(posterSports()||[])[0],px+br,my-26,br*2); }catch(e){}
+  px+=br*2+gap; x.font=mf;x.fillStyle='#0f1410';x.fillText('TRAINING',px,my);
+  ctr(t('How to sign in'),my+78,'700 40px '+FONT,'#3a6e14');
+  const rule=x.createLinearGradient(W/2-110,0,W/2+110,0);
+  rule.addColorStop(0,'#ff8a1a');rule.addColorStop(1,'#f05a14');
+  x.fillStyle=rule;x.fillRect(W/2-110,my+106,220,8);
+  // the two things that matter, each in its own box so neither can be misread
+  const box=(label,val,y)=>{
+    x.fillStyle='#f4f7f0';x.strokeStyle='#dde5d5';x.lineWidth=2;
+    x.beginPath();x.roundRect?x.roundRect(90,y,W-180,150,18):x.rect(90,y,W-180,150);x.fill();x.stroke();
+    x.textAlign='left';x.font='600 30px '+FONT;x.fillStyle='#6b7a63';x.fillText(label,120,y+52);
+    x.font='800 58px '+FONT;x.fillStyle='#0f1410';
+    let v=String(val||''),f=58;
+    while(x.measureText(v).width>W-240&&f>26){f-=3;x.font='800 '+f+'px '+FONT;}
+    x.fillText(v,120,y+118);
+  };
+  let y=my+170;
+  ctr('rxtraining.org',y+6,'700 44px '+FONT,'#0f1410'); y+=60;
+  box(t('Name'),c.name||'',y); y+=180;
+  box(t('Password'),c.pwd||DB.settings.defaultClientPwd||'',y); y+=210;
+  // a QR straight to the site, so nobody has to type anything at all
+  try{
+    const mat=qrMatrix('https://rxtraining.org'),n=mat.length,quiet=4;
+    const cell=Math.max(4,Math.floor(300/(n+quiet*2))),side=cell*(n+quiet*2);
+    const qx=(W-side)/2;
+    x.fillStyle='#fff';x.fillRect(qx,y,side,side);
+    x.fillStyle='#0f1410';
+    for(let r=0;r<n;r++)for(let col=0;col<n;col++)if(mat[r][col])
+      x.fillRect(qx+(col+quiet)*cell,y+(r+quiet)*cell,cell,cell);
+    y+=side+58;
+  }catch(e){ y+=20; }
+  /* Wrapped, not cut: a sentence that stops mid-word reads as a broken card, and this one is the
+     instruction that keeps two namesakes from sharing a password. */
+  x.font='400 28px '+FONT; x.textAlign='center'; x.fillStyle='#6b7a63';
+  let lines=[]; const note=t('CHANGE_PWD_SHORT');
+  try{ lines=posterWrap(x,note,W-220)||[note]; }catch(e){ lines=[note]; }
+  lines.slice(0,3).forEach((ln,i)=>x.fillText(ln,W/2,y+i*38));
+  y+=lines.slice(0,3).length*38;
+  /* Crop to what was actually drawn — the QR's size depends on the URL, so the tail of the card
+     is not a fixed height and a fixed canvas leaves a slab of white under it. */
+  const out=document.createElement('canvas');
+  out.width=W; out.height=Math.max(600,Math.min(H,Math.round(y+46)));
+  out.getContext('2d').drawImage(cv,0,0);
+  return out;
+}
+function shareCredentials(id){
+  const c=custById(id); if(!c)return;
+  let url=''; try{ url=credsCardCanvas(c).toDataURL('image/png'); }catch(e){ console.warn('creds card failed:',e&&e.message); }
+  const fname=((c.name||'client').replace(/[^a-z0-9\u4e00-\u9fff]+/gi,'-').toLowerCase())+'-rx-signin.png';
+  openModal('Sign-in details — '+(c.name||''),
+    `<p class="muted small" style="margin-bottom:10px">Three ways to give this to the family. The password is theirs alone \u2014 send it to the parent, not to a group.</p>
+     <textarea id="credsTxt" rows="6" style="width:100%;font-family:monospace;font-size:13px">${escapeHtml(credsText(c))}</textarea>
+     <div class="row" style="gap:8px;margin:10px 0;flex-wrap:wrap">
+       <button class="btn sm" onclick="rxCopy('credsTxt','Sign-in details copied \u2014 paste into WeChat')">\u2398 Copy text</button>
+       ${c.email?`<button class="btn sm ghost" onclick="emailCreds('${id}')">\u2709\ufe0f Email to ${escapeHtml(c.email)}</button>`
+                :`<span class="clienttag">No email on file \u2014 use the text or the picture</span>`}
+     </div>
+     ${url?`<p class="muted small" style="margin-bottom:8px">To send it in WeChat, send this as a <b style="color:var(--txt)">photo</b>. On a phone: <b style="color:var(--txt)">press and hold</b> the image, then Save.</p>
+       <img src="${url}" alt="sign-in card" style="width:100%;border:1px solid var(--line);border-radius:12px;display:block">`:''}`,
+    `${url?`<a class="btn" href="${url}" download="${attrEsc(fname)}">Download picture</a>`:''}
+     <button class="btn ghost" onclick="closeModal()">Close</button>`,{full:false});
+}
+function emailCreds(id){
+  const c=custById(id); if(!c)return;
+  if(!c.email)return flash('No email on file',true);
+  emailClient(c.email,'RX Training — your sign-in details',
+    'Hi '+firstName(c.parent||c.name)+',\n\n'+credsText(c)+'\n\n\u2014 RX Training');
+  logAct('creds_sent',c.name+' \u2192 '+c.email,c.id);
 }
 function rxCopy(id,msg){
   const el=document.getElementById(id); if(!el)return;
@@ -13704,10 +13838,22 @@ let rxJumpToTop=false;
     if(typeof fn!=='function')return;
     window[n]=function(){
       if(rxJumpToTop) return fn.apply(this,arguments);          // tab change: let it start at the top
-      let y=0, cols=[];
+      let y=0, cols=[], foc=null;
       try{
         y=window.scrollY||window.pageYOffset||0;
         cols=[...document.querySelectorAll('.tblscroll')].map(e=>[e.scrollLeft,e.scrollTop]);
+        /* A search box that re-renders on every keystroke destroys the very input being typed
+           into, so the caret lands on <body> and only the FIRST character arrives. Remember which
+           field had focus and where the caret was, and put it back. Keyed by id, else placeholder,
+           else position among the view's fields — the elements are rebuilt and have no identity
+           of their own. */
+        const a=document.activeElement;
+        if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')&&!a.readOnly&&!a.disabled){
+          const all=[...document.querySelectorAll('input,textarea')];
+          let st=null,en=null;
+          try{ st=a.selectionStart; en=a.selectionEnd; }catch(e){}   // throws on number/email inputs
+          foc={id:a.id||'',ph:a.getAttribute('placeholder')||'',i:all.indexOf(a),st:st,en:en};
+        }
       }catch(e){}
       const out=fn.apply(this,arguments);
       const put=()=>{ try{
@@ -13715,6 +13861,18 @@ let rxJumpToTop=false;
         document.querySelectorAll('.tblscroll').forEach((e,i)=>{
           if(cols[i]){ e.scrollLeft=cols[i][0]; e.scrollTop=cols[i][1]; }
         });
+        /* Only when the render actually TOOK the focus — if the person has since clicked
+           somewhere else, leave them where they are rather than yanking the caret back. */
+        if(foc){
+          const cur=document.activeElement;
+          if(!cur||cur===document.body||cur===document.documentElement){
+            const all=[...document.querySelectorAll('input,textarea')];
+            const el=(foc.id&&document.getElementById(foc.id))
+                  || (foc.ph&&all.find(e=>e.getAttribute('placeholder')===foc.ph))
+                  || (foc.i>=0?all[foc.i]:null);
+            if(el){ el.focus(); try{ if(foc.st!=null)el.setSelectionRange(foc.st,foc.en); }catch(e){} }
+          }
+        }
       }catch(e){} };
       // twice: once now, once after layout settles (wrapTables builds the scrollers on a timer)
       requestAnimationFrame(put); setTimeout(put,60);
