@@ -5649,11 +5649,12 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-11 22:27 UTC';
+const BUILD='2026-09-11 22:48 UTC';
 const CHANGELOG=[
  {v:'4.5', d:'2026-09-11', t:'Buttons kids want to press, numbers where they belong', items:[
    '<b>The three buttons now look like an app, not a form.</b> Deep colour, a round icon badge and a card that presses in when you touch it. The people actually tapping these are twelve years old and their parents \u2014 three identical dark-green rectangles asked them to read before they could choose. Geometry, type and behaviour stay identical on all three, so none is a default; only the colour tells them apart, the same way the number tiles do.',
    '<b>Every Register and Join button now goes to the thing it names.</b> The scrolling bar at the top and <b>Reserve your spot</b> in Featured both used to open the same generic sign-in card, which forgot which event you had tapped \u2014 and asked for an account that is no longer needed. They now open that event\u2019s registration, with the sign-in route for families we already know. A <b>Join</b> on a group does the same: signed in, the request goes in there and then; signed out, the group is carried through sign-in.',
+   '<b>Payment asks now name RX.TRAINING, not Raymond.</b> The Zelle number is unchanged \u2014 only who the money is being sent to on paper. A parent reading \u201cZelle payment to Raymond at 339\u2026\u201d sees a teenager\u2019s first name beside a phone number and an amount, which is the shape of every scam text they have been warned about, and it makes RX read as pocket money rather than a business. <b>Past messages were updated too</b>, so a client scrolling back does not find two different payees for the same account. The coach\u2019s name still appears where it belongs \u2014 whose session it was.',
    '<b>Age is required too, and the name field now says what it is for.</b> Age decides which group a child can join and how a coach plans a session \u2014 a blank one meant somebody had to go and ask before anything could be booked. And under <b>Player full name</b> both forms now say plainly that this is the name they will sign in with next time: a parent who typed \u201cTommy\u201d and then tried to sign in as \u201cThomas Chen\u201d could not get in, and there was nothing on the form to warn them.',
    '<b>Email is now required when a family creates their own record</b> \u2014 on the event form and on Create account. It is the only channel for sending the sign-in details and the confirmation; without it somebody registers, closes the screen showing their password, and the only way back is to ask a coach. Adding a client yourself in Admin is unchanged \u2014 a walk-in with no email can still be entered by hand.',
    '<b>Highlights is one reel now, not a filing cabinet.</b> The month tabs are gone and the sport no longer changes on its own \u2014 every photo and clip plays through in one run, newest first, whatever sport it is, with the date under each. Before, a visitor landed on one month of one sport and saw a couple of pictures before the tab strip flipped to another sport on its own timer and then back; nothing ever played through, and the month labels meant nothing to somebody who has never trained here. The sport tabs are still there to filter by hand \u2014 with an <b>All</b> tab, which is where it starts \u2014 and dragging in Admin still sets the order within a day.',
@@ -11992,6 +11993,28 @@ function togglePayoutSettled(id,coachId){
   if(AUTH==='owner'){ refreshOwner(); if(coachId)openCoachPayouts(coachId); }
   else renderMoney();
 }
+/* Settling a whole coach at once. Ticking rows one at a time is correct for "I paid him for
+   Saturday", and useless for the far more common "I have been paying him cash all along" — which
+   is how a coach who has had every dollar still shows a debt: nobody ticks thirty rows, so the
+   ledger drifts from reality and stops being worth reading. Each row can still be undone
+   individually afterwards. */
+function settleAllPayouts(coachId){
+  if(typeof syncFails!=='undefined'&&syncFails&&syncFails.settings){
+    return flash('Cannot record this yet — the settings table failed to save. Run supabase-setup.sql, then try again.',true);
+  }
+  const rows=coachPayoutRows(coachId).filter(r=>!isSettled(r.id));
+  if(!rows.length)return flash('Nothing outstanding for '+coachName(coachId));
+  const total=rows.reduce((a,r)=>a+r.amount,0);
+  if(!confirm('Mark all '+rows.length+' outstanding payout'+(rows.length>1?'s':'')+' to '+coachName(coachId)+' as paid?\n\n'+
+              'Total '+money(total)+'\n\nThis records that the money has actually been handed over. Any single row can be undone afterwards.'))return;
+  const set=settledSet();
+  rows.forEach(r=>set.add(r.id));
+  DB.settings.payoutsSettled=[...set];
+  save();
+  logAct('payouts_settled',coachName(coachId)+' · '+rows.length+' row(s) · '+money(total));
+  flash('Marked '+rows.length+' payout'+(rows.length>1?'s':'')+' paid — '+money(total)+' to '+coachName(coachId));
+  if(AUTH==='owner'){ refreshOwner(); openCoachPayouts(coachId); } else renderMoney();
+}
 function coachOwedTotal(coachId){
   return coachPayoutRows(coachId).filter(r=>!isSettled(r.id)).reduce((a,r)=>a+r.amount,0);
 }
@@ -12057,7 +12080,8 @@ function openCoachPayouts(coachId){
       <div class="stat"><div class="k">Already paid</div><div class="v">${money(coachPaidTotal(coachId))}</div><div class="d muted">ticked off below</div></div>
       <div class="stat"><div class="k">Earned</div><div class="v">${money(coachPayoutTotal(coachId))}</div><div class="d muted">all completed work</div></div>
     </div>`+coachPayoutTableHtml(coachId),
-    `<button class="btn" onclick="closeModal()">Close</button>`,{full:AUTH==='owner'});
+    `${owed>0?`<button class="btn" onclick="settleAllPayouts('${coachId}')">✓ Mark everything paid — ${money(owed)}</button>`:''}
+     <button class="btn ghost" onclick="closeModal()">Close</button>`,{full:AUTH==='owner'});
 }
 /* ---- Unpaid family time: people, rates, and the log ---------------------- */
 function contribSorted(){
