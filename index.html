@@ -684,16 +684,40 @@
   .ptr.spinning .ptr-spin{animation:ptrSpin .7s linear infinite}
   @keyframes ptrSpin{to{transform:rotate(360deg)}}
   @media(prefers-reduced-motion:reduce){.ptr.spinning .ptr-spin{animation:none}}
-  .lp-live{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin:4px 0 26px}
-  .lp-live-lab{font-size:10.5px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:var(--lp-mut)}
-  .lp-live-chip{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:800;
-    color:#2f6b12;background:var(--a1b);border:1.5px solid var(--lp-volt-d);border-radius:999px;padding:6px 14px}
+  /* What we coach right now. Stacked — label, then the sports — and given real space beneath, so
+     it reads as a caption under the slogan rather than a row of controls crowding the buttons. */
+  .lp-live{display:flex;flex-direction:column;align-items:center;gap:12px;margin:22px 0 40px}
+  .lp-live-lab{display:inline-flex;align-items:center;gap:12px;
+    font-size:10px;font-weight:800;letter-spacing:2.2px;text-transform:uppercase;color:var(--lp-mut)}
+  .lp-live-lab::before,.lp-live-lab::after{content:'';width:26px;height:1px;background:var(--lp-line)}
+  .lp-live-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  /* A quiet chip: white, hairline edge, the glyph held in its own soft disc. The heavy green
+     outline it replaced competed with the buttons directly underneath it. */
+  .lp-live-chip{display:inline-flex;align-items:center;gap:9px;font-size:14px;font-weight:700;
+    letter-spacing:.2px;color:var(--lp-ink);background:var(--lp-bg);
+    border:1px solid var(--lp-line);border-radius:999px;padding:5px 16px 5px 5px;
+    box-shadow:0 1px 2px rgba(15,20,16,.05)}
+  .lp-live-chip i{font-style:normal;display:flex;align-items:center;justify-content:center;
+    width:28px;height:28px;border-radius:50%;background:var(--lp-soft);font-size:15px;line-height:1}
   @media(max-width:560px){
-    /* On a phone this strip sat in the middle of the hero at full size and pushed the three
-       buttons into the fold. Same information, half the room. */
-    .lp-live{gap:6px;margin:2px 0 14px}
-    .lp-live-lab{font-size:9.5px;letter-spacing:1.2px}
-    .lp-live-chip{font-size:12px;padding:4px 10px}
+    .lp-live{gap:10px;margin:16px 0 30px}
+    .lp-live-lab{font-size:9.5px;letter-spacing:1.8px}
+    .lp-live-lab::before,.lp-live-lab::after{width:18px}
+    .lp-live-row{gap:8px}
+    .lp-live-chip{font-size:12.5px;padding:4px 13px 4px 4px;gap:7px}
+    .lp-live-chip i{width:24px;height:24px;font-size:13px}
+  }
+  /* Narrower than the tier above, so these MUST come after it — equal specificity, last one
+     wins. Three sports broke 2+1 at phone width, which is the ragged shape just taken out of the
+     buttons; each notch keeps them on one line. A fourth sport still wraps rather than clipping. */
+  @media(max-width:440px){
+    .lp-live-row{gap:4px;width:100%}
+    .lp-live-chip{font-size:11px;padding:3px 9px 3px 3px;gap:5px;letter-spacing:0}
+    .lp-live-chip i{width:21px;height:21px;font-size:11.5px}
+  }
+  @media(max-width:385px){
+    .lp-live-chip{font-size:10.5px;padding:2px 8px 2px 2px;gap:4px}
+    .lp-live-chip i{width:19px;height:19px;font-size:11px}
   }
   .lp-role{font-size:clamp(15px,2.4vw,19px);font-weight:800;color:var(--lp-mut);letter-spacing:3px;text-transform:uppercase;margin-bottom:20px}
   .lp-lede{max-width:640px;margin:0 auto 26px;font-size:16.5px;line-height:1.65;color:var(--lp-mut)}
@@ -703,27 +727,50 @@
      as a chosen answer and two alternatives. Fixed at three columns on purpose: wrapping 2+1 put
      the most important row on the page into a ragged block that looked like leftovers. The label
      shrinks and wraps inside its own card instead. */
-  .lp-doors{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:620px;margin:2px auto 0}
-  .lp-door{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
-    border:0;cursor:pointer;font-family:inherit;text-align:center;color:#fff;
-    background:var(--lp-volt-d);border-radius:16px;padding:16px 10px;min-height:94px;
-    font-weight:800;font-size:15px;line-height:1.2;
-    box-shadow:0 6px 18px rgba(90,160,0,.22);transition:transform .12s ease,background .15s ease}
-  .lp-door:hover{background:#5da000;transform:translateY(-2px)}
-  .lp-door:active{transform:translateY(0)}
-  .lp-door i{font-style:normal;font-size:23px;line-height:1}
+  .lp-doors{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:660px;margin:6px auto 0}
+  /* One system, three energies. Geometry, type and behaviour are identical on all three — none is
+     a default — while the colour tells them apart at a glance, the same way the number tiles lower
+     down use one hue each. The audience is twelve-year-olds and their parents: deep gradients, a
+     big round icon chip and a card that actually presses when you touch it read as an app, which
+     is what a kid expects to tap. */
+  .lp-door{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:9px;border:0;cursor:pointer;font-family:inherit;text-align:center;
+    color:#fff;border-radius:20px;padding:18px 10px 16px;min-height:112px;
+    font-weight:900;font-size:15px;line-height:1.2;letter-spacing:.2px;
+    transition:transform .14s cubic-bezier(.34,1.56,.64,1),box-shadow .16s ease,filter .16s ease}
+  .lp-door i{font-style:normal;font-size:24px;line-height:1;display:flex;align-items:center;
+    justify-content:center;width:48px;height:48px;border-radius:50%;
+    background:rgba(255,255,255,.22);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.35)}
   .lp-door span{display:block;max-width:100%}
+  /* a highlight across the top edge, so a flat fill reads as a surface rather than a swatch */
+  .lp-door::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:linear-gradient(180deg,rgba(255,255,255,.20),rgba(255,255,255,0) 42%)}
+  .lp-door:hover{transform:translateY(-3px) scale(1.015);filter:saturate(1.08)}
+  .lp-door:active{transform:translateY(1px) scale(.985)}
+  .lp-door.d1{background:linear-gradient(145deg,#8ed600,#3f6b00);box-shadow:0 8px 20px rgba(77,128,0,.34)}
+  .lp-door.d2{background:linear-gradient(145deg,#ffa32e,#ef5a14);box-shadow:0 8px 20px rgba(239,90,20,.32)}
+  .lp-door.d3{background:linear-gradient(145deg,#3f8ce8,#6d34b0);box-shadow:0 8px 20px rgba(109,52,176,.32)}
+  .lp-door.d1:hover{box-shadow:0 12px 26px rgba(77,128,0,.42)}
+  .lp-door.d2:hover{box-shadow:0 12px 26px rgba(239,90,20,.40)}
+  .lp-door.d3:hover{box-shadow:0 12px 26px rgba(109,52,176,.40)}
   @media(max-width:560px){
-    .lp-doors{gap:8px;max-width:none}
-    .lp-door{padding:13px 5px;min-height:86px;font-size:12.5px;border-radius:14px;gap:5px;
-      box-shadow:0 4px 12px rgba(90,160,0,.20)}
-    .lp-door i{font-size:20px}
+    .lp-doors{gap:9px;max-width:none;margin-top:2px}
+    .lp-door{padding:14px 5px 12px;min-height:104px;font-size:12.5px;border-radius:17px;gap:7px}
+    .lp-door i{font-size:21px;width:42px;height:42px}
   }
-  @media(max-width:370px){ .lp-door{font-size:11.5px;padding:11px 3px;min-height:80px} }
+  @media(max-width:370px){ .lp-door{font-size:11.5px;padding:12px 3px 10px;min-height:98px}
+    .lp-door i{width:38px;height:38px;font-size:19px} }
+  @media(prefers-reduced-motion:reduce){ .lp-door{transition:none} .lp-door:hover{transform:none} }
   .lp-cta{display:flex;gap:11px;justify-content:center;flex-wrap:wrap}
   .lp-big{font-size:15px;padding:13px 26px}
-  .lp-stats{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:40px}
-  @media(max-width:560px){.lp-stats{gap:10px;margin-top:24px}}
+  /* The numbers are proof, not a headline — they belong at the end of the pitch, where somebody
+     who has read the page is deciding whether to trust it. In the hero they pushed the three
+     buttons under the fold on a phone and asked a first-time visitor to care about a count
+     before they knew what the business was. */
+  .lp-numbers{text-align:center}
+  .lp-numbers .lp-kicker{margin-bottom:18px}
+  .lp-stats{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:0}
+  @media(max-width:560px){.lp-stats{gap:10px}.lp-stat{padding:14px 18px;min-width:130px;flex:1 1 40%}}
   .lp-stat{background:var(--lp-soft);border:1px solid var(--lp-line);border-radius:14px;padding:16px 26px;min-width:150px}
   .lp-stat b{display:block;font-size:24px;font-weight:900;color:var(--lp-volt-d)}
   /* Each header stat gets its own hue so four numbers read as four facts, not one block. */
@@ -1383,6 +1430,7 @@ const ZH={
   'I already have one':'我已有账号',
   'Sign in & register':'登录并报名','SIGNIN_PREFILL':'以前在我们这里训练过？直接登录即可，姓名、年龄和免责协议都已存档，无需重新填写。',
   'CHANGE_PWD_SHORT':'登录后请立即修改密码。',
+  'BY_THE_NUMBERS':'用数字说话',
   'Already train with us?':'已经是我们的学员？','NEW_HERE_BELOW':'\u2014 或者，第一次参加请在下方填写 \u2014',
   'Book Sessions':'预约课程','Register Events':'活动报名','Join Groups':'加入小组','Register for an event':'活动报名','Groups you can join':'可加入的小组课','NO_EVENTS_OPEN':'目前没有开放报名的活动 —— 新活动会第一时间发布在这里。','NO_GROUPS_FORMING':'目前没有正在组建的小组课 —— 你可以发起一个，其他家庭就能申请加入。',
   'Reserve your spot →':'立即报名 →',
@@ -1599,6 +1647,7 @@ const KO={
   'I already have one':'이미 계정이 있어요',
   'Sign in & register':'로그인 후 등록','SIGNIN_PREFILL':'이전에 함께 훈련한 적이 있나요? 로그인하면 이름·나이·동의서가 이미 저장되어 있어 다시 입력할 필요가 없습니다.',
   'CHANGE_PWD_SHORT':'로그인 후 비밀번호를 변경해 주세요.',
+  'BY_THE_NUMBERS':'숫자로 보는 RX',
   'Already train with us?':'이미 저희와 훈련 중이신가요?','NEW_HERE_BELOW':'\u2014 처음이시라면 아래에 입력해 주세요 \u2014',
   'Book Sessions':'세션 예약','Register Events':'이벤트 등록','Join Groups':'그룹 참여','Register for an event':'이벤트 등록','Groups you can join':'참여할 수 있는 그룹','NO_EVENTS_OPEN':'현재 열린 이벤트가 없습니다 — 새 이벤트는 이곳에 가장 먼저 올라옵니다.','NO_GROUPS_FORMING':'지금 모집 중인 그룹이 없습니다 — 직접 만들면 다른 가족이 참여를 신청할 수 있습니다.',
   'Reserve your spot →':'자리 예약 →',
@@ -1810,6 +1859,7 @@ const JA={
   'I already have one':'すでに持っています',
   'Sign in & register':'ログインして申込','SIGNIN_PREFILL':'以前トレーニングされたことがありますか？ログインすれば氏名・年齢・同意書は登録済みで、再入力は不要です。',
   'CHANGE_PWD_SHORT':'ログイン後にパスワードを変更してください。',
+  'BY_THE_NUMBERS':'数字で見る RX',
   'Already train with us?':'すでに参加されていますか？','NEW_HERE_BELOW':'\u2014 はじめての方は下記にご記入ください \u2014',
   'Book Sessions':'セッション予約','Register Events':'イベント申込','Join Groups':'グループに参加','Register for an event':'イベント申込','Groups you can join':'参加できるグループ','NO_EVENTS_OPEN':'現在受付中のイベントはありません — 新しいイベントはここに最初に掲載されます。','NO_GROUPS_FORMING':'現在募集中のグループはありません — 作成すると他のご家族が参加を申請できます。',
   'Reserve your spot →':'枠を確保 →',
@@ -1877,6 +1927,7 @@ const EN={
   'EVPROMPT_INTRO':'You haven\'t signed up for these yet. Register now, or find them later on the Events tab.',
   'Sign in & register':'Sign in & register','SIGNIN_PREFILL':'Trained with us before? Sign in instead — your details and waiver are already on file.',
   'CHANGE_PWD_SHORT':'Please change this password after your first sign-in.',
+  'BY_THE_NUMBERS':'By the numbers',
   'Already train with us?':'Already train with us?','NEW_HERE_BELOW':'\u2014 or, new here? fill in the form below \u2014',
   'Book Sessions':'Book Sessions','Register Events':'Register Events','Join Groups':'Join Groups','Register for an event':'Register for an event','Groups you can join':'Groups you can join','NO_EVENTS_OPEN':'No events are open right now — new ones are posted here first.','NO_GROUPS_FORMING':'No group is forming right now — start one and other families can ask to join yours.',
   'Coming up':'Coming up',
@@ -4697,9 +4748,14 @@ function lpCoachCards(){
 function lpLiveSportsHtml(){
   const live=bookableSports();
   if(!live.length)return '';
+  /* The label sits on its own line with a hairline either side, and each sport is a quiet chip
+     with its glyph in a round badge. The old strip put a small-caps label and heavy outlined
+     pills on one wrapping line, which at phone width broke mid-list and read as a toolbar. */
   return `<div class="lp-live reveal">
     <span class="lp-live-lab">${t('Training now')}</span>
-    ${live.map(sp=>`<span class="lp-live-chip">${sportIcon(sp)} ${sportName(sp)||sp}</span>`).join('')}
+    <span class="lp-live-row">
+      ${live.map(sp=>`<span class="lp-live-chip"><i>${sportIcon(sp)}</i>${sportName(sp)||sp}</span>`).join('')}
+    </span>
   </div>`;
 }
 /* Sports we advertise. Any sport with an active coach is live; the rest read "coming soon" —
@@ -4914,12 +4970,9 @@ function renderLanding(){
            three always answer. Signed in, they are shortcuts into the app instead of the sign-in
            card; "Back to app" for that case lives in the nav bar above. -->
       <div class="lp-doors reveal">
-        <button class="lp-door" onclick="lpDoBook()"><i>📅</i><span>${t('Book Sessions')}</span></button>
-        <button class="lp-door" onclick="lpDoEvents()"><i>🌟</i><span>${t('Register Events')}</span></button>
-        <button class="lp-door" onclick="lpDoGroups()"><i>👥</i><span>${t('Join Groups')}</span></button>
-      </div>
-      <div class="lp-stats">
-        ${statTiles.map(([v,l])=>`<div class="lp-stat reveal"><b>${v}</b><span>${l}</span></div>`).join('')}
+        <button class="lp-door d1" onclick="lpDoBook()"><i>📅</i><span>${t('Book Sessions')}</span></button>
+        <button class="lp-door d2" onclick="lpDoEvents()"><i>🌟</i><span>${t('Register Events')}</span></button>
+        <button class="lp-door d3" onclick="lpDoGroups()"><i>👥</i><span>${t('Join Groups')}</span></button>
       </div>
     </header>
 
@@ -4975,6 +5028,13 @@ function renderLanding(){
         <a class="lp-btn line" href="mailto:xuraymond777@gmail.com">✉️ xuraymond777@gmail.com</a>
       </div>
     </section>
+
+    ${statTiles.length?`<section class="lp-sec lp-numbers">
+      <div class="lp-kicker">${t('BY_THE_NUMBERS')}</div>
+      <div class="lp-stats">
+        ${statTiles.map(([v,l])=>`<div class="lp-stat reveal"><b>${v}</b><span>${l}</span></div>`).join('')}
+      </div>
+    </section>`:''}
 
     <footer class="lp-foot">
       © ${new Date().getFullYear()} RX Training · Lexington, MA
@@ -5536,8 +5596,13 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-11 01:46 UTC';
+const BUILD='2026-09-11 02:00 UTC';
 const CHANGELOG=[
+ {v:'4.5', d:'2026-09-11', t:'Buttons kids want to press, numbers where they belong', items:[
+   '<b>The three buttons now look like an app, not a form.</b> Deep colour, a round icon badge and a card that presses in when you touch it. The people actually tapping these are twelve years old and their parents \u2014 three identical dark-green rectangles asked them to read before they could choose. Geometry, type and behaviour stay identical on all three, so none is a default; only the colour tells them apart, the same way the number tiles do.',
+   '<b>Training now</b> is quieter and better spaced: the label sits on its own line between two hairlines, each sport is a white chip with its icon in a soft disc, and the whole strip has real room above the buttons. The heavy green outlines it replaced were competing with the buttons directly underneath, and at phone width the list broke across two lines \u2014 the same ragged shape just taken out of the buttons. Three sports now hold one line down to the smallest phone.',
+   '<b>The numbers moved to the foot of the page.</b> Sports, sessions coached, coaches and athletes trained are proof, and proof belongs at the end of the pitch \u2014 for somebody who has read the page and is deciding whether to trust it. In the header they pushed the three buttons under the fold on a phone, and asked a first-time visitor to care about a count before they knew what RX was.',
+ ]},
  {v:'4.4', d:'2026-09-11', t:'The three buttons, side by side', items:[
    '<b>Book Sessions, Register Events and Join Groups now look like what they are \u2014 three equal choices.</b> Book was drawn as the solid one and the other two as outlines, which reads as an answer already chosen and two alternatives. Nothing is picked for you now; all three carry the same weight.',
    '<b>On a phone they stay on one line.</b> They used to wrap two-and-one, which turned the most important row on the page into a ragged block. Each is now a card with its icon above the label, sized to the screen, three across on the narrowest phone as well as on a laptop.',
