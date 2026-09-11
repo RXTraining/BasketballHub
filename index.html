@@ -2574,6 +2574,14 @@ async function fetchCloud(){
   let cbs={data:[]}, cbl={data:[]};
   try{const c1=await supa.from('contributors').select('*'); if(c1&&!c1.error)cbs=c1;}catch(e){}
   try{const c2=await supa.from('contributions').select('*'); if(c2&&!c2.error)cbl=c2;}catch(e){}
+  /* Every id the server holds right now. This is the ONLY thing that licenses a later delete —
+     see syncSeen. Activity is excluded on purpose: it is never bulk-synced. */
+  seenIds('coaches',coa.data); seenIds('locations',loc.data); seenIds('customers',cus.data);
+  seenIds('packages',pkg.data); seenIds('sessions',ses.data); seenIds('expenses',exp.data);
+  seenIds('cash_entries',cash.data); seenIds('availability',avail.data);
+  seenIds('events',evs.data); seenIds('event_regs',regs.data); seenIds('messages',msgs.data);
+  seenIds('highlights',hl.data); seenIds('skills',sk.data); seenIds('skill_log',sl.data);
+  seenIds('contributors',cbs.data); seenIds('contributions',cbl.data);
   return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data,avail.data,coa.data,evs.data,regs.data,msgs.data,acts.data,sk.data,sl.data,hl.data,cbs.data,cbl.data);
 }
 async function bootLoad(){
@@ -2990,11 +2998,53 @@ async function pushRowsNow(table,rows){
     return true;
   }catch(e){ noteSyncFail(table,e); return false; }
 }
+/* ---- What this device has seen the server holding ----------------------------------------------
+   The owner's sync used to make the server look exactly like this browser tab: upsert every local
+   row, then delete every row whose id was not in that list. It could not tell "the owner deleted
+   this" from "this was created somewhere else and we have never pulled it" — and it treated both
+   as delete. The tab goes stale easily (pollSync skips while a dialog is open, while someone is
+   typing, and while the tab is hidden), so a family registering during an editor session was
+   deleted from Postgres the moment the owner saved. That happened on 2026-09-10 and cost a
+   customer, their registrations, and edits made on other devices.
+
+   syncSeen is the fix: the ids this device has actually observed on the server, filled in on every
+   successful fetch and after every successful push. A prune may only delete ids IN THAT SET.
+   A row we have never seen is not ours to delete — it stays, and the next poll pulls it in.
+   Empty (nothing fetched yet this session) means no deletes at all. */
+let syncSeen={};
+function seenIds(name,rows){ syncSeen[name]=new Set((rows||[]).map(r=>String(r.id))); }
+/* Rows to delete: seen, and no longer held locally. Separated out so it can be tested. */
+function pruneList(seen,haveIds){
+  if(!seen)return [];                       // never fetched — deleting anything would be a guess
+  const have=new Set((haveIds||[]).map(String));
+  return [...seen].filter(id=>!have.has(id));
+}
+/* A prune that removes more than it keeps is not an edit, it is a wipe — a cleared localStorage,
+   a half-loaded DB, a migration gone wrong. Refuse it and say so, loudly and persistently. The
+   cost of a false positive is one undeleted row; the cost of a false negative is this afternoon. */
+const PRUNE_ALARM=5;
+let syncBlocked={};
+try{ syncBlocked=JSON.parse(localStorage.getItem('rx_syncblocked')||'{}')||{}; }catch(e){ syncBlocked={}; }
+function pruneSafe(name,gone,keep){
+  if(gone.length>PRUNE_ALARM && gone.length>keep){
+    syncBlocked[name]=gone.length+' row(s) at '+new Date().toISOString();
+    try{localStorage.setItem('rx_syncblocked',JSON.stringify(syncBlocked));}catch(e){}
+    console.warn('prune blocked:',name,gone.length,'deletions vs',keep,'kept');
+    flash('\u26a0 Blocked a delete of '+gone.length+' '+name.replace(/_/g,' ')+' row(s) \u2014 this device looks out of date. Reload before saving again.',true);
+    return false;
+  }
+  return true;
+}
 async function syncTable(name,rows){
   if(rows.length) {const {error}=await supa.from(name).upsert(rows); if(error) throw error;}
-  const ids=rows.map(r=>r.id);
-  if(ids.length){await supa.from(name).delete().not('id','in','('+ids.map(x=>'"'+x+'"').join(',')+')');}
-  else{await supa.from(name).delete().neq('id','__none__');}
+  const ids=rows.map(r=>String(r.id));
+  const gone=pruneList(syncSeen[name],ids);
+  if(gone.length && pruneSafe(name,gone,ids.length)){
+    const {error}=await supa.from(name).delete().in('id',gone);
+    if(error) throw error;
+  }
+  // the server now holds these, as far as we know; anything we have never seen stays untouched
+  seenIds(name,rows.map(r=>({id:r.id})));
 }
 let pushing=false;
 /* table name -> last error message. Survives a reload so the warning cannot be missed. */
@@ -5425,8 +5475,14 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-10 23:31 UTC';
+const BUILD='2026-09-10 23:58 UTC';
 const CHANGELOG=[
+ {v:'4.2', d:'2026-09-10', t:'A save can no longer delete what it has not seen', items:[
+   '<b>What went wrong today.</b> Saving as the owner did not merge your changes into the cloud \u2014 it made the cloud look <i>exactly</i> like the copy in your browser, deleting anything it did not hold. Your device stops refreshing while an editor is open, while you are typing, and while the tab is in the background. So a family who registered on their phone during an editing session existed only in the cloud, your browser had never seen them, and your next save deleted them. A customer, their registrations, and edits made elsewhere were lost that way.',
+   '<b>The rule has changed.</b> A save may now only delete rows this device has <b>actually seen and then removed</b> \u2014 what it has never seen is none of its business, so it stays and arrives on the next refresh. Deleting something yourself still works exactly as before: the app removes that row and nothing else.',
+   '<b>A wipe is refused outright.</b> If a save ever tries to delete more than it keeps \u2014 a cleared browser, a half-loaded copy \u2014 it is blocked, nothing is deleted, and <b>Admin</b> shows a red notice telling you to reload first. That notice stays until you dismiss it.',
+   '<b>What this does not do:</b> it does not bring back what was already lost, and two people editing the <i>same</i> record still ends with the last save winning. It closes the hole where a save destroyed records it had never heard of.',
+ ]},
  {v:'4.1', d:'2026-09-10', t:'Three doors on the home page', items:[
    '<b>Book Sessions, Register Events and Join Groups</b> now sit at the top of the home page, above everything else. All three things were already on the page, but each was a scroll and a sign-in away \u2014 and the sections for events and groups <i>disappear entirely</i> when there is nothing on, so a visitor could not tell \u201cnothing this month\u201d from \u201cwe don\u2019t run those\u201d. The buttons are always there and always answer, empty or not.',
    'Signed in, the same three buttons are shortcuts into the app rather than into the sign-in card \u2014 straight to booking, to Events, or to your group list.',
@@ -12283,6 +12339,11 @@ function retrySync(){
   flash('Retrying…');
   cloudPush().then(()=>{ renderAdmin(); flash(Object.keys(syncFails).length?'Still failing — check the error above':'Cloud save succeeded ✅'); });
 }
+function clearSyncBlocked(){
+  syncBlocked={};
+  try{localStorage.removeItem('rx_syncblocked');}catch(e){}
+  renderAdmin();
+}
 function clearSyncFails(){
   syncFails={};
   try{localStorage.removeItem('rx_syncfails');}catch(e){}
@@ -12323,6 +12384,24 @@ function renderAdmin(){
         <div class="row" style="gap:8px;margin-top:12px">
           <button class="btn sm" onclick="retrySync()">Retry cloud save</button>
           <button class="btn ghost sm" onclick="clearSyncFails()">Dismiss</button>
+        </div></div>`;
+    })()}
+    ${(()=>{
+      const names=Object.keys(syncBlocked||{});
+      if(!names.length)return '';
+      /* The prune guard fired. Nothing was lost — that is the point — but this device was about
+         to delete rows it no longer held, which means its copy is behind the server. */
+      return `<div class="panel" style="border-color:var(--red);background:var(--a8b);margin-bottom:16px">
+        <h3 style="border-left-color:var(--red)">\u26a0 A delete was blocked \u2014 this device is out of date</h3>
+        <div class="clienttag" style="margin-bottom:10px">This copy of the app tried to remove rows it no longer holds, in numbers that look like a
+          stale copy rather than an edit. <b style="color:var(--txt)">Nothing was deleted.</b> Reload this page so it pulls the current data,
+          then make your change again.</div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Table</th><th>Blocked</th></tr></thead><tbody>
+          ${names.map(n=>`<tr><td><b>${n}</b></td><td class="muted">${String(syncBlocked[n]).replace(/</g,'&lt;')}</td></tr>`).join('')}
+        </tbody></table></div>
+        <div class="row" style="gap:8px;margin-top:12px">
+          <button class="btn sm" onclick="location.reload()">Reload now</button>
+          <button class="btn ghost sm" onclick="clearSyncBlocked()">Dismiss</button>
         </div></div>`;
     })()}
     <div class="twocol">
