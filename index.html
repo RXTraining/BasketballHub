@@ -2648,6 +2648,42 @@ async function migrateSource(){
   try{const {data}=await supa.from(STATE_TABLE).select('data').eq('id','main').maybeSingle();if(data&&data.data)return normalize(data.data);}catch(e){}
   return localData();
 }
+/* ---- Every email leaves signed --------------------------------------------------------------
+   A message from RX that ends mid-sentence with no name on it looks like something a script sent,
+   which is exactly what a parent has been told to distrust — and none of them carried the address
+   of the site they were being asked to go to.
+
+   Applied by wrapping the ONE call every email passes through, rather than at each of the dozen
+   places that compose one. Editing them individually guarantees the next one added is the one
+   that goes out bare. Old hand-written sign-offs are stripped first so nobody gets two, and a
+   text already carrying this signature is left alone. */
+/* The full https:// form on purpose. These go out as plain text (the edge function sends `text`
+   only), so whether the address becomes a link is the mail client's decision — and a bare
+   "rxtraining.org" is the form Outlook in particular leaves as dead text. With the scheme, every
+   mainstream client links it. */
+const MAIL_SIGN='\u2014 RX.TRAINING\nhttps://rxtraining.org';
+function signEmail(text){
+  let t=String(text==null?'':text).replace(/\s+$/,'');
+  if(t.indexOf(MAIL_SIGN)>=0)return t;                       // already ours
+  t=t.replace(/\n+\s*\u2014\s*RX\.TRAINING\s*\n\s*rxtraining\.org\s*$/i,'');   // the pre-https version
+  t=t.replace(/\n+\s*[\u2014\u2013-]\s*RX[.\s]?Training\s*$/i,'');   // an older sign-off
+  return t+'\n\n'+MAIL_SIGN;
+}
+function installMailSignature(){
+  try{
+    if(!supa||!supa.functions||typeof supa.functions.invoke!=='function'||supa.functions.__rxSigned)return;
+    const orig=supa.functions.invoke.bind(supa.functions);
+    supa.functions.invoke=function(name,opts){
+      try{
+        if(name==='send-request-email'&&opts&&opts.body&&typeof opts.body.text==='string'){
+          opts=Object.assign({},opts,{body:Object.assign({},opts.body,{text:signEmail(opts.body.text)})});
+        }
+      }catch(e){ console.warn('mail signature:',e&&e.message); }
+      return orig(name,opts);
+    };
+    supa.functions.__rxSigned=true;
+  }catch(e){ console.warn('mail signature install:',e&&e.message); }
+}
 async function fetchCloud(){
   const [st,loc,cus,pkg,ses,exp,cash,avail,coa]=await Promise.all([
     supa.from('settings').select('*').eq('id','main').maybeSingle(),
@@ -2689,6 +2725,7 @@ async function bootLoad(){
   if(cfg && window.supabase){
     try{
       supa=window.supabase.createClient(cfg.url,cfg.key);
+      installMailSignature();
       const fresh=await fetchCloud();
       SUPA_OK=true;
       const empty=!fresh.customers.length && !fresh.sessions.length;
@@ -5650,8 +5687,12 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-13 01:05 UTC';
+const BUILD='2026-09-13 01:49 UTC';
 const CHANGELOG=[
+ {v:'4.8', d:'2026-09-13', t:'Every email signs off properly', items:[
+   '<b>Emails now end with RX.TRAINING and the website address</b> \u2014 approvals, sign-in details, confirmations, declines, event announcements, cancellations, all of them. A message that stopped mid-sentence with no name on it read like something a script sent, which is exactly what parents are told to distrust, and none of them carried the address of the site they were being asked to go to.',
+   'Done at the single point every email passes through rather than in the dozen places one gets written, so the next kind of email we add is signed without anyone remembering to. Older hand-written sign-offs are replaced rather than stacked, so nobody gets two.',
+ ]},
  {v:'4.7', d:'2026-09-13', t:'Calling an event off', items:[
    '<b>Events can be cancelled properly now</b> \u2014 from the events list or inside the editor. Un-ticking <i>Published</i> only ever hid an event: the families who had registered found it silently gone, and a place bought with a credit stayed spent. Cancelling withdraws it, cancels every registration on it, and tells each family what happened \u2014 in chat and by email where we have an address, because a cancellation is the one message that is useless if it is read tomorrow.',
    '<b>Credits come back on their own.</b> A place paid for with a group credit returns that credit the moment the registration is cancelled \u2014 nothing to put right by hand.',
