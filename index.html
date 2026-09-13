@@ -5687,8 +5687,13 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-13 02:12 UTC';
+const BUILD='2026-09-13 02:33 UTC';
 const CHANGELOG=[
+ {v:'5.0', d:'2026-09-13', t:'Undoing a cancelled event', items:[
+   '<b>A cancelled event can be put back on.</b> Cancel messages every registered family, so having no way back was the wrong shape for a one-click button. <b>\u21a9 Restore</b> republishes the event, puts every registration back to exactly what it was \u2014 a place that was pending approval is pending again \u2014 and tells each family it is on after all, through the same chat and email the cancellation used.',
+   '<b>Restore works after the start time; Cancel does not.</b> You cannot call off something that has already begun, but an event cancelled by mistake still needs its registrations back so attendance and payment can be recorded. A finished event is restored quietly \u2014 nobody is told a past event is \u201cback on\u201d.',
+   'Credits and payments look after themselves: a place paid with a credit spends it again the moment the registration is live, because credits are counted from live registrations rather than stored.',
+ ]},
  {v:'4.9', d:'2026-09-13', t:'Money that was paid for a session that never happened', items:[
    '<b>Fix: a manual credit could not be taken back down to zero.</b> Setting a grant of 3 to 0 and saving left the 3 in place \u2014 a zero was treated as \u201cnothing to write\u201d and the old figure survived the save, so the form looked broken. A blank or zero box is the owner saying <i>none</i>, and it is recorded as one.',
    '<b>New: cash taken for a session that was then cancelled can be kept as a credit.</b> Open the cancelled session and choose <b>\u{1F39F}\uFE0F Keep as credit</b> \u2014 each player who had actually paid gets one credit toward a future session of that type, and they are told so in chat. Or <b>\u21a9 Refunded \u2014 clear</b> once you have handed the money back.',
@@ -5704,6 +5709,7 @@ const CHANGELOG=[
    '<b>Events can be cancelled properly now</b> \u2014 from the events list or inside the editor. Un-ticking <i>Published</i> only ever hid an event: the families who had registered found it silently gone, and a place bought with a credit stayed spent. Cancelling withdraws it, cancels every registration on it, and tells each family what happened \u2014 in chat and by email where we have an address, because a cancellation is the one message that is useless if it is read tomorrow.',
    '<b>Credits come back on their own.</b> A place paid for with a group credit returns that credit the moment the registration is cancelled \u2014 nothing to put right by hand.',
    '<b>Cash is not touched, and the dialog says so.</b> The app cannot move money, and quietly zeroing a payment would erase the record that it was taken. Before you confirm you are told exactly how much was paid in cash and needs refunding; the family\u2019s message says a refund is coming, so it is in writing on both sides.',
+   '<b>Cancelling keeps the owner\u2019s record.</b> The registrations stay on your list, greyed out and read-only, marked <b>\u2716 Cancelled</b> and still showing who had paid \u2014 cash still to refund, or a credit already returned. Everything derived from them (revenue, places left, the sign-in sheet) ignores them, and the client and coach never see the event again once it is withdrawn. Losing the rows was the same as deleting the history of an event that really did have twelve families in it.',
    'Cancel only appears on an event that is <b>published and still to come</b> \u2014 a past event is history, not something to call off. The editor\u2019s own Cancel button is now <b>Close</b>, so the two cannot be confused.',
  ]},
  {v:'4.6', d:'2026-09-12', t:'An event that has finished asks for its money', items:[
@@ -7916,6 +7922,7 @@ function cancelEvent(eid){
       '\n\nThe event is withdrawn from the site. Re-publishing it later does not bring the registrations back.'))return;
   const msgs=[];
   regs.forEach(r=>{
+    r.statusWas=r.status;          // so Restore puts back exactly what was there, pending included
     r.status='cancelled';
     const c=custById(r.customerId); if(!c)return;
     const owed=(r.paid&&r.paidVia!=='package')?(' '+money(ev.price||0)+' you have already paid will be refunded.')
@@ -7942,6 +7949,50 @@ function cancelEvent(eid){
   flash('Event cancelled — '+regs.length+(regs.length===1?' family':' families')+' told'+(refund?(' · '+money(refund)+' to refund'):''));
   refreshOwner();
   closeModal();
+}
+/* ---- Putting an event back on ------------------------------------------------------------------
+   Cancel is one click; before this, undoing it was not possible at all — which is the wrong shape
+   for a button that messages every family. Restore republishes the event, puts each registration
+   back to what it was (a place that was pending approval is pending again), and tells everyone it
+   is back on, through the same two channels the cancellation used.
+
+   Credits look after themselves: a place paid with a credit consumes it again the moment the
+   registration is live, because credits are counted from live registrations rather than stored. */
+function restoreEvent(eid){
+  const ev=eventById(eid); if(!ev)return;
+  const back=(DB.eventRegs||[]).filter(r=>r.eventId===eid&&r.status==='cancelled');
+  if(!confirm('Put "'+mlText(ev.title)+'" back on?\n\n'+eventWhen(ev)+
+      (back.length?('\n\n• '+back.length+' cancelled registration'+(back.length===1?'':'s')+' restored'+
+                    (eventUpcoming(ev)?', and each family told it is back on':' (the event has already started — nobody is messaged)')):
+                   '\n\nNo registrations to restore — the event is simply published again.')+
+      (eventUpcoming(ev)?'\n\nAnyone told it was cancelled gets a second message, so do this only if it really is going ahead.':'')))return;
+  /* Cancel is gated to events that have not happened; Restore is not. An event cancelled by
+     mistake still needs its registrations back afterwards so attendance and payment can be
+     recorded — but nobody is told a finished event is "back on". */
+  const tell=eventUpcoming(ev);
+  ev.active=true;
+  const msgs=[];
+  back.forEach(r=>{
+    r.status=r.statusWas||'registered';
+    delete r.statusWas;
+    const c=custById(r.customerId); if(!tell||!c)return;
+    const text='Hi'+(' '+firstName(c.parent||c.name))+'! Good news \u2014 '+mlText(ev.title)+' on '+eventWhen(ev)+
+               ' is back on'+(ev.location?(' at '+ev.location):'')+'. Sorry for the confusion, and see you there! \u{1F3C0}';
+    const m={id:uid(),peerType:'client',clientId:r.customerId,coachId:'',sender:'owner',
+      text,media:[],created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false};
+    DB.messages.push(m); msgs.push(m);
+    if(c.email&&supa&&SUPA_OK){
+      try{ supa.functions.invoke('send-request-email',{body:{to:[c.email],replyTo:'rx@rxtraining.org',
+        subject:'RX Training — '+mlText(ev.title)+' is back on', text:text}}).then(()=>{},()=>{}); }catch(e){}
+    }
+  });
+  save();
+  pushRows('events',[eventRow(ev)]);
+  if(back.length)pushRows('event_regs',back.map(eventRegRow));
+  if(msgs.length)pushRows('messages',msgs.map(messageRow));
+  logAct('event_restored',mlText(ev.title)+' · '+back.length+' registration(s) restored',eid);
+  flash('Back on \u2014 '+back.length+' registration'+(back.length===1?'':'s')+' restored'+(msgs.length?(', '+msgs.length+' told'):''));
+  refreshOwner(); closeModal();
 }
 function eventPaymentText(ev,c){
   const zelle=(DB.settings.zellePhone||'').trim();
@@ -8002,8 +8053,53 @@ function sweepEventPayments(){
 }
 /* The other half, mirroring a session: once they pay, say thank you — but only to somebody we
    actually asked, so marking an old record paid does not message a family out of nowhere. */
+/* ---- Money on a place whose event was cancelled ------------------------------------------------
+   Cash often arrives before the cancellation catches up — a parent pays on Saturday for Saturday
+   and Sunday, and Sunday is called off that evening. The registration is then cancelled and the
+   money is real but recorded nowhere, so the app says "nothing to refund" while RX is holding $25.
+
+   Two markers do the job, both on the existing paid_via column so no new field is needed, and both
+   only ever appear on a cancelled place: 'credited' (kept on account, one group credit granted)
+   and 'refunded' (handed back). Everything that counts money already ignores cancelled
+   registrations, so neither can leak into revenue. */
+function eventRegKeepCredit(id){
+  const r=(DB.eventRegs||[]).find(x=>x.id===id); if(!r)return;
+  const ev=eventById(r.eventId), c=custById(r.customerId);
+  if(!ev||!c)return;
+  if(!r.paid||r.paidVia==='package')return flash('Nothing recorded as paid in cash on this place',true);
+  if(!confirm('Keep '+money(ev.price||0)+' on account for '+c.name+' instead of refunding it?\n\n'+
+      'Adds one group credit — it covers a clinic, a group session or a weekend class. Nothing is refunded.'))return;
+  c.creditsTotal=Object.assign({_v:2},c.creditsTotal||{});
+  c.creditsTotal.group=(Number(c.creditsTotal.group)||0)+1;
+  r.paidVia='credited';
+  const m={id:uid(),peerType:'client',clientId:c.id,coachId:'',sender:'owner',
+    text:'Hi'+(' '+firstName(c.parent||c.name))+'! '+mlText(ev.title)+' was cancelled, and we have kept the '+
+         money(ev.price||0)+' you paid as a credit on your account — it covers your next clinic or group session. \u{1F3C0}',
+    media:[],created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false};
+  DB.messages.push(m);
+  save();
+  pushRows('customers',[custRow(c)]); pushRows('event_regs',[eventRegRow(r)]); pushRows('messages',[messageRow(m)]);
+  logAct('event_cash_credited',c.name+' · '+money(ev.price||0)+' · '+mlText(ev.title),ev.id);
+  flash('Kept as credit — 1 group credit added for '+c.name+' \u{1F39F}\uFE0F');
+  refreshOwner(); viewEventRegs(ev.id);
+}
+function eventRegRefunded(id){
+  const r=(DB.eventRegs||[]).find(x=>x.id===id); if(!r)return;
+  const ev=eventById(r.eventId), c=custById(r.customerId);
+  if(!ev||!c)return;
+  if(!r.paid||r.paidVia==='package')return flash('Nothing recorded as paid in cash on this place',true);
+  if(!confirm('Record that '+money(ev.price||0)+' has been refunded to '+c.name+'?\n\nThis only clears the reminder — the app cannot move money.'))return;
+  r.paidVia='refunded';
+  save(); pushRows('event_regs',[eventRegRow(r)]);
+  logAct('event_cash_refunded',c.name+' · '+money(ev.price||0)+' · '+mlText(ev.title),ev.id);
+  flash('Marked as refunded');
+  refreshOwner(); viewEventRegs(ev.id);
+}
 function eventPaymentThanks(r){
   if(!r||!r.payRequested)return;
+  // a cancelled place is being tidied up, not paid for — no "payment received" to the family
+  if(r.status==='cancelled')return;
+  const evx=eventById(r.eventId); if(evx&&evx.active===false)return;
   const ev=eventById(r.eventId), c=custById(r.customerId);
   if(!ev||!c)return;
   const m={id:uid(),peerType:'client',clientId:r.customerId,coachId:'',sender:'owner',
@@ -10781,6 +10877,7 @@ function renderEventsOwner(){
         ${ev.email_note?'':''}<button class="iconbtn" title="Email all clients about this" onclick="announceEvent('${ev.id}')">📣</button>
         <button class="iconbtn" onclick="openEvent('${ev.id}')">Edit</button>
         ${(ev.active!==false&&!eventPast(ev))?`<button class="iconbtn" title="Cancel this event and tell everyone registered" onclick="cancelEvent('${ev.id}')">✖ Cancel</button>`:''}
+        ${ev.active===false?`<button class="iconbtn" title="Publish it again and put the registrations back" onclick="restoreEvent('${ev.id}')">↩ Restore</button>`:''}
       </div></td></tr>`;
   }).join('')||'<tr><td colspan="8"><div class="empty">No events yet — create your first announcement.</div></td></tr>';
   $('#view-events').innerHTML=`
@@ -10865,6 +10962,7 @@ function openEvent(id){
     <p class="muted small" style="margin-top:8px">Uncheck Published to keep it a draft. Use 📣 in the list to email all clients once it's ready.</p>
   `,`
     ${id&&eventById(id)&&eventById(id).active!==false&&!eventPast(eventById(id))?`<button class="btn" onclick="cancelEvent('${id}')">✖ Cancel event</button>`:''}
+    ${id&&eventById(id)&&eventById(id).active===false?`<button class="btn" onclick="restoreEvent('${id}')">↩ Restore event</button>`:''}
     ${id?`<button class="btn danger" onclick="delEvent('${id}')">Delete</button>`:''}
     <button class="btn ghost" onclick="closeModal()">Close</button>
     <button class="btn" onclick="saveEvent('${id||''}')">Save</button>`);
@@ -11515,8 +11613,9 @@ function viewEventRegs(id){
       :(r.status==='pending'?'<span class="pill yellow">⏳ Pending</span>':'<span class="pill green">Registered</span>')}</td>
     <td>${dead
       ? (r.paid
-          ? (r.paidVia==='package'
-              ? '<span class="pill">🎟️ Credit returned</span>'
+          ? (r.paidVia==='package' ? '<span class="pill">🎟️ Credit returned</span>'
+            : r.paidVia==='credited' ? '<span class="pill green">🎟️ Kept as credit</span>'
+            : r.paidVia==='refunded' ? '<span class="pill">↩ Refunded</span>'
               : `<span class="pill red">↩ ${money(ev.price||0)} to refund</span>`)
           : '<span class="muted">—</span>')
       : r.paid
@@ -11526,7 +11625,13 @@ function viewEventRegs(id){
       : (ev.price?'<span class="pill red">Unpaid</span>':'<span class="pill">Free</span>')}</td>
     <td>${r.checkedIn?'<span class="pill green">✓ In</span>':'—'}</td>
     <td class="right"><div class="actions">
-      ${dead?'<span class="clienttag">record kept</span>':''}
+      ${!dead?'':(!ev.price?'<span class="clienttag">record kept</span>'
+        : (!r.paid
+            ? `<span class="clienttag">record kept</span><button class="iconbtn" title="They did pay cash — record it, then keep it as credit or refund it" onclick="eventRegPay('${r.id}')">💵 Was paid</button>`
+            : (r.paidVia==='cash'
+                ? `<button class="iconbtn" title="Keep the money on account as one group credit" onclick="eventRegKeepCredit('${r.id}')">🎟️ Keep as credit</button>
+                   <button class="iconbtn" title="You have handed the money back" onclick="eventRegRefunded('${r.id}')">↩ Refunded</button>`
+                : '<span class="clienttag">settled</span>')))}
       ${dead?'':(r.status==='pending'?`<button class="btn sm" onclick="eventRegApprove('${r.id}')">Approve</button>`:'')}
       ${(dead||!ev.price)?'':(()=>{
         /* The payment method has to be changeable after the fact, not only on the way in — a place
