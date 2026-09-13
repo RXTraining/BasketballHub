@@ -5687,8 +5687,14 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-13 02:02 UTC';
+const BUILD='2026-09-13 02:12 UTC';
 const CHANGELOG=[
+ {v:'4.9', d:'2026-09-13', t:'Money that was paid for a session that never happened', items:[
+   '<b>Fix: a manual credit could not be taken back down to zero.</b> Setting a grant of 3 to 0 and saving left the 3 in place \u2014 a zero was treated as \u201cnothing to write\u201d and the old figure survived the save, so the form looked broken. A blank or zero box is the owner saying <i>none</i>, and it is recorded as one.',
+   '<b>New: cash taken for a session that was then cancelled can be kept as a credit.</b> Open the cancelled session and choose <b>\u{1F39F}\uFE0F Keep as credit</b> \u2014 each player who had actually paid gets one credit toward a future session of that type, and they are told so in chat. Or <b>\u21a9 Refunded \u2014 clear</b> once you have handed the money back.',
+   'Either way the red <b>to refund</b> reminder clears, so from now on it means <i>this money is still unresolved</i> rather than <i>this was once paid</i>. Before, the reminder never went away whatever you did.',
+   'In a group, only the players who had actually paid get a credit \u2014 the session now remembers who that was, not just the total. A credit rather than a cash balance on purpose: it is the unit the rest of the app already counts in, and it survives a price change.',
+ ]},
  {v:'4.8', d:'2026-09-13', t:'Every email signs off properly', items:[
    '<b>Emails now end with RX.TRAINING and the website address</b> \u2014 approvals, sign-in details, confirmations, declines, event announcements, cancellations, all of them. A message that stopped mid-sentence with no name on it read like something a script sent, which is exactly what parents are told to distrust, and none of them carried the address of the site they were being asked to go to.',
    'The address is written as <b>https://rxtraining.org</b> rather than bare: these are plain-text emails, so whether it becomes a clickable link is the mail app\u2019s decision, and the bare form is the one Outlook in particular leaves as dead text.',
@@ -7933,7 +7939,7 @@ function cancelEvent(eid){
   if(regs.length)pushRows('event_regs',regs.map(eventRegRow));
   if(msgs.length)pushRows('messages',msgs.map(messageRow));
   logAct('event_cancelled',mlText(ev.title)+' · '+regs.length+' registration(s) told',eid);
-  flash('Event cancelled — '+regs.length+' family'+(regs.length===1?'':'ies')+' told'+(refund?(' · '+money(refund)+' to refund'):''));
+  flash('Event cancelled — '+regs.length+(regs.length===1?' family':' families')+' told'+(refund?(' · '+money(refund)+' to refund'):''));
   refreshOwner();
   closeModal();
 }
@@ -11491,22 +11497,38 @@ function announceEvent(id){
 }
 function viewEventRegs(id){
   const ev=eventById(id);if(!ev)return;
-  const regs=(DB.eventRegs||[]).filter(r=>r.eventId===id&&r.status!=='cancelled');
-  const rows=regs.map(r=>{const c=custById(r.customerId);return `<tr>
+  /* Cancelled places stay on the OWNER's list, greyed out and read-only. Everything derived —
+     revenue, places left, the sign-in sheet, the client's own Events tab — still ignores them
+     (eventRegsFor filters them out), and the client and coach never see the event at all once it
+     is withdrawn. But the owner needs the record: who had signed up, who had paid, and what was
+     returned. Dropping the rows from this screen was the same as deleting the history of an event
+     that really did have twelve families in it. Live places sort first. */
+  const live=(DB.eventRegs||[]).filter(r=>r.eventId===id&&r.status!=='cancelled');
+  const gone=(DB.eventRegs||[]).filter(r=>r.eventId===id&&r.status==='cancelled');
+  const regs=live.concat(gone);
+  const rows=regs.map(r=>{const c=custById(r.customerId);const dead=(r.status==='cancelled');return `<tr${dead?' style="opacity:.55"':''}>
     <td><div class="nameceil"><span class="av">${c?initials(c.name):'⚠'}</span><div><b>${c?c.name:'Record missing'}</b>
       ${c?'':`<div class="clienttag" style="color:var(--red)">This registration points at a client record that is not in the database — usually a failed cloud save. Check <b>Admin → Cloud sync</b>, then remove this row and re-add them by hand.<br><span class="mono">${escapeHtml(r.customerId||'(no id)')}</span></div>`}
       <div class="clienttag">${(c&&c.level)||'—'}${c&&c.parent?' · '+c.parent:''}</div></div></div></td>
     <td>${c&&c.phone?`<a href="tel:${c.phone.replace(/[^0-9+]/g,'')}">${c.phone}</a>`:'<span class="muted">—</span>'}</td>
-    <td>${r.status==='pending'?'<span class="pill yellow">⏳ Pending</span>':'<span class="pill green">Registered</span>'}</td>
-    <td>${r.paid
+    <td>${dead?'<span class="pill">✖ Cancelled</span>'
+      :(r.status==='pending'?'<span class="pill yellow">⏳ Pending</span>':'<span class="pill green">Registered</span>')}</td>
+    <td>${dead
+      ? (r.paid
+          ? (r.paidVia==='package'
+              ? '<span class="pill">🎟️ Credit returned</span>'
+              : `<span class="pill red">↩ ${money(ev.price||0)} to refund</span>`)
+          : '<span class="muted">—</span>')
+      : r.paid
       ? (r.paidVia==='package'
           ? `<span class="pill green">🎟️ Credit</span>${(()=>{const u=eventRegCreditUse(r);return u?`<div class="clienttag">${escapeHtml(u.pkg||'')} · ${u.n}/${u.total}</div>`:'';})()}`
           : '<span class="pill green">Paid</span>')
       : (ev.price?'<span class="pill red">Unpaid</span>':'<span class="pill">Free</span>')}</td>
     <td>${r.checkedIn?'<span class="pill green">✓ In</span>':'—'}</td>
     <td class="right"><div class="actions">
-      ${r.status==='pending'?`<button class="btn sm" onclick="eventRegApprove('${r.id}')">Approve</button>`:''}
-      ${!ev.price?'':(()=>{
+      ${dead?'<span class="clienttag">record kept</span>':''}
+      ${dead?'':(r.status==='pending'?`<button class="btn sm" onclick="eventRegApprove('${r.id}')">Approve</button>`:'')}
+      ${(dead||!ev.price)?'':(()=>{
         /* The payment method has to be changeable after the fact, not only on the way in — a place
            marked cash by mistake had no route back to a credit, which is exactly what happened. */
         const hasCred=creditsFor(custById(r.customerId),'group')>0;
@@ -11519,12 +11541,12 @@ function viewEventRegs(id){
         return (r.paidVia==='package'?cashBtn:credBtn)
           +`<button class="iconbtn" title="Mark unpaid again" onclick="eventRegUnpay('${r.id}')">↩</button>`;
       })()}
-      <button class="iconbtn" onclick="eventRegCheckin('${r.id}')">${r.checkedIn?'Undo in':'Check in'}</button>
-      <button class="iconbtn" onclick="eventRegRemove('${r.id}')">✕</button>
+      ${dead?'':`<button class="iconbtn" onclick="eventRegCheckin('${r.id}')">${r.checkedIn?'Undo in':'Check in'}</button>
+      <button class="iconbtn" onclick="eventRegRemove('${r.id}')">✕</button>`}
     </div></td></tr>`;}).join('')||'<tr><td colspan="6"><div class="empty">No registrations yet.</div></td></tr>';
   const custOpts='<option value="">— add a client —</option>'+DB.customers.filter(c=>!myEventReg(id,c.id)).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
   openModal('Registrations — '+ev.title,`
-    <div class="clienttag" style="margin-bottom:10px">${eventWhen(ev)} · 📍 ${ev.location||'TBD'} · ${ev.price?money(ev.price):'Free'} · ${regs.length}${ev.capacity?('/'+ev.capacity):''} registered · collected <b style="color:var(--txt)">${money(eventRevenue(ev))}</b>${eventOwedAmt(ev)>0?(' · <b style="color:var(--red)">'+money(eventOwedAmt(ev))+' still owed</b>'):''}</div>
+    <div class="clienttag" style="margin-bottom:10px">${ev.active===false?'<span class="pill">✖ Cancelled / withdrawn</span> ':''}${eventWhen(ev)} · 📍 ${ev.location||'TBD'} · ${ev.price?money(ev.price):'Free'} · ${live.length}${ev.capacity?('/'+ev.capacity):''} registered${gone.length?(' · '+gone.length+' cancelled'):''} · collected <b style="color:var(--txt)">${money(eventRevenue(ev))}</b>${eventOwedAmt(ev)>0?(' · <b style="color:var(--red)">'+money(eventOwedAmt(ev))+' still owed</b>'):''}</div>
     ${(!eventUpcoming(ev)&&ev.price&&eventPayDue(id).length)?`<button class="btn sm" style="margin-bottom:8px" onclick="requestEventPayments('${id}')">💬 Send payment reminder (${eventPayDue(id).length})</button> `:''}
     ${eventRegsFor(ev.id).filter(r=>!r.paid&&r.status!=='cancelled').length>1&&ev.price?`<button class="btn sm ghost" style="margin-bottom:8px" onclick="eventMarkAllPaid('${id}')">Mark all remaining paid</button>`:''}
     <div class="row" style="align-items:flex-end;gap:8px;margin-bottom:8px">
