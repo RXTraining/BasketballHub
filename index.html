@@ -5687,10 +5687,11 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-13 01:49 UTC';
+const BUILD='2026-09-13 02:02 UTC';
 const CHANGELOG=[
  {v:'4.8', d:'2026-09-13', t:'Every email signs off properly', items:[
    '<b>Emails now end with RX.TRAINING and the website address</b> \u2014 approvals, sign-in details, confirmations, declines, event announcements, cancellations, all of them. A message that stopped mid-sentence with no name on it read like something a script sent, which is exactly what parents are told to distrust, and none of them carried the address of the site they were being asked to go to.',
+   'The address is written as <b>https://rxtraining.org</b> rather than bare: these are plain-text emails, so whether it becomes a clickable link is the mail app\u2019s decision, and the bare form is the one Outlook in particular leaves as dead text.',
    'Done at the single point every email passes through rather than in the dozen places one gets written, so the next kind of email we add is signed without anyone remembering to. Older hand-written sign-offs are replaced rather than stacked, so nobody gets two.',
  ]},
  {v:'4.7', d:'2026-09-13', t:'Calling an event off', items:[
@@ -8121,7 +8122,12 @@ function markCancelled(s,who){
   s.status='cancelled';s.cancelledBy=who;s.cancelledAt=new Date().toISOString();
   if(hadCash>0){ s.paidWas=hadCash; s.paidViaWas='cash'; }
   s.paid=false; s.paidVia='';
-  if(s.pay){ Object.keys(s.pay).forEach(cid=>{ s.pay[cid]={paid:false,paidVia:'',requested:!!(s.pay[cid]||{}).requested}; }); }
+  /* Keep a per-player note of who had actually paid cash. The flags are cleared (the session did
+     not happen), but without this the only surviving record is the TOTAL, and a group of four
+     with two payers cannot be turned back into the right two credits. `pay` is jsonb, so this
+     needs no new column. */
+  if(s.pay){ Object.keys(s.pay).forEach(cid=>{ const was=s.pay[cid]||{};
+    s.pay[cid]={paid:false,paidVia:'',requested:!!was.requested,wasCash:!!(was.paid&&was.paidVia==='cash')}; }); }
   s.paymentRequested=false;
 }
 /* Cash actually taken for a session, computed BEFORE the flags are cleared. */
@@ -8135,6 +8141,62 @@ function cancelRefundDue(s){
   },0);
 }
 function clearCancel(s){s.cancelledBy='';s.cancelledAt='';}
+/* ---- Money already taken for a session that then got cancelled ---------------------------------
+   Until now the only thing the app did was flag it: a red "↩ $35 to refund" that never went away,
+   whatever you did about it. In practice most families do not want the cash back — they want it to
+   count toward the next session, which is what a credit is. Both endings are now recordable, and
+   the pill clears either way, so it means "still unresolved" rather than "was once paid".
+
+   A credit rather than a cash balance on purpose: a credit is already the unit the whole app
+   counts in, and it survives a price change. Keeping a dollar figure would be a second kind of
+   money to reconcile. */
+function cancelPaidCustomers(s){
+  if(!s)return [];
+  const ids=(s.customerIds||[]);
+  const perPlayer=ids.filter(cid=>((s.pay||{})[cid]||{}).wasCash);
+  if(perPlayer.length)return perPlayer;
+  // 1:1, or a session cancelled before per-player notes existed
+  return (s.paidViaWas==='cash'&&ids.length===1)?ids.slice():[];
+}
+function cancelCashKeep(id){
+  const s=DB.sessions.find(x=>x.id===id); if(!s||!(s.paidWas>0))return;
+  const who=cancelPaidCustomers(s);
+  if(!who.length)return flash('This record does not say which player paid — add the credit on their profile instead',true);
+  const each=Math.round((s.paidWas/who.length)*100)/100;
+  if(!confirm('Keep '+money(s.paidWas)+' on account instead of refunding it?\n\n'+
+      who.map(cid=>'• '+((custById(cid)||{}).name||'?')+' — 1 '+typeShort(s.type)+' credit ('+money(each)+')').join('\n')+
+      '\n\nNothing is refunded. Each player gets one credit toward a future session of this type.'))return;
+  const changed=[];
+  who.forEach(cid=>{
+    const c=custById(cid); if(!c)return;
+    c.creditsTotal=Object.assign({_v:2},c.creditsTotal||{});
+    c.creditsTotal[s.type]=(Number(c.creditsTotal[s.type])||0)+1;
+    changed.push(c);
+    const m={id:uid(),peerType:'client',clientId:cid,coachId:'',sender:'owner',
+      text:'Hi'+(' '+firstName(c.parent||c.name))+'! The '+typeShort(s.type)+' on '+fmtDT(s.date,s.time)+
+           ' was cancelled. We have kept the '+money(each)+' you paid as a credit toward your next session — nothing to pay next time. \u{1F3C0}',
+      media:[],created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false};
+    DB.messages.push(m); pushRows('messages',[messageRow(m)]);
+  });
+  const amt=s.paidWas;
+  s.paidWas=0;
+  save();
+  if(changed.length)pushRows('customers',changed.map(custRow));
+  pushRows('sessions',[sessRow(s)]);
+  logAct('cancel_cash_credited',money(amt)+' · '+who.length+' credit(s) · '+fmtDT(s.date,s.time),s.id);
+  flash('Kept as credit — '+who.length+' credit'+(who.length>1?'s':'')+' added \u{1F39F}\uFE0F');
+  refreshOwner(); closeModal();
+}
+function cancelCashRefunded(id){
+  const s=DB.sessions.find(x=>x.id===id); if(!s||!(s.paidWas>0))return;
+  if(!confirm('Record that '+money(s.paidWas)+' has been refunded?\n\nThis only clears the reminder — the app cannot move money.'))return;
+  const amt=s.paidWas;
+  s.paidWas=0;
+  save(); pushRows('sessions',[sessRow(s)]);
+  logAct('cancel_cash_refunded',money(amt)+' · '+fmtDT(s.date,s.time),s.id);
+  flash('Marked as refunded');
+  refreshOwner(); closeModal();
+}
 /* email the assigned coach (if they have an email on file) that one of their sessions was
    cancelled by someone else. Silent — no flash — since this is a background side notification,
    same pattern as notifyCancel() which alerts the owner. */
@@ -8552,6 +8614,13 @@ function openSession(id,returnCust,preset){
         ${['pending','scheduled','completed','cancelled'].map(v=>`<option ${s.status===v?'selected':''}>${v}</option>`).join('')}</select></div>
     </div>
     <div class="row">
+      ${(id&&s.status==='cancelled'&&s.paidWas>0)?`<div class="panel" style="background:var(--a8b);border-color:var(--red);margin-bottom:12px">
+        <b class="small">${money(s.paidWas)} was collected in cash before this was cancelled</b>
+        <div class="clienttag" style="margin:6px 0 10px">Decide what happened to it. Either way the reminder clears — while it is showing, the money is unresolved.</div>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          <button class="btn sm" onclick="cancelCashKeep('${id}')">🎟️ Keep as credit</button>
+          <button class="btn ghost sm" onclick="cancelCashRefunded('${id}')">↩ Refunded — clear</button>
+        </div></div>`:''}
       <div class="field"><label class="f">Payment${s.type!=='1on1'?' (default for anyone not set individually)':''}</label><select id="sPay">
         <option value="" ${payVal===''?'selected':''}>Unpaid</option>
         <option value="cash" ${payVal==='cash'?'selected':''}>Paid — cash</option>
@@ -9271,7 +9340,11 @@ function saveCustomer(id){
   // Read whatever inputs the form rendered. The old code wrote a fixed {1on1,group} object,
   // so saving a customer silently deleted any weekend-class credits they held.
   const credits={};
-  $$('.cTotType').forEach(el=>{const v=Math.max(0,Math.round(+el.value||0)); if(v)credits[el.dataset.type]=v;});
+  /* Write the number even when it is ZERO. `if(v)` skipped zeros, and the save then merged what
+     was left over the existing object — so taking a manual grant of 3 back down to 0 left the 3
+     in place and the form looked like it had not saved at all. A blank or zero box IS the owner
+     saying "none", and it has to be recorded as one. */
+  $$('.cTotType').forEach(el=>{ credits[el.dataset.type]=Math.max(0,Math.round(+el.value||0)); });
   credits._v=2;   // already in adjustment form — normalize() must not subtract the packages again
   const pwd=($('#cPwd').value||'').trim()||DB.settings.defaultClientPwd;
   const created=($('#cCreated')&&$('#cCreated').value)||todayISO();
