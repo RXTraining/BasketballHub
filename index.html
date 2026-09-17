@@ -763,22 +763,25 @@
   @media(prefers-reduced-motion:reduce){ .lp-door{transition:none} .lp-door:hover{transform:none} }
   .lp-cta{display:flex;gap:11px;justify-content:center;flex-wrap:wrap}
   .lp-big{font-size:15px;padding:13px 26px}
-  /* The numbers are proof, not a headline — they belong at the end of the pitch, where somebody
-     who has read the page is deciding whether to trust it. In the hero they pushed the three
-     buttons under the fold on a phone and asked a first-time visitor to care about a count
-     before they knew what the business was. */
-  .lp-numbers{text-align:center}
-  .lp-numbers .lp-kicker{margin-bottom:18px}
-  .lp-stats{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:0}
-  @media(max-width:560px){.lp-stats{gap:10px}.lp-stat{padding:14px 18px;min-width:130px;flex:1 1 40%}}
-  .lp-stat{background:var(--lp-soft);border:1px solid var(--lp-line);border-radius:14px;padding:16px 26px;min-width:150px}
-  .lp-stat b{display:block;font-size:24px;font-weight:900;color:var(--lp-volt-d)}
-  /* Each header stat gets its own hue so four numbers read as four facts, not one block. */
-  .lp-stat:nth-child(1){background:var(--a1b);border-color:var(--a1)} .lp-stat:nth-child(1) b{color:var(--a1)}
-  .lp-stat:nth-child(2){background:var(--a3b);border-color:var(--a3)} .lp-stat:nth-child(2) b{color:var(--a3)}
-  .lp-stat:nth-child(3){background:var(--a4b);border-color:var(--a4)} .lp-stat:nth-child(3) b{color:var(--a4)}
-  .lp-stat:nth-child(4){background:var(--a2b);border-color:var(--a2)} .lp-stat:nth-child(4) b{color:var(--a2)}
-  .lp-stat span{font-size:12px;color:var(--lp-mut);font-weight:700;letter-spacing:.4px}
+  /* The numbers sit right under the three buttons, as a quiet line of figures rather than four
+     coloured tiles. Boxes that size competed with the buttons directly above them and made the
+     top of the page read like a dashboard; hairline dividers and small caps say the same thing
+     and leave the buttons the loudest object in the hero. */
+  .lp-facts{display:flex;justify-content:center;align-items:stretch;flex-wrap:wrap;
+    gap:0;margin:30px auto 0;max-width:640px}
+  .lp-fact{display:flex;flex-direction:column;align-items:center;gap:4px;padding:2px 22px;position:relative}
+  .lp-fact+.lp-fact::before{content:'';position:absolute;left:0;top:4px;bottom:4px;width:1px;background:var(--lp-line)}
+  .lp-fact b{font-size:21px;font-weight:800;line-height:1.1;color:var(--lp-ink);letter-spacing:-.3px}
+  .lp-fact span{font-size:9.5px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;
+    color:var(--lp-mut);white-space:nowrap}
+  @media(max-width:560px){
+    .lp-facts{margin-top:22px;gap:14px 0}
+    .lp-fact{padding:2px 12px;flex:1 1 40%}
+    .lp-fact b{font-size:18px}
+    .lp-fact span{font-size:8.5px;letter-spacing:1px}
+    /* two per row on a phone, so a divider never lands at the start of a wrapped row */
+    .lp-fact:nth-child(odd)::before{display:none}
+  }
   .lp-sec{padding:52px 0;border-top:1px solid var(--lp-line);
     scroll-margin-top:calc(var(--lp-navh,52px) + var(--lp-railh,0px) + 12px)}
   .lp-kicker{font-size:12.5px;font-weight:800;letter-spacing:2.5px;text-transform:uppercase;color:var(--lp-volt-d);margin-bottom:7px;
@@ -5057,6 +5060,9 @@ function renderLanding(){
         <button class="lp-door d2" onclick="lpDoEvents()"><i>🌟</i><span>${t('Register Events')}</span></button>
         <button class="lp-door d3" onclick="lpDoGroups()"><i>👥</i><span>${t('Join Groups')}</span></button>
       </div>
+      ${statTiles.length?`<div class="lp-facts reveal">
+        ${statTiles.map(([v,l])=>`<div class="lp-fact"><b>${v}</b><span>${l}</span></div>`).join('')}
+      </div>`:''}
     </header>
 
     <section class="lp-sec lp-about" id="lpAbout">
@@ -5111,13 +5117,6 @@ function renderLanding(){
         <a class="lp-btn line" href="mailto:xuraymond777@gmail.com">✉️ xuraymond777@gmail.com</a>
       </div>
     </section>
-
-    ${statTiles.length?`<section class="lp-sec lp-numbers">
-      <div class="lp-kicker">${t('BY_THE_NUMBERS')}</div>
-      <div class="lp-stats">
-        ${statTiles.map(([v,l])=>`<div class="lp-stat reveal"><b>${v}</b><span>${l}</span></div>`).join('')}
-      </div>
-    </section>`:''}
 
     <footer class="lp-foot">
       © ${new Date().getFullYear()} RX Training · Lexington, MA
@@ -5687,8 +5686,18 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-13 02:33 UTC';
+const BUILD='2026-09-17 03:02 UTC';
 const CHANGELOG=[
+ {v:'5.2', d:'2026-09-17', t:'The numbers, said quietly', items:[
+   '<b>Sports, sessions coached, coaches and athletes trained now sit directly under the three buttons</b> \u2014 as a line of figures with hairline dividers rather than four coloured tiles. At tile size they competed with the buttons right above them and made the top of the page read like a dashboard; small caps and a thin rule say exactly the same thing and leave the buttons the loudest object in the hero.',
+   'On a phone they fall into two neat pairs rather than a ragged row, and the section that had been sitting above the footer is gone \u2014 the numbers are in one place again.',
+ ]},
+ {v:'5.1', d:'2026-09-13', t:'Money on a place whose event was cancelled', items:[
+   '<b>Cash that arrived before the cancellation can now be recorded and settled.</b> A parent pays on Saturday for Saturday and Sunday, Sunday is called off that evening, and the app said \u201cnothing to refund\u201d while RX was holding their money \u2014 because the place had never been marked paid, and a cancelled place could not be touched.',
+   'On a cancelled registration: <b>\u{1F4B5} Was paid</b> records money that really did arrive, then <b>\u{1F39F}\uFE0F Keep as credit</b> turns it into one group credit (covering a clinic, a group session or a weekend class) or <b>\u21a9 Refunded</b> records that you handed it back. The family is told either way, and the row then reads <i>Kept as credit</i> or <i>Refunded</i> instead of a standing reminder.',
+   'Attendance controls stay off a cancelled place \u2014 check-in and remove make no sense for a session nobody attended. Only the money is still editable, because money is the part that keeps arriving late.',
+   'None of it can leak into the accounts: everything that counts revenue already ignores cancelled registrations, so a settled place changes the books by nothing.',
+ ]},
  {v:'5.0', d:'2026-09-13', t:'Undoing a cancelled event', items:[
    '<b>A cancelled event can be put back on.</b> Cancel messages every registered family, so having no way back was the wrong shape for a one-click button. <b>\u21a9 Restore</b> republishes the event, puts every registration back to exactly what it was \u2014 a place that was pending approval is pending again \u2014 and tells each family it is on after all, through the same chat and email the cancellation used.',
    '<b>Restore works after the start time; Cancel does not.</b> You cannot call off something that has already begun, but an event cancelled by mistake still needs its registrations back so attendance and payment can be recorded. A finished event is restored quietly \u2014 nobody is told a past event is \u201cback on\u201d.',
