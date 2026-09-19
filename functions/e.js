@@ -96,7 +96,16 @@ export async function onRequestGet(context){
     else if (/^ko|[,;]\s*ko/.test(al)) lang = 'ko';
     else if (/^ja|[,;]\s*ja/.test(al)) lang = 'ja';
   }
-  const appUrl = SITE + '/#e=' + id + (lang && lang !== 'en' ? '&l=' + lang : '');
+  /* An invitation link carries WHO was asked and WHAT they tapped, so a parent can answer from
+     an email without a password — which is the whole reason they used to wait to be asked instead.
+     `k` is the customer's own token (the query string's `c` is already taken by the short event
+     code, so it cannot be reused here); it is handed to the app as `#…&c=` because that is the
+     param the app already understands. It identifies, it does not sign anybody in. */
+  const who = (url.searchParams.get('k') || '').replace(/[^a-z0-9]/gi,'').slice(0,64);
+  const ans = (url.searchParams.get('a') || '').toLowerCase().replace(/[^a-z]/g,'').slice(0,5);
+  const appUrl = SITE + '/#e=' + id + (lang && lang !== 'en' ? '&l=' + lang : '')
+    + (who ? '&c=' + who : '')
+    + (['in','out','maybe'].indexOf(ans) >= 0 ? '&a=' + ans : '');
 
   let ev = null;
   if (id){
