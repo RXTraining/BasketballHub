@@ -2582,7 +2582,8 @@ function normalize(d){
   (d.coaches||[]).forEach(c=>{if(c.lastLogin===undefined)c.lastLogin='';if(c.loginCount===undefined)c.loginCount=0;});
   d.events.forEach(e=>{if(e.active===undefined)e.active=true;if(e.price==null)e.price=0;if(e.capacity==null)e.capacity=0;if(!e.created)e.created=todayISO();if(e.coachId===undefined)e.coachId='';if(!e.detail)e.detail=e.detail||'';if(e.video===undefined)e.video='';if(e.featured===undefined)e.featured=false;if(!Array.isArray(e.payouts))e.payouts=[];});
   d.eventRegs.forEach(r=>{if(!r.status)r.status='registered';if(r.paid===undefined)r.paid=false;if(r.paidVia===undefined)r.paidVia='';if(r.checkedIn===undefined)r.checkedIn=false;
-    if(r.answer===undefined)r.answer='';if(r.askedAt===undefined)r.askedAt='';if(r.nudges===undefined)r.nudges=0;});
+    if(r.answer===undefined)r.answer='';if(r.askedAt===undefined)r.askedAt='';if(r.nudges===undefined)r.nudges=0;
+    if(r.nudgesAuto===undefined)r.nudgesAuto=0;});
   return d;
 }
 function localData(){let d;try{const r=localStorage.getItem(DB_KEY);if(r)d=JSON.parse(r);}catch(e){}return normalize(d);}
@@ -2649,8 +2650,8 @@ const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'
 /* The inverse of eventRegRow. Named rather than inline because the reconcile below has to put a
    server row into exactly the shape eventRegRow produces, and two hand-written copies of that
    mapping would drift the moment a column is added. */
-const regFromRow=r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||'',payRequested:!!r.pay_requested,answer:r.answer||'',askedAt:r.asked_at||'',nudges:+(r.nudges||0),waiver:(r.waiver&&typeof r.waiver==='object'?r.waiver:null)});
-const eventRegRow=r=>({id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||'',pay_requested:!!r.payRequested,answer:r.answer||'',asked_at:r.askedAt||'',nudges:+(r.nudges||0),waiver:(r.waiver||null)});
+const regFromRow=r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||'',payRequested:!!r.pay_requested,answer:r.answer||'',askedAt:r.asked_at||'',nudges:+(r.nudges||0),nudgesAuto:+(r.nudges_auto||0),waiver:(r.waiver&&typeof r.waiver==='object'?r.waiver:null)});
+const eventRegRow=r=>({id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||'',pay_requested:!!r.payRequested,answer:r.answer||'',asked_at:r.askedAt||'',nudges:+(r.nudges||0),nudges_auto:+(r.nudgesAuto||0),waiver:(r.waiver||null)});
 const messageRow=m=>({id:m.id,peer_type:m.peerType||'client',client_id:m.clientId||'',coach_id:m.coachId||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',read_owner:m.readOwner===true,read_client:m.readClient===true,read_coach:m.readCoach===true});
 async function migrateSource(){
   try{const {data}=await supa.from(STATE_TABLE).select('data').eq('id','main').maybeSingle();if(data&&data.data)return normalize(data.data);}catch(e){}
@@ -3021,7 +3022,6 @@ function startPolling(){
   pruneActivity();  // owner-only: drop activity rows past the retention window
   try{ migratePayeeName(); }catch(e){ console.warn('payee rename:',e&&e.message); }
   try{ sweepEventPayments(); }catch(e){ console.warn('event payment sweep:',e&&e.message); }
-  try{ sweepEventInvites(); }catch(e){ console.warn('event invite sweep:',e&&e.message); }
   if(!pollHooked){
     pollHooked=true;
     document.addEventListener('visibilitychange',()=>{if(!document.hidden){pollSync();if(TAB==='messages')renderMessages();}}); // refresh + mark read on return
@@ -4169,11 +4169,8 @@ function answerFromLink(eid,cid,ans){
      pulled out of history days later. Recording the same answer again is harmless — telling the
      owner again is not, and “X registered” landing in the inbox for somebody who did nothing is
      how a notification stops being believed. */
-  const before=eventRowFor(eid,cid);
-  const was=before?(before.status+'/'+(before.answer||'')):'';
   const okd=setEventAnswer(eid,cid,ans,{silent:true});
-  const now=eventRowFor(eid,cid);
-  const changed=(now?(now.status+'/'+(now.answer||'')):'')!==was;
+  const changed=!!(okd&&okd.changed);
   /* Take the answer off the address bar the moment it is recorded. Left there, a reload — or a
      browser restoring its tabs in the morning — replays it. */
   if(okd){ try{ if(/[#&]a=/.test(location.hash))
@@ -4416,7 +4413,7 @@ async function submitPublicReg(eid,opts){
      approval can be hours later, and by then the screen they were shown is long gone. Quietly:
      this is a stranger's phone, and a failed email must not look like a failed registration. */
   if(isNew&&c.email&&supa&&SUPA_OK){
-    try{ supa.functions.invoke('send-request-email',{body:{to:[c.email],replyTo:'rx@rxtraining.org',
+    try{ supa.functions.invoke('send-request-email',{body:{to:[c.email],replyTo:ownerReplyTo(),
       subject:'RX Training — '+mlText(ev.title)+': you are registered',
       text:'Hi '+firstName(c.parent||c.name)+',\n\n'+name+' has a place at '+mlText(ev.title)+
            ' ('+eventWhen(ev)+(ev.location?', '+ev.location:'')+').\n\n'+credsText(c)+
@@ -5626,7 +5623,7 @@ function clearSignup(){try{localStorage.removeItem('rx_signup');}catch(e){}clear
 function notifySignup(c){
   const emails=(DB.settings.notifyEmails||'').split(',').map(x=>x.trim()).filter(Boolean);
   if(!emails.length||!(supa&&SUPA_OK))return;
-  supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:'rx@rxtraining.org',
+  supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:ownerReplyTo(),
     subject:'RX Training — new account request: '+c.name,
     text:'New client signup awaiting approval:\n\nName: '+c.name+'\nPhone: '+(c.phone||'-')+'\nEmail: '+(c.email||'-')+'\nTown: '+(c.town||'-')+'\n\nApprove in RX.TRAINING (⏳ approvals).'}}).then(()=>{},()=>{});
 }
@@ -5985,8 +5982,20 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-19 02:21 UTC';
+const BUILD='2026-09-19 03:41 UTC';
 const CHANGELOG=[
+ {v:'5.9', d:'2026-09-19', t:'Nothing is sent unless you send it', items:[
+   '<b>The automatic reminder is gone.</b> RX used to send its own reminder four days and two days before an event, to everyone who had not answered. Reminders now go out only when you press <b>Remind</b> \u2014 nothing else can send one.',
+   'The reason is worth writing down: you looked at \u201c3 reminder rounds\u201d on your own event and knew you had pressed the button once. A number you cannot account for is worse than no number, and messages going out in your name to thirty-three families without you knowing is worse still. Two automatic rounds across that list is sixty-six messages nobody chose to send.',
+   'Events still running from before the change keep their history and label it honestly \u2014 <i>\u201c3 reminder rounds (2 automatic, 1 by you)\u201d</i> \u2014 so the figure you queried explains itself rather than quietly becoming yours.',
+   '<b>Payment reminders after a finished event are unchanged</b>, because you asked for those and they only go to people who owe money for an event that has already happened.',
+ ]},
+ {v:'5.8', d:'2026-09-19', t:'Telling the family where they stand, and who sent the reminders', items:[
+   '<b>A family now gets their answer back in writing.</b> Tapping Yes or Not-this-week only ever produced a screen that vanished when the tab closed \u2014 so a parent who answered on Tuesday had nothing on Saturday to tell them it worked, and the natural thing to do about that is message you and ask. Every answer now lands in their RX chat and in their inbox: what was recorded, when and where the event is, what is due, and a one-tap link to change their mind.',
+   '<b>Replies go somewhere you read.</b> Every email went out with a fixed reply address at the rxtraining.org domain. Some parents will always reply to a message rather than tap a link, and a reply sitting in a mailbox nobody opens is worse than sending nothing \u2014 the family believes they have answered and you never hear it. Replies now go to the first address in <b>Admin \u2192 Notification emails</b>. The invitation also says plainly that a reply reaches a person.',
+   '<b>\u201c3 reminders\u201d did not mean you sent three.</b> RX sends its own reminder four days and two days before an event, to whoever has not answered \u2014 that is two rounds nobody pressed a button for. The board was adding those to yours and calling the total \u201creminders\u201d, which read as three you chose to send. It now says <i>\u201c3 reminder rounds (2 automatic, 1 by you)\u201d</i>, and events whose history predates this tracking show a plain total rather than crediting anybody.',
+   '<b>The events list carries it too</b> \u2014 \u201c\ud83d\udd14 2 reminders (1 by you) \u00b7 4 msg\u201d under the registration figures, so you can see what has already gone out before pressing Remind again.',
+ ]},
  {v:'5.7', d:'2026-09-19', t:'An email that said somebody registered when they had not', items:[
    '<b>Fix: \u201cX registered for \u2026\u201d arrived for people who had not registered.</b> Two separate causes, both in the one-tap answer link. A parent tapping <b>Not this week</b> triggered the same owner email as a yes \u2014 so a refusal read as a registration. And the answer stayed in the web address afterwards, so re-opening that page, or a browser restoring its tabs in the morning, replayed the tap and sent it again.',
    'Now only a <b>yes</b> emails you \u2014 it takes a place, it may owe money, and it changes what the coach plans for. A no or a maybe belongs on the board, which is where you are already looking; mailing those would rebuild the interruption this feature exists to remove. The same answer is never mailed twice, and the address bar is cleared the moment the answer is recorded, so a link sitting in a text message for a week cannot register anybody a second time.',
@@ -7386,7 +7395,7 @@ function cancelJoinRequest(id){
 function notifyOwnerJoin(s,c){
   const emails=(DB.settings.notifyEmails||'').split(',').map(x=>x.trim()).filter(Boolean);
   if(!emails.length||!(supa&&SUPA_OK))return;
-  supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:'rx@rxtraining.org',
+  supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:ownerReplyTo(),
     subject:'RX Training — group join request from '+((c&&c.name)||'a client'),
     text:((c&&c.name)||'A client')+' asked to join a group session:\n'+fmtDT(s.date,s.time)+
          '\nCoach: '+coachName(s.coachId)+'\nLocation: '+(s.location||'TBD')+
@@ -8153,13 +8162,13 @@ function textConfirm(s){
   const co=coachById(s.coachId); if(co){const a=smsAddr(co.phone,co.carrier);if(a)to.push(a);}
   if(!to.length)return;
   const msg='RX Training: your '+typeShort(s.type)+' session '+fmtDT(s.date,s.time)+' @ '+(s.location||'TBD')+' with '+coachName(s.coachId)+' is CONFIRMED.';
-  supa.functions.invoke('send-request-email',{body:{to,subject:'RX Training',text:msg,replyTo:'rx@rxtraining.org'}}).then(()=>{},()=>{});
+  supa.functions.invoke('send-request-email',{body:{to,subject:'RX Training',text:msg,replyTo:ownerReplyTo()}}).then(()=>{},()=>{});
 }
 /* email a single client via the Edge Function (replies route to rx@rxtraining.org) */
 function emailClient(to,subject,text){
   if(!to)return flash('Client has no email on file',true);
   if(!(supa&&SUPA_OK))return flash('Connect Supabase to send email',true);
-  supa.functions.invoke('send-request-email',{body:{to:[to],subject,text,replyTo:'rx@rxtraining.org'}})
+  supa.functions.invoke('send-request-email',{body:{to:[to],subject,text,replyTo:ownerReplyTo()}})
     .then(({error})=>{if(error)throw error;flash('Email sent to client 📧');},()=>flash('Email failed — check the function',true));
 }
 /* Auto-notify the client to pay once a session is marked completed and it's still unpaid
@@ -8284,7 +8293,7 @@ function cancelEvent(eid){
        tomorrow. Sent one at a time on purpose — a single call with every address in it would
        show each family who else is registered. */
     if(c.email&&supa&&SUPA_OK){
-      try{ supa.functions.invoke('send-request-email',{body:{to:[c.email],replyTo:'rx@rxtraining.org',
+      try{ supa.functions.invoke('send-request-email',{body:{to:[c.email],replyTo:ownerReplyTo(),
         subject:'RX Training — '+mlText(ev.title)+' is cancelled', text:text}}).then(()=>{},()=>{}); }catch(e){}
     }
   });
@@ -8330,7 +8339,7 @@ function restoreEvent(eid){
       text,media:[],created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false};
     DB.messages.push(m); msgs.push(m);
     if(c.email&&supa&&SUPA_OK){
-      try{ supa.functions.invoke('send-request-email',{body:{to:[c.email],replyTo:'rx@rxtraining.org',
+      try{ supa.functions.invoke('send-request-email',{body:{to:[c.email],replyTo:ownerReplyTo(),
         subject:'RX Training — '+mlText(ev.title)+' is back on', text:text}}).then(()=>{},()=>{}); }catch(e){}
     }
   });
@@ -8387,38 +8396,15 @@ function requestEventPayments(eid,opts){
 /* Runs once when the owner signs in: anything that finished in the last 60 days and still has
    unpaid places gets its asks sent. The window stops a long-dormant account from mailing everyone
    about a camp from last year. */
-/* Two nudges, then stop. Somebody who has ignored a question twice has answered it, and a third
-   message is the point at which a reminder becomes the reason a family stops reading anything we
-   send. Four days out gives a parent time to rearrange the weekend; two days out is the last
-   moment the number is still useful for planning. `nudges` on the row is what makes each window
-   fire once — the sweep runs on every owner sign-in, which may be six times a day.
-   A 'maybe' is not a headcount, so it joins the list at the two-day mark but is left alone before
-   then: they have already told us they do not know yet. */
-function eventNudgeWindow(ev){
-  if(!ev.date)return 0;
-  const days=Math.round((Date.parse(ev.date)-Date.parse(todayISO()))/864e5);
-  if(days>=3&&days<=5)return 1;
-  if(days>=1&&days<=2)return 2;
-  return 0;
-}
-function sweepEventInvites(){
-  if(AUTH!=='owner')return;
-  let n=0, evs=0;
-  (DB.events||[]).forEach(ev=>{
-    if(ev.active===false||!eventUpcoming(ev))return;
-    const win=eventNudgeWindow(ev); if(!win)return;
-    if(eventSpotsLeft(ev)<=0)return;                    // full: chasing more people is pointless
-    const b=eventRsvpBoard(ev.id);
-    const pool=win>=2?b.silent.concat(b.maybe):b.silent;
-    const due=pool.filter(r=>(r.nudges||0)<win);
-    if(!due.length)return;
-    try{
-      const k=inviteToEvent(ev.id,{nudge:true,silent:true,only:due.map(r=>r.customerId)});
-      if(k){ n+=k; evs++; }
-    }catch(e){ console.warn('invite nudge:',e&&e.message); }
-  });
-  if(n)flash('Reminder sent to '+n+' famil'+(n===1?'y':'ies')+' for '+evs+' event'+(evs===1?'':'s')+' \ud83d\udd14');
-}
+/* ---- There is deliberately NO automatic reminder ----------------------------------------------
+   RX used to send its own reminder four days and two days before an event, to whoever had not
+   answered. It was removed on 2026-09-19 at the owner's request, and the reason is worth keeping:
+   messages that go out on their own are messages the owner cannot account for. He looked at
+   “3 reminder rounds” on his own event and knew he had pressed the button once — which makes the
+   number useless, and makes him wonder what else is being sent in his name to thirty-three
+   families. Reminders now go out only when somebody presses Remind.
+   If this is ever reinstated it needs to be a setting that is OFF until the owner turns it on,
+   and every count must say plainly which reminders were his and which were not. */
 function sweepEventPayments(){
   if(AUTH!=='owner')return;
   let n=0, evs=0;
@@ -8688,7 +8674,7 @@ function emailCoachCancelled(s,who){
   const cn=custNames(s.customerIds);
   const subject='RX Training — session cancelled by '+who;
   const text='Hi '+firstName(co.name)+',\n\n'+cn+"'s session has been cancelled:\n"+fmtDT(s.date,s.time)+' · '+(s.location||'')+'\n\n— RX Training';
-  supa.functions.invoke('send-request-email',{body:{to:[co.email],subject,text,replyTo:'rx@rxtraining.org'}}).then(()=>{},()=>{});
+  supa.functions.invoke('send-request-email',{body:{to:[co.email],subject,text,replyTo:ownerReplyTo()}}).then(()=>{},()=>{});
 }
 /* Unified cancellation fan-out: whoever cancels a session (client / coach / owner), everyone
    ELSE with a stake in it gets an email — the client, the assigned coach, and the owner's
@@ -8717,7 +8703,7 @@ function notifyCancel(s,actor){
   if(!emails.length||!(supa&&SUPA_OK))return;
   const cn=custNames(s.customerIds);
   const who=actor==='coach'?coachName(s.coachId):cn;
-  supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:'rx@rxtraining.org',
+  supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:ownerReplyTo(),
     subject:'RX Training — session CANCELLED by '+who,
     text:who+' cancelled a session:\n'+(s.type==='1on1'?'1:1 Private':'Group')+'\n'+fmtDT(s.date,s.time)+'\nLocation: '+s.location}}).then(()=>{},()=>{});
 }
@@ -10086,7 +10072,7 @@ function doApproveAllAvail(){let n=0;(DB.availability||[]).forEach(a=>{if(a.appr
 function doApproveEventReg(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(r){r.status='registered';save();flash('Registration approved ✅');}refreshApprovals();}
 function doRejectEventReg(id){if(!confirm('Reject this event registration? It will be cancelled.'))return;const r=(DB.eventRegs||[]).find(x=>x.id===id);if(r){r.status='cancelled';save();flash('Registration rejected');}refreshApprovals();}
 function doApproveCustomer(id){const c=custById(id);if(c){c.approved=true;if(!c.token)c.token=uid()+uid();save();
-  if(c.email&&supa&&SUPA_OK)supa.functions.invoke('send-request-email',{body:{to:[c.email],replyTo:'rx@rxtraining.org',subject:'RX Training — your account is approved',text:'Hi '+firstName(c.name)+',\n\nYour RX Training account is approved! Sign in with:\n\nName: '+c.name+'\nPassword: '+(c.pwd||DB.settings.defaultClientPwd)+'\n\nPlease change your password after your first sign-in.\n\n— RX Training'}}).then(()=>{},()=>{});
+  if(c.email&&supa&&SUPA_OK)supa.functions.invoke('send-request-email',{body:{to:[c.email],replyTo:ownerReplyTo(),subject:'RX Training — your account is approved',text:'Hi '+firstName(c.name)+',\n\nYour RX Training account is approved! Sign in with:\n\nName: '+c.name+'\nPassword: '+(c.pwd||DB.settings.defaultClientPwd)+'\n\nPlease change your password after your first sign-in.\n\n— RX Training'}}).then(()=>{},()=>{});
   flash('Account approved ✅ — '+c.name+' can now sign in');}refreshApprovals();}
 function doRejectCustomer(id){const c=custById(id);if(!c)return;if(!confirm('Reject and remove this account request for '+c.name+'?'))return;DB.customers=DB.customers.filter(x=>x.id!==id);save();flash('Request removed');refreshApprovals();}
 function doApproveSession(id){
@@ -10592,7 +10578,7 @@ function submitAvailDraft(){
 function notifyOwnerAvail(n,cid){
   const emails=(DB.settings.notifyEmails||'').split(',').map(x=>x.trim()).filter(Boolean);
   if(!emails.length||!(supa&&SUPA_OK))return;
-  supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:'rx@rxtraining.org',
+  supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:ownerReplyTo(),
     subject:'RX Training — '+coachName(cid)+' submitted availability',
     text:coachName(cid)+' submitted '+n+' availability window(s) for approval.\nOpen RX.TRAINING → Availability to approve.'}}).then(()=>{},()=>{});
 }
@@ -11264,7 +11250,9 @@ function renderEventsOwner(){
       <td>${conf}${cap}<div class="clienttag">${pend?('⏳ '+pend+' pending · '):''}${paid} paid</div>
         ${(()=>{const b=eventRsvpBoard(ev.id);const asked=b.out.length+b.maybe.length+b.silent.length;
           if(!asked)return '';
-          return `<div class="clienttag" style="margin-top:3px">✖ ${b.out.length} out${b.maybe.length?' · ? '+b.maybe.length:''}${b.silent.length?` · <b style="color:var(--yellow)">${b.silent.length} no answer</b>`:''}</div>`;})()}</td>
+          const s=eventRemindStats(ev.id);
+          return `<div class="clienttag" style="margin-top:3px">✖ ${b.out.length} out${b.maybe.length?' · ? '+b.maybe.length:''}${b.silent.length?` · <b style="color:var(--yellow)">${b.silent.length} no answer</b>`:''}</div>`
+            +(s.messages?`<div class="clienttag" title="${escapeHtml(remindSummary(ev.id))}">\ud83d\udd14 ${s.rounds} reminder${s.rounds>1?'s':''}${s.split?` (${s.byOwnerRounds} by you)`:''} · ${s.messages} msg</div>`:'');})()}</td>
       <td class="right"><b>${money(eventRevenue(ev))}</b>${eventPayoutTotal(ev)>0
         ? `<div class="clienttag">less ${money(eventPayoutTotal(ev))} coach pay</div>`:''}${eventOwedAmt(ev)>0
         ? `<div class="clienttag" style="color:var(--red)">${money(eventOwedAmt(ev))} unpaid</div>`
@@ -11999,7 +11987,7 @@ function announceEvent(id){
   if(!emails.length)return flash('No client emails on file',true);
   if(!confirm('Email '+emails.length+' client(s) about “'+ev.title+'”?'))return;
   const text='New RX Training event:\n\n'+ev.title+'\n'+eventWhen(ev)+'\n📍 '+(ev.location||'TBD')+'\n'+(ev.price?('Price: '+money(ev.price)+' per person'):'Free')+'\n\n'+(ev.detail||'')+'\n\nSign in to the app to register.';
-  supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:'rx@rxtraining.org',subject:'RX Training — '+ev.title,text}}).then(({error})=>{if(error)throw error;flash('Announced to '+emails.length+' client(s) 📣');},()=>flash('Email failed — check the function',true));
+  supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:ownerReplyTo(),subject:'RX Training — '+ev.title,text}}).then(({error})=>{if(error)throw error;flash('Announced to '+emails.length+' client(s) 📣');},()=>flash('Email failed — check the function',true));
 }
 /* ---- Inviting, and the answer that makes the chasing stop -----------------------------------
    The weekly job was asking every family, one at a time, whether they were coming on Saturday.
@@ -12015,6 +12003,17 @@ function announceEvent(id){
    `answer` carries 'in' | 'out' | 'maybe' so "not answered" and "answered maybe" stay distinct.
    Only 'registered' and 'pending' are places (see isEventPlace), so an invitation never fills the
    event, bills a parent or reaches a sign-in sheet. */
+/* Where a reply actually lands.
+   Every email went out with a fixed rx@rxtraining.org reply address. Some parents will always
+   reply to a message rather than tap a link — it is the most natural thing in the world — and a
+   reply that arrives in a mailbox nobody opens is worse than sending no email at all: the family
+   believes they have answered, and the owner never hears it. So replies go to the address the
+   owner already receives notifications on, and only fall back to the domain address if none is
+   set. Set it in Admin → Notification emails. */
+function ownerReplyTo(){
+  const first=String((DB&&DB.settings&&DB.settings.notifyEmails)||'').split(',')[0].trim();
+  return first||'rx@rxtraining.org';
+}
 function eventInviteLink(ev,c,ans){
   /* The customer token is what makes this one tap from an email: it identifies the family without
      a password, which is the whole reason a parent gives up and waits to be asked instead. It is
@@ -12036,7 +12035,8 @@ function eventInviteText(ev,c,nudge){
     : ('Would '+who+' like a place? ');
   return hi+(nudge?'':'We have ')+what+cost+room+ask+
     'Tap to answer:\n✅ Yes: '+eventInviteLink(ev,c,'in')+
-    '\n❌ Not this week: '+eventInviteLink(ev,c,'out');
+    '\n❌ Not this week: '+eventInviteLink(ev,c,'out')+
+    '\n\nEither one confirms straight away — no password needed. Or just reply to this message and we will sort it out.';
 }
 /* Who still has to be asked. Never anybody who already holds a place, already said no, or has an
    unanswered invitation sitting in their chat — the point of this is fewer messages, not more. */
@@ -12063,7 +12063,24 @@ function eventRemindStats(eid){
   const rounds=rows.reduce((a,r)=>Math.max(a,r.nudges||0),0);
   const messages=rows.reduce((a,r)=>a+(r.nudges||0),0);
   const reminded=rows.filter(r=>(r.nudges||0)>0).length;
-  return {rounds,messages,reminded};
+  /* `nudgesAuto` is history only: it counts reminders the app sent by itself, before that was
+     removed. Nothing writes to it any more, so anything above zero belongs to an event that was
+     already running when the change was made, and saying so is more honest than quietly folding
+     those into the owner's total. */
+  const autoRounds=rows.reduce((a,r)=>Math.max(a,r.nudgesAuto||0),0);
+  const autoMsgs=rows.reduce((a,r)=>a+(r.nudgesAuto||0),0);
+  return {rounds,messages,reminded,autoRounds,autoMsgs,
+          byOwnerRounds:Math.max(0,rounds-autoRounds),
+          byOwnerMsgs:Math.max(0,messages-autoMsgs),
+          split:autoMsgs>0};
+}
+/* One phrase, shared by the board and the events list so the two can never disagree. */
+function remindSummary(eid){
+  const s=eventRemindStats(eid);
+  if(!s.messages)return '';
+  const tail=' · '+s.messages+' message'+(s.messages===1?'':'s')+' to '+s.reminded+' famil'+(s.reminded===1?'y':'ies');
+  const r=s.rounds+' reminder round'+(s.rounds===1?'':'s');
+  return s.split?(r+' ('+s.autoRounds+' automatic, '+s.byOwnerRounds+' by you)'+tail):(r+tail);
 }
 function eventRsvpBoard(eid){
   const best=new Map();
@@ -12132,7 +12149,7 @@ function inviteToEvent(eid,opts){
   if(supa&&SUPA_OK){
     targets.forEach(({c})=>{
       if(!c.email)return;
-      try{ supa.functions.invoke('send-request-email',{body:{to:[c.email],replyTo:'rx@rxtraining.org',
+      try{ supa.functions.invoke('send-request-email',{body:{to:[c.email],replyTo:ownerReplyTo(),
         subject:(nudge?'Reminder — ':'')+'RX Training — '+mlText(ev.title)+': can '+firstName(c.name)+' make it?',
         text:eventInviteText(ev,c,nudge)}}).then(()=>{},()=>{}); }catch(e){}
     });
@@ -12140,6 +12157,47 @@ function inviteToEvent(eid,opts){
   logAct(nudge?'event_nudged':'event_invited',mlText(ev.title)+' · '+msgs.length+' family(ies)',eid);
   if(!silent)flash((nudge?'Nudged ':'Asked ')+msgs.length+' famil'+(msgs.length===1?'y':'ies')+' \u{1F4AC}');
   return msgs.length;
+}
+/* What a family gets back the moment they answer.
+   Until now the only acknowledgement was a screen that vanished when the tab closed, so a parent
+   who tapped Yes on Tuesday had nothing on Saturday morning to tell them it had worked — and the
+   natural response to that is to message the owner and ask, which is the very job this was meant
+   to take away. Every answer now leaves a trace the family keeps: in their RX chat, and in the
+   inbox where they answered.
+   Each one carries the OPPOSITE link, because the commonest thing after answering is changing
+   your mind, and a family that cannot do that themselves does it through the owner. */
+function answerConfirmText(ev,c,ans){
+  const hi='Hi '+firstName(c.parent||c.name)+'! ';
+  const when=eventWhen(ev)+(ev.location?', '+ev.location:'');
+  const who=firstName(c.name);
+  if(ans==='in')
+    return hi+who+' has a place at '+mlText(ev.title)+' — '+when+'.'+
+      (ev.price?(' '+money(ev.price)+' due on the day.'):' Free.')+
+      '\n\nCannot make it after all? '+eventInviteLink(ev,c,'out');
+  if(ans==='out')
+    return hi+'thanks for letting us know '+who+' cannot make '+mlText(ev.title)+' ('+when+'). '+
+      'We will not chase you about this one, and we will tell you about the next.'+
+      '\n\nChanged your mind? '+eventInviteLink(ev,c,'in');
+  return hi+'we have '+who+' down as a maybe for '+mlText(ev.title)+' ('+when+'), '+
+    'and we will remind you nearer the day.'+
+    '\n\nDecided?\n✅ Yes: '+eventInviteLink(ev,c,'in')+'\n❌ No: '+eventInviteLink(ev,c,'out');
+}
+function confirmAnswerToClient(eid,cid,ans){
+  const ev=eventById(eid), c=custById(cid);
+  if(!ev||!c)return;
+  const text=answerConfirmText(ev,c,ans);
+  /* The chat message always happens: it needs no email address, it is on the record inside the
+     app, and the owner can see exactly what the family was told. */
+  try{
+    const m={id:uid(),peerType:'client',clientId:cid,coachId:'',sender:'owner',text,media:[],
+             created:new Date().toISOString(),readOwner:true,readClient:false,readCoach:false};
+    DB.messages.push(m); save(); pushRows('messages',[messageRow(m)]);
+  }catch(e){}
+  if(c.email&&supa&&SUPA_OK){
+    const head=ans==='in'?'you have a place':(ans==='out'?'thanks for letting us know':'noted — maybe');
+    try{ supa.functions.invoke('send-request-email',{body:{to:[c.email],replyTo:ownerReplyTo(),
+      subject:'RX Training — '+mlText(ev.title)+': '+head, text}}).then(()=>{},()=>{}); }catch(e){}
+  }
 }
 /* Record an answer. One place for it, because it arrives from four directions: the client's own
    Events tab, the event banner, a tap in an email, and the owner answering on a family's behalf
@@ -12152,6 +12210,9 @@ function setEventAnswer(eid,cid,ans,opts){
      same child ended up under both In and Out: an answer landed on one row while a second row for
      the same event sat there saying something else. Paid rows are never touched — money is not a
      duplicate to be tidied away. */
+  const prior=(DB.eventRegs||[]).filter(x=>x.eventId===eid&&x.customerId===cid)
+    .sort((a,b)=>eventRegRank(b)-eventRegRank(a))[0];
+  const was=prior?(prior.status+'/'+(prior.answer||'')):'';
   const dupes=(DB.eventRegs||[]).filter(x=>x.eventId===eid&&x.customerId===cid)
     .sort((a,b)=>eventRegRank(b)-eventRegRank(a));
   let r=dupes[0]||null;
@@ -12185,8 +12246,11 @@ function setEventAnswer(eid,cid,ans,opts){
   }else return false;
   save();
   pushRows('event_regs',[eventRegRow(r)]);
-  logAct('event_answer',mlText(ev.title)+' · '+c.name+' · '+ans,eid);
-  return true;
+  const changed=(r.status+'/'+(r.answer||''))!==was;
+  if(changed)logAct('event_answer',mlText(ev.title)+' · '+c.name+' · '+ans,eid);
+  /* Only on a real change: the same link tapped twice must not send a second confirmation. */
+  if(changed&&opts.tell!==false){ try{ confirmAnswerToClient(eid,cid,ans); }catch(e){} }
+  return {changed};
 }
 function viewEventRegs(id){
   const ev=eventById(id);if(!ev)return;
@@ -12383,9 +12447,9 @@ function rsvpBoardHtml(eid){
   return `<div class="panel" style="padding:12px 14px;margin-bottom:10px">
     <div class="row" style="justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
       <b class="small">Who is coming</b>
-      ${(()=>{const s=eventRemindStats(eid);
-        if(!s.messages)return '<span class="clienttag">no reminders sent yet</span>';
-        return `<span class="clienttag"><b style="color:var(--txt)">${s.rounds}</b> reminder round${s.rounds>1?'s':''} \u00b7 <b style="color:var(--txt)">${s.messages}</b> message${s.messages>1?'s':''} to ${s.reminded} famil${s.reminded===1?'y':'ies'}</span>`;})()}
+      ${(()=>{const txt=remindSummary(eid);
+        if(!txt)return '<span class="clienttag">no reminders sent yet</span>';
+        return `<span class="clienttag" title="Reminders only go out when you press Remind — RX never sends one by itself.">${escapeHtml(txt)}</span>`;})()}
       <div class="actions">
         ${toAsk?`<button class="btn sm" onclick="closeModal();inviteToEvent('${eid}');viewEventRegs('${eid}')">\ud83d\udce3 Ask ${toAsk} not yet asked</button>`:''}
         ${b.silent.length?`<button class="btn sm ghost" onclick="closeModal();inviteToEvent('${eid}',{nudge:true});viewEventRegs('${eid}')">\ud83d\udd14 Nudge ${b.silent.length}</button>`:''}
@@ -12683,7 +12747,7 @@ function registerEvent(eid){
 function notifyOwnerEventReg(ev,c){
   const emails=(DB.settings.notifyEmails||'').split(',').map(x=>x.trim()).filter(Boolean);
   if(!emails.length||!(supa&&SUPA_OK))return;
-  supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:'rx@rxtraining.org',
+  supa.functions.invoke('send-request-email',{body:{to:emails,replyTo:ownerReplyTo(),
     subject:'RX Training — event registration: '+ev.title,
     text:(c?c.name:'A client')+' registered for “'+ev.title+'” ('+eventWhen(ev)+').\nApprove in RX.TRAINING → Events.'}}).then(()=>{},()=>{});
 }
