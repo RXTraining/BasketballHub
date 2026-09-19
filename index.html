@@ -1029,6 +1029,12 @@
   .lp-sporttab.on{background:var(--lp-volt-d);border-color:var(--lp-volt-d);color:#fff}
   .lp-sporttab.on span{background:rgba(255,255,255,.28);color:#fff}
   @media(max-width:560px){.lp-sporttab{font-size:12.5px;padding:7px 12px}}
+  /* Months sit UNDER the sport row and are deliberately quieter: sport is what a parent is
+     actually choosing between, a month is a way to narrow what they have already chosen. Two
+     identical rows of chips would read as two equal decisions. */
+  .lp-monthtabs{margin:0 0 10px}
+  .lp-monthtabs .lp-sporttab{font-size:12.5px;padding:6px 12px;border-width:1px}
+  @media(max-width:560px){.lp-monthtabs .lp-sporttab{font-size:11.5px;padding:5px 10px}}
   .lp-months{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 14px}
   .lp-month{background:#fff;border:1.5px solid var(--lp-line);border-radius:999px;padding:7px 14px;
     cursor:pointer;font-family:inherit;font-weight:800;font-size:13px;color:var(--lp-ink);
@@ -4788,7 +4794,7 @@ function lpTickerHtml(){
                         without loading their player API, and guessing a duration would cut
                         someone off mid-video. Manual arrows only.
    ============================================================================ */
-let lpGalIdx=0, lpGalTimer=null, lpGalPaused=false, lpGalSport=null;
+let lpGalIdx=0, lpGalTimer=null, lpGalPaused=false, lpGalSport=null, lpGalMonth=null;
 const LP_PHOTO_MS=4500, LP_VIDEO_CAP_MS=90000;
 function lpHighlights(){
   return (DB.highlights||[]).filter(h=>h.active!==false&&h.url)
@@ -4827,10 +4833,18 @@ function lpMonthLabel(k){
    that mean nothing to somebody who has never trained here. Months are a filing system for the
    owner, not a way for a parent to look at pictures. The date still shows under each photo, so
    the chronology is not lost — it is just no longer a gate. */
-function lpGalItems(sport){
+function lpGalItems(sport,month){
   return lpHighlights()
     .filter(h=>!sport||sportKey(hlSport(h))===sportKey(sport))
+    .filter(h=>!month||lpMonthKey(h.date)===month)
     .sort((a,b)=>((b.date||'').localeCompare(a.date||''))||((a.ord||0)-(b.ord||0)));
+}
+/* The months that actually have something in them, for the sport being shown, newest first.
+   Derived rather than listed: an empty month is a chip that does nothing. */
+function lpGalMonths(sport){
+  const seen=[];
+  lpGalItems(sport).forEach(h=>{ const k=lpMonthKey(h.date); if(k&&seen.indexOf(k)<0)seen.push(k); });
+  return seen.sort((a,b)=>b.localeCompare(a));
 }
 function lpHighlightsHtml(){
   const sports=lpGalSports();
@@ -4842,7 +4856,11 @@ function lpHighlightsHtml(){
      without touching anything. Picking a sport is a filter they choose, not a state the page
      puts them in. */
   if(lpGalSport&&!sports.some(x=>sportKey(x)===sportKey(lpGalSport))){ lpGalSport=null; lpGalIdx=0; }
-  const items=lpGalItems(lpGalSport);
+  /* A month that has nothing in it for the sport on screen would be an empty reel, so the filter
+     lets go rather than showing one. */
+  const months=lpGalMonths(lpGalSport);
+  if(lpGalMonth&&months.indexOf(lpGalMonth)<0){ lpGalMonth=null; lpGalIdx=0; }
+  const items=lpGalItems(lpGalSport,lpGalMonth);
   if(lpGalIdx>=items.length)lpGalIdx=0;
   /* The sport row only appears when there is more than one — a single-sport gallery should not
      grow a tab that does nothing. */
@@ -4854,11 +4872,28 @@ function lpHighlightsHtml(){
     ${sports.map(sp=>`<button class="lp-sporttab${lpGalSport&&sportKey(sp)===sportKey(lpGalSport)?' on':''}" onclick="lpGalPickSport('${String(sp).replace(/'/g,"\\'")}')">
       ${sportIcon(sp)} ${sportName(sp)||sp}<span>${lpHighlights().filter(h=>sportKey(hlSport(h))===sportKey(sp)).length}</span></button>`).join('')}
   </div>`:'';
-  return `${sportTabs}<div class="lp-gal" id="lpGal">${lpGalSlideHtml(items,lpGalIdx)}</div>`;
+  /* Months as a filter the visitor chooses, never the state the page starts in.
+     This gallery HAD month tabs once and they were removed for good reason: a visitor landed on
+     one month of one sport, saw a single photo, and had to work out that everything else was
+     behind tabs labelled with months that mean nothing to somebody who has never trained here.
+     Bringing months back only works if ALL stays the default, so the whole reel still plays
+     without touching anything and a month is a way to narrow it, not a gate in front of it.
+     Only shown when there is more than one month to choose between. */
+  const monthTabs=months.length>1?`<div class="lp-sporttabs lp-monthtabs">
+    <button class="lp-sporttab${lpGalMonth?'':' on'}" onclick="lpGalPickMonth('')">
+      ${t('All')}<span>${lpGalItems(lpGalSport).length}</span></button>
+    ${months.map(k=>`<button class="lp-sporttab${lpGalMonth===k?' on':''}" onclick="lpGalPickMonth('${k}')">
+      ${lpMonthLabel(k)}<span>${lpGalItems(lpGalSport,k).length}</span></button>`).join('')}
+  </div>`:'';
+  return `${sportTabs}${monthTabs}<div class="lp-gal" id="lpGal">${lpGalSlideHtml(items,lpGalIdx)}</div>`;
 }
 function lpGalPickSport(sp,auto){ if(!auto)sportRotStop('lpFilm');
   lpGalSport=sp||null;                      // '' is the ALL tab — every sport in one reel
+  /* Changing sport starts the months again: last month's basketball tells you nothing about
+     which months have track in them. */
+  lpGalMonth=null;
   lpGalIdx=0; renderLanding(); }
+function lpGalPickMonth(k){ sportRotStop('lpFilm'); lpGalMonth=k||null; lpGalIdx=0; renderLanding(); }
 function lpGalSlideHtml(items,i){
   if(!items.length)return `<div class="empty">${t('Nothing here yet.')}</div>`;
   i=Math.max(0,Math.min(i,items.length-1));
@@ -4912,14 +4947,14 @@ function attachCodecCheck(root){
 }
 function lpGalRender(){
   const box=document.getElementById('lpGal'); if(!box)return;
-  const items=lpGalItems(lpGalSport);
+  const items=lpGalItems(lpGalSport,lpGalMonth);
   box.innerHTML=lpGalSlideHtml(items,lpGalIdx);
   attachCodecCheck(box);
   lpGalSchedule();
 }
 function lpGalGo(n){ lpGalIdx=n; lpGalRender(); }
 function lpGalStep(d){
-  const items=lpGalItems(lpGalSport); if(!items.length)return;
+  const items=lpGalItems(lpGalSport,lpGalMonth); if(!items.length)return;
   lpGalIdx=(lpGalIdx+d+items.length)%items.length;
   lpGalRender();
 }
@@ -4933,7 +4968,7 @@ function lpGalToggle(btn){
 function lpGalSchedule(){
   if(lpGalTimer){clearTimeout(lpGalTimer);lpGalTimer=null;}
   if(lpGalPaused)return;
-  const items=lpGalItems(lpGalSport);
+  const items=lpGalItems(lpGalSport,lpGalMonth);
   if(items.length<2)return;
   const h=items[lpGalIdx]; if(!h)return;
   const box=document.getElementById('lpGal'); if(!box)return;
@@ -5982,8 +6017,14 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-19 04:12 UTC';
+const BUILD='2026-09-19 18:10 UTC';
 const CHANGELOG=[
+ {v:'6.1', d:'2026-09-19', t:'Highlights by sport, and now by month as well', items:[
+   '<b>Months are back under the sport row.</b> Highlights were grouped by sport only, in one long reel; you can now narrow that to <i>Sep 2026</i>, <i>Aug 2026</i> and so on, with a count on each. Sport and month work together \u2014 basketball in September is two taps.',
+   'Months had been tried before and removed, so this is the same idea built differently. <b>All stays selected on arrival</b>: the whole reel still plays without anybody touching a thing, and a month narrows what is already on screen rather than standing in front of it. A visitor landing on a single photo behind a tab labelled with a month that means nothing to them was the reason the old version came out.',
+   'Only months that actually have something in them appear, newest first, and the row is hidden when there is only one. Switching sport clears the month \u2014 last month\u2019s basketball tells you nothing about which months have track in them, and being left on an empty reel is worse than starting over.',
+   'The arrows and the counter follow the filter, so what you step through is always what you can see.',
+ ]},
  {v:'6.0', d:'2026-09-19', t:'A quieter events row, and a cancel you have to mean', items:[
    '<b>Remind is off the events list.</b> It writes to every family who has not answered, and it sat one pixel from Edit and Cancel in a dense row of small buttons. It lives on the board inside <b>Registrations</b> instead \u2014 beside the names it is about, and beside the count of what has already gone out. <b>\ud83d\udce3 Ask</b> stays in the list, because it is the first thing you do with a new event and it only ever reaches families nobody has asked yet.',
    '<b>Cancelling now asks properly.</b> It used the browser\u2019s own confirm box: one line of unformatted text, no way to show the money at stake, and in an installed app it does not always appear at all \u2014 which would mean the cancellation going out with no question asked. You now get RX\u2019s own dialog listing exactly what will happen: how many families are messaged and emailed, how many group credits go back automatically, and in red, any cash already taken that you will have to refund yourself. The confirming button says <i>\u201cCancel it and tell 12 families\u201d</i>; the other one says <i>Keep the event</i>.',
