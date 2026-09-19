@@ -2603,7 +2603,7 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
   d.expenses=(exp||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,cat:e.cat,amount:Number(e.amount),note:e.note||'',freq:e.freq||'once'}));
   d.cashEntries=(cash||[]).map(e=>({id:e.id,coachId:e.coach_id||'',date:e.date,amount:Number(e.amount),note:e.note||'',customerId:e.customer_id||'',type:e.type||'1on1',qty:e.qty||1}));
   d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',sport:(e.sport||''),coachId:e.coach_id||'',coachIds:(Array.isArray(e.coach_ids)?e.coach_ids:(e.coach_id?[e.coach_id]:[])),leadCoachId:(e.lead_coach_id||''),price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||'',video:e.video||'',featured:e.featured===true,payouts:(Array.isArray(e.payouts)?e.payouts:[])}));
-  d.eventRegs=(regs||[]).map(r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||'',payRequested:!!r.pay_requested,answer:r.answer||'',askedAt:r.asked_at||'',nudges:+(r.nudges||0),waiver:(r.waiver&&typeof r.waiver==='object'?r.waiver:null)}));
+  d.eventRegs=(regs||[]).map(regFromRow);
   d.messages=(msgs||[]).map(m=>({id:m.id,peerType:m.peer_type||'client',clientId:m.client_id||'',coachId:m.coach_id||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',readOwner:m.read_owner===true,readClient:m.read_client===true,readCoach:m.read_coach===true}));
   d.highlights=(hl||[]).map(h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',sport:h.sport||'',active:h.active!==false,type:h.type||'',ord:(h.ord!=null?h.ord:null)}));
   d.contributors=(cbs||[]).map(c=>({id:c.id,name:c.name||'',role:c.role||'',rate:Number(c.rate||0)}));
@@ -2646,6 +2646,10 @@ const custRow=c=>({id:c.id,name:c.name,phone:c.phone||'',carrier:c.carrier||'',e
 const sessRow=s=>({id:s.id,coach_id:s.coachId||null,customer_ids:s.customerIds||[],type:s.type,cap:(s.cap!=null?s.cap:null),sport:(s.sport||null),date:s.date,time:s.time,dur:s.dur,price:s.price,status:s.status,paid:!!s.paid,paid_via:s.paidVia||'',checked_in:!!s.checkedIn,location:s.location||'',notes:s.notes||'',feedback:s.feedback||'',media:s.media||[],cancelled_by:s.cancelledBy||null,cancelled_at:s.cancelledAt||null,paid_was:(s.paidWas!=null?s.paidWas:null),payouts:(s.payouts||[]),payment_requested:!!s.paymentRequested,pay:s.pay||{},join_req:s.joinReq||[],form_alerted:!!s.formAlerted});
 const expRow=e=>({id:e.id,coach_id:e.coachId||null,date:e.date,cat:e.cat,amount:e.amount,note:e.note||'',freq:e.freq||'once'});
 const eventRow=e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',location:e.location||'',sport:(e.sport||null),coach_id:(eventCoachIds(e)[0]||null),coach_ids:eventCoachIds(e),lead_coach_id:(eventLeadId(e)||null),price:e.price||0,capacity:e.capacity||0,active:e.active!==false,created:e.created||'',video:e.video||'',featured:e.featured===true,payouts:(e.payouts||[])});
+/* The inverse of eventRegRow. Named rather than inline because the reconcile below has to put a
+   server row into exactly the shape eventRegRow produces, and two hand-written copies of that
+   mapping would drift the moment a column is added. */
+const regFromRow=r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||'',payRequested:!!r.pay_requested,answer:r.answer||'',askedAt:r.asked_at||'',nudges:+(r.nudges||0),waiver:(r.waiver&&typeof r.waiver==='object'?r.waiver:null)});
 const eventRegRow=r=>({id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||'',pay_requested:!!r.payRequested,answer:r.answer||'',asked_at:r.askedAt||'',nudges:+(r.nudges||0),waiver:(r.waiver||null)});
 const messageRow=m=>({id:m.id,peer_type:m.peerType||'client',client_id:m.clientId||'',coach_id:m.coachId||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',read_owner:m.readOwner===true,read_client:m.readClient===true,read_coach:m.readCoach===true});
 async function migrateSource(){
@@ -2720,6 +2724,7 @@ async function fetchCloud(){
   seenIds('packages',pkg.data); seenIds('sessions',ses.data); seenIds('expenses',exp.data);
   seenIds('cash_entries',cash.data); seenIds('availability',avail.data);
   seenIds('events',evs.data); seenIds('event_regs',regs.data); seenIds('messages',msgs.data);
+  seenRegFP(regs.data);                    // and WHAT each registration said, not just that it exists
   seenIds('highlights',hl.data); seenIds('skills',sk.data); seenIds('skill_log',sl.data);
   seenIds('contributors',cbs.data); seenIds('contributions',cbl.data);
   return assemble(st.data,loc.data,cus.data,pkg.data,ses.data,exp.data,cash.data,avail.data,coa.data,evs.data,regs.data,msgs.data,acts.data,sk.data,sl.data,hl.data,cbs.data,cbl.data);
@@ -3179,16 +3184,76 @@ function pruneSafe(name,gone,keep){
   }
   return true;
 }
-async function syncTable(name,rows){
+/* `allIds` is every id this device still holds, which is not always the same as the rows being
+   upserted: the reconcile below deliberately declines to push rows another device owns, and those
+   rows must still count as "we have this" or the prune would delete them for being absent. */
+/* ---- Registrations are the one table OTHER devices write to ----------------------------------
+   The owner's bulk sync re-asserts every local row. For everything else that is fine, because the
+   owner is the only author. Registrations are not: a parent tapping “Yes” in a text writes one
+   from their own phone, and so does anyone using the public link.
+
+   The owner's tab goes stale extremely easily — pollSync deliberately skips while a dialog is
+   open, while somebody is typing, and while a push is in flight. Working inside the Registrations
+   dialog is therefore the single most likely moment to be stale, and also the exact moment a
+   parent is most likely to answer. Re-asserting a row we never touched then silently reverts that
+   parent's answer: they saw “you have a place”, and the owner sees “no answer” for ever.
+   Same failure as the 2026-09-10 prune — a stale tab speaking for rows it does not own.
+
+   The test is not “who is newer”, which we cannot know without a clock we do not have. It is
+   “did WE change this?”: compare each local row with what this device last SAW on the server.
+     unchanged here, different there  -> somebody else wrote it. Take theirs, push nothing.
+     changed here                     -> ours goes up, as always.
+   Being wrong in the second direction only costs a redundant write; being wrong in the first
+   costs a family their place. */
+let syncFP={};
+function regFP(r){ return JSON.stringify(eventRegRow(regFromRow(r))); }
+/* A full fetch replaces what we know; a push only adds to it. */
+function seenRegFP(serverRows){
+  const m=new Map();
+  (serverRows||[]).forEach(r=>{ try{ m.set(String(r.id),regFP(r)); }catch(e){} });
+  syncFP['event_regs']=m;
+}
+function mergeRegFP(rows){
+  const m=syncFP['event_regs']||new Map();
+  (rows||[]).forEach(r=>{ try{ m.set(String(r.id),regFP(r)); }catch(e){} });
+  syncFP['event_regs']=m;
+}
+async function reconcileEventRegs(localRows){
+  const seen=syncFP['event_regs'];
+  /* Never observed the table this session: we have no basis for calling anything "unchanged",
+     and guessing would be the very thing this function exists to prevent. Push as before. */
+  if(!seen||!seen.size)return localRows;
+  let srv;
+  try{ const r=await supa.from('event_regs').select('*'); if(r.error)throw r.error; srv=r.data||[]; }
+  catch(e){ console.warn('event_regs reconcile skipped:',e&&e.message); return localRows; }
+  const byId=new Map(srv.map(x=>[String(x.id),x]));
+  const mine=[], theirs=[];
+  localRows.forEach(row=>{
+    const id=String(row.id), s=byId.get(id), base=seen.get(id);
+    if(!s||base===undefined){ mine.push(row); return; }   // new here, or never seen there
+    if(JSON.stringify(row)!==base){ mine.push(row); return; }          // WE edited it
+    if(regFP(s)!==base){ theirs.push(regFromRow(s)); seen.set(id,regFP(s)); return; }
+    mine.push(row);                                                     // identical everywhere
+  });
+  if(theirs.length){
+    theirs.forEach(a=>{ const i=(DB.eventRegs||[]).findIndex(x=>String(x.id)===String(a.id)); if(i>=0)DB.eventRegs[i]=a; });
+    try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){}
+    console.warn('kept '+theirs.length+' registration(s) written on another device');
+    try{ flash(theirs.length+' registration'+(theirs.length>1?'s':'')+' answered on another device \u2014 kept \ud83d\udd04'); }catch(e){}
+    setTimeout(()=>{ try{refreshOwner();}catch(e){} },0);
+  }
+  return mine;
+}
+async function syncTable(name,rows,allIds){
   if(rows.length) {const {error}=await supa.from(name).upsert(rows); if(error) throw error;}
-  const ids=rows.map(r=>String(r.id));
+  const ids=(allIds||rows.map(r=>r.id)).map(String);
   const gone=pruneList(syncSeen[name],ids);
   if(gone.length && pruneSafe(name,gone,ids.length)){
     const {error}=await supa.from(name).delete().in('id',gone);
     if(error) throw error;
   }
   // the server now holds these, as far as we know; anything we have never seen stays untouched
-  seenIds(name,rows.map(r=>({id:r.id})));
+  seenIds(name,ids.map(id=>({id})));
 }
 let pushing=false;
 /* table name -> last error message. Survives a reload so the warning cannot be missed. */
@@ -3247,7 +3312,13 @@ async function cloudPush(){
     await push('cash_entries',()=>syncTable('cash_entries',DB.cashEntries.map(e=>({id:e.id,coach_id:e.coachId||null,date:e.date,amount:e.amount,note:e.note||'',customer_id:e.customerId||null,type:e.type||null,qty:e.qty||null}))));
     await push('availability',()=>syncTable('availability',(DB.availability||[]).map(a=>({id:a.id,coach_id:a.coachId||null,date:a.date,start_t:a.start,end_t:a.end,slot_min:a.slotMin,location:a.location||'',session_type:a.sessionType||'',approved:a.approved!==false}))));
     await push('events',()=>syncTable('events',(DB.events||[]).map(eventRow)));
-    await push('event_regs',()=>syncTable('event_regs',(DB.eventRegs||[]).map(eventRegRow)));
+    await push('event_regs',async()=>{
+      /* Prune against everything we hold, upsert only what we actually changed. */
+      const all=(DB.eventRegs||[]).map(eventRegRow);
+      const send=await reconcileEventRegs(all);
+      await syncTable('event_regs',send,(DB.eventRegs||[]).map(r=>r.id));
+      mergeRegFP(send);                      // what we just made true on the server
+    });
     await push('messages',()=>syncTable('messages',(DB.messages||[]).map(messageRow)));
     await push('highlights',()=>syncTable('highlights',(DB.highlights||[]).map(highlightRow)));
     await push('skills',()=>syncTable('skills',(DB.skills||[]).map(skillRow)));
@@ -5897,8 +5968,14 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-19 00:24 UTC';
+const BUILD='2026-09-19 01:02 UTC';
 const CHANGELOG=[
+ {v:'5.5', d:'2026-09-19', t:'An answer from a parent could be overwritten by the owner\u2019s own screen', items:[
+   '<b>Fix: a family who answered could silently go back to \u201cno answer\u201d.</b> A parent taps <i>Yes</i> in a text, sees <i>you have a place</i>, and it really does save. Then the owner\u2019s app saves something \u2014 anything \u2014 and pushes its own copy of every registration over the top, including the row it still thinks says \u201cinvited\u201d. The parent believes they are registered; the owner never sees them. That is what happened on the 9am Sunday clinic.',
+   'It is the same shape as the 10 September incident: a screen that has been open a while speaking for rows it does not own. Registrations are the one table <b>other people write to</b> \u2014 parents, from their own phones \u2014 and the owner\u2019s screen deliberately stops refreshing while a dialog is open, while somebody is typing, and while a save is in flight. Working inside <i>Registrations</i> is therefore both the most likely moment to be out of date and the most likely moment for a parent to answer.',
+   '<b>The app now only sends up registrations it actually changed.</b> Before each save it compares every row with what this device last saw on the server: unchanged here but different there means somebody else answered, so their answer is kept and the screen updates instead of overwriting it. Anything the owner really did edit still goes up exactly as before, and deleting still deletes.',
+   'You will see <i>\u201c1 registration answered on another device \u2014 kept\u201d</i> when that happens, rather than it passing in silence.',
+ ]},
  {v:'5.4', d:'2026-09-18', t:'Stop asking families one at a time', items:[
    '<b>The app now asks every family, and collects the answer — including the no.</b> The weekly round of "can you make Saturday?" was never expensive because of the asking. It was expensive because of the <i>silence</i>: a family who says no costs nothing, a family who says nothing costs a second message and a third. Until now there was no way to record a no at all, so every non-answer looked the same and all of them had to be chased by hand.',
    '<b>\u{1F4E3} Ask</b> on an event messages and emails every active family at once, with <b>✅ Yes</b> and <b>❌ Not this week</b> as tappable links. A parent can answer straight from the email — no password, no app, one tap — because a parent who has to find a password is a parent who waits to be asked by hand instead.',
