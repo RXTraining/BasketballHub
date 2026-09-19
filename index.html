@@ -5982,8 +5982,13 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-19 03:41 UTC';
+const BUILD='2026-09-19 04:12 UTC';
 const CHANGELOG=[
+ {v:'6.0', d:'2026-09-19', t:'A quieter events row, and a cancel you have to mean', items:[
+   '<b>Remind is off the events list.</b> It writes to every family who has not answered, and it sat one pixel from Edit and Cancel in a dense row of small buttons. It lives on the board inside <b>Registrations</b> instead \u2014 beside the names it is about, and beside the count of what has already gone out. <b>\ud83d\udce3 Ask</b> stays in the list, because it is the first thing you do with a new event and it only ever reaches families nobody has asked yet.',
+   '<b>Cancelling now asks properly.</b> It used the browser\u2019s own confirm box: one line of unformatted text, no way to show the money at stake, and in an installed app it does not always appear at all \u2014 which would mean the cancellation going out with no question asked. You now get RX\u2019s own dialog listing exactly what will happen: how many families are messaged and emailed, how many group credits go back automatically, and in red, any cash already taken that you will have to refund yourself. The confirming button says <i>\u201cCancel it and tell 12 families\u201d</i>; the other one says <i>Keep the event</i>.',
+   'It also stops telling you that re-publishing will not bring the registrations back. That has been untrue since <b>\u21a9 Restore</b> was built \u2014 the dialog now says so, which is the difference between a warning you believe and one you learn to ignore.',
+ ]},
  {v:'5.9', d:'2026-09-19', t:'Nothing is sent unless you send it', items:[
    '<b>The automatic reminder is gone.</b> RX used to send its own reminder four days and two days before an event, to everyone who had not answered. Reminders now go out only when you press <b>Remind</b> \u2014 nothing else can send one.',
    'The reason is worth writing down: you looked at \u201c3 reminder rounds\u201d on your own event and knew you had pressed the button once. A number you cannot account for is worse than no number, and messages going out in your name to thirty-three families without you knowing is worse still. Two automatic rounds across that list is sixty-six messages nobody chose to send.',
@@ -8266,17 +8271,37 @@ function requestPaymentZelle(s){
    Cash already collected is NOT touched: the app cannot move money, and quietly zeroing a payment
    would lose the record that it was taken. The dialog says what has to be refunded by hand, and
    the family's message says a refund is coming, so both sides have it in writing. */
+/* Cancelling messages and emails every registered family. A browser confirm() is the wrong shape
+   for that: one line of unformatted text, no way to show the money at stake, and in an installed
+   web app it does not reliably appear at all — which would mean the cancellation going out with
+   no question asked. The app's own dialog says what is about to happen, and the button that does
+   it is red and names the consequence. */
 function cancelEvent(eid){
   const ev=eventById(eid); if(!ev)return;
   const regs=eventRegsFor(eid).filter(r=>r.status!=='cancelled');
   const paid=regs.filter(r=>r.paid&&r.paidVia!=='package');
   const cred=regs.filter(r=>r.paid&&r.paidVia==='package');
   const refund=paid.length*(ev.price||0);
-  if(!confirm('Cancel "'+mlText(ev.title)+'"?\n\n'+eventWhen(ev)+
-      '\n\n• '+regs.length+' registration'+(regs.length===1?'':'s')+' will be cancelled and told'+
-      (cred.length?('\n• '+cred.length+' group credit'+(cred.length===1?'':'s')+' returned automatically'):'')+
-      (refund?('\n• '+money(refund)+' already paid in cash — you will need to refund that yourself'):'')+
-      '\n\nThe event is withdrawn from the site. Re-publishing it later does not bring the registrations back.'))return;
+  const line=(txt,warn)=>`<li style="margin-top:6px${warn?';color:var(--red)':''}">${txt}</li>`;
+  openModal('Cancel this event?',
+    `<p><b>${escapeHtml(mlText(ev.title))}</b></p>
+     <p class="clienttag" style="margin-top:6px">\ud83d\udcc5 ${eventWhen(ev)}${ev.location?' \u00b7 \ud83d\udccd '+escapeHtml(ev.location):''}</p>
+     <ul style="margin:12px 0 0 18px;font-size:14px;line-height:1.5">
+       ${regs.length?line('<b>'+regs.length+'</b> famil'+(regs.length===1?'y is':'ies are')+' registered \u2014 each one is messaged and emailed that it is off.')
+                    :line('Nobody is registered yet, so no one is told.')}
+       ${cred.length?line('<b>'+cred.length+'</b> group credit'+(cred.length===1?'':'s')+' go back on their accounts automatically.'):''}
+       ${refund?line('<b>'+money(refund)+'</b> has already been paid in cash \u2014 you refund that yourself.',true):''}
+       ${line('The event comes off the site straight away.')}
+       ${line('You can put it back with <b>\u21a9 Restore</b>, and every registration returns to exactly what it was.')}
+     </ul>`,
+    `<button class="btn ghost" onclick="closeModal()">Keep the event</button>
+     <button class="btn danger" onclick="doCancelEvent('${eid}')">${regs.length?('Cancel it and tell '+regs.length+' famil'+(regs.length===1?'y':'ies')):'Cancel the event'}</button>`);
+}
+function doCancelEvent(eid){
+  const ev=eventById(eid); if(!ev)return;
+  const regs=eventRegsFor(eid).filter(r=>r.status!=='cancelled');
+  const paid=regs.filter(r=>r.paid&&r.paidVia!=='package');
+  const refund=paid.length*(ev.price||0);
   const msgs=[];
   regs.forEach(r=>{
     r.statusWas=r.status;          // so Restore puts back exactly what was there, pending included
@@ -11262,14 +11287,14 @@ function renderEventsOwner(){
         <button class="btn sm" onclick="viewEventRegs('${ev.id}')">Registrations</button>
         <button class="iconbtn" title="Public sign-up link — share anywhere" onclick="shareEventLink('${ev.id}')">🔗</button>
         <button class="iconbtn" title="Poster image with QR code — for WeChat" onclick="sharePoster('${ev.id}')">🖼️</button>
-        ${(ev.active!==false&&eventUpcoming(ev))?(()=>{
-          const b=eventRsvpBoard(ev.id), left=eventToInvite(ev.id).length;
-          /* One button, and what it does depends on where the round has got to: ask the people
-             who have never been asked, then nudge the ones who have not answered. When both are
-             empty there is nothing useful to press, so it says so rather than sending again. */
-          if(left)return `<button class="iconbtn" title="Ask ${left} famil${left===1?'y':'ies'} — message and email, with one-tap yes/no" onclick="inviteToEvent('${ev.id}')">📣 Ask ${left}</button>`;
-          if(b.silent.length)return `<button class="iconbtn" style="color:var(--yellow)" title="Remind the ${b.silent.length} who have not answered — nobody else" onclick="inviteToEvent('${ev.id}',{nudge:true})">🔔 Nudge ${b.silent.length}</button>`;
-          return `<span class="clienttag" title="Everybody has been asked and answered">✓ all answered</span>`;
+        ${(ev.active!==false&&eventUpcoming(ev)&&eventToInvite(ev.id).length)?(()=>{
+          /* Asking the families who have never been asked stays here: it is the first thing you do
+             with a new event and it cannot surprise anybody. REMIND does not belong in this row.
+             It writes to every family who has not answered, and it sat one pixel from Edit and
+             Cancel in a dense line of small buttons. It lives on the board inside Registrations
+             instead, beside the names it is about and the count of what has already gone out. */
+          const left=eventToInvite(ev.id).length;
+          return `<button class="iconbtn" title="Ask ${left} famil${left===1?'y':'ies'} \u2014 message and email, with one-tap yes/no" onclick="inviteToEvent('${ev.id}')">\ud83d\udce3 Ask ${left}</button>`;
         })():''}
         <button class="iconbtn" onclick="openEvent('${ev.id}')">Edit</button>
         ${(ev.active!==false&&!eventPast(ev))?`<button class="iconbtn" title="Cancel this event and tell everyone registered" onclick="cancelEvent('${ev.id}')">✖ Cancel</button>`:''}
