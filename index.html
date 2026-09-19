@@ -5968,8 +5968,15 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-19 01:02 UTC';
+const BUILD='2026-09-19 01:48 UTC';
 const CHANGELOG=[
+ {v:'5.6', d:'2026-09-19', t:'One person, one place on the board', items:[
+   '<b>Fix: the same player could appear under both In and Out.</b> The board was counting registration ROWS, and a family can hold more than one for an event \u2014 registered through the public link and invited by you, answered on two devices, or added by hand after an answer went missing. Ethan Niu was in both columns at once, which is not a display quirk: In was over by one and Out was over by one, so the headcount was wrong in both directions at the same time. The board now counts <b>people</b>, showing each family once under their most settled answer.',
+   'Answering also tidies up behind itself: a second, unpaid row for the same family is cleared away as the answer is recorded, so the duplicate cannot come back. A row that has been <b>paid</b> is never touched \u2014 money is not a duplicate to be tidied.',
+   '<b>\u201cRecord missing\u201d rows are out of the registration list.</b> They had no name and no number, so there was nothing to do with them except read the same warning every time the event was opened. They are now one quiet line under the table with a <b>Clear</b> button that deletes them properly.',
+   '<b>Removing somebody now removes them.</b> It used to mark the registration cancelled and leave it in place, so the person went on showing in the list and the counts for ever. Cancelling a whole <i>event</i> still keeps every registration \u2014 that record is worth having \u2014 but taking one person off a list is you saying they were never coming. A paid place asks twice before it goes.',
+   '<b>\u201cNudge\u201d is now \u201cRemind\u201d.</b> Nudge is casual English for a gentle reminder and does not travel \u2014 this app is read in four languages. The button does exactly what the word now says.',
+ ]},
  {v:'5.5', d:'2026-09-19', t:'An answer from a parent could be overwritten by the owner\u2019s own screen', items:[
    '<b>Fix: a family who answered could silently go back to \u201cno answer\u201d.</b> A parent taps <i>Yes</i> in a text, sees <i>you have a place</i>, and it really does save. Then the owner\u2019s app saves something \u2014 anything \u2014 and pushes its own copy of every registration over the top, including the row it still thinks says \u201cinvited\u201d. The parent believes they are registered; the owner never sees them. That is what happened on the 9am Sunday clinic.',
    'It is the same shape as the 10 September incident: a screen that has been open a while speaking for rows it does not own. Registrations are the one table <b>other people write to</b> \u2014 parents, from their own phones \u2014 and the owner\u2019s screen deliberately stops refreshing while a dialog is open, while somebody is typing, and while a save is in flight. Working inside <i>Registrations</i> is therefore both the most likely moment to be out of date and the most likely moment for a parent to answer.',
@@ -12015,8 +12022,24 @@ function eventToInvite(eid){
   const ev=eventById(eid); if(!ev)return [];
   return (DB.customers||[]).filter(c=>c.approved!==false&&!c.suspended&&!eventRowFor(eid,c.id));
 }
+/* One entry per PERSON, never per row.
+   A family can end up holding more than one registration row for the same event — registered
+   through the public link and invited by the owner, answered on two devices, or added by hand
+   after an answer went missing. Bucketing raw rows then put the same child under BOTH “In” and
+   “Out” at once, which is not a display quirk: In was over by one and Out was over by one, so the
+   headcount was wrong in both directions at the same time.
+   Precedence is how settled the answer is — a place beats a refusal beats a maybe beats silence.
+   A place wins even over a later refusal because a place may be paid for and will be on the
+   sign-in sheet; the registrations table below still shows exactly what rows exist. */
+function eventRegRank(r){ return isEventPlace(r)?4:(r.status==='declined'?3:(r.answer==='maybe'?2:1)); }
 function eventRsvpBoard(eid){
-  const rows=(DB.eventRegs||[]).filter(r=>r.eventId===eid);
+  const best=new Map();
+  (DB.eventRegs||[]).filter(r=>r.eventId===eid).forEach(r=>{
+    const k=String(r.customerId||('row:'+r.id));
+    const cur=best.get(k);
+    if(!cur||eventRegRank(r)>eventRegRank(cur))best.set(k,r);
+  });
+  const rows=[...best.values()];
   return {
     in:   rows.filter(r=>isEventPlace(r)),
     out:  rows.filter(r=>r.status==='declined'),
@@ -12048,7 +12071,7 @@ function inviteToEvent(eid,opts){
     targets=eventToInvite(eid).map(c=>({c,r:null}));
   }
   if(!targets.length){
-    if(!silent)flash(nudge?'Everyone has answered — nobody left to nudge':'Everyone has already been asked');
+    if(!silent)flash(nudge?'Everyone has answered — nobody left to remind':'Everyone has already been asked');
     return 0;
   }
   const msgs=[], regs=[], now=new Date().toISOString();
@@ -12092,7 +12115,17 @@ function setEventAnswer(eid,cid,ans,opts){
   opts=opts||{};
   const ev=eventById(eid), c=custById(cid);
   if(!ev||!c)return false;
-  let r=eventRowFor(eid,cid);
+  /* Work on the person's most settled row, and clear away the leftovers. Duplicates are how the
+     same child ended up under both In and Out: an answer landed on one row while a second row for
+     the same event sat there saying something else. Paid rows are never touched — money is not a
+     duplicate to be tidied away. */
+  const dupes=(DB.eventRegs||[]).filter(x=>x.eventId===eid&&x.customerId===cid)
+    .sort((a,b)=>eventRegRank(b)-eventRegRank(a));
+  let r=dupes[0]||null;
+  if(dupes.length>1){
+    const junk=dupes.slice(1).filter(x=>!x.paid);
+    if(junk.length)dropRegRows(junk);
+  }
   if(ans==='in'){
     if(!r||!isEventPlace(r)){
       if(eventSpotsLeft(ev)<=0){ if(!opts.silent)flash(t('Sorry, this event just filled up'),true); return false; }
@@ -12130,8 +12163,12 @@ function viewEventRegs(id){
      is withdrawn. But the owner needs the record: who had signed up, who had paid, and what was
      returned. Dropping the rows from this screen was the same as deleting the history of an event
      that really did have twelve families in it. Live places sort first. */
-  const live=(DB.eventRegs||[]).filter(r=>r.eventId===id&&isEventPlace(r));
-  const gone=(DB.eventRegs||[]).filter(r=>r.eventId===id&&r.status==='cancelled');
+  /* A row whose client record is gone has no name, no number and nothing the owner can act on,
+     so it is not listed. It is not hidden either — see the line under the table. */
+  const named=r=>!!custById(r.customerId);
+  const orphans=eventOrphanRegs(id);
+  const live=(DB.eventRegs||[]).filter(r=>r.eventId===id&&isEventPlace(r)&&named(r));
+  const gone=(DB.eventRegs||[]).filter(r=>r.eventId===id&&r.status==='cancelled'&&named(r));
   const regs=live.concat(gone);
   const rows=regs.map(r=>{const c=custById(r.customerId);const dead=(r.status==='cancelled');return `<tr${dead?' style="opacity:.55"':''}>
     <td><div class="nameceil"><span class="av">${c?initials(c.name):'⚠'}</span><div><b>${c?c.name:'Record missing'}</b>
@@ -12189,6 +12226,7 @@ function viewEventRegs(id){
       <button class="btn sm" onclick="ownerAddReg('${id}')">Add</button>
     </div>
     <div class="panel" style="padding:6px 14px;overflow-x:auto"><table><thead><tr><th>Player</th><th>Phone</th><th>Status</th><th>Payment</th><th>Check-in</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    ${orphans.length?`<p class="clienttag" style="margin-top:10px">${orphans.length} registration${orphans.length>1?'s':''} point${orphans.length>1?'':'s'} at a client record that is no longer in the database, so ${orphans.length>1?'they are':'it is'} not listed above. <button class="btn sm ghost" onclick="eventDropOrphans('${id}')">Clear ${orphans.length}</button></p>`:''}
   `,`<button class="btn ghost" onclick="printEventRegs('${id}')">🖨 Print sign-in sheet</button>
      <button class="btn" onclick="closeModal()">Close</button>`);
 }
@@ -12427,7 +12465,45 @@ function eventRegUnpay(id){
   viewEventRegs(r.eventId);
 }
 function eventRegCheckin(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;r.checkedIn=!r.checkedIn;save();refreshOwner();viewEventRegs(r.eventId);}
-function eventRegRemove(id){const r=(DB.eventRegs||[]).find(x=>x.id===id);if(!r)return;if(!confirm('Remove this registration?'))return;const eid=r.eventId;r.status='cancelled';save();flash('Removed');refreshOwner();viewEventRegs(eid);}
+/* Really delete the rows, here and on the server.
+   Marking them cancelled instead is right when the whole EVENT is called off — the owner asked to
+   keep that record — but it is wrong for taking one person off a list, where a row left behind
+   goes on showing in the board, the counts and this table for ever. */
+function dropRegRows(rows){
+  if(!rows||!rows.length)return 0;
+  const ids=rows.map(r=>String(r.id));
+  DB.eventRegs=(DB.eventRegs||[]).filter(r=>ids.indexOf(String(r.id))<0);
+  save();
+  if(supa&&SUPA_OK){ try{ supa.from('event_regs').delete().in('id',ids).then(()=>{},()=>{}); }catch(e){} }
+  /* Drop the fingerprints too. Leave them and the next reconcile sees a row we are no longer
+     holding, decides another device must own it, and quietly adopts the deleted row back. */
+  try{ const m=syncFP&&syncFP['event_regs']; if(m)ids.forEach(id=>m.delete(id)); }catch(e){}
+  return ids.length;
+}
+function eventRegRemove(id){
+  const r=(DB.eventRegs||[]).find(x=>x.id===id); if(!r)return;
+  const c=custById(r.customerId), who=(c&&c.name)||'this registration';
+  if(!confirm('Remove '+who+' from this event?\n\nThe registration is deleted, not just marked cancelled.'))return;
+  if(r.paid&&!confirm('This place is marked as PAID. Remove it anyway? The payment record goes with it.'))return;
+  const eid=r.eventId;
+  dropRegRows([r]);
+  flash('Removed'); refreshOwner(); viewEventRegs(eid);
+}
+/* Registrations pointing at a client record that is not in the database. They were shown in full,
+   with an explanation, on the reasoning that a silent disappearance is worse than a visible
+   problem — but there is nothing the owner can DO with a row that has no name and no number, so
+   it was two lines of alarm in the middle of the list every time the event was opened. Out of the
+   table; one quiet line and a button that clears them. */
+function eventOrphanRegs(eid){
+  return (DB.eventRegs||[]).filter(r=>r.eventId===eid&&r.customerId&&!custById(r.customerId));
+}
+function eventDropOrphans(eid){
+  const orph=eventOrphanRegs(eid);
+  if(!orph.length)return;
+  if(!confirm('Remove '+orph.length+' registration'+(orph.length>1?'s':'')+' whose client record is no longer in the database?'))return;
+  const n=dropRegRows(orph);
+  flash('Cleared '+n); refreshOwner(); viewEventRegs(eid);
+}
 
 /* ---- client view ---- */
 /* The client's own answer. Separate from registerEvent() because that one creates a place
