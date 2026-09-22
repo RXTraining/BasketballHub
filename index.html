@@ -6088,8 +6088,14 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-20 20:26 UTC';
+const BUILD='2026-09-22 00:05 UTC';
 const CHANGELOG=[
+ {v:'6.4', d:'2026-09-22', t:'The 1:1 credit now works on a group session, not just an event', items:[
+   '<b>Fix: the button was missing.</b> A 1:1 credit could already cover a group place, but the payment dialog for a group SESSION only ever asked about group credits \u2014 so a player holding ten 1:1 credits and no group ones was shown <i>\u201cSell credit\u201d</i>, and there was no way to reach the rule at all. The rule shipped; the door did not.',
+   'The dialog now offers <b>\ud83c\udf9f\ufe0f 1:1 credit</b> once the group pool is empty, and says before you press it what it will cost: <i>\u201cno Group &amp; weekend credit \u00b7 10 \u00d7 1:1 available, $15 would stay on their account\u201d</i>. A paid share also now says which credit paid for it rather than just \u201cCredit\u201d, and any money on the player\u2019s account is shown beside their name.',
+   'A player with no credits of any kind still sees <i>Sell credit</i> \u2014 that part was right and is now covered by a test, so it cannot quietly change.',
+   'The money behaves exactly as it does on an event place: a $35 credit against a $20 share leaves $15, and two of those become another group credit.',
+ ]},
  {v:'6.3', d:'2026-09-20', t:'What the client has left, and a column that counts one way', items:[
    '<b>Fix: the Credit-used column counted two different things.</b> A session said <i>9/10</i> \u2014 the ninth credit of that ten-pack \u2014 while an event said <i>18/20</i>, the eighteenth of every credit in the pool. Same column, two denominators, so the numbers looked wrong even though the balance was right. Both now report the position inside the package named beside them, which is the pair that agrees with the label.',
    '<b>Clients can now see what they have left.</b> A panel at the top of Payments: 1:1 credits, group &amp; weekend credits, and any money sitting on their account \u2014 in all four languages. A family that cannot see their own balance asks you for it.',
@@ -9481,7 +9487,14 @@ function openGroupPay(id){
   const n=s.customerIds.length||1;
   const rows=s.customerIds.map(cid=>{
     const c=custById(cid); const p=custPay(s,cid);
-    const hasCredit=c?creditsFor(c,s.type)>0:false;
+    /* The same pool test the payment itself uses. It used to ask only about the session's own
+       pool, so a player holding ten 1:1 credits and no group ones was shown “Sell credit” — the
+       fallback existed in setGroupPay() and there was no way to reach it. A rule the owner cannot
+       press is not a rule. */
+    const _g=c?creditsFor(c,s.type):0;
+    const _o=(c&&s.type!==POOL_1ON1)?creditsFor(c,POOL_1ON1):0;
+    const hasCredit=_g>0||_o>0;
+    const _back=(_g<=0&&_o>0&&c)?Math.max(0,creditUnitValue(c,POOL_1ON1)-headPrice(s)):0;
     let actionHtml;
     if(AUTH==='coach'){
       if(p.paidVia==='package'){ actionHtml='<span class="pill green">Credit</span><div class="clienttag">owner-managed</div>'; }
@@ -9491,11 +9504,13 @@ function openGroupPay(id){
       }
     } else {
       actionHtml = p.paid
-        ? `<span class="pill green">${p.paidVia==='package'?'Credit':'Cash'}</span>
+        ? `<span class="pill green">${p.paidVia==='package'?(p.pool===POOL_1ON1?'1:1 credit':'Credit'):'Cash'}</span>
            <button class="iconbtn" title="Undo" onclick="setGroupPay('${id}','${cid}',false)">Undo</button>
            <button class="iconbtn" title="Resend payment-received confirmation" onclick="manualMemberPaymentConfirm('${id}','${cid}')">✅</button>`
         : `${hasCredit
-             ? `<button class="iconbtn" title="Use a prepaid credit — ${creditsFor(c,s.type)} left across ${poolLabel(s.type)}" onclick="setGroupPay('${id}','${cid}',true,'package')">🎟️ Credit (${creditsFor(c,s.type)})</button>`
+             ? (_g>0
+                ? `<button class="iconbtn" title="Use a prepaid credit — ${_g} left across ${poolLabel(s.type)}" onclick="setGroupPay('${id}','${cid}',true,'package')">🎟️ Credit (${_g})</button>`
+                : `<button class="iconbtn" title="No ${attrEsc(poolLabel(s.type))} credit left — use one of their ${_o} 1:1 credit${_o===1?'':'s'}${_back>0?('; '+money(_back)+' stays on their account'):''}" onclick="setGroupPay('${id}','${cid}',true,'package')">🎟️ 1:1 credit (${_o})</button>`)
              /* Previously this rendered nothing, so "no credit" and "credit not supported here"
                 looked identical. Now it stays visible, explains itself, and — for the owner —
                 is a one-tap route to selling the package that would make it usable. */
@@ -9503,7 +9518,10 @@ function openGroupPay(id){
            <button class="iconbtn" onclick="setGroupPay('${id}','${cid}',true,'cash')">💵 Cash</button>`;
     }
     return `<div class="row" style="justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)">
-      <div><b>${c?c.name:'—'}</b><div class="clienttag">${shareLabel(s)} share${(hasCredit&&!p.paid)?' · has a credit available':''}</div></div>
+      <div><b>${c?c.name:'—'}</b><div class="clienttag">${shareLabel(s)} share${
+        p.paid?'':(_g>0?' · has a credit available'
+                       :(_o>0?(' · no '+poolLabel(s.type)+' credit · '+_o+' × 1:1 available'+(_back>0?(', '+money(_back)+' would stay on their account'):'')):''))
+        }${(c&&changeRemainder(c)>0)?' · '+money(changeRemainder(c))+' on account':''}</div></div>
       <div class="actions">${actionHtml}</div>
     </div>`;
   }).join('');
