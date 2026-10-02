@@ -6169,8 +6169,13 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-10-02 21:20 UTC';
+const BUILD='2026-10-02 21:46 UTC';
 const CHANGELOG=[
+ {v:'6.13', d:'2026-10-02', t:'A share past the end of a package can be fixed where you see it', items:[
+   '<b>Fix: the one screen that could settle an over-the-package share was the one screen saying there was nothing to settle.</b> Every list showed <i>Unpaid · Group &amp; weekend classes 21/20 · over</i>, but opening <b>Manage</b> on that session showed a green <b>Credit</b> pill and a single <b>Undo</b> button — which reads as though pressing it would make things worse. So the row stayed unpaid for ever while the client sat on unused 1:1 credits.',
+   'The dialog now wears the <b>same red 21/20 · over badge</b> as the rest of the app and offers the payment buttons beside it, so re-pointing the share at a 1:1 credit, at money on account, or at cash is <b>one tap</b>. Undo is still there for when the credit was applied by mistake.',
+   'Re-pointing moves the credit to the right pool: the group pool stops reading <i>over</i>, one 1:1 credit is spent, and the difference between the two prices goes onto the client’s account, visible to them.'
+ ]},
  {v:'6.12', d:'2026-10-02', t:'Every registration email says where it came from', items:[
    '<b>The “X registered” email now names the action that caused it and the time.</b> Five different things send that mail — a tap on a link in an email or message, the public registration page either way, and the app itself — and when one arrives for somebody who did nothing, the first question is always which. It now says so: <i>“How: tapped Yes on an email or message link”</i>. A link lives in a text message for ever and gets reopened by hand, restored with a browser tab, or replayed when a phone wakes up, so a timestamp at 3am tells you it was a device and not a person.',
    '<b>Suspend now means suspended everywhere.</b> A suspended account could not sign in and was not invited, but could still be registered from the public page, and still emailed you when it was. Half a rule is worse than none: you press the button, the mail keeps coming, and the button is the next thing you stop trusting. A suspended account now registers nothing and sends nothing — which makes it the switch for a test account.',
@@ -9630,11 +9635,21 @@ function openGroupPay(id){
         : `<button class="btn sm" onclick="setGroupPay('${id}','${cid}',true,'cash')">Mark cash paid</button>`;
       }
     } else {
-      actionHtml = p.paid
+      /* A share marked "package" whose credit fell past the end of the package is NOT settled —
+         every other screen says Unpaid · over, and this dialog used to show a green "Credit" pill
+         and nothing but Undo. So the one screen that can fix it was the one screen claiming there
+         was nothing to fix, and the only visible button looked like it would make things worse.
+         It now shows the same red over badge the other screens show and offers the credit buttons,
+         so re-pointing the share at a 1:1 credit or money on account is one tap. A rule the owner
+         cannot press is not a rule. */
+      const _settled=custSettled(s,cid);
+      const _over=(p.paid&&!_settled)?creditUse(s,cid):null;
+      actionHtml = (p.paid&&_settled)
         ? `<span class="pill green">${p.paidVia==='package'?(p.pool===POOL_1ON1?'1:1 credit':p.pool===POOL_ACCOUNT?'Account':'Credit'):'Cash'}</span>
            <button class="iconbtn" title="Undo" onclick="setGroupPay('${id}','${cid}',false)">Undo</button>
            <button class="iconbtn" title="Resend payment-received confirmation" onclick="manualMemberPaymentConfirm('${id}','${cid}')">✅</button>`
-        : `${hasCredit
+        : `${_over?`<span class="pill red" title="All ${_over.total} ${attrEsc(_over.label)} credits were already used, so nothing covers this one — pay it another way or sell another package">${_over.n}/${_over.total} · over</span>`:''}
+           ${hasCredit
              ? (_g>0
                 ? `<button class="iconbtn" title="Use a prepaid credit — ${_g} left across ${poolLabel(s.type)}" onclick="setGroupPay('${id}','${cid}',true,'package')">🎟️ Credit (${_g})</button>`
                 : _acct
@@ -9644,11 +9659,12 @@ function openGroupPay(id){
                 looked identical. Now it stays visible, explains itself, and — for the owner —
                 is a one-tap route to selling the package that would make it usable. */
              : `<button class="iconbtn" style="opacity:.5" title="${(c?c.name:'This player')} has no ${poolLabel(s.type)} credit left${AUTH==='owner'?' — tap to sell a package':''}" ${AUTH==='owner'?`onclick="openSellPackage('${cid}','${s.type}')"`:'disabled'}>🎟️ ${AUTH==='owner'?'Sell credit':'No credit'}</button>`}
-           <button class="iconbtn" onclick="setGroupPay('${id}','${cid}',true,'cash')">💵 Cash</button>`;
+           <button class="iconbtn" onclick="setGroupPay('${id}','${cid}',true,'cash')">💵 Cash</button>
+           ${_over?`<button class="iconbtn" title="Take the credit back off this session and leave it unpaid" onclick="setGroupPay('${id}','${cid}',false)">Undo</button>`:''}`;
     }
     return `<div class="row" style="justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)">
       <div><b>${c?c.name:'—'}</b><div class="clienttag">${shareLabel(s)} share${
-        p.paid?'':(_g>0?' · has a credit available'
+        (p.paid&&custSettled(s,cid))?'':(_g>0?' · has a credit available'
                        :(_o>0?(' · no '+poolLabel(s.type)+' credit · '+_o+' × 1:1 available'+(_back>0?(', '+money(_back)+' would stay on their account'):'')):''))
         }${(c&&accountLeft(c)>0)?' · '+money(accountLeft(c))+' on account':''}</div></div>
       <div class="actions">${actionHtml}</div>
