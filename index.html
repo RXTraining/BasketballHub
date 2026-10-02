@@ -6119,8 +6119,13 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-10-02 02:04 UTC';
+const BUILD='2026-10-02 02:36 UTC';
 const CHANGELOG=[
+ {v:'6.8', d:'2026-10-02', t:'The coaches read as one line on the poster', items:[
+   '<b>All the coaches on one line, in the order set in 6.7.</b> A name per row ran four rows deep for a track session and pushed everything below it toward the code. Read as a block, the names are the part a parent is scanning for, and they scan faster side by side than stacked — <i>“Sabina Perez · Nicolas Perroud · Raymond Xu · Jack Hamilton”</i>.',
+   'Two or more coaches share one address for the whole team. <b>A single coach still gets their own</b>, because on one line it costs no extra room. The line is allowed to wrap: ellipsising somebody’s name to save space is worse than the space.',
+   'The 6.7 overflow fallback stays as a guard for a very long title — it now simply drops the address line and keeps every name.'
+ ]},
  {v:'6.7', d:'2026-10-02', t:'Coaches read in the order that makes sense', items:[
    '<b>Lead coach first, then the rest of that sport, then anyone from another sport.</b> A parent scanning a track session wants the track coaches together, and the person running it named first \u2014 not whatever order the coaches happened to be added in. Within each group the order you entered is kept, so it never reshuffles two coaches it has no opinion about.',
    'The event\u2019s own sport decides it; an older event without one falls back to the lead coach\u2019s sport. The same order is used everywhere the event lists its coaches \u2014 the poster, the events table, the share box \u2014 so they can never disagree.',
@@ -12016,16 +12021,14 @@ function eventPosterCanvas(ev){
   const title=mlText(ev.title)||t('Event');
   let rows=[[t('When'),eventWhen(ev)]];
   if(ev.location)rows.push([t('Where'),ev.location]);
-  /* Every coach, not just the lead one. A poster that named one of three was quietly deciding
-     which of them the parents would recognise. Each gets the address of their own bio underneath,
-     in smaller muted type — typed, not tapped, because a picture has no links in it. */
-  (function(){
-    const ids=eventCoachIdsOrdered(ev);
-    ids.forEach((id,i)=>{
-      const co=coachById(id); if(!co)return;
-      rows.push([i?'':(ids.length>1?t('Coaches'):t('Coach')), co.name, coachShortUrl(co)]);
-    });
-  })();
+  /* Every coach, on ONE line. A name per row was four rows deep for a track session and pushed
+     everything else toward the code; read as a block, the names are what a parent is scanning for
+     and they scan faster side by side than stacked.
+     A single coach still gets their own address underneath, because there it costs no extra room.
+     Two or more share one line for the whole team — four addresses stacked under four names is the
+     layout this replaced. Allowed four wrapped lines: ellipsising somebody's name to save space is
+     worse than the space. */
+  { const cr=posterCoachRow(ev); if(cr)rows.push(cr); }
   rows.push([t('Price'),ev.price?money(ev.price)+' '+t('per player'):t('Free')]);
   const left=eventLeftText(ev); if(left)rows.push([t('Places'),left]);
   const colX=W/2-300,valX=colX+30,valW=W-valX-70;
@@ -12048,7 +12051,7 @@ function eventPosterCanvas(ev){
       x.font='800 '+st.tf+'px '+FONT;
       st.lines=posterFit(x,title,W-160,3);
       x.font='700 '+st.rf+'px '+FONT;
-      st.wrapped=rws.map(([k,v,sub])=>[k,posterFit(x,v,valW,st.ml),sub||'']);
+      st.wrapped=rws.map(([k,v,sub,ml])=>[k,posterFit(x,v,valW,Math.max(st.ml,ml||0)),sub||'']);
       let h=st.lines.length*st.tf*1.22+26;
       st.wrapped.forEach(([,ls,sub])=>h+=st.rowH+(ls.length>1?st.rf*1.16:0)+(sub?st.rf*0.95:0));
       p={...st,h};
@@ -12065,9 +12068,10 @@ function eventPosterCanvas(ev){
      individual addresses collapse into one line for the whole team. Dropping information beats
      overlapping it, and the names are what a parent is scanning for. */
   if(!got.fits&&rows.some(r=>r[2])){
-    const flat=rows.map(([k,v,sub])=>[k,v,'']);
-    const lastCoach=flat.map(r=>r[1]).lastIndexOf(rows.filter(r=>r[2]).slice(-1)[0][1]);
-    flat.splice(lastCoach+1,0,['',t('All coach bios')+': '+location.origin.replace(/^https?:\/\//,'')+'/c','']);
+    /* Still too tall — a very long title, or a lot of coaches. Drop the address lines and keep
+       every name: dropping detail beats printing the last row through "Scan to register", and the
+       names are the part a parent is actually looking for. */
+    const flat=rows.map(([k,v,sub,ml])=>[k,v,'',ml]);
     const alt=planFor(flat);
     if(alt.fits||!got.fits){ rows=flat; got=alt; }
   }
@@ -12230,6 +12234,18 @@ function previewOgCard(){
    it, and leaving it swapped would silently repaint the whole admin in Chinese. */
 let posterLang=null;
 function posterLangFor(){ return posterLang||LANG||'en'; }
+/* The poster's coach line, as one row: [label, names, sub, maxLines] — or null when nobody is
+   assigned. Lifted out of sharePoster so the rule can be checked without rendering a canvas. */
+function posterCoachRow(ev){
+  const ids=eventCoachIdsOrdered(ev);
+  if(!ids.length)return null;
+  const names=ids.map(id=>coachName(id)).join(' · ');
+  if(ids.length===1){
+    const co=coachById(ids[0]);
+    return [t('Coach'),names,co?coachShortUrl(co):'',2];
+  }
+  return [t('Coaches'),names,t('All coach bios')+': '+location.origin.replace(/^https?:\/\//,'')+'/c',4];
+}
 function sharePoster(eid,lang){
   const ev=eventById(eid); if(!ev)return;
   posterLang=lang||posterLang||LANG||'en';
