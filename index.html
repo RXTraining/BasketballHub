@@ -976,6 +976,8 @@
   .lp-coach-bio{font-size:13.5px;line-height:1.6;color:var(--lp-mut);margin:0;
     display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
   .lp-coach-bio.open{-webkit-line-clamp:unset;display:block}
+  /* One card on its own should not sit in a three-column grid looking like a gap. */
+  .lp-coach-focus{max-width:620px;margin:0 auto;box-shadow:0 10px 30px rgba(24,48,10,.12)}
   .lp-bio-wrap{margin-top:2px}
   .lp-more{background:none;border:0;padding:4px 0 0;cursor:pointer;font-family:inherit;
     font-weight:800;font-size:12.5px;color:var(--lp-volt-d)}
@@ -4550,6 +4552,11 @@ function initAuth(){
      that was already signed in opened the event form and then had the waiver land on top of it a
      moment later, and cancelling that dropped the person on their own client page having never
      seen the event. One arrival, one intent. */
+  /* rxtraining.org/c?k=sabina — functions/c.js hands it over as #coach=sabina. */
+  try{
+    const cm=location.hash.match(/[#&]coach=([a-z0-9]+)/i);
+    if(cm){ setTimeout(()=>{ try{ openCoachPage(cm[1]); }catch(e){} },260); }
+  }catch(e){}
   const em=location.hash.match(/[#&]e=([a-z0-9]+)/i);
   if(em)linkEventId=em[1];
   /* A tap on "Yes" or "Not this week" in an email. The token says who, the answer says what, and
@@ -5203,8 +5210,15 @@ function lpCoachCards(){
      what an empty string would otherwise do. Name breaks a tie.
      The BOOKING pickers keep their own order — Raymond pinned first, where he is the usual
      choice — because that is a convenience list, not a roster. */
-  const list=coachesByJoined(activeCoaches());
+  let list=coachesByJoined(activeCoaches());   // reassigned below when one coach is in focus
   if(!list.length)return '<div class="lp-card">'+t('NO_COACHES')+'</div>';
+  /* Arriving from a coach's own address shows THAT coach, not a wall of cards to hunt through —
+     the link was printed under their name, so landing anywhere else is a broken promise. One chip
+     gets back to the whole team. */
+  if(lpCoachFocus){
+    const only=list.filter(c=>coachSlug(c)===lpCoachFocus||coachSlugify(firstName(c.name||''))===lpCoachFocus);
+    if(only.length)list=only;
+  }
   return list.map((c,i)=>{
     const founder=(c.name||'').trim().toLowerCase()==='raymond xu';
     const initials=(c.name||'?').split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
@@ -5212,7 +5226,7 @@ function lpCoachCards(){
       ? `<img src="${c.photo}" alt="${c.name}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'lp-av',textContent:'${initials}'}))">`
       : `<div class="lp-av">${initials}</div>`;
     const bio=mlText(c.bio||'').trim();
-    return `<article class="lp-coach reveal" style="animation-delay:${i*90}ms">
+    return `<article class="lp-coach reveal${lpCoachFocus?' lp-coach-focus':''}" id="coach_${c.id}" style="animation-delay:${i*90}ms">
       <div class="lp-coach-top">
         ${photo}
         <div style="min-width:0">
@@ -5511,6 +5525,7 @@ function renderLanding(){
       <div class="lp-kicker">${t('The team')}</div>
       <h2 class="lp-h2">${t('YOUR COACHES')}</h2>
       <p class="lp-p">${t('COACHES_P')}</p>
+      ${lpCoachFocus?`<div style="margin-bottom:14px"><button class="lp-btn" onclick="lpCoachShowAll()">← ${t('All coaches')}</button></div>`:''}
       <div class="lp-coaches">${lpCoachCards()}</div>
     </section>
 
@@ -6104,8 +6119,14 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-09-22 00:52 UTC';
+const BUILD='2026-10-02 01:38 UTC';
 const CHANGELOG=[
+ {v:'6.6', d:'2026-10-02', t:'Every coach on the poster, each with their own page', items:[
+   '<b>The poster now names every coach on the event, not just the lead one.</b> A poster that named one of three was quietly deciding which of them a parent would recognise.',
+   '<b>Each name carries its own address underneath</b> \u2014 <span class="mono">rxtraining.org/c?k=sabina</span> \u2014 and typing it opens the site <b>on that coach</b>: their card alone, bio already open, with one chip back to the whole team.',
+   'The address is the coach\u2019s first name, because that is what somebody will actually type off a picture. Two coaches sharing a first name get a last initial, and a poster printed before the second one joined still resolves \u2014 an exact miss falls back to a first-name match rather than a dead page.',
+   '<b>It is printed, not tapped, and that is a limit of posters rather than a choice.</b> A PNG has no links inside it, in WeChat or anywhere else \u2014 so the line is sized to be copied onto a phone. Wherever the same event appears as real text (chat, email, the share box) the coach link is an ordinary tappable link.',
+ ]},
  {v:'6.5', d:'2026-09-22', t:'Change is money, and it stops inflating the credit count', items:[
    '<b>Fix: \u201cGroup &amp; weekend classes: 20/21 used \u00b7 1 left\u201d.</b> Yanyan had bought 20 group credits and spent all 20 \u2014 the 21st was change from a 1:1 credit that the app had quietly converted into a group credit. The arithmetic was right and the answer was wrong: a pool he had used up read as having one left, against a total he never bought.',
    '<b>Credit pools now show exactly what was bought and used.</b> Nothing is ever added to them. Money left over from a 1:1 credit stays money, on its own line: <i>\u201c$30 on account\u201d</i>.',
@@ -11403,6 +11424,55 @@ function eventPast(ev){ return !eventUpcoming(ev); }
 /* One of the hosts is the name people recognise — the one worth putting on the poster. Stored
    separately so re-ordering or adding hosts never silently changes who is billed as lead; if the
    nominated coach is later removed from the event, it falls back to the first host. */
+/* ---- A public address for one coach -----------------------------------------------------------
+   A poster is a picture: nothing drawn into it can be tapped, in WeChat or anywhere else. So a
+   coach needs an address short enough that a parent will actually type it, and the SAME address
+   has to work as a real link everywhere the event appears as text — chat, email, the share box.
+
+   The slug is the coach's first name while that is unique among the active coaches, because
+   "rxtraining.org/c?k=sabina" is worth typing and a four-character hash is not. Two Sabinas get a
+   last initial. The resolver is deliberately forgiving: a poster printed last month keeps working
+   after a second Sabina joins, because an exact miss falls back to a first-name match. */
+let lpCoachFocus=null;
+function lpCoachShowAll(){ lpCoachFocus=null;
+  try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}
+  renderLanding(); setTimeout(()=>{const el=document.getElementById('lpCoaches'); if(el)el.scrollIntoView({behavior:'smooth',block:'start'});},60); }
+/* Open the page on one coach. Used by the printed address, and by every place a coach's name is a
+   real link — where it IS tappable. */
+function openCoachPage(slug){
+  const co=coachBySlug(slug);
+  lpCoachFocus=co?coachSlug(co):null;
+  try{ renderLanding(); }catch(e){}
+  setTimeout(()=>{
+    const el=document.getElementById('lpCoaches');
+    if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+    /* Open the bio rather than leaving it clamped: the whole point of the link is the bio. */
+    if(co){ const b=document.getElementById('bio_'+co.id); if(b)b.classList.add('open'); }
+  },80);
+  return !!co;
+}
+function coachSlugify(n){ return String(n||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,''); }
+function coachSlug(co){
+  if(!co)return '';
+  const first=coachSlugify(firstName(co.name||''));
+  if(!first)return coachSlugify(co.id);
+  const clash=(DB.coaches||[]).filter(x=>x.id!==co.id&&x.active!==false
+    &&coachSlugify(firstName(x.name||''))===first).length;
+  if(!clash)return first;
+  const last=(String(co.name||'').trim().split(/\s+/).slice(-1)[0]||'');
+  return first+coachSlugify(last).slice(0,1);
+}
+function coachBySlug(slug){
+  const k=coachSlugify(slug); if(!k)return null;
+  const live=(DB.coaches||[]).filter(c=>c.active!==false);
+  return live.find(c=>coachSlug(c)===k)
+      || live.find(c=>coachSlugify(firstName(c.name||''))===k)        // a poster that predates a clash
+      || live.find(c=>coachSlugify(c.name)===k)
+      || null;
+}
+/* Typed off a poster, so no scheme and no hash — functions/c.js turns it into the app link. */
+function coachShortUrl(co){ return location.origin.replace(/^https?:\/\//,'')+'/c?k='+coachSlug(co); }
+function coachPublicUrl(co){ return location.origin+'/c?k='+coachSlug(co); }
 function eventLeadId(ev){
   const ids=eventCoachIds(ev);
   if(ev&&ev.leadCoachId&&ids.indexOf(ev.leadCoachId)>=0)return ev.leadCoachId;
@@ -11916,7 +11986,16 @@ function eventPosterCanvas(ev){
   const title=mlText(ev.title)||t('Event');
   const rows=[[t('When'),eventWhen(ev)]];
   if(ev.location)rows.push([t('Where'),ev.location]);
-  if(eventLeadId(ev))rows.push([t('Coach'),eventLeadName(ev)]);
+  /* Every coach, not just the lead one. A poster that named one of three was quietly deciding
+     which of them the parents would recognise. Each gets the address of their own bio underneath,
+     in smaller muted type — typed, not tapped, because a picture has no links in it. */
+  (function(){
+    const ids=eventCoachIds(ev);
+    ids.forEach((id,i)=>{
+      const co=coachById(id); if(!co)return;
+      rows.push([i?'':(ids.length>1?t('Coaches'):t('Coach')), co.name, coachShortUrl(co)]);
+    });
+  })();
   rows.push([t('Price'),ev.price?money(ev.price)+' '+t('per player'):t('Free')]);
   const left=eventLeftText(ev); if(left)rows.push([t('Places'),left]);
   const colX=W/2-300,valX=colX+30,valW=W-valX-70;
@@ -11933,9 +12012,9 @@ function eventPosterCanvas(ev){
     x.font='800 '+st.tf+'px '+FONT;
     st.lines=posterFit(x,title,W-160,3);
     x.font='700 '+st.rf+'px '+FONT;
-    st.wrapped=rows.map(([k,v])=>[k,posterFit(x,v,valW,st.ml)]);
+    st.wrapped=rows.map(([k,v,sub])=>[k,posterFit(x,v,valW,st.ml),sub||'']);
     let h=st.lines.length*st.tf*1.22+26;
-    st.wrapped.forEach(([,ls])=>h+=st.rowH+(ls.length>1?st.rf*1.16:0));
+    st.wrapped.forEach(([,ls,sub])=>h+=st.rowH+(ls.length>1?st.rf*1.16:0)+(sub?st.rf*0.95:0));
     plan=st; plan.h=h;
     if(top+h<=floor) break;
   }
@@ -11945,11 +12024,19 @@ function eventPosterCanvas(ev){
   x.textAlign='center';x.font='800 '+plan.tf+'px '+FONT;x.fillStyle='#0f1410';
   plan.lines.forEach(l=>{x.fillText(l,W/2,y);y+=plan.tf*1.22;});
   y+=26;
-  plan.wrapped.forEach(([k,ls])=>{
-    x.textAlign='right';x.font='600 '+Math.round(plan.rf*.9)+'px '+FONT;x.fillStyle='#7a8676';x.fillText(k,colX,y);
+  plan.wrapped.forEach(([k,ls,sub])=>{
+    x.textAlign='right';x.font='600 '+Math.round(plan.rf*.9)+'px '+FONT;x.fillStyle='#7a8676';
+    if(k)x.fillText(k,colX,y);
     x.textAlign='left';x.font='700 '+plan.rf+'px '+FONT;x.fillStyle='#0f1410';
     ls.forEach((l,i)=>x.fillText(l,valX,y+i*plan.rf*1.16));
     y+=plan.rowH+(ls.length>1?plan.rf*1.16:0);
+    if(sub){
+      /* Big enough to copy by hand onto a phone — this line exists to be TYPED, so shrinking it
+         to fit is a false economy; the planner already has steps that shrink everything. */
+      x.font='700 '+Math.round(plan.rf*0.70)+'px '+FONT;x.fillStyle='#98560a';
+      x.fillText(sub,valX,y-plan.rowH*0.32);
+      y+=plan.rf*0.95;
+    }
   });
 
   // Quiet zone included, because a code butted up against artwork often will not lock on
