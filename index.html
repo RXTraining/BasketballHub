@@ -6119,8 +6119,13 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-10-02 01:38 UTC';
+const BUILD='2026-10-02 02:04 UTC';
 const CHANGELOG=[
+ {v:'6.7', d:'2026-10-02', t:'Coaches read in the order that makes sense', items:[
+   '<b>Lead coach first, then the rest of that sport, then anyone from another sport.</b> A parent scanning a track session wants the track coaches together, and the person running it named first \u2014 not whatever order the coaches happened to be added in. Within each group the order you entered is kept, so it never reshuffles two coaches it has no opinion about.',
+   'The event\u2019s own sport decides it; an older event without one falls back to the lead coach\u2019s sport. The same order is used everywhere the event lists its coaches \u2014 the poster, the events table, the share box \u2014 so they can never disagree.',
+   '<b>Fix: four coaches ran straight through \u201cScan to register\u201d.</b> Each coach\u2019s address needs its own line, and past three there is no font small enough to fit them all and stay off the code. Shrinking further would defeat the point, since those lines exist to be typed. So when they will not fit, <b>every name stays</b> and the individual addresses collapse into one line for the whole team \u2014 <i>\u201cAll coach bios: rxtraining.org/c\u201d</i>. Dropping detail beats overlapping it, and the names are what a parent is looking for.',
+ ]},
  {v:'6.6', d:'2026-10-02', t:'Every coach on the poster, each with their own page', items:[
    '<b>The poster now names every coach on the event, not just the lead one.</b> A poster that named one of three was quietly deciding which of them a parent would recognise.',
    '<b>Each name carries its own address underneath</b> \u2014 <span class="mono">rxtraining.org/c?k=sabina</span> \u2014 and typing it opens the site <b>on that coach</b>: their card alone, bio already open, with one chip back to the whole team.',
@@ -11493,16 +11498,41 @@ function eventCoachIds(ev){
   return ev.coachId?[ev.coachId]:[];
 }
 function eventHasCoach(ev,cid){ return !cid||eventCoachIds(ev).indexOf(cid)>=0; }
+/* The order coaches are READ in, which is not the order they were added in.
+   Lead first — they are the person running it, and a parent scanning a poster reads one name.
+   Then the rest of that sport, because a track parent looking at a track session wants the track
+   coaches together. Then anyone from another sport, who is there to help rather than to be the
+   reason you came.
+   The event's own sport wins when it has one; otherwise the lead coach's sport stands in, which is
+   right for every event created before the sport field existed. Ties keep the order the owner
+   entered, so this never reshuffles two coaches it has no opinion about.
+   Membership tests keep using eventCoachIds() — order is a display question. */
+function eventCoachIdsOrdered(ev){
+  const ids=eventCoachIds(ev);
+  if(ids.length<2)return ids;
+  const lead=eventLeadId(ev);
+  const leadCo=lead?coachById(lead):null;
+  const evSport=sportKey((ev&&ev.sport)||(leadCo&&leadCo.sport)||'');
+  const rank=id=>{
+    if(id===lead)return 0;
+    if(!evSport)return 1;
+    const co=coachById(id);
+    return (co&&sportKey(co.sport)===evSport)?1:2;
+  };
+  return ids.map((id,i)=>({id,i,r:rank(id)}))
+            .sort((a,b)=>(a.r-b.r)||(a.i-b.i))
+            .map(x=>x.id);
+}
 /* "🏀 Raymond Xu · 🏃 Jack" — or nothing at all for a general event */
 function eventCoachHtml(ev,pill){
-  const ids=eventCoachIds(ev);
+  const ids=eventCoachIdsOrdered(ev);
   if(!ids.length)return pill?'':'<span class="muted">General</span>';
   return ids.map(id=>pill
     ? `<span class="pill">${coachIcon(id)} ${coachName(id)}</span>`
     : `${coachIcon(id)} ${coachName(id)}`).join(pill?' ':' · ');
 }
 function eventCoachNames(ev){
-  const ids=eventCoachIds(ev);
+  const ids=eventCoachIdsOrdered(ev);
   return ids.length?ids.map(coachName).join(', '):'General';
 }
 /* Whether an event should still be advertised — the ONE rule behind the home page ticker, the
@@ -11984,13 +12014,13 @@ function eventPosterCanvas(ev){
   const top=my+(sports.length>1?250:210);   // clear the sports row when there is one
   let y=top;
   const title=mlText(ev.title)||t('Event');
-  const rows=[[t('When'),eventWhen(ev)]];
+  let rows=[[t('When'),eventWhen(ev)]];
   if(ev.location)rows.push([t('Where'),ev.location]);
   /* Every coach, not just the lead one. A poster that named one of three was quietly deciding
      which of them the parents would recognise. Each gets the address of their own bio underneath,
      in smaller muted type — typed, not tapped, because a picture has no links in it. */
   (function(){
-    const ids=eventCoachIds(ev);
+    const ids=eventCoachIdsOrdered(ev);
     ids.forEach((id,i)=>{
       const co=coachById(id); if(!co)return;
       rows.push([i?'':(ids.length>1?t('Coaches'):t('Coach')), co.name, coachShortUrl(co)]);
@@ -12004,20 +12034,44 @@ function eventPosterCanvas(ev){
      is deliberately reachable — earlier this gave up while still too tall and the final row ran
      straight through "Scan to register", so the tightest step drops each value to one ellipsised
      line, which always fits. Shrinking beats overlapping. */
+  /* The ladder has to reach small enough for the WORST case, not the common one: a long title
+     plus five coaches plus a bios line is nine rows, and stopping at rf 24 / rowH 40 left the last
+     row sitting on "Scan to register". Overlap is the one outcome that cannot be allowed, so the
+     bottom of the ladder is deliberately tighter than anything that looks good — it is a floor
+     that is reached rarely, not a target. */
   const steps=[];
-  for(let s=0;s<13;s++) steps.push({tf:Math.max(34,76-s*4), rf:Math.max(24,38-Math.round(s*1.4)),
-                                    rowH:Math.max(40,58-s*2), ml:s<9?2:1});
-  let plan=steps[0];
-  for(const st of steps){
-    x.font='800 '+st.tf+'px '+FONT;
-    st.lines=posterFit(x,title,W-160,3);
-    x.font='700 '+st.rf+'px '+FONT;
-    st.wrapped=rows.map(([k,v,sub])=>[k,posterFit(x,v,valW,st.ml),sub||'']);
-    let h=st.lines.length*st.tf*1.22+26;
-    st.wrapped.forEach(([,ls,sub])=>h+=st.rowH+(ls.length>1?st.rf*1.16:0)+(sub?st.rf*0.95:0));
-    plan=st; plan.h=h;
-    if(top+h<=floor) break;
+  for(let s=0;s<20;s++) steps.push({tf:Math.max(30,76-s*4), rf:Math.max(19,38-Math.round(s*1.4)),
+                                    rowH:Math.max(30,58-s*2), ml:s<9?2:1});
+  const planFor=rws=>{
+    let p=steps[0], fits=false;
+    for(const st of steps){
+      x.font='800 '+st.tf+'px '+FONT;
+      st.lines=posterFit(x,title,W-160,3);
+      x.font='700 '+st.rf+'px '+FONT;
+      st.wrapped=rws.map(([k,v,sub])=>[k,posterFit(x,v,valW,st.ml),sub||'']);
+      let h=st.lines.length*st.tf*1.22+26;
+      st.wrapped.forEach(([,ls,sub])=>h+=st.rowH+(ls.length>1?st.rf*1.16:0)+(sub?st.rf*0.95:0));
+      p={...st,h};
+      if(top+h<=floor){ fits=true; break; }
+    }
+    return {plan:p,fits};
+  };
+  let got=planFor(rows);
+  /* A per-coach address needs its own line, and with four or five coaches there is no font small
+     enough to fit them AND stay off the code — the old ladder simply ran out and the last row
+     printed straight through "Scan to register". Shrinking further would defeat the point anyway:
+     these lines exist to be TYPED.
+     So when they will not fit, every NAME stays (that is the thing the owner asked for) and the
+     individual addresses collapse into one line for the whole team. Dropping information beats
+     overlapping it, and the names are what a parent is scanning for. */
+  if(!got.fits&&rows.some(r=>r[2])){
+    const flat=rows.map(([k,v,sub])=>[k,v,'']);
+    const lastCoach=flat.map(r=>r[1]).lastIndexOf(rows.filter(r=>r[2]).slice(-1)[0][1]);
+    flat.splice(lastCoach+1,0,['',t('All coach bios')+': '+location.origin.replace(/^https?:\/\//,'')+'/c','']);
+    const alt=planFor(flat);
+    if(alt.fits||!got.fits){ rows=flat; got=alt; }
   }
+  let plan=got.plan;
   // Centre the block in the space above the code; bottom-anchoring the QR otherwise leaves a
   // short event floating with a large hole under it
   y=top+Math.max(0,(floor-top-plan.h)/2);
