@@ -6263,12 +6263,14 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-10-10 03:20 UTC';
+const BUILD='2026-10-10 03:52 UTC';
 const CHANGELOG=[
  {v:'6.15', d:'2026-10-10', t:'Money received has to say what it buys', items:[
    '<b>Fix: “Sell cash sessions” gave the client nothing.</b> It had a session type and a quantity and worked out the amount from the rate, so filling in <i>group × 20, $400</i> read exactly like selling a twenty-pack — and created a revenue line and <b>no credits at all</b>, with nothing on screen saying so. The dialog is now called <b>Money received</b> and asks what the money is for, showing what each answer will do before you save.',
    '<b>Money on account is now something you can put money INTO.</b> It already existed — it is where the change goes when a $35 credit pays for a $20 place — but the only way to create it was as change. A balance spends on <b>any session or event, any coach, any price</b>, at what that one actually costs. No pool to run out, no credit worth the wrong amount.',
    '<b>A balance can pay a 1:1 too.</b> It could not before: a 1:1 had nowhere to record which pool paid for it. The rule keeping 1:1 packages separate exists so a cheap CREDIT cannot settle an expensive session — a dollar is not a credit, so it never applied to money. The Credit button now appears on a 1:1 when the balance covers it.',
+   '<b>Fix: on the account option, Session type and Sessions (qty) are gone.</b> A balance is a sum of money, not a count of sessions — and leaving them on screen was worse than pointless, because touching either one would have quietly replaced a $400 balance with one session’s rate. The amount is left exactly as typed. They come back for a prepaid block, where they decide how many credits are bought, labelled <i>Credits (qty)</i>.',
+   'The “pick a client” warning now clears the moment you pick one — it was only watching the type and the quantity, so it sat there in red under a chosen client.',
    '<b>The balance is on the Clients row</b>, beside the credits, and in the client’s own view. What a family has left is one question; showing half of it is how $400 sits on an account unnoticed.'
  ]},
  {v:'6.14', d:'2026-10-09', t:'Posters say when it ends, and an old one is no longer a dead end', items:[
@@ -15729,25 +15731,33 @@ function openCashEntry(id,prefillCust){
       <div class="clienttag" id="kKindHint" style="margin-top:4px"></div></div>
     <div class="field"><label class="f">Coach (whose revenue)</label><select id="kCoach">${coachSelectOptions(e.coachId||targetCoach(),false)}</select></div>
     <div class="row">
-      <div class="field"><label class="f">Source (client)</label><select id="kCust">${custOpts}</select></div>
+      <div class="field"><label class="f">Source (client)</label><select id="kCust" onchange="recalcCash()">${custOpts}</select></div>
       <div class="field"><label class="f">Date</label><input type="date" id="kDate" value="${e.date}"></div>
     </div>
-    <div class="row">
+    <div class="row" id="kRowWhat">
       <div class="field"><label class="f">Session type</label><select id="kType" onchange="recalcCash()">${TYPE_ORDER.map(ty=>`<option value="${ty}" ${e.type===ty?'selected':''}>${typeIcon(ty)} ${typeDef(ty).label} (${money(coachRate(e.coachId||targetCoach(),ty))}${ty==='1on1'?'/hr':'/player'})</option>`).join('')}</select></div>
-      <div class="field"><label class="f">Sessions (qty)</label><input type="number" id="kQty" min="1" value="${e.qty||1}" onchange="recalcCash()" oninput="recalcCash()"></div>
+      <div class="field"><label class="f" id="kQtyLbl">Sessions (qty)</label><input type="number" id="kQty" min="1" value="${e.qty||1}" onchange="recalcCash()" oninput="recalcCash()"></div>
     </div>
     <div class="row">
-      <div class="field"><label class="f">Amount ($) — auto, editable</label><input type="number" id="kAmt" value="${e.amount}"></div>
+      <div class="field"><label class="f" id="kAmtLbl">Amount ($) — auto, editable</label><input type="number" id="kAmt" value="${e.amount}"></div>
       <div class="field"><label class="f">Note</label><input id="kNote" value="${e.note||''}" placeholder="optional"></div>
     </div>
-    <p class="muted small">Both count toward revenue on the date above. The difference is whether the client ends up holding <b style="color:var(--txt)">credits</b>: a prepaid block does, money for sessions already taken does not. Pick the client as source, or leave blank for a walk-in (a walk-in cannot hold credits).</p>
+    <p class="muted small">All three count toward revenue on the date above. What differs is what the client is left holding: a <b style="color:var(--txt)">prepaid block</b> leaves them credits, <b style="color:var(--txt)">on account</b> leaves them money, and <b style="color:var(--txt)">sessions already taken</b> leaves them nothing because they have had the sessions. Leave the client blank only for a walk-in — a walk-in can hold neither.</p>
   `,`${id?`<button class="btn danger" onclick="delCashEntry('${id}')">Delete</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveCashEntry('${id||''}')">Save</button>`);
   if(!id)recalcCash();
 }
 function recalcCash(){
   const type=$('#kType').value,qty=+$('#kQty').value||0;
   const cid=$('#kCoach')?$('#kCoach').value:targetCoach();
-  $('#kAmt').value=qty*coachRate(cid,type);
+  const kind=$('#kKind')?$('#kKind').value:'cash';
+  /* A balance is a sum of money, not a count of sessions — so the type and the quantity have
+     nothing to say about it, and the auto-amount must keep its hands off what was typed. Leaving
+     them on screen was worse than useless: touching either one would have quietly replaced a
+     $400 balance with one session's rate. */
+  const row=$('#kRowWhat'); if(row)row.style.display=(kind==='acct')?'none':'';
+  const al=$('#kAmtLbl'); if(al)al.textContent=(kind==='acct')?'Amount ($)':'Amount ($) — auto, editable';
+  const ql=$('#kQtyLbl'); if(ql)ql.textContent=(kind==='pkg')?'Credits (qty)':'Sessions (qty)';
+  if(kind!=='acct')$('#kAmt').value=qty*coachRate(cid,type);
   /* The trap this replaces: "Sell cash sessions" with a type and a quantity reads exactly like
      selling a block, so $400 for 20 group sessions went in as revenue and the client got no
      credits at all — and nothing on the screen said so. Now the screen says it. */
