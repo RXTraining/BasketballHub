@@ -2618,6 +2618,9 @@ function assemble(st,loc,cus,pkg,ses,exp,cash,avail,coa,evs,regs,msgs,acts,sk,sl
      it. Run supabase-setup.sql and it starts being saved; until then nothing breaks. */
   if(evs&&evs.length)EV_END_COL=Object.prototype.hasOwnProperty.call(evs[0],'end_time');
   d.events=(evs||[]).map(e=>({id:e.id,title:e.title||'',detail:e.detail||'',date:e.date||'',time:e.time||'',endTime:(e.end_time||''),location:e.location||'',sport:(e.sport||''),coachId:e.coach_id||'',coachIds:(Array.isArray(e.coach_ids)?e.coach_ids:(e.coach_id?[e.coach_id]:[])),leadCoachId:(e.lead_coach_id||''),price:Number(e.price||0),capacity:Number(e.capacity||0),active:e.active!==false,created:e.created||'',video:e.video||'',featured:e.featured===true,payouts:(Array.isArray(e.payouts)?e.payouts:[])}));
+  /* Same guard as EV_END_COL and CU_GUARD_COL: an upsert naming a column the database does not
+     have fails the WHOLE row, which here would be every registration write in the app. */
+  if(regs&&regs.length)EV_PAYER_COL=Object.prototype.hasOwnProperty.call(regs[0],'payer');
   d.eventRegs=(regs||[]).map(regFromRow);
   d.messages=(msgs||[]).map(m=>({id:m.id,peerType:m.peer_type||'client',clientId:m.client_id||'',coachId:m.coach_id||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',readOwner:m.read_owner===true,readClient:m.read_client===true,readCoach:m.read_coach===true}));
   d.highlights=(hl||[]).map(h=>({id:h.id,url:h.url||'',title:h.title||'',date:h.date||'',sport:h.sport||'',active:h.active!==false,type:h.type||'',ord:(h.ord!=null?h.ord:null)}));
@@ -2670,8 +2673,12 @@ const eventRow=e=>Object.assign(EV_END_COL===false?{}:{end_time:(e.endTime||null
 /* The inverse of eventRegRow. Named rather than inline because the reconcile below has to put a
    server row into exactly the shape eventRegRow produces, and two hand-written copies of that
    mapping would drift the moment a column is added. */
-const regFromRow=r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||'',payRequested:!!r.pay_requested,answer:r.answer||'',askedAt:r.asked_at||'',nudges:+(r.nudges||0),nudgesAuto:+(r.nudges_auto||0),creditPool:r.credit_pool||'',waiver:(r.waiver&&typeof r.waiver==='object'?r.waiver:null)});
-const eventRegRow=r=>({id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||'',pay_requested:!!r.payRequested,answer:r.answer||'',asked_at:r.askedAt||'',nudges:+(r.nudges||0),nudges_auto:+(r.nudgesAuto||0),credit_pool:r.creditPool||'',waiver:(r.waiver||null)});
+const regFromRow=r=>({id:r.id,eventId:r.event_id||'',customerId:r.customer_id||'',
+  payer:(r.payer||''),payerAmount:(r.payer_amount!=null?Number(r.payer_amount):null),status:r.status||'registered',paid:!!r.paid,paidVia:r.paid_via||'',checkedIn:!!r.checked_in,created:r.created||'',payRequested:!!r.pay_requested,answer:r.answer||'',askedAt:r.asked_at||'',nudges:+(r.nudges||0),nudgesAuto:+(r.nudges_auto||0),creditPool:r.credit_pool||'',waiver:(r.waiver&&typeof r.waiver==='object'?r.waiver:null)});
+let EV_PAYER_COL=null;      // null = not looked yet
+const eventRegRow=r=>Object.assign(
+  EV_PAYER_COL===false?{}:{payer:(r.payer||null),payer_amount:(r.payerAmount!=null?r.payerAmount:null)},
+ {id:r.id,event_id:r.eventId||'',customer_id:r.customerId||'',status:r.status||'registered',paid:!!r.paid,paid_via:r.paidVia||'',checked_in:!!r.checkedIn,created:r.created||'',pay_requested:!!r.payRequested,answer:r.answer||'',asked_at:r.askedAt||'',nudges:+(r.nudges||0),nudges_auto:+(r.nudgesAuto||0),credit_pool:r.creditPool||'',waiver:(r.waiver||null)});
 const messageRow=m=>({id:m.id,peer_type:m.peerType||'client',client_id:m.clientId||'',coach_id:m.coachId||'',sender:m.sender||'client',text:m.text||'',media:m.media||[],created:m.created||'',read_owner:m.readOwner===true,read_client:m.readClient===true,read_coach:m.readCoach===true});
 async function migrateSource(){
   try{const {data}=await supa.from(STATE_TABLE).select('data').eq('id','main').maybeSingle();if(data&&data.data)return normalize(data.data);}catch(e){}
@@ -3599,6 +3606,10 @@ function accountSpent(c){
   (DB.eventRegs||[]).forEach(r=>{
     if(r.customerId!==c.id||!isEventPlace(r)||!r.paid||r.paidVia!=='package')return;
     if(regPoolKey(r)!==POOL_ACCOUNT)return;
+    /* Somebody else's balance covered this place — it is their spend, counted in paidForOthers,
+       not this family's. Counting it here as well took the same $20 off two balances and left
+       the friend reading minus twenty. */
+    if(r.payer&&r.payer!==c.id)return;
     const ev=eventById(r.eventId); if(!ev)return;
     sum+=Number(ev.price)||0;
   });
@@ -6366,11 +6377,12 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-10-18 15:10 UTC';
+const BUILD='2026-10-18 16:05 UTC';
 const CHANGELOG=[
  {v:'6.17', d:'2026-10-18', t:'Past events, paying for a friend, two parents, the right ball', items:[
    '<b>Fix: a client could still take a place at an event that had already happened.</b> A place was taken on a 19 September session on 17 October. The lists were filtered by date, but filtering a list is not the same as refusing the action, and a screen can be minutes or days old — a tab left open, a phone waking up, a link kept in a message. Registering, answering yes in the app, and the one-tap link in an email are all refused now, at the one gate underneath all three.',
    '<b>One player’s balance can pay for another’s place.</b> A parent brings a friend along and settles for them on the spot — the friend has no credits, no balance and may not be on the books at all. <b>🤝 Another account</b> on the unpaid player’s row takes it out of whoever is paying, <b>at an amount you set</b>, so covering half of a place works too. Both sides read the same story: the friend’s row says <i>Paid by Yanyan Li · $20</i> rather than claiming the money was theirs.',
+   '<b>Paying for a friend works on an event place as well as a group session.</b> The weekend rounds, where a parent most often brings somebody along, are events — and the button was only ever drawn on a session, so the half that mattered could not be reached. 🤝 <b>Another account</b> is now on an unpaid registration too, with the same amount you set, and undoing a place hands the money back rather than leaving it spent.',
    '<b>A player can have more than one parent.</b> Mum books and Dad collects, on different mobiles and different inboxes, and whichever one was on the record got every message. There is now an <b>Other parents / guardians</b> block on the client, each with their own mobile and email; every message to the family goes to all of them, and the family is found by any of their numbers.',
    '<b>Fix: merging or rejecting a duplicate threw away the contact it carried.</b> That contact is usually the one the record on file is missing — which is why the duplicate got created. A merge now keeps <b>both</b> contacts rather than only filling blanks, and rejecting a request that carries a number or address the record lacks asks whether to keep it first.',
    '<b>The mark between RX and TRAINING is the event’s own sport.</b> It was read off the business’s sports list, so a track poster led with a basketball. Basketball, track, soccer — whatever the event is set to; the house mark still stands in when an event has no sport.',
@@ -13145,7 +13157,7 @@ function viewEventRegs(id){
           : '<span class="muted">—</span>')
       : r.paid
       ? (r.paidVia==='package'
-          ? `<span class="pill green">🎟️ ${regPoolKey(r)===POOL_ACCOUNT?'Account':'Credit'}</span>${(()=>{const u=eventRegCreditUse(r);
+          ? `<span class="pill green">🎟️ ${regPoolKey(r)===POOL_ACCOUNT?((r.payer&&r.payer!==r.customerId)?('Paid by '+((custById(r.payer)||{}).name||'another')):'Account'):'Credit'}</span>${(()=>{const u=eventRegCreditUse(r);
               if(!u)return '';
               if(u.account)return `<div class="clienttag">${money(u.amount)} ${t('from account')}</div>`;
               return `<div class="clienttag">${escapeHtml(u.pkg||'')} · ${u.over?(u.n+'/'+u.total+' · '+t('over')):(u.pkgN+'/'+u.pkgOf)}</div>`;})()}`
@@ -13175,7 +13187,16 @@ function viewEventRegs(id){
                :_acct?('Pay from the '+money(_bal)+' on their account')
                :('No group credits left — use one of their '+_o+' 1:1 credit'+(_o===1?'':'s')+'; the difference stays on their account')}" onclick="eventRegCredit('${r.id}')">🎟️ ${_g>0?'Credit':_acct?('Account '+money(_bal)):'1:1 credit'}</button>`
           : `<button class="iconbtn" style="opacity:.5" title="No group credit left — tap to sell a package" onclick="openSellPackage('${r.customerId}','group')">🎟️ Sell credit</button>`;
-        if(!r.paid)return cashBtn+credBtn;
+        /* The accounting for "somebody else paid" has read event places since it was written,
+           but nothing drew the button, so it could only ever happen on a group session — and the
+           weekend rounds, where a parent most often brings a friend, are events. A rule the owner
+           cannot press is not a rule. */
+        const _payers=eventRegsFor(ev.id).map(x=>custById(x.customerId))
+          .filter(x=>x&&x.id!==r.customerId&&accountLeft(x)>0);
+        const otherBtn=(_pr>0&&_payers.length)
+          ? `<button class="iconbtn" title="Take this place out of another family's account balance" onclick="openEventPayForOther('${r.id}')">🤝 Another account</button>`
+          : '';
+        if(!r.paid)return cashBtn+credBtn+otherBtn;
         // already paid: offer the OTHER method, plus a way back to unpaid
         return (r.paidVia==='package'?cashBtn:credBtn)
           +`<button class="iconbtn" title="Mark unpaid again" onclick="eventRegUnpay('${r.id}')">↩</button>`;
@@ -13432,10 +13453,47 @@ function eventRegCredit(id){
   logAct('credit_used',c.name+' · event place · '+(mode===POOL_1ON1?'1:1 credit':mode===POOL_ACCOUNT?'account balance':'group credit'),r.eventId);
   viewEventRegs(r.eventId);
 }
+/* Who is paying for this place, and how much of it — the event twin of openPayForOther. */
+function openEventPayForOther(id){
+  const r=(DB.eventRegs||[]).find(x=>x.id===id); if(!r)return;
+  const ev=eventById(r.eventId); if(!ev)return;
+  const who=custById(r.customerId), price=Number(ev.price)||0;
+  const payers=eventRegsFor(ev.id).map(x=>custById(x.customerId))
+    .filter(x=>x&&x.id!==r.customerId&&accountLeft(x)>0);
+  if(!payers.length)return flash('Nobody else registered has money on their account',true);
+  openModal('Pay for '+((who&&who.name)||'this place'),
+    `<p class="small">Takes this place out of another family's balance. Their balance goes down, this place is settled, and both sides read the same story.</p>
+     <div class="field" style="margin-top:10px"><label class="f">Paid by</label>
+       <select id="efoWho">${payers.map(p=>`<option value="${p.id}">${escapeHtml(p.name)} — ${money(accountLeft(p))} available</option>`).join('')}</select></div>
+     <div class="field"><label class="f">Amount ($)</label>
+       <input type="number" id="efoAmt" min="0" step="0.01" value="${price}">
+       <div class="clienttag" style="margin-top:4px">This place is ${money(price)}. Enter less if they are only covering part of it — the rest stays unpaid.</div></div>`,
+    `<button class="btn ghost" onclick="closeModal()">Cancel</button>
+     <button class="btn" onclick="doEventPayForOther('${id}')">Pay from their account</button>`);
+}
+function doEventPayForOther(id){
+  const r=(DB.eventRegs||[]).find(x=>x.id===id); if(!r)return;
+  const payerId=$('#efoWho').value, payer=custById(payerId);
+  const amt=Math.round((+$('#efoAmt').value||0)*100)/100;
+  if(!payer)return flash('Pick who is paying',true);
+  if(amt<=0)return flash('Enter an amount',true);
+  if(accountLeft(payer)<amt)
+    return flash(payer.name+' has '+money(accountLeft(payer))+' on account — not enough for '+money(amt),true);
+  r.paid=true; r.paidVia='package'; r.creditPool=POOL_ACCOUNT;
+  r.payer=payerId; r.payerAmount=amt;
+  try{ eventPaymentThanks(r); }catch(e){}
+  save(); pushRows('event_regs',[eventRegRow(r)]);
+  logAct('credit_used',((custById(r.customerId)||{}).name||'')+' · event place · paid by '+payer.name+' · '+money(amt)+' from their account',r.eventId);
+  closeModal();
+  flash(money(amt)+' taken from '+payer.name+"'s account · "+money(accountLeft(payer))+' left');
+  refreshOwner(); viewEventRegs(r.eventId);
+}
 function eventRegCreditUse(r){
   const c=custById(r&&r.customerId); if(!c||r.paidVia!=='package')return null;
   if(regPoolKey(r)===POOL_ACCOUNT){ const ev=eventById(r.eventId);
-    return {account:true,amount:(ev&&Number(ev.price))||0}; }
+    return {account:true,
+            amount:(r.payerAmount!=null?Number(r.payerAmount):((ev&&Number(ev.price))||0)),
+            payer:(r.payer&&r.payer!==r.customerId)?r.payer:''}; }
   const list=creditConsumers(c.id,regPoolKey(r));
   const n=list.findIndex(x=>x.id===r.id)+1; if(!n)return null;
   const slots=creditSlots(c,regPoolKey(r)), slot=slots[n-1];
@@ -13451,6 +13509,9 @@ function eventRegCreditUse(r){
 function eventRegUnpay(id){
   const r=(DB.eventRegs||[]).find(x=>x.id===id); if(!r)return;
   const was=r.paidVia;
+  /* If somebody else's balance covered this, undoing has to give it back — otherwise the money
+     stays spent against a place that is no longer paid. */
+  r.payer=''; r.payerAmount=null;
   r.paid=false; r.paidVia='';
   save(); flash(was==='package'?'Credit returned 🎟️':'Marked unpaid'); refreshOwner();
   viewEventRegs(r.eventId);
