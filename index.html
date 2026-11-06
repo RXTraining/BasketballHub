@@ -6377,7 +6377,7 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-11-06 03:31 UTC';
+const BUILD='2026-11-06 04:24 UTC';
 const CHANGELOG=[
  {v:'6.17', d:'2026-10-18', t:'Past events, paying for a friend, two parents, the right ball', items:[
    '<b>Fix: a client could still take a place at an event that had already happened.</b> A place was taken on a 19 September session on 17 October. The lists were filtered by date, but filtering a list is not the same as refusing the action, and a screen can be minutes or days old — a tab left open, a phone waking up, a link kept in a message. Registering, answering yes in the app, and the one-tap link in an email are all refused now, at the one gate underneath all three.',
@@ -16450,9 +16450,18 @@ let rxJumpToTop=false, rxRenderDepth=0;
            into, so the caret lands on <body> and only the FIRST character arrives. Remember which
            field had focus and where the caret was, and put it back. Keyed by id, else placeholder,
            else position among the view's fields — the elements are rebuilt and have no identity
-           of their own. */
+           of their own.
+
+           NOT a field inside a dialog. Closing a modal does not blur it, so after saving a session
+           or an event the last field you typed in was still the active element. It was then matched
+           against the MAIN view by position, and focusing that unrelated field scrolled the page to
+           wherever it happened to sit — usually the top. That is the "editing anything throws me
+           back to the top" bug: the scroll was restored correctly a moment earlier and then thrown
+           away by the focus. A dialog's field is a different context and never needs restoring —
+           the dialog is gone. */
         const a=document.activeElement;
-        if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')&&!a.readOnly&&!a.disabled){
+        const inModal=!!(a&&a.closest&&a.closest('#modal'));
+        if(a&&!inModal&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')&&!a.readOnly&&!a.disabled){
           const all=[...document.querySelectorAll('input,textarea')];
           let st=null,en=null;
           try{ st=a.selectionStart; en=a.selectionEnd; }catch(e){}   // throws on number/email inputs
@@ -16474,11 +16483,17 @@ let rxJumpToTop=false, rxRenderDepth=0;
         if(foc){
           const cur=document.activeElement;
           if(!cur||cur===document.body||cur===document.documentElement){
-            const all=[...document.querySelectorAll('input,textarea')];
+            const all=[...document.querySelectorAll('input,textarea')].filter(e=>!(e.closest&&e.closest('#modal')));
             const el=(foc.id&&document.getElementById(foc.id))
                   || (foc.ph&&all.find(e=>e.getAttribute('placeholder')===foc.ph))
                   || (foc.i>=0?all[foc.i]:null);
-            if(el){ el.focus(); try{ if(foc.st!=null)el.setSelectionRange(foc.st,foc.en); }catch(e){} }
+            /* preventScroll, always. Putting a caret back is a courtesy; moving the page out from
+               under the reader to do it is not. Without it the browser scrolls the field into
+               view and undoes the scroll restore two lines above. */
+            if(el&&!(el.closest&&el.closest('#modal'))){
+              try{ el.focus({preventScroll:true}); }catch(e){ el.focus(); }
+              try{ if(foc.st!=null)el.setSelectionRange(foc.st,foc.en); }catch(e){}
+            }
           }
         }
       }catch(e){} };
