@@ -6377,7 +6377,7 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
    does, and several entries below exist because a bug was found in production. When you ship a
    change, add an entry here rather than relying on memory.
    ============================================================================ */
-const BUILD='2026-10-18 16:05 UTC';
+const BUILD='2026-11-06 03:31 UTC';
 const CHANGELOG=[
  {v:'6.17', d:'2026-10-18', t:'Past events, paying for a friend, two parents, the right ball', items:[
    '<b>Fix: a client could still take a place at an event that had already happened.</b> A place was taken on a 19 September session on 17 October. The lists were filtered by date, but filtering a list is not the same as refusing the action, and a screen can be minutes or days old — a tab left open, a phone waking up, a link kept in a message. Registering, answering yes in the app, and the one-tap link in an email are all refused now, at the one gate underneath all three.',
@@ -16418,17 +16418,30 @@ window.addEventListener('resize',()=>{if(AUTH==='owner'&&['finance','pl','bookin
 
    Tables are keyed by their position in the view rather than by id, because they are rebuilt from
    scratch and have no stable identity. Same page, same order — good enough, and wrong only if the
-   number of tables changes, in which case starting at 0 is the right answer anyway. */
-let rxJumpToTop=false;
+   number of tables changes, in which case starting at 0 is the right answer anyway.
+
+   ONLY THE OUTERMOST RENDER OWNS THE SCROLL.
+   Renderers call each other: renderBooking -> renderBookingOwner -> renderBookingTable, and all
+   three are wrapped. The inner two used to take their own reading of the scroll position — but by
+   then the outer one had already replaced the view's innerHTML, the page had briefly collapsed to
+   a fraction of its height, and the browser had clamped the scroll to fit. So they captured 0,
+   and because they were scheduled last, their 0 was the one that stuck.
+   That is why editing anything from a LONG list threw you back to the top while a short list
+   looked fine: a short list was never scrolled far enough for the clamp to matter. A depth count
+   makes the nested calls pass straight through and leaves the outermost one in charge. */
+let rxJumpToTop=false, rxRenderDepth=0;
 (function(){
   const NAMES=['renderCustomers','renderCoaches','renderBooking','renderBookingOwner','renderBookingTable',
     'renderAvailability','renderFinance','renderPL','renderEvents','renderEventsOwner','renderAdmin',
-    'renderMessages','renderActivity','renderSkills','renderMoney','renderLocations','renderApprovals'];
+    'renderMessages','renderActivity','renderSkills','renderMoney','renderLocations','renderApprovals',
+    /* client-facing views that were never wrapped at all, so they jumped unconditionally */
+    'renderPast','renderJourney','renderAbout'];
   NAMES.forEach(n=>{
     const fn=window[n];
     if(typeof fn!=='function')return;
     window[n]=function(){
       if(rxJumpToTop) return fn.apply(this,arguments);          // tab change: let it start at the top
+      if(rxRenderDepth>0) return fn.apply(this,arguments);      // nested: the outer call owns it
       let y=0, cols=[], foc=null;
       try{
         y=window.scrollY||window.pageYOffset||0;
@@ -16446,7 +16459,11 @@ let rxJumpToTop=false;
           foc={id:a.id||'',ph:a.getAttribute('placeholder')||'',i:all.indexOf(a),st:st,en:en};
         }
       }catch(e){}
-      const out=fn.apply(this,arguments);
+      let out;
+      rxRenderDepth++;
+      // finally, so a throw inside a render cannot leave the counter stuck above zero and
+      // silently disable scroll restoration for the rest of the session
+      try{ out=fn.apply(this,arguments); } finally { rxRenderDepth--; }
       const put=()=>{ try{
         if(y)window.scrollTo(0,y);
         document.querySelectorAll('.tblscroll').forEach((e,i)=>{
